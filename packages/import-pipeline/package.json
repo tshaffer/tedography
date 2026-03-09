@@ -1,0 +1,20 @@
+{
+  "name": "@tedography/import-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "lint": "echo 'lint not configured yet'"
+  },
+  "dependencies": {
+    "@tedography/domain": "workspace:*",
+    "@tedography/media-metadata": "workspace:*",
+    "@tedography/shared": "workspace:*"
+  }
+}
