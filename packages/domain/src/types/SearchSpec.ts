@@ -1,4 +1,4 @@
-import { PhotoState } from '../enums/PhotoState';
+import { PhotoState } from '../enums/PhotoState.js';
 
 export interface SearchSpec {
   photoStates?: PhotoState[];

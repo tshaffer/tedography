@@ -3,21 +3,16 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {
   mode: "development",
-
-  entry: "./src/main.tsx",
-
-  devtool: "inline-source-map",
-
+  entry: path.resolve(__dirname, "src/main.tsx"),
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: "bundle.js",
-    clean: true
+    clean: true,
+    publicPath: "/"
   },
-
   resolve: {
-    extensions: [".ts", ".tsx", ".js"]
+    extensions: [".tsx", ".ts", ".js"]
   },
-
   module: {
     rules: [
       {
@@ -27,19 +22,24 @@ module.exports = {
       }
     ]
   },
-
   plugins: [
     new HtmlWebpackPlugin({
-      template: "./index.html"
+      template: path.resolve(__dirname, "index.html")
     })
   ],
-
+  devtool: "source-map",
   devServer: {
-    static: {
-      directory: path.join(__dirname, "dist")
-    },
     port: 3000,
     hot: true,
-    historyApiFallback: true
+    historyApiFallback: true,
+    static: {
+      directory: path.resolve(__dirname, "dist")
+    },
+    proxy: [
+      {
+        context: ["/api"],
+        target: "http://localhost:4000"
+      }
+    ]
   }
 };

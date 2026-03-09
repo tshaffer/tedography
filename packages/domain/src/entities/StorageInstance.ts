@@ -1,4 +1,4 @@
-import { StorageRole } from '../enums/StorageRole';
+import { StorageRole } from '../enums/StorageRole.js';
 
 export interface StorageInstance {
   id: string;

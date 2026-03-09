@@ -1,5 +1,5 @@
-import { MediaType } from '../enums/MediaType';
-import { PhotoState } from '../enums/PhotoState';
+import { MediaType } from '../enums/MediaType.js';
+import { PhotoState } from '../enums/PhotoState.js';
 
 export interface MediaAsset {
   id: string;

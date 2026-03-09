@@ -1,4 +1,4 @@
-import { AssetEventType } from '../enums/AssetEventType';
+import { AssetEventType } from '../enums/AssetEventType.js';
 
 export interface AssetEvent {
   id: string;

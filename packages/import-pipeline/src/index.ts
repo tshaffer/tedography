@@ -1,2 +1,2 @@
-export * from './hashFile';
-export * from './importAsset';
+export * from './hashFile.js';
+export * from './importAsset.js';

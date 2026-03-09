@@ -6,3 +6,18 @@ node_modules
 dist
 coverage
 *.log
+
+# TypeScript build artifacts
+*.tsbuildinfo
+
+# compiled JS
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+
+# build output
+dist/
+
+# macOS
+.DS_Store

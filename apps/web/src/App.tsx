@@ -1,17 +1,25 @@
-import { CssBaseline, Container, Typography } from '@mui/material';
+import { useEffect, useState } from "react";
 
 export default function App() {
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data.status === "string") {
+          setStatus(data.status);
+          return;
+        }
+        setStatus(data.ok ? "ok" : "error");
+      })
+      .catch(() => setStatus("error"));
+  }, []);
+
   return (
-    <>
-      <CssBaseline />
-      <Container sx={{ py: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Tedography
-        </Typography>
-        <Typography>
-          Repo bootstrap successful.
-        </Typography>
-      </Container>
-    </>
+    <div>
+      <h1>Tedography</h1>
+      <p>API status: {status}</p>
+    </div>
   );
 }

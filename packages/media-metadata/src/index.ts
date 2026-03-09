@@ -1,1 +1,1 @@
-export * from './extractMetadata';
+export * from './extractMetadata.js';

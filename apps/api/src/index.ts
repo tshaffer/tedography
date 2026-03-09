@@ -1,8 +1,10 @@
 import { createServer } from './server.js';
 
-const port = Number(process.env.PORT ?? 4000);
 const app = createServer();
+const port = Number(process.env.PORT ?? 4000);
 
-app.listen(port, () => {
-  console.log(`Tedography API listening on port ${port}`);
+const server = app.listen(port, () => {
+  console.log(`[src] Tedography API running on http://localhost:${port}`);
 });
+
+void server;

@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/media-metadata" },
+    { "path": "./packages/import-pipeline" },
+    { "path": "./apps/api" },
+    { "path": "./apps/web" }
+  ]
+}
