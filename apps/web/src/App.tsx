@@ -151,6 +151,19 @@ function formatCaptureDate(dateString: string): string {
   return parsed.toLocaleString();
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    return true;
+  }
+
+  return target.isContentEditable;
+}
+
 type AssetCardProps = {
   asset: MediaAsset;
   isSelected: boolean;
@@ -431,6 +444,17 @@ export default function App() {
     }
   }
 
+  function handleSelectAbsolute(position: 'first' | 'last'): void {
+    if (filteredAssets.length === 0) {
+      return;
+    }
+
+    const nextAsset = position === 'first' ? filteredAssets[0] : filteredAssets[filteredAssets.length - 1];
+    if (nextAsset) {
+      setSelectedAssetId(nextAsset.id);
+    }
+  }
+
   function openLoupe(): void {
     if (!selectedAsset) {
       return;
@@ -439,8 +463,38 @@ export default function App() {
     setLoupeOpen(true);
   }
 
+  async function handleKeyboardReview(shortcutKey: string): Promise<void> {
+    if (!selectedAsset || updatingAssetIds[selectedAsset.id] === true) {
+      return;
+    }
+
+    const key = shortcutKey.toLowerCase();
+    if (key === 's') {
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Select);
+      return;
+    }
+
+    if (key === 'p') {
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Pending);
+      return;
+    }
+
+    if (key === 'r') {
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Reject);
+      return;
+    }
+
+    if (key === 'u') {
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Unreviewed);
+    }
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
       if (event.key === 'Escape' && loupeOpen) {
         setLoupeOpen(false);
         return;
@@ -460,23 +514,41 @@ export default function App() {
           event.preventDefault();
           handleSelectRelative(-1);
         }
-        return;
+      } else {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          handleSelectRelative(1);
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          handleSelectRelative(-1);
+        }
+
+        if (event.key === 'Home') {
+          event.preventDefault();
+          handleSelectAbsolute('first');
+        }
+
+        if (event.key === 'End') {
+          event.preventDefault();
+          handleSelectAbsolute('last');
+        }
+
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openLoupe();
+        }
       }
 
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-        handleSelectRelative(1);
-      }
-
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-        handleSelectRelative(-1);
-      }
+      void handleKeyboardReview(event.key);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredAssets, loupeOpen, selectedAssetId]);
+  }, [filteredAssets, loupeOpen, selectedAsset, selectedAssetId, updatingAssetIds]);
 
   return (
     <div style={pageStyle}>
@@ -497,6 +569,9 @@ export default function App() {
           ))}
         </select>
       </div>
+      <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
+        Keyboard: arrows navigate, Home/End jump, Enter/Space loupe, S/P/R/U review.
+      </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
