@@ -21,3 +21,5 @@ dist/
 
 # macOS
 .DS_Store
+
+mock-media

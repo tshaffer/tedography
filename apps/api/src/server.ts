@@ -1,6 +1,12 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const mockMediaDir = path.resolve(__dirname, '../mock-media');
 
 const mockAssets: MediaAsset[] = [
   {
@@ -9,9 +15,9 @@ const mockAssets: MediaAsset[] = [
     mediaType: MediaType.Photo,
     photoState: PhotoState.Unreviewed,
     captureDateTime: '2025-08-17T15:24:00.000Z',
-    thumbnailUrl: 'https://picsum.photos/id/1025/480/320',
-    width: 6000,
-    height: 4000
+    thumbnailUrl: '/media/IMG_3284.JPG',
+    width: 4032,
+    height: 3024
   },
   {
     id: 'asset-2',
@@ -19,9 +25,9 @@ const mockAssets: MediaAsset[] = [
     mediaType: MediaType.Photo,
     photoState: PhotoState.Pending,
     captureDateTime: '2025-08-17T15:31:00.000Z',
-    thumbnailUrl: 'https://picsum.photos/id/1036/480/320',
-    width: 6016,
-    height: 4016
+    thumbnailUrl: '/media/IMG_3285.JPG',
+    width: 4032,
+    height: 3024
   },
   {
     id: 'asset-3',
@@ -29,9 +35,9 @@ const mockAssets: MediaAsset[] = [
     mediaType: MediaType.Photo,
     photoState: PhotoState.Select,
     captureDateTime: '2025-08-17T15:44:00.000Z',
-    thumbnailUrl: 'https://picsum.photos/id/1043/480/320',
-    width: 6048,
-    height: 4024
+    thumbnailUrl: '/media/IMG_3286.JPG',
+    width: 4032,
+    height: 3024
   },
   {
     id: 'asset-4',
@@ -39,9 +45,9 @@ const mockAssets: MediaAsset[] = [
     mediaType: MediaType.Video,
     photoState: PhotoState.Reject,
     captureDateTime: '2025-08-17T16:02:00.000Z',
-    thumbnailUrl: 'https://picsum.photos/id/1069/480/320',
-    width: 3840,
-    height: 2160
+    thumbnailUrl: '/media/IMG_3287.JPG',
+    width: 3024,
+    height: 5032
   },
   {
     id: 'asset-5',
@@ -49,9 +55,9 @@ const mockAssets: MediaAsset[] = [
     mediaType: MediaType.Photo,
     photoState: PhotoState.Select,
     captureDateTime: '2025-09-03T19:18:00.000Z',
-    thumbnailUrl: 'https://picsum.photos/id/1074/480/320',
-    width: 5472,
-    height: 3648
+    thumbnailUrl: '/media/IMG_3321.PNG',
+    width: 1206,
+    height: 2622
   }
 ];
 
@@ -73,6 +79,7 @@ export function createServer(): Express {
 
   app.use(cors());
   app.use(express.json());
+  app.use('/media', express.static(mockMediaDir));
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.
