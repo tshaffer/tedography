@@ -211,6 +211,16 @@ const surveyFocusedTileStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(77, 163, 255, 0.2)'
 };
 
+const surveySelectTileStyle: CSSProperties = {
+  borderColor: '#1f8f4d',
+  backgroundColor: '#132217'
+};
+
+const surveyRejectTileStyle: CSSProperties = {
+  opacity: 0.45,
+  filter: 'grayscale(35%)'
+};
+
 const surveyImageStyle: CSSProperties = {
   width: '100%',
   aspectRatio: '3 / 2',
@@ -454,6 +464,7 @@ type SurveyModeProps = {
   isUpdating: boolean;
   onClose: () => void;
   onFocusAsset: (assetId: string) => void;
+  onKeepFocusedRejectOthers: () => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
@@ -464,6 +475,7 @@ function SurveyMode({
   isUpdating,
   onClose,
   onFocusAsset,
+  onKeepFocusedRejectOthers,
   onSetPhotoState
 }: SurveyModeProps) {
   return (
@@ -492,6 +504,9 @@ function SurveyMode({
             <strong>Captured:</strong> {formatCaptureDate(focusedAsset.captureDateTime)}
           </p>
           <div style={actionsStyle}>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedRejectOthers}>
+              Keep Focused (K)
+            </button>
             {reviewActions.map((state) => (
               <button
                 key={state}
@@ -504,17 +519,21 @@ function SurveyMode({
               </button>
             ))}
           </div>
+          <p style={{ color: '#b8b8b8', fontSize: '12px', marginTop: '8px' }}>
+            Survey shortcuts: S/P/R/U review focused, K keep focused and reject others.
+          </p>
         </div>
 
         <div style={surveyGridStyle}>
           {assets.map((asset) => (
             <article
               key={asset.id}
-              style={
-                asset.id === focusedAsset.id
-                  ? { ...surveyTileStyle, ...surveyFocusedTileStyle }
-                  : surveyTileStyle
-              }
+              style={{
+                ...surveyTileStyle,
+                ...(asset.photoState === PhotoState.Select ? surveySelectTileStyle : {}),
+                ...(asset.photoState === PhotoState.Reject ? surveyRejectTileStyle : {}),
+                ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
+              }}
               onClick={() => onFocusAsset(asset.id)}
             >
               {asset.thumbnailUrl ? (
@@ -767,6 +786,20 @@ export default function App() {
     }
   }
 
+  async function handleSurveyKeepFocusedRejectOthers(): Promise<void> {
+    if (!selectedAssetId || compareAssets.length < 2) {
+      return;
+    }
+
+    for (const asset of compareAssets) {
+      if (asset.id === selectedAssetId) {
+        await handleSetPhotoState(asset.id, PhotoState.Select);
+      } else {
+        await handleSetPhotoState(asset.id, PhotoState.Reject);
+      }
+    }
+  }
+
   function handleCardClick(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
     const isToggleSelection = event.metaKey || event.ctrlKey;
 
@@ -820,6 +853,12 @@ export default function App() {
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           handleSelectRelativeInList(compareAssets, -1);
+        }
+
+        if (event.key.toLowerCase() === 'k') {
+          event.preventDefault();
+          void handleSurveyKeepFocusedRejectOthers();
+          return;
         }
 
         void handleKeyboardReview(event.key);
@@ -974,6 +1013,7 @@ export default function App() {
           isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
           onClose={() => setSurveyOpen(false)}
           onFocusAsset={setSelectedAssetId}
+          onKeepFocusedRejectOthers={() => void handleSurveyKeepFocusedRejectOthers()}
           onSetPhotoState={handleSetPhotoState}
         />
       ) : null}
