@@ -1,4 +1,5 @@
 import { mockAssets } from './data/mockAssets.js';
+import { log } from './logger.js';
 import { MediaAssetModel } from './models/mediaAssetModel.js';
 
 export async function seedMediaAssetsIfEmpty(): Promise<void> {
@@ -8,5 +9,5 @@ export async function seedMediaAssetsIfEmpty(): Promise<void> {
   }
 
   await MediaAssetModel.insertMany(mockAssets);
-  console.log(`[src] Seeded ${mockAssets.length} mediaAssets records`);
+  log.info(`Seeded ${mockAssets.length} mediaAssets records`);
 }

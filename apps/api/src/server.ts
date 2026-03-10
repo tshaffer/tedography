@@ -3,6 +3,7 @@ import express, { type Express } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { log } from './logger.js';
 import { MediaAssetModel } from './models/mediaAssetModel.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,7 +32,7 @@ export function createServer(): Express {
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.
-    console.log('[src] Health check received');
+    log.info('Health check received');
     res.json({ ok: true, status: 'ok', service: 'tedography-api' });
   });
 
@@ -40,7 +41,7 @@ export function createServer(): Express {
       const assets = await MediaAssetModel.find({}, { _id: 0 }).sort({ id: 1 }).lean<MediaAsset[]>();
       res.json(assets);
     } catch (error) {
-      console.error('[src] Failed to read assets', error);
+      log.error('Failed to read assets', error);
       res.status(500).json({ error: 'Failed to load assets' });
     }
   });
@@ -66,7 +67,7 @@ export function createServer(): Express {
 
       res.json(updatedAsset);
     } catch (error) {
-      console.error('[src] Failed to update asset photoState', error);
+      log.error('Failed to update asset photoState', error);
       res.status(500).json({ error: 'Failed to update asset' });
     }
   });
