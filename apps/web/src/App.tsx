@@ -100,39 +100,74 @@ const detailImageStyle: CSSProperties = {
   marginBottom: '10px'
 };
 
-const loupeButtonStyle: CSSProperties = {
+const immersiveButtonStyle: CSSProperties = {
   ...actionButtonStyle,
   marginTop: '4px'
 };
 
-const loupeOverlayStyle: CSSProperties = {
+const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  backgroundColor: 'rgba(0, 0, 0, 0.92)',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '20px',
+  flexDirection: 'column',
+  padding: '12px',
   zIndex: 1000
 };
 
-const loupeModalStyle: CSSProperties = {
-  backgroundColor: '#fff',
-  borderRadius: '10px',
-  maxWidth: '900px',
+const immersiveTopBarStyle: CSSProperties = {
   width: '100%',
-  maxHeight: '92vh',
-  overflow: 'auto',
-  padding: '14px'
+  color: '#f5f5f5',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '10px',
+  paddingBottom: '10px'
 };
 
-const loupeImageStyle: CSSProperties = {
+const immersiveInfoStyle: CSSProperties = {
+  display: 'grid',
+  gap: '2px'
+};
+
+const immersiveControlsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px'
+};
+
+const immersiveControlButtonStyle: CSSProperties = {
+  backgroundColor: '#1f1f1f',
+  border: '1px solid #515151',
+  color: '#f3f3f3',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  padding: '6px 10px'
+};
+
+const immersiveImageWrapStyle: CSSProperties = {
+  flex: 1,
   width: '100%',
-  maxHeight: '65vh',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const immersiveImageStyle: CSSProperties = {
+  width: '100%',
+  maxWidth: '96vw',
+  maxHeight: '78vh',
   objectFit: 'contain',
-  backgroundColor: '#eee',
+  backgroundColor: '#111',
   borderRadius: '8px',
-  border: '1px solid #ddd'
+  border: '1px solid #2b2b2b'
+};
+
+const immersiveBottomHintStyle: CSSProperties = {
+  color: '#a9a9a9',
+  fontSize: '12px',
+  marginTop: '8px'
 };
 
 const reviewActions: PhotoState[] = [
@@ -210,11 +245,16 @@ function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }:
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
   isUpdating: boolean;
-  onOpenLoupe: () => void;
+  onOpenImmersive: () => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
-function AssetDetailPanel({ asset, isUpdating, onOpenLoupe, onSetPhotoState }: AssetDetailPanelProps) {
+function AssetDetailPanel({
+  asset,
+  isUpdating,
+  onOpenImmersive,
+  onSetPhotoState
+}: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
   }
@@ -241,8 +281,8 @@ function AssetDetailPanel({ asset, isUpdating, onOpenLoupe, onSetPhotoState }: A
         <strong>Dimensions:</strong>{' '}
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
-      <button type="button" style={loupeButtonStyle} onClick={onOpenLoupe}>
-        Loupe
+      <button type="button" style={immersiveButtonStyle} onClick={onOpenImmersive}>
+        Immersive
       </button>
       <div style={actionsStyle}>
         {reviewActions.map((state) => (
@@ -261,8 +301,10 @@ function AssetDetailPanel({ asset, isUpdating, onOpenLoupe, onSetPhotoState }: A
   );
 }
 
-type LoupeModalProps = {
+type ImmersiveViewerProps = {
   asset: MediaAsset;
+  index: number;
+  total: number;
   hasPrevious: boolean;
   hasNext: boolean;
   onClose: () => void;
@@ -270,33 +312,57 @@ type LoupeModalProps = {
   onNext: () => void;
 };
 
-function LoupeModal({ asset, hasPrevious, hasNext, onClose, onPrevious, onNext }: LoupeModalProps) {
+function ImmersiveViewer({
+  asset,
+  index,
+  total,
+  hasPrevious,
+  hasNext,
+  onClose,
+  onPrevious,
+  onNext
+}: ImmersiveViewerProps) {
   return (
-    <div style={loupeOverlayStyle} onClick={onClose}>
-      <section style={loupeModalStyle} onClick={(event) => event.stopPropagation()}>
-        <div style={{ ...actionsStyle, marginTop: 0, marginBottom: '10px' }}>
-          <button type="button" style={actionButtonStyle} onClick={onClose}>
-            Close
-          </button>
-          <button type="button" style={actionButtonStyle} onClick={onPrevious} disabled={!hasPrevious}>
-            Previous
-          </button>
-          <button type="button" style={actionButtonStyle} onClick={onNext} disabled={!hasNext}>
-            Next
-          </button>
+    <div style={immersiveOverlayStyle} onClick={onClose}>
+      <section style={{ width: '100%', height: '100%' }} onClick={(event) => event.stopPropagation()}>
+        <div style={immersiveTopBarStyle}>
+          <div style={immersiveInfoStyle}>
+            <strong>{asset.filename}</strong>
+            <span>
+              {asset.photoState} | {asset.mediaType} | {index + 1} / {total}
+            </span>
+            <span>{formatCaptureDate(asset.captureDateTime)}</span>
+          </div>
+          <div style={immersiveControlsStyle}>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onClose}>
+              Close
+            </button>
+            <button
+              type="button"
+              style={immersiveControlButtonStyle}
+              onClick={onPrevious}
+              disabled={!hasPrevious}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              style={immersiveControlButtonStyle}
+              onClick={onNext}
+              disabled={!hasNext}
+            >
+              Next
+            </button>
+          </div>
         </div>
-        {asset.thumbnailUrl ? (
-          <img src={asset.thumbnailUrl} alt={asset.filename} style={loupeImageStyle} />
-        ) : (
-          <div style={loupeImageStyle} />
-        )}
-        <p>
-          <strong>{asset.filename}</strong>
-        </p>
-        <p>
-          {asset.photoState} | {asset.mediaType}
-        </p>
-        <p>{formatCaptureDate(asset.captureDateTime)}</p>
+        <div style={immersiveImageWrapStyle}>
+          {asset.thumbnailUrl ? (
+            <img src={asset.thumbnailUrl} alt={asset.filename} style={immersiveImageStyle} />
+          ) : (
+            <div style={immersiveImageStyle} />
+          )}
+        </div>
+        <p style={immersiveBottomHintStyle}>Keyboard: Left/Right navigate, Escape close, S/P/R/U review.</p>
       </section>
     </div>
   );
@@ -311,7 +377,7 @@ export default function App() {
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [loupeOpen, setLoupeOpen] = useState(false);
+  const [immersiveOpen, setImmersiveOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
@@ -382,10 +448,10 @@ export default function App() {
   }, [filteredAssets, selectedAssetId]);
 
   useEffect(() => {
-    if (loupeOpen && !selectedAsset) {
-      setLoupeOpen(false);
+    if (immersiveOpen && !selectedAsset) {
+      setImmersiveOpen(false);
     }
-  }, [loupeOpen, selectedAsset]);
+  }, [immersiveOpen, selectedAsset]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
@@ -449,18 +515,19 @@ export default function App() {
       return;
     }
 
-    const nextAsset = position === 'first' ? filteredAssets[0] : filteredAssets[filteredAssets.length - 1];
+    const nextAsset =
+      position === 'first' ? filteredAssets[0] : filteredAssets[filteredAssets.length - 1];
     if (nextAsset) {
       setSelectedAssetId(nextAsset.id);
     }
   }
 
-  function openLoupe(): void {
+  function openImmersive(): void {
     if (!selectedAsset) {
       return;
     }
 
-    setLoupeOpen(true);
+    setImmersiveOpen(true);
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -495,8 +562,8 @@ export default function App() {
         return;
       }
 
-      if (event.key === 'Escape' && loupeOpen) {
-        setLoupeOpen(false);
+      if (event.key === 'Escape' && immersiveOpen) {
+        setImmersiveOpen(false);
         return;
       }
 
@@ -504,7 +571,7 @@ export default function App() {
         return;
       }
 
-      if (loupeOpen) {
+      if (immersiveOpen) {
         if (event.key === 'ArrowRight') {
           event.preventDefault();
           handleSelectRelative(1);
@@ -537,7 +604,7 @@ export default function App() {
 
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          openLoupe();
+          openImmersive();
         }
       }
 
@@ -548,7 +615,7 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredAssets, loupeOpen, selectedAsset, selectedAssetId, updatingAssetIds]);
+  }, [filteredAssets, immersiveOpen, selectedAsset, selectedAssetId, updatingAssetIds]);
 
   return (
     <div style={pageStyle}>
@@ -570,7 +637,7 @@ export default function App() {
         </select>
       </div>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
-        Keyboard: arrows navigate, Home/End jump, Enter/Space loupe, S/P/R/U review.
+        Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review.
       </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -582,7 +649,7 @@ export default function App() {
             <AssetDetailPanel
               asset={selectedAsset}
               isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
-              onOpenLoupe={openLoupe}
+              onOpenImmersive={openImmersive}
               onSetPhotoState={handleSetPhotoState}
             />
             <div style={gridStyle}>
@@ -603,19 +670,21 @@ export default function App() {
             <AssetDetailPanel
               asset={null}
               isUpdating={false}
-              onOpenLoupe={openLoupe}
+              onOpenImmersive={openImmersive}
               onSetPhotoState={handleSetPhotoState}
             />
             <p>No assets match this filter.</p>
           </>
         )
       ) : null}
-      {loupeOpen && selectedAsset ? (
-        <LoupeModal
+      {immersiveOpen && selectedAsset ? (
+        <ImmersiveViewer
           asset={selectedAsset}
+          index={selectedAssetIndex}
+          total={filteredAssets.length}
           hasPrevious={selectedAssetIndex > 0}
           hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < filteredAssets.length - 1}
-          onClose={() => setLoupeOpen(false)}
+          onClose={() => setImmersiveOpen(false)}
           onPrevious={() => handleSelectRelative(-1)}
           onNext={() => handleSelectRelative(1)}
         />
