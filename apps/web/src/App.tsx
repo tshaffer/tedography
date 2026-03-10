@@ -607,10 +607,20 @@ function SurveyMode({
 }
 
 export default function App() {
+  type ImportSummary = {
+    scanned: number;
+    imported: number;
+    updated: number;
+    unchanged: number;
+  };
+
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
@@ -632,27 +642,34 @@ export default function App() {
       .catch(() => setHealthStatus('error'));
   }, []);
 
+  async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
+    if (options?.showLoading ?? true) {
+      setAssetsLoading(true);
+    }
+
+    setAssetsError(null);
+
+    try {
+      const response = await fetch('/api/assets');
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as MediaAsset[];
+      setAssets(data);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setAssetsError(error.message);
+        return;
+      }
+      setAssetsError('Unknown error');
+    } finally {
+      setAssetsLoading(false);
+    }
+  }
+
   useEffect(() => {
-    fetch('/api/assets')
-      .then((r) => {
-        if (!r.ok) {
-          throw new Error(`Request failed with status ${r.status}`);
-        }
-        return r.json() as Promise<MediaAsset[]>;
-      })
-      .then((data) => {
-        setAssets(data);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof Error) {
-          setAssetsError(error.message);
-          return;
-        }
-        setAssetsError('Unknown error');
-      })
-      .finally(() => {
-        setAssetsLoading(false);
-      });
+    void loadAssets({ showLoading: true });
   }, []);
 
   const filteredAssets = useMemo(() => {
@@ -813,6 +830,39 @@ export default function App() {
 
     setImmersiveOpen(false);
     setSurveyOpen(true);
+  }
+
+  async function handleImportLocalFolder(): Promise<void> {
+    setImportLoading(true);
+    setImportError(null);
+    setImportMessage(null);
+
+    try {
+      const response = await fetch('/api/import/local', { method: 'POST' });
+      const payload = (await response.json()) as ImportSummary | { error?: string };
+
+      if (!response.ok) {
+        const message =
+          typeof payload === 'object' && payload !== null && 'error' in payload && payload.error
+            ? payload.error
+            : `Request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+
+      const summary = payload as ImportSummary;
+      setImportMessage(
+        `Import complete: scanned ${summary.scanned}, imported ${summary.imported}, updated ${summary.updated}, unchanged ${summary.unchanged}.`
+      );
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setImportError(error.message);
+      } else {
+        setImportError('Failed to import local folder');
+      }
+    } finally {
+      setImportLoading(false);
+    }
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -1049,11 +1099,21 @@ export default function App() {
         >
           Survey ({compareAssets.length})
         </button>
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={() => void handleImportLocalFolder()}
+          disabled={importLoading}
+        >
+          {importLoading ? 'Importing…' : 'Import Local Folder'}
+        </button>
       </div>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click
         to multi-select.
       </p>
+      {importMessage ? <p>{importMessage}</p> : null}
+      {importError ? <p>Import failed: {importError}</p> : null}
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
