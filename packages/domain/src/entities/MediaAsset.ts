@@ -3,11 +3,8 @@ import { PhotoState } from '../enums/PhotoState.js';
 
 export interface MediaAsset {
   id: string;
-  contentHash: string;
+  filename: string;
   mediaType: MediaType;
-  captureDateTime?: string;
   photoState: PhotoState;
-  pendingGroupId?: string;
-  albumIds: string[];
-  peopleIds: string[];
+  captureDateTime: string;
 }
