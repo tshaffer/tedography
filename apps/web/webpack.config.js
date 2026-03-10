@@ -37,7 +37,7 @@ module.exports = {
     },
     proxy: [
       {
-        context: ["/api", "/media"],
+        context: ["/api", "/media", "/import-media"],
         target: "http://localhost:4000"
       }
     ]
