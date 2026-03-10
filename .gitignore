@@ -23,3 +23,5 @@ dist/
 .DS_Store
 
 mock-media
+
+apps/api/.env

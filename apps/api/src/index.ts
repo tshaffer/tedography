@@ -1,6 +1,7 @@
+import 'dotenv/config';
+import { createServer } from './server.js';
 import { connectToMongo } from './db.js';
 import { seedMediaAssetsIfEmpty } from './seedMediaAssets.js';
-import { createServer } from './server.js';
 
 async function main(): Promise<void> {
   await connectToMongo();
