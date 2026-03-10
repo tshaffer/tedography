@@ -1,23 +1,16 @@
-import 'dotenv/config';
 import { createServer } from './server.js';
 import { connectToMongo } from './db.js';
 import { seedMediaAssetsIfEmpty } from './seedMediaAssets.js';
+import { config } from './config.js';
 
-async function main(): Promise<void> {
-  await connectToMongo();
-  await seedMediaAssetsIfEmpty();
+await connectToMongo();
 
-  const app = createServer();
-  const port = Number(process.env.PORT ?? 4000);
+await seedMediaAssetsIfEmpty();
 
-  const server = app.listen(port, () => {
-    console.log(`[src] Tedography API running on http://localhost:${port}`);
-  });
+const app = createServer();
 
-  void server;
-}
-
-void main().catch((error: unknown) => {
-  console.error('[src] Failed to start API', error);
-  process.exit(1);
+const server = app.listen(config.port, () => {
+  console.log(`[src] Tedography API running on http://localhost:${config.port}`);
 });
+
+void server;

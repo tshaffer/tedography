@@ -1,15 +1,8 @@
 import mongoose from 'mongoose';
+import { config } from './config.js';
 
 export async function connectToMongo(): Promise<void> {
-  const mongoUri = process.env.MONGODB_URI;
+  await mongoose.connect(config.mongoUri);
 
-  if (!mongoUri) {
-    throw new Error(
-      'MONGODB_URI environment variable is not set. Please configure it in apps/api/.env'
-    );
-  }
-
-  await mongoose.connect(mongoUri);
-
-  console.log(`[src] Connected to MongoDB`);
+  console.log('[src] Connected to MongoDB');
 }
