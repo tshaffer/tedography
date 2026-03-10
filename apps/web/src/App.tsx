@@ -211,9 +211,14 @@ const surveyFocusedTileStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(77, 163, 255, 0.2)'
 };
 
-const surveySelectTileStyle: CSSProperties = {
+const surveyWinnerTileStyle: CSSProperties = {
   borderColor: '#1f8f4d',
   backgroundColor: '#132217'
+};
+
+const surveyAlternateTileStyle: CSSProperties = {
+  borderColor: '#8f7530',
+  backgroundColor: '#242013'
 };
 
 const surveyRejectTileStyle: CSSProperties = {
@@ -236,6 +241,11 @@ const surveyDetailStyle: CSSProperties = {
   backgroundColor: '#1a1a1a',
   padding: '10px',
   marginBottom: '12px'
+};
+
+const surveyRoleStyle: CSSProperties = {
+  fontSize: '12px',
+  margin: '4px 0 0 0'
 };
 
 const reviewActions: PhotoState[] = [
@@ -273,6 +283,22 @@ function arraysEqual(left: string[], right: string[]): boolean {
   }
 
   return left.every((id, index) => id === right[index]);
+}
+
+function compareRoleFromPhotoState(photoState: PhotoState): string {
+  if (photoState === PhotoState.Select) {
+    return 'Winner';
+  }
+
+  if (photoState === PhotoState.Pending) {
+    return 'Alternate';
+  }
+
+  if (photoState === PhotoState.Reject) {
+    return 'Reject';
+  }
+
+  return 'Unreviewed';
 }
 
 type AssetCardProps = {
@@ -464,6 +490,10 @@ type SurveyModeProps = {
   isUpdating: boolean;
   onClose: () => void;
   onFocusAsset: (assetId: string) => void;
+  onSetFocusedWinner: () => void;
+  onSetFocusedAlternate: () => void;
+  onSetFocusedReject: () => void;
+  onKeepFocusedAlternates: () => void;
   onKeepFocusedRejectOthers: () => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
@@ -475,6 +505,10 @@ function SurveyMode({
   isUpdating,
   onClose,
   onFocusAsset,
+  onSetFocusedWinner,
+  onSetFocusedAlternate,
+  onSetFocusedReject,
+  onKeepFocusedAlternates,
   onKeepFocusedRejectOthers,
   onSetPhotoState
 }: SurveyModeProps) {
@@ -498,15 +532,30 @@ function SurveyMode({
             <strong>Focused:</strong> {focusedAsset.filename}
           </p>
           <p>
+            <strong>Compare role:</strong> {compareRoleFromPhotoState(focusedAsset.photoState)} |{' '}
             <strong>State:</strong> {focusedAsset.photoState} | <strong>Type:</strong> {focusedAsset.mediaType}
           </p>
           <p>
             <strong>Captured:</strong> {formatCaptureDate(focusedAsset.captureDateTime)}
           </p>
           <div style={actionsStyle}>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedRejectOthers}>
-              Keep Focused (K)
+            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedWinner}>
+              Winner (W)
             </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedAlternate}>
+              Alternate (A)
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedReject}>
+              Reject (R)
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedAlternates}>
+              Winner + Alternates (K)
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedRejectOthers}>
+              Winner Only (Shift+K)
+            </button>
+          </div>
+          <div style={actionsStyle}>
             {reviewActions.map((state) => (
               <button
                 key={state}
@@ -520,7 +569,11 @@ function SurveyMode({
             ))}
           </div>
           <p style={{ color: '#b8b8b8', fontSize: '12px', marginTop: '8px' }}>
-            Survey shortcuts: S/P/R/U review focused, K keep focused and reject others.
+            Survey shortcuts: W winner, A alternate, R reject, K winner + alternates, Shift+K winner
+            only.
+          </p>
+          <p style={{ color: '#9f9f9f', fontSize: '12px', marginTop: '4px' }}>
+            Also available: S/P/R/U maps to Select/Pending/Reject/Unreviewed.
           </p>
         </div>
 
@@ -530,7 +583,8 @@ function SurveyMode({
               key={asset.id}
               style={{
                 ...surveyTileStyle,
-                ...(asset.photoState === PhotoState.Select ? surveySelectTileStyle : {}),
+                ...(asset.photoState === PhotoState.Select ? surveyWinnerTileStyle : {}),
+                ...(asset.photoState === PhotoState.Pending ? surveyAlternateTileStyle : {}),
                 ...(asset.photoState === PhotoState.Reject ? surveyRejectTileStyle : {}),
                 ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
               }}
@@ -543,6 +597,7 @@ function SurveyMode({
               )}
               <strong>{asset.filename}</strong>
               <p>{asset.photoState}</p>
+              <p style={surveyRoleStyle}>Role: {compareRoleFromPhotoState(asset.photoState)}</p>
             </article>
           ))}
         </div>
@@ -800,6 +855,28 @@ export default function App() {
     }
   }
 
+  async function handleSurveySetFocusedPhotoState(photoState: PhotoState): Promise<void> {
+    if (!selectedAssetId) {
+      return;
+    }
+
+    await handleSetPhotoState(selectedAssetId, photoState);
+  }
+
+  async function handleSurveyKeepFocusedAlternates(): Promise<void> {
+    if (!selectedAssetId || compareAssets.length < 2) {
+      return;
+    }
+
+    for (const asset of compareAssets) {
+      if (asset.id === selectedAssetId) {
+        await handleSetPhotoState(asset.id, PhotoState.Select);
+      } else {
+        await handleSetPhotoState(asset.id, PhotoState.Pending);
+      }
+    }
+  }
+
   function handleCardClick(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
     const isToggleSelection = event.metaKey || event.ctrlKey;
 
@@ -855,9 +932,33 @@ export default function App() {
           handleSelectRelativeInList(compareAssets, -1);
         }
 
-        if (event.key.toLowerCase() === 'k') {
+        if (event.key.toLowerCase() === 'w') {
+          event.preventDefault();
+          void handleSurveySetFocusedPhotoState(PhotoState.Select);
+          return;
+        }
+
+        if (event.key.toLowerCase() === 'a') {
+          event.preventDefault();
+          void handleSurveySetFocusedPhotoState(PhotoState.Pending);
+          return;
+        }
+
+        if (event.key.toLowerCase() === 'r') {
+          event.preventDefault();
+          void handleSurveySetFocusedPhotoState(PhotoState.Reject);
+          return;
+        }
+
+        if (event.key.toLowerCase() === 'k' && event.shiftKey) {
           event.preventDefault();
           void handleSurveyKeepFocusedRejectOthers();
+          return;
+        }
+
+        if (event.key.toLowerCase() === 'k') {
+          event.preventDefault();
+          void handleSurveyKeepFocusedAlternates();
           return;
         }
 
@@ -1013,6 +1114,10 @@ export default function App() {
           isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
           onClose={() => setSurveyOpen(false)}
           onFocusAsset={setSelectedAssetId}
+          onSetFocusedWinner={() => void handleSurveySetFocusedPhotoState(PhotoState.Select)}
+          onSetFocusedAlternate={() => void handleSurveySetFocusedPhotoState(PhotoState.Pending)}
+          onSetFocusedReject={() => void handleSurveySetFocusedPhotoState(PhotoState.Reject)}
+          onKeepFocusedAlternates={() => void handleSurveyKeepFocusedAlternates()}
           onKeepFocusedRejectOthers={() => void handleSurveyKeepFocusedRejectOthers()}
           onSetPhotoState={handleSetPhotoState}
         />
