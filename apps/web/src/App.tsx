@@ -52,6 +52,29 @@ const cardBodyStyle: CSSProperties = {
   padding: '10px'
 };
 
+const actionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
+  marginTop: '8px'
+};
+
+const actionButtonStyle: CSSProperties = {
+  backgroundColor: '#f4f4f4',
+  border: '1px solid #c8c8c8',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  padding: '4px 8px'
+};
+
+const reviewActions: PhotoState[] = [
+  PhotoState.Select,
+  PhotoState.Pending,
+  PhotoState.Reject,
+  PhotoState.Unreviewed
+];
+
 function formatCaptureDate(dateString: string): string {
   const parsed = new Date(dateString);
   if (Number.isNaN(parsed.getTime())) {
@@ -61,7 +84,13 @@ function formatCaptureDate(dateString: string): string {
   return parsed.toLocaleString();
 }
 
-function AssetCard({ asset }: { asset: MediaAsset }) {
+type AssetCardProps = {
+  asset: MediaAsset;
+  isUpdating: boolean;
+  onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
+};
+
+function AssetCard({ asset, isUpdating, onSetPhotoState }: AssetCardProps) {
   return (
     <article style={cardStyle}>
       {asset.thumbnailUrl ? (
@@ -74,6 +103,19 @@ function AssetCard({ asset }: { asset: MediaAsset }) {
         <span>State: {asset.photoState}</span>
         <span>Type: {asset.mediaType}</span>
         <span>Captured: {formatCaptureDate(asset.captureDateTime)}</span>
+        <div style={actionsStyle}>
+          {reviewActions.map((state) => (
+            <button
+              key={state}
+              type="button"
+              style={actionButtonStyle}
+              onClick={() => onSetPhotoState(asset.id, state)}
+              disabled={isUpdating || asset.photoState === state}
+            >
+              {state}
+            </button>
+          ))}
+        </div>
       </div>
     </article>
   );
@@ -84,6 +126,8 @@ export default function App() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
 
   useEffect(() => {
@@ -130,6 +174,42 @@ export default function App() {
     return assets.filter((asset) => asset.photoState === filter);
   }, [assets, filter]);
 
+  function setAssetUpdating(assetId: string, isUpdating: boolean): void {
+    setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
+  }
+
+  async function handleSetPhotoState(assetId: string, photoState: PhotoState): Promise<void> {
+    setAssetUpdating(assetId, true);
+    setUpdateError(null);
+
+    try {
+      const response = await fetch(`/api/assets/${assetId}/photoState`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ photoState })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const updatedAsset = (await response.json()) as MediaAsset;
+      setAssets((previous) =>
+        previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
+      );
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setUpdateError(`Failed to update asset ${assetId}: ${error.message}`);
+      } else {
+        setUpdateError(`Failed to update asset ${assetId}`);
+      }
+    } finally {
+      setAssetUpdating(assetId, false);
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <h1>Tedography</h1>
@@ -152,11 +232,17 @@ export default function App() {
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
+      {updateError ? <p>{updateError}</p> : null}
       {!assetsLoading && !assetsError ? (
         filteredAssets.length > 0 ? (
           <div style={gridStyle}>
             {filteredAssets.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} />
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                isUpdating={updatingAssetIds[asset.id] === true}
+                onSetPhotoState={handleSetPhotoState}
+              />
             ))}
           </div>
         ) : (

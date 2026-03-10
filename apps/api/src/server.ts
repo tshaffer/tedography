@@ -55,6 +55,19 @@ const mockAssets: MediaAsset[] = [
   }
 ];
 
+function parsePhotoState(value: unknown): PhotoState | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const validStates = Object.values(PhotoState);
+  if (!validStates.includes(value as PhotoState)) {
+    return null;
+  }
+
+  return value as PhotoState;
+}
+
 export function createServer(): Express {
   const app = express();
 
@@ -69,6 +82,23 @@ export function createServer(): Express {
 
   app.get('/api/assets', (_req, res) => {
     res.json(mockAssets);
+  });
+
+  app.patch('/api/assets/:id/photoState', (req, res) => {
+    const photoState = parsePhotoState((req.body as { photoState?: unknown }).photoState);
+    if (!photoState) {
+      res.status(400).json({ error: 'photoState must be one of Unreviewed, Pending, Select, Reject' });
+      return;
+    }
+
+    const asset = mockAssets.find((candidate) => candidate.id === req.params.id);
+    if (!asset) {
+      res.status(404).json({ error: 'Asset not found' });
+      return;
+    }
+
+    asset.photoState = photoState;
+    res.json(asset);
   });
 
   return app;
