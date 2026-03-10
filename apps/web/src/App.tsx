@@ -100,6 +100,41 @@ const detailImageStyle: CSSProperties = {
   marginBottom: '10px'
 };
 
+const loupeButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  marginTop: '4px'
+};
+
+const loupeOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '20px',
+  zIndex: 1000
+};
+
+const loupeModalStyle: CSSProperties = {
+  backgroundColor: '#fff',
+  borderRadius: '10px',
+  maxWidth: '900px',
+  width: '100%',
+  maxHeight: '92vh',
+  overflow: 'auto',
+  padding: '14px'
+};
+
+const loupeImageStyle: CSSProperties = {
+  width: '100%',
+  maxHeight: '65vh',
+  objectFit: 'contain',
+  backgroundColor: '#eee',
+  borderRadius: '8px',
+  border: '1px solid #ddd'
+};
+
 const reviewActions: PhotoState[] = [
   PhotoState.Select,
   PhotoState.Pending,
@@ -162,10 +197,11 @@ function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }:
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
   isUpdating: boolean;
+  onOpenLoupe: () => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
-function AssetDetailPanel({ asset, isUpdating, onSetPhotoState }: AssetDetailPanelProps) {
+function AssetDetailPanel({ asset, isUpdating, onOpenLoupe, onSetPhotoState }: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
   }
@@ -192,6 +228,9 @@ function AssetDetailPanel({ asset, isUpdating, onSetPhotoState }: AssetDetailPan
         <strong>Dimensions:</strong>{' '}
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
+      <button type="button" style={loupeButtonStyle} onClick={onOpenLoupe}>
+        Loupe
+      </button>
       <div style={actionsStyle}>
         {reviewActions.map((state) => (
           <button
@@ -209,6 +248,47 @@ function AssetDetailPanel({ asset, isUpdating, onSetPhotoState }: AssetDetailPan
   );
 }
 
+type LoupeModalProps = {
+  asset: MediaAsset;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onClose: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+};
+
+function LoupeModal({ asset, hasPrevious, hasNext, onClose, onPrevious, onNext }: LoupeModalProps) {
+  return (
+    <div style={loupeOverlayStyle} onClick={onClose}>
+      <section style={loupeModalStyle} onClick={(event) => event.stopPropagation()}>
+        <div style={{ ...actionsStyle, marginTop: 0, marginBottom: '10px' }}>
+          <button type="button" style={actionButtonStyle} onClick={onClose}>
+            Close
+          </button>
+          <button type="button" style={actionButtonStyle} onClick={onPrevious} disabled={!hasPrevious}>
+            Previous
+          </button>
+          <button type="button" style={actionButtonStyle} onClick={onNext} disabled={!hasNext}>
+            Next
+          </button>
+        </div>
+        {asset.thumbnailUrl ? (
+          <img src={asset.thumbnailUrl} alt={asset.filename} style={loupeImageStyle} />
+        ) : (
+          <div style={loupeImageStyle} />
+        )}
+        <p>
+          <strong>{asset.filename}</strong>
+        </p>
+        <p>
+          {asset.photoState} | {asset.mediaType}
+        </p>
+        <p>{formatCaptureDate(asset.captureDateTime)}</p>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -218,6 +298,7 @@ export default function App() {
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [loupeOpen, setLoupeOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
@@ -267,6 +348,10 @@ export default function App() {
     () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [filteredAssets, selectedAssetId]
   );
+  const selectedAssetIndex = useMemo(
+    () => filteredAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [filteredAssets, selectedAssetId]
+  );
 
   useEffect(() => {
     if (filteredAssets.length === 0) {
@@ -282,6 +367,12 @@ export default function App() {
       }
     }
   }, [filteredAssets, selectedAssetId]);
+
+  useEffect(() => {
+    if (loupeOpen && !selectedAsset) {
+      setLoupeOpen(false);
+    }
+  }, [loupeOpen, selectedAsset]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
@@ -323,31 +414,61 @@ export default function App() {
     setSelectedAssetId(assetId);
   }
 
+  function handleSelectRelative(offset: number): void {
+    if (selectedAssetId === null) {
+      return;
+    }
+
+    const currentIndex = filteredAssets.findIndex((asset) => asset.id === selectedAssetId);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const nextIndex = Math.min(Math.max(currentIndex + offset, 0), filteredAssets.length - 1);
+    const nextAsset = filteredAssets[nextIndex];
+    if (nextAsset) {
+      setSelectedAssetId(nextAsset.id);
+    }
+  }
+
+  function openLoupe(): void {
+    if (!selectedAsset) {
+      return;
+    }
+
+    setLoupeOpen(true);
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && loupeOpen) {
+        setLoupeOpen(false);
+        return;
+      }
+
       if (filteredAssets.length === 0 || selectedAssetId === null) {
         return;
       }
 
-      const currentIndex = filteredAssets.findIndex((asset) => asset.id === selectedAssetId);
-      if (currentIndex < 0) {
+      if (loupeOpen) {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          handleSelectRelative(1);
+        }
+
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          handleSelectRelative(-1);
+        }
         return;
       }
 
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-        const nextIndex = Math.min(currentIndex + 1, filteredAssets.length - 1);
-        const nextAsset = filteredAssets[nextIndex];
-        if (nextAsset) {
-          setSelectedAssetId(nextAsset.id);
-        }
+        handleSelectRelative(1);
       }
 
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-        const previousIndex = Math.max(currentIndex - 1, 0);
-        const previousAsset = filteredAssets[previousIndex];
-        if (previousAsset) {
-          setSelectedAssetId(previousAsset.id);
-        }
+        handleSelectRelative(-1);
       }
     };
 
@@ -355,7 +476,7 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredAssets, selectedAssetId]);
+  }, [filteredAssets, loupeOpen, selectedAssetId]);
 
   return (
     <div style={pageStyle}>
@@ -386,6 +507,7 @@ export default function App() {
             <AssetDetailPanel
               asset={selectedAsset}
               isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
+              onOpenLoupe={openLoupe}
               onSetPhotoState={handleSetPhotoState}
             />
             <div style={gridStyle}>
@@ -403,10 +525,25 @@ export default function App() {
           </>
         ) : (
           <>
-            <AssetDetailPanel asset={null} isUpdating={false} onSetPhotoState={handleSetPhotoState} />
+            <AssetDetailPanel
+              asset={null}
+              isUpdating={false}
+              onOpenLoupe={openLoupe}
+              onSetPhotoState={handleSetPhotoState}
+            />
             <p>No assets match this filter.</p>
           </>
         )
+      ) : null}
+      {loupeOpen && selectedAsset ? (
+        <LoupeModal
+          asset={selectedAsset}
+          hasPrevious={selectedAssetIndex > 0}
+          hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < filteredAssets.length - 1}
+          onClose={() => setLoupeOpen(false)}
+          onPrevious={() => handleSelectRelative(-1)}
+          onNext={() => handleSelectRelative(1)}
+        />
       ) : null}
     </div>
   );
