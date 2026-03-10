@@ -5,24 +5,53 @@ import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 const mockAssets: MediaAsset[] = [
   {
     id: 'asset-1',
-    filename: 'IMG_1001.jpg',
+    filename: '2025-08-17-yosemite-valley-001.jpg',
     mediaType: MediaType.Photo,
     photoState: PhotoState.Unreviewed,
-    captureDateTime: '2025-07-04T16:20:00.000Z'
+    captureDateTime: '2025-08-17T15:24:00.000Z',
+    thumbnailUrl: 'https://picsum.photos/id/1025/480/320',
+    width: 6000,
+    height: 4000
   },
   {
     id: 'asset-2',
-    filename: 'IMG_1002.jpg',
+    filename: '2025-08-17-yosemite-valley-002.jpg',
     mediaType: MediaType.Photo,
-    photoState: PhotoState.Select,
-    captureDateTime: '2025-09-14T08:45:00.000Z'
+    photoState: PhotoState.Pending,
+    captureDateTime: '2025-08-17T15:31:00.000Z',
+    thumbnailUrl: 'https://picsum.photos/id/1036/480/320',
+    width: 6016,
+    height: 4016
   },
   {
     id: 'asset-3',
-    filename: 'VID_2001.mp4',
+    filename: '2025-08-17-yosemite-valley-003.jpg',
+    mediaType: MediaType.Photo,
+    photoState: PhotoState.Select,
+    captureDateTime: '2025-08-17T15:44:00.000Z',
+    thumbnailUrl: 'https://picsum.photos/id/1043/480/320',
+    width: 6048,
+    height: 4024
+  },
+  {
+    id: 'asset-4',
+    filename: '2025-08-17-waterfall-pan.mp4',
     mediaType: MediaType.Video,
-    photoState: PhotoState.Pending,
-    captureDateTime: '2025-11-21T22:10:00.000Z'
+    photoState: PhotoState.Reject,
+    captureDateTime: '2025-08-17T16:02:00.000Z',
+    thumbnailUrl: 'https://picsum.photos/id/1069/480/320',
+    width: 3840,
+    height: 2160
+  },
+  {
+    id: 'asset-5',
+    filename: '2025-09-03-family-hike-014.jpg',
+    mediaType: MediaType.Photo,
+    photoState: PhotoState.Select,
+    captureDateTime: '2025-09-03T19:18:00.000Z',
+    thumbnailUrl: 'https://picsum.photos/id/1074/480/320',
+    width: 5472,
+    height: 3648
   }
 ];
 

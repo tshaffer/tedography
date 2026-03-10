@@ -7,4 +7,7 @@ export interface MediaAsset {
   mediaType: MediaType;
   photoState: PhotoState;
   captureDateTime: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
 }
