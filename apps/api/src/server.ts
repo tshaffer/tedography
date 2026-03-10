@@ -3,6 +3,8 @@ import express, { type Express } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PhotoState } from '@tedography/domain';
+import { config } from './config.js';
+import { importFromLocalFolder } from './import/importFromLocalFolder.js';
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 
@@ -29,6 +31,9 @@ export function createServer(): Express {
   app.use(cors());
   app.use(express.json());
   app.use('/media', express.static(mockMediaDir));
+  if (config.importRoot) {
+    app.use('/import-media', express.static(config.importRoot));
+  }
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.
@@ -65,6 +70,23 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to update asset photoState', error);
       res.status(500).json({ error: 'Failed to update asset' });
+    }
+  });
+
+  app.post('/api/import/local', async (_req, res) => {
+    if (!config.importRoot) {
+      res.status(400).json({
+        error: 'TEDOGRAPHY_IMPORT_ROOT is required to run local import'
+      });
+      return;
+    }
+
+    try {
+      const summary = await importFromLocalFolder(config.importRoot);
+      res.json(summary);
+    } catch (error) {
+      log.error('Failed to import from local folder', error);
+      res.status(500).json({ error: 'Failed to import local folder' });
     }
   });
 

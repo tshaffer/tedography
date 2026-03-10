@@ -1,4 +1,4 @@
-import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import { mockAssets } from '../data/mockAssets.js';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
@@ -39,4 +39,42 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
     { $set: { photoState } },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
+}
+
+export type ImportUpsertOutcome = 'inserted' | 'updated' | 'unchanged';
+
+export type ImportAssetInput = {
+  id: string;
+  filename: string;
+  captureDateTime: string;
+  thumbnailUrl: string;
+};
+
+export async function upsertImportedAsset(asset: ImportAssetInput): Promise<ImportUpsertOutcome> {
+  const result = await MediaAssetModel.updateOne(
+    { id: asset.id },
+    {
+      $setOnInsert: {
+        id: asset.id,
+        mediaType: MediaType.Photo,
+        photoState: PhotoState.Unreviewed
+      },
+      $set: {
+        filename: asset.filename,
+        captureDateTime: asset.captureDateTime,
+        thumbnailUrl: asset.thumbnailUrl
+      }
+    },
+    { upsert: true, runValidators: true }
+  );
+
+  if (result.upsertedCount > 0) {
+    return 'inserted';
+  }
+
+  if (result.modifiedCount > 0) {
+    return 'updated';
+  }
+
+  return 'unchanged';
 }

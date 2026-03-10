@@ -14,6 +14,7 @@ function requireEnv(name: string): string {
 
 export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
+  importRoot: process.env.TEDOGRAPHY_IMPORT_ROOT,
 
   port: Number(process.env.PORT ?? 4000),
 };
