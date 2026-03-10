@@ -2,9 +2,9 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { PhotoState } from '@tedography/domain';
 import { log } from './logger.js';
-import { MediaAssetModel } from './models/mediaAssetModel.js';
+import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,7 +38,7 @@ export function createServer(): Express {
 
   app.get('/api/assets', async (_req, res) => {
     try {
-      const assets = await MediaAssetModel.find({}, { _id: 0 }).sort({ id: 1 }).lean<MediaAsset[]>();
+      const assets = await getAllAssets();
       res.json(assets);
     } catch (error) {
       log.error('Failed to read assets', error);
@@ -54,11 +54,7 @@ export function createServer(): Express {
     }
 
     try {
-      const updatedAsset = await MediaAssetModel.findOneAndUpdate(
-        { id: req.params.id },
-        { $set: { photoState } },
-        { new: true, projection: { _id: 0 } }
-      ).lean<MediaAsset | null>();
+      const updatedAsset = await updatePhotoState(req.params.id, photoState);
 
       if (!updatedAsset) {
         res.status(404).json({ error: 'Asset not found' });

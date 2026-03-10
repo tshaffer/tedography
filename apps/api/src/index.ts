@@ -1,10 +1,12 @@
 import { createServer } from './server.js';
 import { connectToMongo } from './db.js';
-import { seedMediaAssetsIfEmpty } from './seedMediaAssets.js';
 import { config } from './config.js';
 import { log } from './logger.js';
+import { seedMediaAssetsIfEmpty, syncMediaAssetIndexes } from './repositories/assetRepository.js';
 
 await connectToMongo();
+
+await syncMediaAssetIndexes();
 
 await seedMediaAssetsIfEmpty();
 
