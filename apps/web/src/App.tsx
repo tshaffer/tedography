@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { PhotoState, type MediaAsset } from '@tedography/domain';
 
 type AssetFilter = 'All' | PhotoState;
@@ -35,7 +35,8 @@ const cardStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '8px',
   overflow: 'hidden',
-  backgroundColor: '#fff'
+  backgroundColor: '#fff',
+  cursor: 'pointer'
 };
 
 const selectedCardStyle: CSSProperties = {
@@ -105,6 +106,12 @@ const immersiveButtonStyle: CSSProperties = {
   marginTop: '4px'
 };
 
+const compareButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  fontSize: '13px',
+  padding: '6px 10px'
+};
+
 const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -170,6 +177,57 @@ const immersiveBottomHintStyle: CSSProperties = {
   marginTop: '8px'
 };
 
+const surveyOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.88)',
+  padding: '16px',
+  zIndex: 1100,
+  overflow: 'auto'
+};
+
+const surveyContainerStyle: CSSProperties = {
+  maxWidth: '1200px',
+  margin: '0 auto',
+  color: '#f3f3f3'
+};
+
+const surveyGridStyle: CSSProperties = {
+  display: 'grid',
+  gap: '12px',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
+};
+
+const surveyTileStyle: CSSProperties = {
+  border: '1px solid #444',
+  borderRadius: '8px',
+  backgroundColor: '#171717',
+  padding: '8px',
+  cursor: 'pointer'
+};
+
+const surveyFocusedTileStyle: CSSProperties = {
+  border: '2px solid #4da3ff',
+  boxShadow: '0 0 0 2px rgba(77, 163, 255, 0.2)'
+};
+
+const surveyImageStyle: CSSProperties = {
+  width: '100%',
+  aspectRatio: '3 / 2',
+  objectFit: 'cover',
+  borderRadius: '6px',
+  marginBottom: '6px',
+  backgroundColor: '#2a2a2a'
+};
+
+const surveyDetailStyle: CSSProperties = {
+  border: '1px solid #444',
+  borderRadius: '8px',
+  backgroundColor: '#1a1a1a',
+  padding: '10px',
+  marginBottom: '12px'
+};
+
 const reviewActions: PhotoState[] = [
   PhotoState.Select,
   PhotoState.Pending,
@@ -199,17 +257,28 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable;
 }
 
+function arraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((id, index) => id === right[index]);
+}
+
 type AssetCardProps = {
   asset: MediaAsset;
   isSelected: boolean;
   isUpdating: boolean;
-  onSelect: (assetId: string) => void;
+  onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
-function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }: AssetCardProps) {
+function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState }: AssetCardProps) {
   return (
-    <article style={isSelected ? { ...cardStyle, ...selectedCardStyle } : cardStyle}>
+    <article
+      style={isSelected ? { ...cardStyle, ...selectedCardStyle } : cardStyle}
+      onClick={(event) => onCardClick(event, asset.id)}
+    >
       {asset.thumbnailUrl ? (
         <img src={asset.thumbnailUrl} alt={asset.filename} style={imageStyle} loading="lazy" />
       ) : (
@@ -221,7 +290,14 @@ function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }:
         <span>State: {asset.photoState}</span>
         <span>Type: {asset.mediaType}</span>
         <span>Captured: {formatCaptureDate(asset.captureDateTime)}</span>
-        <button type="button" style={cardSelectButtonStyle} onClick={() => onSelect(asset.id)}>
+        <button
+          type="button"
+          style={cardSelectButtonStyle}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCardClick(event, asset.id);
+          }}
+        >
           Focus
         </button>
         <div style={actionsStyle}>
@@ -230,7 +306,10 @@ function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }:
               key={state}
               type="button"
               style={actionButtonStyle}
-              onClick={() => onSetPhotoState(asset.id, state)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSetPhotoState(asset.id, state);
+              }}
               disabled={isUpdating || asset.photoState === state}
             >
               {state}
@@ -368,6 +447,91 @@ function ImmersiveViewer({
   );
 }
 
+type SurveyModeProps = {
+  assets: MediaAsset[];
+  focusedAsset: MediaAsset;
+  focusedIndex: number;
+  isUpdating: boolean;
+  onClose: () => void;
+  onFocusAsset: (assetId: string) => void;
+  onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
+};
+
+function SurveyMode({
+  assets,
+  focusedAsset,
+  focusedIndex,
+  isUpdating,
+  onClose,
+  onFocusAsset,
+  onSetPhotoState
+}: SurveyModeProps) {
+  return (
+    <div style={surveyOverlayStyle} onClick={onClose}>
+      <section style={surveyContainerStyle} onClick={(event) => event.stopPropagation()}>
+        <div style={{ ...immersiveTopBarStyle, paddingBottom: '12px' }}>
+          <div style={immersiveInfoStyle}>
+            <strong>Survey Compare</strong>
+            <span>
+              {focusedAsset.filename} | {focusedIndex + 1} / {assets.length}
+            </span>
+          </div>
+          <button type="button" style={immersiveControlButtonStyle} onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <div style={surveyDetailStyle}>
+          <p>
+            <strong>Focused:</strong> {focusedAsset.filename}
+          </p>
+          <p>
+            <strong>State:</strong> {focusedAsset.photoState} | <strong>Type:</strong> {focusedAsset.mediaType}
+          </p>
+          <p>
+            <strong>Captured:</strong> {formatCaptureDate(focusedAsset.captureDateTime)}
+          </p>
+          <div style={actionsStyle}>
+            {reviewActions.map((state) => (
+              <button
+                key={state}
+                type="button"
+                style={immersiveControlButtonStyle}
+                onClick={() => onSetPhotoState(focusedAsset.id, state)}
+                disabled={isUpdating || focusedAsset.photoState === state}
+              >
+                {state}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={surveyGridStyle}>
+          {assets.map((asset) => (
+            <article
+              key={asset.id}
+              style={
+                asset.id === focusedAsset.id
+                  ? { ...surveyTileStyle, ...surveyFocusedTileStyle }
+                  : surveyTileStyle
+              }
+              onClick={() => onFocusAsset(asset.id)}
+            >
+              {asset.thumbnailUrl ? (
+                <img src={asset.thumbnailUrl} alt={asset.filename} style={surveyImageStyle} />
+              ) : (
+                <div style={surveyImageStyle} />
+              )}
+              <strong>{asset.filename}</strong>
+              <p>{asset.photoState}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -377,7 +541,9 @@ export default function App() {
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [immersiveOpen, setImmersiveOpen] = useState(false);
+  const [surveyOpen, setSurveyOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
@@ -427,31 +593,70 @@ export default function App() {
     () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [filteredAssets, selectedAssetId]
   );
+
+  const compareAssets = useMemo(
+    () => filteredAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
+    [filteredAssets, selectedAssetIds]
+  );
+
   const selectedAssetIndex = useMemo(
     () => filteredAssets.findIndex((asset) => asset.id === selectedAssetId),
     [filteredAssets, selectedAssetId]
   );
 
-  useEffect(() => {
-    if (filteredAssets.length === 0) {
-      setSelectedAssetId(null);
-      return;
+  const surveyFocusedAsset = useMemo(
+    () => compareAssets.find((asset) => asset.id === selectedAssetId) ?? compareAssets[0] ?? null,
+    [compareAssets, selectedAssetId]
+  );
+
+  const surveyFocusedIndex = useMemo(() => {
+    if (!surveyFocusedAsset) {
+      return -1;
     }
 
-    const selectedIsVisible = filteredAssets.some((asset) => asset.id === selectedAssetId);
-    if (!selectedIsVisible) {
-      const firstAsset = filteredAssets[0];
-      if (firstAsset) {
-        setSelectedAssetId(firstAsset.id);
-      }
+    return compareAssets.findIndex((asset) => asset.id === surveyFocusedAsset.id);
+  }, [compareAssets, surveyFocusedAsset]);
+
+  useEffect(() => {
+    const visibleIds = new Set(filteredAssets.map((asset) => asset.id));
+    const prunedSelected = selectedAssetIds.filter((id) => visibleIds.has(id));
+
+    let nextFocused: string | null = selectedAssetId;
+    if (!nextFocused || !visibleIds.has(nextFocused)) {
+      nextFocused = prunedSelected[0] ?? filteredAssets[0]?.id ?? null;
     }
-  }, [filteredAssets, selectedAssetId]);
+
+    let nextSelected = prunedSelected;
+    if (nextFocused && !nextSelected.includes(nextFocused)) {
+      nextSelected = [nextFocused, ...nextSelected];
+    }
+
+    if (!arraysEqual(selectedAssetIds, nextSelected)) {
+      setSelectedAssetIds(nextSelected);
+    }
+
+    if (selectedAssetId !== nextFocused) {
+      setSelectedAssetId(nextFocused);
+    }
+  }, [filteredAssets, selectedAssetId, selectedAssetIds]);
 
   useEffect(() => {
     if (immersiveOpen && !selectedAsset) {
       setImmersiveOpen(false);
     }
   }, [immersiveOpen, selectedAsset]);
+
+  useEffect(() => {
+    if (surveyOpen && compareAssets.length < 2) {
+      setSurveyOpen(false);
+    }
+  }, [compareAssets, surveyOpen]);
+
+  useEffect(() => {
+    if (surveyOpen && surveyFocusedAsset && selectedAssetId !== surveyFocusedAsset.id) {
+      setSelectedAssetId(surveyFocusedAsset.id);
+    }
+  }, [selectedAssetId, surveyFocusedAsset, surveyOpen]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
@@ -489,22 +694,18 @@ export default function App() {
     }
   }
 
-  function handleSelectAsset(assetId: string): void {
-    setSelectedAssetId(assetId);
-  }
-
-  function handleSelectRelative(offset: number): void {
-    if (selectedAssetId === null) {
+  function handleSelectRelativeInList(list: MediaAsset[], offset: number): void {
+    if (selectedAssetId === null || list.length === 0) {
       return;
     }
 
-    const currentIndex = filteredAssets.findIndex((asset) => asset.id === selectedAssetId);
+    const currentIndex = list.findIndex((asset) => asset.id === selectedAssetId);
     if (currentIndex < 0) {
       return;
     }
 
-    const nextIndex = Math.min(Math.max(currentIndex + offset, 0), filteredAssets.length - 1);
-    const nextAsset = filteredAssets[nextIndex];
+    const nextIndex = Math.min(Math.max(currentIndex + offset, 0), list.length - 1);
+    const nextAsset = list[nextIndex];
     if (nextAsset) {
       setSelectedAssetId(nextAsset.id);
     }
@@ -527,7 +728,17 @@ export default function App() {
       return;
     }
 
+    setSurveyOpen(false);
     setImmersiveOpen(true);
+  }
+
+  function openSurveyMode(): void {
+    if (compareAssets.length < 2) {
+      return;
+    }
+
+    setImmersiveOpen(false);
+    setSurveyOpen(true);
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -556,9 +767,38 @@ export default function App() {
     }
   }
 
+  function handleCardClick(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
+    const isToggleSelection = event.metaKey || event.ctrlKey;
+
+    if (!isToggleSelection) {
+      setSelectedAssetId(assetId);
+      setSelectedAssetIds([assetId]);
+      return;
+    }
+
+    const alreadySelected = selectedAssetIds.includes(assetId);
+    if (!alreadySelected) {
+      setSelectedAssetIds([...selectedAssetIds, assetId]);
+      setSelectedAssetId(assetId);
+      return;
+    }
+
+    const nextSelectedIds = selectedAssetIds.filter((id) => id !== assetId);
+    setSelectedAssetIds(nextSelectedIds);
+
+    if (selectedAssetId === assetId) {
+      setSelectedAssetId(nextSelectedIds[0] ?? null);
+    }
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.key === 'Escape' && surveyOpen) {
+        setSurveyOpen(false);
         return;
       }
 
@@ -571,41 +811,59 @@ export default function App() {
         return;
       }
 
-      if (immersiveOpen) {
+      if (surveyOpen) {
         if (event.key === 'ArrowRight') {
           event.preventDefault();
-          handleSelectRelative(1);
+          handleSelectRelativeInList(compareAssets, 1);
         }
 
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          handleSelectRelative(-1);
-        }
-      } else {
-        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-          event.preventDefault();
-          handleSelectRelative(1);
+          handleSelectRelativeInList(compareAssets, -1);
         }
 
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        void handleKeyboardReview(event.key);
+        return;
+      }
+
+      if (immersiveOpen) {
+        if (event.key === 'ArrowRight') {
           event.preventDefault();
-          handleSelectRelative(-1);
+          handleSelectRelativeInList(filteredAssets, 1);
         }
 
-        if (event.key === 'Home') {
+        if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          handleSelectAbsolute('first');
+          handleSelectRelativeInList(filteredAssets, -1);
         }
 
-        if (event.key === 'End') {
-          event.preventDefault();
-          handleSelectAbsolute('last');
-        }
+        void handleKeyboardReview(event.key);
+        return;
+      }
 
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openImmersive();
-        }
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        handleSelectRelativeInList(filteredAssets, 1);
+      }
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        handleSelectRelativeInList(filteredAssets, -1);
+      }
+
+      if (event.key === 'Home') {
+        event.preventDefault();
+        handleSelectAbsolute('first');
+      }
+
+      if (event.key === 'End') {
+        event.preventDefault();
+        handleSelectAbsolute('last');
+      }
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openImmersive();
       }
 
       void handleKeyboardReview(event.key);
@@ -615,7 +873,15 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filteredAssets, immersiveOpen, selectedAsset, selectedAssetId, updatingAssetIds]);
+  }, [
+    compareAssets,
+    filteredAssets,
+    immersiveOpen,
+    selectedAsset,
+    selectedAssetId,
+    surveyOpen,
+    updatingAssetIds
+  ]);
 
   return (
     <div style={pageStyle}>
@@ -635,9 +901,18 @@ export default function App() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={openSurveyMode}
+          disabled={compareAssets.length < 2}
+        >
+          Survey ({compareAssets.length})
+        </button>
       </div>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
-        Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review.
+        Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click
+        to multi-select.
       </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -657,9 +932,9 @@ export default function App() {
                 <AssetCard
                   key={asset.id}
                   asset={asset}
-                  isSelected={selectedAssetId === asset.id}
+                  isSelected={selectedAssetIds.includes(asset.id)}
                   isUpdating={updatingAssetIds[asset.id] === true}
-                  onSelect={handleSelectAsset}
+                  onCardClick={handleCardClick}
                   onSetPhotoState={handleSetPhotoState}
                 />
               ))}
@@ -677,6 +952,7 @@ export default function App() {
           </>
         )
       ) : null}
+
       {immersiveOpen && selectedAsset ? (
         <ImmersiveViewer
           asset={selectedAsset}
@@ -685,8 +961,20 @@ export default function App() {
           hasPrevious={selectedAssetIndex > 0}
           hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < filteredAssets.length - 1}
           onClose={() => setImmersiveOpen(false)}
-          onPrevious={() => handleSelectRelative(-1)}
-          onNext={() => handleSelectRelative(1)}
+          onPrevious={() => handleSelectRelativeInList(filteredAssets, -1)}
+          onNext={() => handleSelectRelativeInList(filteredAssets, 1)}
+        />
+      ) : null}
+
+      {surveyOpen && surveyFocusedAsset ? (
+        <SurveyMode
+          assets={compareAssets}
+          focusedAsset={surveyFocusedAsset}
+          focusedIndex={surveyFocusedIndex}
+          isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
+          onClose={() => setSurveyOpen(false)}
+          onFocusAsset={setSelectedAssetId}
+          onSetPhotoState={handleSetPhotoState}
         />
       ) : null}
     </div>
