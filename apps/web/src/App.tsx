@@ -38,6 +38,11 @@ const cardStyle: CSSProperties = {
   backgroundColor: '#fff'
 };
 
+const selectedCardStyle: CSSProperties = {
+  border: '2px solid #1f6feb',
+  boxShadow: '0 0 0 2px rgba(31, 111, 235, 0.15)'
+};
+
 const imageStyle: CSSProperties = {
   aspectRatio: '3 / 2',
   backgroundColor: '#f1f1f1',
@@ -50,6 +55,16 @@ const cardBodyStyle: CSSProperties = {
   display: 'grid',
   gap: '4px',
   padding: '10px'
+};
+
+const cardSelectButtonStyle: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: '#1f6feb',
+  cursor: 'pointer',
+  fontSize: '12px',
+  padding: 0,
+  textAlign: 'left'
 };
 
 const actionsStyle: CSSProperties = {
@@ -66,6 +81,23 @@ const actionButtonStyle: CSSProperties = {
   cursor: 'pointer',
   fontSize: '12px',
   padding: '4px 8px'
+};
+
+const detailPanelStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '10px',
+  padding: '14px',
+  marginBottom: '16px',
+  backgroundColor: '#fafafa'
+};
+
+const detailImageStyle: CSSProperties = {
+  width: '100%',
+  maxWidth: '520px',
+  borderRadius: '8px',
+  border: '1px solid #dedede',
+  display: 'block',
+  marginBottom: '10px'
 };
 
 const reviewActions: PhotoState[] = [
@@ -86,13 +118,15 @@ function formatCaptureDate(dateString: string): string {
 
 type AssetCardProps = {
   asset: MediaAsset;
+  isSelected: boolean;
   isUpdating: boolean;
+  onSelect: (assetId: string) => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
-function AssetCard({ asset, isUpdating, onSetPhotoState }: AssetCardProps) {
+function AssetCard({ asset, isSelected, isUpdating, onSelect, onSetPhotoState }: AssetCardProps) {
   return (
-    <article style={cardStyle}>
+    <article style={isSelected ? { ...cardStyle, ...selectedCardStyle } : cardStyle}>
       {asset.thumbnailUrl ? (
         <img src={asset.thumbnailUrl} alt={asset.filename} style={imageStyle} loading="lazy" />
       ) : (
@@ -100,9 +134,13 @@ function AssetCard({ asset, isUpdating, onSetPhotoState }: AssetCardProps) {
       )}
       <div style={cardBodyStyle}>
         <strong>{asset.filename}</strong>
+        {isSelected ? <span>Selected</span> : null}
         <span>State: {asset.photoState}</span>
         <span>Type: {asset.mediaType}</span>
         <span>Captured: {formatCaptureDate(asset.captureDateTime)}</span>
+        <button type="button" style={cardSelectButtonStyle} onClick={() => onSelect(asset.id)}>
+          Focus
+        </button>
         <div style={actionsStyle}>
           {reviewActions.map((state) => (
             <button
@@ -121,6 +159,56 @@ function AssetCard({ asset, isUpdating, onSetPhotoState }: AssetCardProps) {
   );
 }
 
+type AssetDetailPanelProps = {
+  asset: MediaAsset | null;
+  isUpdating: boolean;
+  onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
+};
+
+function AssetDetailPanel({ asset, isUpdating, onSetPhotoState }: AssetDetailPanelProps) {
+  if (!asset) {
+    return <p style={detailPanelStyle}>No asset selected.</p>;
+  }
+
+  return (
+    <section style={detailPanelStyle}>
+      <h2 style={{ marginTop: 0 }}>Focused Asset</h2>
+      {asset.thumbnailUrl ? (
+        <img src={asset.thumbnailUrl} alt={asset.filename} style={detailImageStyle} />
+      ) : null}
+      <p>
+        <strong>Filename:</strong> {asset.filename}
+      </p>
+      <p>
+        <strong>Type:</strong> {asset.mediaType}
+      </p>
+      <p>
+        <strong>Photo state:</strong> {asset.photoState}
+      </p>
+      <p>
+        <strong>Captured:</strong> {formatCaptureDate(asset.captureDateTime)}
+      </p>
+      <p>
+        <strong>Dimensions:</strong>{' '}
+        {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
+      </p>
+      <div style={actionsStyle}>
+        {reviewActions.map((state) => (
+          <button
+            key={state}
+            type="button"
+            style={actionButtonStyle}
+            onClick={() => onSetPhotoState(asset.id, state)}
+            disabled={isUpdating || asset.photoState === state}
+          >
+            {state}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -129,6 +217,7 @@ export default function App() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -174,6 +263,26 @@ export default function App() {
     return assets.filter((asset) => asset.photoState === filter);
   }, [assets, filter]);
 
+  const selectedAsset = useMemo(
+    () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
+    [filteredAssets, selectedAssetId]
+  );
+
+  useEffect(() => {
+    if (filteredAssets.length === 0) {
+      setSelectedAssetId(null);
+      return;
+    }
+
+    const selectedIsVisible = filteredAssets.some((asset) => asset.id === selectedAssetId);
+    if (!selectedIsVisible) {
+      const firstAsset = filteredAssets[0];
+      if (firstAsset) {
+        setSelectedAssetId(firstAsset.id);
+      }
+    }
+  }, [filteredAssets, selectedAssetId]);
+
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
   }
@@ -210,6 +319,44 @@ export default function App() {
     }
   }
 
+  function handleSelectAsset(assetId: string): void {
+    setSelectedAssetId(assetId);
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (filteredAssets.length === 0 || selectedAssetId === null) {
+        return;
+      }
+
+      const currentIndex = filteredAssets.findIndex((asset) => asset.id === selectedAssetId);
+      if (currentIndex < 0) {
+        return;
+      }
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        const nextIndex = Math.min(currentIndex + 1, filteredAssets.length - 1);
+        const nextAsset = filteredAssets[nextIndex];
+        if (nextAsset) {
+          setSelectedAssetId(nextAsset.id);
+        }
+      }
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        const previousIndex = Math.max(currentIndex - 1, 0);
+        const previousAsset = filteredAssets[previousIndex];
+        if (previousAsset) {
+          setSelectedAssetId(previousAsset.id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [filteredAssets, selectedAssetId]);
+
   return (
     <div style={pageStyle}>
       <h1>Tedography</h1>
@@ -235,18 +382,30 @@ export default function App() {
       {updateError ? <p>{updateError}</p> : null}
       {!assetsLoading && !assetsError ? (
         filteredAssets.length > 0 ? (
-          <div style={gridStyle}>
-            {filteredAssets.map((asset) => (
-              <AssetCard
-                key={asset.id}
-                asset={asset}
-                isUpdating={updatingAssetIds[asset.id] === true}
-                onSetPhotoState={handleSetPhotoState}
-              />
-            ))}
-          </div>
+          <>
+            <AssetDetailPanel
+              asset={selectedAsset}
+              isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
+              onSetPhotoState={handleSetPhotoState}
+            />
+            <div style={gridStyle}>
+              {filteredAssets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  isSelected={selectedAssetId === asset.id}
+                  isUpdating={updatingAssetIds[asset.id] === true}
+                  onSelect={handleSelectAsset}
+                  onSetPhotoState={handleSetPhotoState}
+                />
+              ))}
+            </div>
+          </>
         ) : (
-          <p>No assets match this filter.</p>
+          <>
+            <AssetDetailPanel asset={null} isUpdating={false} onSetPhotoState={handleSetPhotoState} />
+            <p>No assets match this filter.</p>
+          </>
         )
       ) : null}
     </div>
