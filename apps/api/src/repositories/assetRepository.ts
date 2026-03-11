@@ -5,7 +5,6 @@ import {
   type MediaAsset
 } from '@tedography/domain';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
 import { mockAssets } from '../data/mockAssets.js';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
@@ -151,72 +150,4 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
     { $set: { photoState } },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
-}
-
-export type ImportUpsertOutcome = 'inserted' | 'updated' | 'unchanged';
-
-export type ImportAssetInput = {
-  id: string;
-  filename: string;
-  captureDateTime: string;
-  thumbnailUrl: string;
-  width?: number;
-  height?: number;
-};
-
-function toFileFormatFromFilename(filename: string): string {
-  const extension = path.extname(filename).toLowerCase().replace('.', '');
-  return extension.length > 0 ? extension : 'unknown';
-}
-
-export async function upsertImportedAsset(asset: ImportAssetInput): Promise<ImportUpsertOutcome> {
-  const fileFormat = toFileFormatFromFilename(asset.filename);
-
-  const setFields: Record<string, string | number | null> = {
-    filename: asset.filename,
-    captureDateTime: asset.captureDateTime,
-    thumbnailUrl: asset.thumbnailUrl,
-    importedAt: new Date().toISOString(),
-    originalStorageRootId: 'local-import',
-    originalArchivePath: asset.id,
-    originalFileSizeBytes: 0,
-    originalContentHash: asset.id,
-    originalFileFormat: fileFormat,
-    displayStorageType: 'archive-root',
-    displayStorageRootId: 'local-import',
-    displayArchivePath: asset.id,
-    displayDerivedPath: null,
-    displayFileFormat: fileFormat
-  };
-
-  if (typeof asset.width === 'number') {
-    setFields.width = asset.width;
-  }
-
-  if (typeof asset.height === 'number') {
-    setFields.height = asset.height;
-  }
-
-  const result = await MediaAssetModel.updateOne(
-    { id: asset.id },
-    {
-      $setOnInsert: {
-        id: asset.id,
-        mediaType: MediaType.Photo,
-        photoState: PhotoState.Unreviewed
-      },
-      $set: setFields
-    },
-    { upsert: true, runValidators: true }
-  );
-
-  if (result.upsertedCount > 0) {
-    return 'inserted';
-  }
-
-  if (result.modifiedCount > 0) {
-    return 'updated';
-  }
-
-  return 'unchanged';
 }

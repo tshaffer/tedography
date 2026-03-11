@@ -20,6 +20,8 @@ TEDOGRAPHY_STORAGE_ROOTS=shmedia|ShMedia|/Volumes/ShMedia;shafferoto|Shafferoto 
 TEDOGRAPHY_DERIVED_ROOT=/Volumes/ShMedia/TedographyDerived
 ```
 
+`TEDOGRAPHY_IMPORT_ROOT` is obsolete and should not be configured.
+
 Format:
 
 ```text

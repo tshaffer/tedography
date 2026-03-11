@@ -86,7 +86,6 @@ function parseStorageRoots(value: string | undefined): StorageRootConfig[] {
 
 export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
-  importRoot: process.env.TEDOGRAPHY_IMPORT_ROOT,
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
   derivedRoot: requireAbsolutePathEnv('TEDOGRAPHY_DERIVED_ROOT'),
 
