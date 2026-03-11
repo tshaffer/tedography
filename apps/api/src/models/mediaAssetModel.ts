@@ -8,6 +8,11 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     mediaType: { type: String, required: true, enum: Object.values(MediaType) },
     photoState: { type: String, required: true, enum: Object.values(PhotoState) },
     captureDateTime: { type: String, required: true, trim: true },
+    storageRootId: { type: String, required: false, trim: true },
+    archivePath: { type: String, required: false, trim: true },
+    fileSizeBytes: { type: Number, required: false },
+    contentHash: { type: String, required: false, trim: true },
+    importedAt: { type: String, required: false, trim: true },
     thumbnailUrl: { type: String, required: false },
     width: { type: Number, required: false },
     height: { type: Number, required: false }
@@ -20,6 +25,18 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     minimize: false
   }
 );
+
+mediaAssetSchema.index(
+  { storageRootId: 1, archivePath: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      storageRootId: { $exists: true, $type: 'string' },
+      archivePath: { $exists: true, $type: 'string' }
+    }
+  }
+);
+mediaAssetSchema.index({ contentHash: 1 });
 
 export const MediaAssetModel: Model<MediaAsset> =
   (mongoose.models.MediaAsset as Model<MediaAsset> | undefined) ??

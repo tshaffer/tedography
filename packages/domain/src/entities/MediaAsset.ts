@@ -7,6 +7,11 @@ export interface MediaAsset {
   mediaType: MediaType;
   photoState: PhotoState;
   captureDateTime: string;
+  storageRootId?: string;
+  archivePath?: string;
+  fileSizeBytes?: number;
+  contentHash?: string;
+  importedAt?: string;
   thumbnailUrl?: string;
   width?: number;
   height?: number;

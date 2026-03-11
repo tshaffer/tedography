@@ -9,4 +9,5 @@ export * from './enums/AssetEventType.js';
 export * from './enums/MediaType.js';
 export * from './enums/PhotoState.js';
 export * from './enums/StorageRole.js';
+export * from './import/index.js';
 export * from './types/SearchSpec.js';

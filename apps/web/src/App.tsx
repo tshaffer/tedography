@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
 
 type AssetFilter = 'All' | PhotoState;
 
@@ -127,30 +128,6 @@ const compareButtonStyle: CSSProperties = {
   padding: '6px 10px'
 };
 
-const importPanelStyle: CSSProperties = {
-  border: '1px solid #d6d6d6',
-  borderRadius: '10px',
-  padding: '12px',
-  marginBottom: '14px',
-  backgroundColor: '#fafafa'
-};
-
-const importFileListStyle: CSSProperties = {
-  listStyle: 'none',
-  margin: '10px 0 0 0',
-  maxHeight: '220px',
-  overflow: 'auto',
-  padding: 0
-};
-
-const importFileRowStyle: CSSProperties = {
-  alignItems: 'center',
-  borderBottom: '1px solid #ececec',
-  display: 'grid',
-  gap: '8px',
-  gridTemplateColumns: 'auto 1fr auto auto',
-  padding: '6px 0'
-};
 
 const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
@@ -304,18 +281,6 @@ function formatCaptureDate(dateString: string): string {
   return parsed.toLocaleString();
 }
 
-function formatBytes(size: number): string {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -353,6 +318,27 @@ function compareRoleFromPhotoState(photoState: PhotoState): string {
   return 'Unreviewed';
 }
 
+function buildImportedMediaUrl(storageRootId: string, archivePath: string): string {
+  return `/api/import/media?rootId=${encodeURIComponent(storageRootId)}&relativePath=${encodeURIComponent(archivePath)}`;
+}
+
+function getAssetImageUrl(asset: MediaAsset): string | null {
+  if (typeof asset.thumbnailUrl === 'string' && asset.thumbnailUrl.trim().length > 0) {
+    return asset.thumbnailUrl;
+  }
+
+  if (
+    typeof asset.storageRootId === 'string' &&
+    asset.storageRootId.trim().length > 0 &&
+    typeof asset.archivePath === 'string' &&
+    asset.archivePath.trim().length > 0
+  ) {
+    return buildImportedMediaUrl(asset.storageRootId, asset.archivePath);
+  }
+
+  return null;
+}
+
 type AssetCardProps = {
   asset: MediaAsset;
   isSelected: boolean;
@@ -363,10 +349,11 @@ type AssetCardProps = {
 
 function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = getAssetImageUrl(asset);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [asset.thumbnailUrl]);
+  }, [imageUrl]);
 
   return (
     <article
@@ -374,9 +361,9 @@ function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState
       onClick={(event) => onCardClick(event, asset.id)}
     >
       <div style={thumbnailFrameStyle}>
-        {asset.thumbnailUrl && !imageFailed ? (
+        {imageUrl && !imageFailed ? (
           <img
-            src={asset.thumbnailUrl}
+            src={imageUrl}
             alt={asset.filename}
             style={thumbnailImageStyle}
             loading="lazy"
@@ -440,11 +427,13 @@ function AssetDetailPanel({
     return <p style={detailPanelStyle}>No asset selected.</p>;
   }
 
+  const imageUrl = getAssetImageUrl(asset);
+
   return (
     <section style={detailPanelStyle}>
       <h2 style={{ marginTop: 0 }}>Focused Asset</h2>
-      {asset.thumbnailUrl ? (
-        <img src={asset.thumbnailUrl} alt={asset.filename} style={detailImageStyle} />
+      {imageUrl ? (
+        <img src={imageUrl} alt={asset.filename} style={detailImageStyle} />
       ) : null}
       <p>
         <strong>Filename:</strong> {asset.filename}
@@ -503,6 +492,8 @@ function ImmersiveViewer({
   onPrevious,
   onNext
 }: ImmersiveViewerProps) {
+  const imageUrl = getAssetImageUrl(asset);
+
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
       <section style={{ width: '100%', height: '100%' }} onClick={(event) => event.stopPropagation()}>
@@ -537,8 +528,8 @@ function ImmersiveViewer({
           </div>
         </div>
         <div style={immersiveImageWrapStyle}>
-          {asset.thumbnailUrl ? (
-            <img src={asset.thumbnailUrl} alt={asset.filename} style={immersiveImageStyle} />
+          {imageUrl ? (
+            <img src={imageUrl} alt={asset.filename} style={immersiveImageStyle} />
           ) : (
             <div style={immersiveImageStyle} />
           )}
@@ -644,28 +635,32 @@ function SurveyMode({
         </div>
 
         <div style={surveyGridStyle}>
-          {assets.map((asset) => (
-            <article
-              key={asset.id}
-              style={{
-                ...surveyTileStyle,
-                ...(asset.photoState === PhotoState.Select ? surveyWinnerTileStyle : {}),
-                ...(asset.photoState === PhotoState.Pending ? surveyAlternateTileStyle : {}),
-                ...(asset.photoState === PhotoState.Reject ? surveyRejectTileStyle : {}),
-                ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
-              }}
-              onClick={() => onFocusAsset(asset.id)}
-            >
-              {asset.thumbnailUrl ? (
-                <img src={asset.thumbnailUrl} alt={asset.filename} style={surveyImageStyle} />
-              ) : (
-                <div style={surveyImageStyle} />
-              )}
-              <strong>{asset.filename}</strong>
-              <p>{asset.photoState}</p>
-              <p style={surveyRoleStyle}>Role: {compareRoleFromPhotoState(asset.photoState)}</p>
-            </article>
-          ))}
+          {assets.map((asset) => {
+            const imageUrl = getAssetImageUrl(asset);
+
+            return (
+              <article
+                key={asset.id}
+                style={{
+                  ...surveyTileStyle,
+                  ...(asset.photoState === PhotoState.Select ? surveyWinnerTileStyle : {}),
+                  ...(asset.photoState === PhotoState.Pending ? surveyAlternateTileStyle : {}),
+                  ...(asset.photoState === PhotoState.Reject ? surveyRejectTileStyle : {}),
+                  ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
+                }}
+                onClick={() => onFocusAsset(asset.id)}
+              >
+                {imageUrl ? (
+                  <img src={imageUrl} alt={asset.filename} style={surveyImageStyle} />
+                ) : (
+                  <div style={surveyImageStyle} />
+                )}
+                <strong>{asset.filename}</strong>
+                <p>{asset.photoState}</p>
+                <p style={surveyRoleStyle}>Role: {compareRoleFromPhotoState(asset.photoState)}</p>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>
@@ -673,35 +668,11 @@ function SurveyMode({
 }
 
 export default function App() {
-  type ImportSummary = {
-    scanned: number;
-    selected: number;
-    imported: number;
-    skippedAlreadyExists: number;
-    metadataUpdated: number;
-    failed: number;
-  };
-
-  type ImportableLocalFile = {
-    relativePath: string;
-    filename: string;
-    size: number;
-    modifiedTime: string;
-  };
-
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importFilesLoading, setImportFilesLoading] = useState(false);
-  const [importPanelOpen, setImportPanelOpen] = useState(false);
-  const [importRoot, setImportRoot] = useState<string | null>(null);
-  const [importCandidates, setImportCandidates] = useState<ImportableLocalFile[]>([]);
-  const [selectedImportPaths, setSelectedImportPaths] = useState<string[]>([]);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<AssetFilter>('All');
@@ -911,132 +882,6 @@ export default function App() {
 
     setImmersiveOpen(false);
     setSurveyOpen(true);
-  }
-
-  async function loadImportCandidates(): Promise<void> {
-    setImportFilesLoading(true);
-    setImportError(null);
-
-    try {
-      const response = await fetch('/api/import/local/files');
-      const payload = (await response.json()) as
-        | { files?: ImportableLocalFile[]; error?: string }
-        | undefined;
-
-      if (!response.ok) {
-        const message =
-          payload && typeof payload.error === 'string'
-            ? payload.error
-            : `Request failed with status ${response.status}`;
-        throw new Error(message);
-      }
-
-      const files = Array.isArray(payload?.files) ? payload.files : [];
-      setImportCandidates(files);
-      setSelectedImportPaths([]);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setImportError(error.message);
-      } else {
-        setImportError('Failed to load import file list');
-      }
-      setImportCandidates([]);
-      setSelectedImportPaths([]);
-    } finally {
-      setImportFilesLoading(false);
-    }
-  }
-
-  async function loadImportInfo(): Promise<void> {
-    try {
-      const response = await fetch('/api/import/local/info');
-      const payload = (await response.json()) as { importRoot?: string; error?: string };
-
-      if (!response.ok || typeof payload.importRoot !== 'string') {
-        throw new Error(payload.error ?? `Request failed with status ${response.status}`);
-      }
-
-      setImportRoot(payload.importRoot);
-    } catch {
-      setImportRoot(null);
-      throw new Error('Failed to load import folder info');
-    }
-  }
-
-  async function handleImportLocalFolder(selectedRelativePaths?: string[]): Promise<void> {
-    setImportLoading(true);
-    setImportError(null);
-    setImportSummary(null);
-    const importCount = selectedRelativePaths?.length ?? 0;
-    setImportMessage(`Importing ${importCount} files...`);
-
-    try {
-      const response = await fetch('/api/import/local', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(
-          selectedRelativePaths && selectedRelativePaths.length > 0
-            ? { selectedRelativePaths }
-            : {}
-        )
-      });
-      const payload = (await response.json()) as ImportSummary | { error?: string };
-
-      if (!response.ok) {
-        const message =
-          typeof payload === 'object' && payload !== null && 'error' in payload && payload.error
-            ? payload.error
-            : `Request failed with status ${response.status}`;
-        throw new Error(message);
-      }
-
-      const summary = payload as ImportSummary;
-      setImportMessage(null);
-      setImportSummary(summary);
-      await loadAssets({ showLoading: false });
-      await loadImportCandidates();
-    } catch (error: unknown) {
-      setImportMessage(null);
-      setImportError('Import failed. See server logs.');
-    } finally {
-      setImportLoading(false);
-    }
-  }
-
-  async function openImportPanel(): Promise<void> {
-    const nextOpen = !importPanelOpen;
-    setImportPanelOpen(nextOpen);
-
-    if (nextOpen) {
-      try {
-        await Promise.all([loadImportInfo(), loadImportCandidates()]);
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          setImportError(error.message);
-        }
-      }
-    } else {
-      setSelectedImportPaths([]);
-      setImportError(null);
-    }
-  }
-
-  function toggleImportPath(relativePath: string): void {
-    setSelectedImportPaths((previous) =>
-      previous.includes(relativePath)
-        ? previous.filter((pathValue) => pathValue !== relativePath)
-        : [...previous, relativePath]
-    );
-  }
-
-  function selectAllImportPaths(): void {
-    setSelectedImportPaths(importCandidates.map((candidate) => candidate.relativePath));
-  }
-
-  function clearImportSelection(): void {
-    setSelectedImportPaths([]);
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -1273,104 +1118,18 @@ export default function App() {
         >
           Survey ({compareAssets.length})
         </button>
-        <button type="button" style={compareButtonStyle} onClick={() => void openImportPanel()}>
-          {importPanelOpen ? 'Close Import Panel' : 'Import Local Folder'}
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={() => setImportDialogOpen(true)}
+        >
+          Import
         </button>
       </div>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click
         to multi-select.
       </p>
-      {importMessage ? <p>{importMessage}</p> : null}
-      {importError ? <p>{importError}</p> : null}
-      {importSummary ? (
-        <section style={importPanelStyle}>
-          <h2 style={{ margin: 0, fontSize: '16px' }}>Import Complete</h2>
-          <p style={{ margin: '8px 0 0 0' }}>Scanned: {importSummary.scanned}</p>
-          <p style={{ margin: '4px 0 0 0' }}>Selected: {importSummary.selected}</p>
-          <p style={{ margin: '4px 0 0 0' }}>Imported: {importSummary.imported}</p>
-          <p style={{ margin: '4px 0 0 0' }}>Already existed: {importSummary.skippedAlreadyExists}</p>
-          <p style={{ margin: '4px 0 0 0' }}>Metadata updated: {importSummary.metadataUpdated}</p>
-          <p style={{ margin: '4px 0 0 0' }}>Failed: {importSummary.failed}</p>
-        </section>
-      ) : null}
-
-      {importPanelOpen ? (
-        <section style={importPanelStyle}>
-          <h2 style={{ margin: 0, fontSize: '16px' }}>Select Local Files</h2>
-          <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: '#555' }}>
-            Choose files from TEDOGRAPHY_IMPORT_ROOT and import only the selected items.
-          </p>
-          <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '13px' }}>
-            <strong>Import folder:</strong> {importRoot ?? 'Unavailable'}
-          </p>
-          <p style={{ marginTop: '6px', marginBottom: 0, fontSize: '13px' }}>
-            <strong>Files available:</strong> {importCandidates.length}
-          </p>
-          <div style={{ ...controlsStyle, marginBottom: '0', marginTop: '10px' }}>
-            <button
-              type="button"
-              style={actionButtonStyle}
-              onClick={() => void loadImportCandidates()}
-              disabled={importFilesLoading || importLoading}
-            >
-              {importFilesLoading ? 'Loading…' : 'Refresh Files'}
-            </button>
-            <button
-              type="button"
-              style={actionButtonStyle}
-              onClick={selectAllImportPaths}
-              disabled={importFilesLoading || importCandidates.length === 0}
-            >
-              Select All
-            </button>
-            <button
-              type="button"
-              style={actionButtonStyle}
-              onClick={clearImportSelection}
-              disabled={selectedImportPaths.length === 0}
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              style={compareButtonStyle}
-              onClick={() => void handleImportLocalFolder(selectedImportPaths)}
-              disabled={importLoading || selectedImportPaths.length === 0}
-            >
-              {importLoading
-                ? 'Importing…'
-                : `Import Selected (${selectedImportPaths.length})`}
-            </button>
-          </div>
-          {importFilesLoading ? <p>Loading importable files...</p> : null}
-          {!importFilesLoading && importCandidates.length === 0 ? (
-            <p>No importable files found in the configured import folder.</p>
-          ) : null}
-          {!importFilesLoading && importCandidates.length > 0 ? (
-            <ul style={importFileListStyle}>
-              {importCandidates.map((candidate) => {
-                const checked = selectedImportPaths.includes(candidate.relativePath);
-                return (
-                  <li key={candidate.relativePath} style={importFileRowStyle}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleImportPath(candidate.relativePath)}
-                      disabled={importLoading}
-                    />
-                    <span>{candidate.filename}</span>
-                    <span style={{ color: '#666', fontSize: '12px' }}>{formatBytes(candidate.size)}</span>
-                    <span style={{ color: '#777', fontSize: '12px' }}>
-                      {formatCaptureDate(candidate.modifiedTime)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
@@ -1439,6 +1198,14 @@ export default function App() {
           onSetPhotoState={handleSetPhotoState}
         />
       ) : null}
+
+      <ImportAssetsDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImportCompleted={() => {
+          void loadAssets({ showLoading: false });
+        }}
+      />
     </div>
   );
 }

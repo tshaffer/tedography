@@ -1,4 +1,5 @@
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
+import { randomUUID } from 'node:crypto';
 import { mockAssets } from '../data/mockAssets.js';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
@@ -31,6 +32,75 @@ export async function seedMediaAssetsIfEmpty(): Promise<void> {
 
 export async function getAllAssets(): Promise<MediaAsset[]> {
   return MediaAssetModel.find({}, { _id: 0 }).sort({ id: 1 }).lean<MediaAsset[]>();
+}
+
+export async function findByStorageRootAndArchivePaths(
+  storageRootId: string,
+  archivePaths: string[]
+): Promise<MediaAsset[]> {
+  if (archivePaths.length === 0) {
+    return [];
+  }
+
+  return MediaAssetModel.find(
+    { storageRootId, archivePath: { $in: archivePaths } },
+    { _id: 0 }
+  ).lean<MediaAsset[]>();
+}
+
+export async function findByContentHashes(contentHashes: string[]): Promise<MediaAsset[]> {
+  if (contentHashes.length === 0) {
+    return [];
+  }
+
+  return MediaAssetModel.find(
+    { contentHash: { $in: contentHashes } },
+    { _id: 0 }
+  ).lean<MediaAsset[]>();
+}
+
+export interface CreateMediaAssetInput {
+  filename: string;
+  mediaType: MediaType;
+  photoState: PhotoState;
+  captureDateTime: Date | null;
+  width: number | null;
+  height: number | null;
+  thumbnailUrl: string | null;
+  storageRootId: string;
+  archivePath: string;
+  fileSizeBytes: number;
+  contentHash: string;
+  importedAt: Date;
+}
+
+export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
+  const id = randomUUID();
+  const createdCaptureDateTime =
+    input.captureDateTime?.toISOString() ?? input.importedAt.toISOString();
+
+  await MediaAssetModel.create({
+    id,
+    filename: input.filename,
+    mediaType: input.mediaType,
+    photoState: input.photoState,
+    captureDateTime: createdCaptureDateTime,
+    storageRootId: input.storageRootId,
+    archivePath: input.archivePath,
+    fileSizeBytes: input.fileSizeBytes,
+    contentHash: input.contentHash,
+    importedAt: input.importedAt.toISOString(),
+    ...(typeof input.width === 'number' ? { width: input.width } : {}),
+    ...(typeof input.height === 'number' ? { height: input.height } : {}),
+    ...(input.thumbnailUrl ? { thumbnailUrl: input.thumbnailUrl } : {})
+  });
+
+  const createdAsset = await MediaAssetModel.findOne({ id }, { _id: 0 }).lean<MediaAsset | null>();
+  if (!createdAsset) {
+    throw new Error(`Failed to load newly created MediaAsset: ${id}`);
+  }
+
+  return createdAsset;
 }
 
 export async function updatePhotoState(id: string, photoState: PhotoState): Promise<MediaAsset | null> {

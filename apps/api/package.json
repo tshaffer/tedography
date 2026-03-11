@@ -18,6 +18,7 @@
     "@tedography/shared": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
+    "exiftool-vendored": "^31.1.0",
     "express": "5.2.1",
     "mongoose": "9.2.4"
   },
