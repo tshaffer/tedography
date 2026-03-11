@@ -86,6 +86,7 @@ export interface ScannedCandidateFileDto {
   width?: number | null;
   height?: number | null;
   contentHash?: string | null;
+  requiresDerivedDisplayFile?: boolean;
 }
 
 export interface ScanImportResponse {

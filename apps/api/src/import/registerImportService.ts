@@ -1,8 +1,21 @@
 import fs from 'node:fs/promises';
-import { MediaType, PhotoState, type MediaAsset, type RegisterImportFileResultDto, type RegisterImportResponse } from '@tedography/domain';
-import { createMediaAsset, findByContentHashes, findByStorageRootAndArchivePaths } from '../repositories/assetRepository.js';
+import {
+  MediaType,
+  PhotoState,
+  type MediaAsset,
+  type RegisterImportFileResultDto,
+  type RegisterImportResponse
+} from '@tedography/domain';
+import {
+  createMediaAsset,
+  findByOriginalContentHashes,
+  findByOriginalStorageRootAndArchivePaths
+} from '../repositories/assetRepository.js';
+import { buildDisplayFilePlan } from './displayFilePlanning.js';
+import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { computeSha256ForFile } from './fileHash.js';
+import { resolveDerivedAbsolutePath } from './derivedStorage.js';
 import { getStorageRootById, getStorageRoots } from './storageRoots.js';
 import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
@@ -18,7 +31,11 @@ export class RegisterImportServiceError extends Error {
   }
 }
 
-function toRegisteredAsset(asset: MediaAsset, relativePath: string): { id: string; filename: string; relativePath: string } {
+function toRegisteredAsset(asset: MediaAsset, relativePath: string): {
+  id: string;
+  filename: string;
+  relativePath: string;
+} {
   return {
     id: asset.id,
     filename: asset.filename,
@@ -28,6 +45,14 @@ function toRegisteredAsset(asset: MediaAsset, relativePath: string): { id: strin
 
 function buildImportedThumbnailUrl(rootId: string, relativePath: string): string {
   return `/api/import/media?rootId=${encodeURIComponent(rootId)}&relativePath=${encodeURIComponent(relativePath)}`;
+}
+
+function getOriginalFileFormat(extension: string | null): string {
+  if (!extension) {
+    return 'unknown';
+  }
+
+  return extension.replace('.', '').toLowerCase();
 }
 
 export async function registerImportedFiles(input: {
@@ -63,28 +88,28 @@ export async function registerImportedFiles(input: {
     }
   }
 
-  const existingByPath = await findByStorageRootAndArchivePaths(
+  const existingByPath = await findByOriginalStorageRootAndArchivePaths(
     root.id,
     Array.from(new Set(normalizedInputPaths))
   );
 
   const existingByPathMap = new Map<string, MediaAsset>();
   for (const asset of existingByPath) {
-    if (asset.archivePath) {
-      existingByPathMap.set(asset.archivePath, asset);
-    }
+    existingByPathMap.set(asset.originalArchivePath, asset);
   }
 
   const knownContentHashes = Array.from(
-    new Set(existingByPath.map((asset) => asset.contentHash).filter((value): value is string => typeof value === 'string' && value.length > 0))
+    new Set(
+      existingByPath
+        .map((asset) => asset.originalContentHash)
+        .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    )
   );
-  const existingByKnownContent = await findByContentHashes(knownContentHashes);
+  const existingByKnownContent = await findByOriginalContentHashes(knownContentHashes);
 
   const existingByContentHashMap = new Map<string, MediaAsset>();
   for (const asset of existingByKnownContent) {
-    if (asset.contentHash) {
-      existingByContentHashMap.set(asset.contentHash, asset);
-    }
+    existingByContentHashMap.set(asset.originalContentHash, asset);
   }
 
   for (const requestedRelativePath of input.relativePaths) {
@@ -164,8 +189,8 @@ export async function registerImportedFiles(input: {
     }
 
     try {
-      const contentHash = await computeSha256ForFile(absolutePath);
-      const existingByContentAsset = existingByContentHashMap.get(contentHash);
+      const originalContentHash = await computeSha256ForFile(absolutePath);
+      const existingByContentAsset = existingByContentHashMap.get(originalContentHash);
 
       if (existingByContentAsset) {
         results.push({
@@ -176,8 +201,45 @@ export async function registerImportedFiles(input: {
         continue;
       }
 
+      const originalFileFormat = getOriginalFileFormat(mediaSupport.extension);
+      const displayPlan = buildDisplayFilePlan({
+        originalStorageRootId: root.id,
+        originalArchivePath: normalizedRelativePath,
+        originalContentHash,
+        originalFileFormat
+      });
+      if (
+        displayPlan.requiresDerivedDisplayFile &&
+        (!displayPlan.displayDerivedPath || displayPlan.displayDerivedPath.length === 0)
+      ) {
+        results.push({
+          relativePath: normalizedRelativePath,
+          status: 'Error',
+          message: 'Derived display path could not be determined for this file'
+        });
+        continue;
+      }
+
+      if (displayPlan.requiresDerivedDisplayFile && displayPlan.displayDerivedPath) {
+        const targetAbsolutePath = resolveDerivedAbsolutePath(displayPlan.displayDerivedPath);
+        await convertHeicToJpeg({
+          sourceAbsolutePath: absolutePath,
+          targetAbsolutePath
+        });
+      }
+
       const metadata = await extractImportMetadata(absolutePath);
       const importedAt = new Date();
+      const displayUrl =
+        displayPlan.displayStorageType === 'archive-root' &&
+        displayPlan.displayStorageRootId &&
+        displayPlan.displayArchivePath
+          ? buildImportedThumbnailUrl(
+              displayPlan.displayStorageRootId,
+              displayPlan.displayArchivePath
+            )
+          : null;
+
       const createdAsset = await createMediaAsset({
         filename: normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
         mediaType: mediaSupport.mediaType === 'Unknown' ? MediaType.Photo : mediaSupport.mediaType,
@@ -185,16 +247,22 @@ export async function registerImportedFiles(input: {
         captureDateTime: metadata.captureDateTime,
         width: metadata.width,
         height: metadata.height,
-        thumbnailUrl: buildImportedThumbnailUrl(root.id, normalizedRelativePath),
-        storageRootId: root.id,
-        archivePath: normalizedRelativePath,
-        fileSizeBytes: fileStat.size,
-        contentHash,
-        importedAt
+        importedAt,
+        originalStorageRootId: root.id,
+        originalArchivePath: normalizedRelativePath,
+        originalFileSizeBytes: fileStat.size,
+        originalContentHash,
+        originalFileFormat,
+        displayStorageType: displayPlan.displayStorageType,
+        displayStorageRootId: displayPlan.displayStorageRootId,
+        displayArchivePath: displayPlan.displayArchivePath,
+        displayDerivedPath: displayPlan.displayDerivedPath,
+        displayFileFormat: displayPlan.displayFileFormat,
+        thumbnailUrl: displayUrl
       });
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);
-      existingByContentHashMap.set(contentHash, createdAsset);
+      existingByContentHashMap.set(originalContentHash, createdAsset);
 
       results.push({
         relativePath: normalizedRelativePath,
@@ -212,8 +280,12 @@ export async function registerImportedFiles(input: {
 
   return {
     importedCount: results.filter((result) => result.status === 'Imported').length,
-    skippedAlreadyImportedByPathCount: results.filter((result) => result.status === 'AlreadyImportedByPath').length,
-    skippedDuplicateContentCount: results.filter((result) => result.status === 'DuplicateByContentHash').length,
+    skippedAlreadyImportedByPathCount: results.filter(
+      (result) => result.status === 'AlreadyImportedByPath'
+    ).length,
+    skippedDuplicateContentCount: results.filter(
+      (result) => result.status === 'DuplicateByContentHash'
+    ).length,
     unsupportedCount: results.filter((result) => result.status === 'Unsupported').length,
     missingCount: results.filter((result) => result.status === 'Missing').length,
     errorCount: results.filter((result) => result.status === 'Error').length,

@@ -8,6 +8,7 @@ import { importFromLocalFolder, listImportableFiles } from './import/importFromL
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 import { importRoutes } from './routes/importRoutes.js';
+import { mediaRoutes } from './routes/mediaRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +33,7 @@ export function createServer(): Express {
   app.use(cors());
   app.use(express.json());
   app.use('/api/import', importRoutes);
+  app.use('/api/media', mediaRoutes);
   app.use('/media', express.static(mockMediaDir));
   if (config.importRoot) {
     app.use('/import-media', express.static(config.importRoot));

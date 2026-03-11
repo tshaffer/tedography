@@ -272,7 +272,11 @@ const reviewActions: PhotoState[] = [
   PhotoState.Unreviewed
 ];
 
-function formatCaptureDate(dateString: string): string {
+function formatCaptureDate(dateString?: string | null): string {
+  if (typeof dateString !== 'string' || dateString.trim().length === 0) {
+    return 'Unknown';
+  }
+
   const parsed = new Date(dateString);
   if (Number.isNaN(parsed.getTime())) {
     return dateString;
@@ -323,6 +327,10 @@ function buildImportedMediaUrl(storageRootId: string, archivePath: string): stri
 }
 
 function getAssetImageUrl(asset: MediaAsset): string | null {
+  if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
+    return `/api/media/display/${encodeURIComponent(asset.id)}`;
+  }
+
   if (typeof asset.thumbnailUrl === 'string' && asset.thumbnailUrl.trim().length > 0) {
     return asset.thumbnailUrl;
   }

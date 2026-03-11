@@ -14,6 +14,7 @@ Example:
 
 ```env
 TEDOGRAPHY_STORAGE_ROOTS=shmedia|ShMedia|/Volumes/ShMedia;shafferoto|Shafferoto Backup|/Volumes/SHAFFEROTO
+TEDOGRAPHY_DERIVED_ROOT=/Volumes/ShMedia/TedographyDerived
 ```
 
 Format:
@@ -27,6 +28,7 @@ Validation expectations:
 - `absolutePath` must be absolute
 - `id` must be unique
 - malformed values should fail API startup
+- `TEDOGRAPHY_DERIVED_ROOT` must be a non-empty absolute path
 
 ## 2. Start Backend
 
@@ -43,6 +45,15 @@ http://localhost:4000
 ```
 
 Use a small test folder first (for example a folder with 3-10 files) to make responses easy to inspect.
+
+### HEIC conversion mechanism used in v1
+
+Tedography uses macOS `sips` during register/import to convert HEIC originals into derived JPG display files.
+
+- command shape:
+  - `sips -s format jpeg <source.heic> --out <derived.jpg>`
+- derived JPGs are written under `TEDOGRAPHY_DERIVED_ROOT`
+- if a derived JPG already exists for the same source content hash, it is reused
 
 ## 3. Test `GET /api/import/storage-roots`
 
@@ -152,6 +163,7 @@ Verify:
   4. `Importable`
 - supported files include `contentHash`
 - metadata fields are present when available (`captureDateTime`, `width`, `height`)
+- `requiresDerivedDisplayFile` is `true` for HEIC files and `false` for JPG/JPEG/PNG files
 
 ## 6. Test `POST /api/import/register`
 
@@ -205,6 +217,32 @@ Verify per-file statuses:
 - `Missing`
 - `Error`
 
+Current behavior for HEIC in this step:
+- scan marks HEIC with `requiresDerivedDisplayFile: true`
+- register converts HEIC into a derived JPG under `TEDOGRAPHY_DERIVED_ROOT`
+- register creates the asset with:
+  - original/source fields pointing to the HEIC
+  - display/render fields pointing to the derived JPG
+
+HEIC verification example:
+
+```bash
+curl -X POST http://localhost:4000/api/import/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rootId": "shmedia",
+    "files": [
+      { "relativePath": "Australia 2025/IMG_1234.HEIC" }
+    ]
+  }'
+```
+
+After success, verify derived file exists:
+
+```bash
+find /Volumes/ShMedia/TedographyDerived/display-jpegs -name "*.jpg" | head
+```
+
 ## 7. Verify MongoDB After Register
 
 ### 7.1 Count before and after
@@ -223,15 +261,21 @@ Run once before register and once after register.
 
 ```javascript
 db.mediaAssets.find(
-  { storageRootId: "shmedia", archivePath: "Australia 2025/IMG_0001.JPG" },
+  { originalStorageRootId: "shmedia", originalArchivePath: "Australia 2025/IMG_0001.JPG" },
   {
     _id: 0,
     id: 1,
     filename: 1,
-    storageRootId: 1,
-    archivePath: 1,
-    fileSizeBytes: 1,
-    contentHash: 1,
+    originalStorageRootId: 1,
+    originalArchivePath: 1,
+    originalFileSizeBytes: 1,
+    originalContentHash: 1,
+    originalFileFormat: 1,
+    displayStorageType: 1,
+    displayStorageRootId: 1,
+    displayArchivePath: 1,
+    displayDerivedPath: 1,
+    displayFileFormat: 1,
     importedAt: 1,
     captureDateTime: 1,
     width: 1,
@@ -242,14 +286,37 @@ db.mediaAssets.find(
 ```
 
 Verify:
-- `storageRootId` and `archivePath` are set
-- `contentHash` exists for supported files
+- `originalStorageRootId` and `originalArchivePath` are set
+- `originalContentHash` exists for supported files
 - `photoState` defaults to `Unreviewed`
 - `width`/`height`/`captureDateTime` are populated when available
+- HEIC originals have `displayStorageType: "derived-root"` and `displayDerivedPath` set
+- JPG/JPEG/PNG originals have `displayStorageType: "archive-root"` with `displayArchivePath`
 
-## 8. Duplicate Guardrail Tests
+## 8. Test media-serving routes
 
-### 8.1 Re-register same path(s)
+Use an imported asset id from Mongo or register response.
+
+Display media:
+
+```bash
+curl -I http://localhost:4000/api/media/display/<assetId>
+```
+
+Original media:
+
+```bash
+curl -I http://localhost:4000/api/media/original/<assetId>
+```
+
+Verify:
+- display route returns a renderable image (`image/jpeg` for HEIC-derived assets)
+- original route returns original file type (`image/heic` for HEIC originals)
+- 404 when asset id does not exist
+
+## 9. Duplicate Guardrail Tests
+
+### 9.1 Re-register same path(s)
 
 Run the same `POST /api/import/register` again.
 
@@ -258,7 +325,7 @@ Expected:
 - files return `AlreadyImportedByPath`
 - `skippedAlreadyImportedByPathCount` increases
 
-### 8.2 Content duplicate at a different path
+### 9.2 Content duplicate at a different path
 
 Choose a file duplicated under a different relative path in the same or another folder under the same root.
 
@@ -268,7 +335,7 @@ Register both paths; for the later duplicate path expect:
 
 Re-run scan afterward to confirm duplicate signaling is reflected there too.
 
-## 9. Error Cases to Exercise
+## 10. Error Cases to Exercise
 
 Invalid body:
 
@@ -308,7 +375,7 @@ Expected:
 - unavailable root: HTTP 409
 - unknown root: HTTP 404
 
-## 10. End State for This Phase
+## 11. End State for This Phase
 
 A complete manual flow should now work:
 1. Browse roots
@@ -318,7 +385,15 @@ A complete manual flow should now work:
 5. Verify MongoDB records
 6. Re-run scan/register and confirm duplicate guardrails
 
-## 11. Frontend Flow Check
+## 12. Original vs Display File Split (Current State)
+
+- Assets now persist original/source file identity separately from display/render file identity.
+- Duplicate checks use original file fields (`originalStorageRootId + originalArchivePath`, `originalContentHash`).
+- For JPG/JPEG/PNG, display references point to archive-root files directly.
+- For HEIC, display references point to derived-root JPG files.
+- `TEDOGRAPHY_DERIVED_ROOT` stores derived display files.
+
+## 13. Frontend Flow Check
 
 Use the web app at `http://localhost:3000`.
 
@@ -332,6 +407,9 @@ Use the web app at `http://localhost:3000`.
 8. Optionally adjust selection, then click `Import Selected`.
 9. Confirm register summary appears in the dialog.
 10. Confirm grid/assets refresh after successful import (`Imported > 0`).
+
+Also verify in browser devtools:
+- asset images are requested via `/api/media/display/<assetId>`
 
 Frontend error checks:
 - unavailable root should show a clear error message in the dialog

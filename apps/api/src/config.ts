@@ -13,6 +13,19 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function requireAbsolutePathEnv(name: string): string {
+  const value = requireEnv(name).trim();
+  if (value.length === 0) {
+    throw new Error(`[config] ${name} must be non-empty`);
+  }
+
+  if (!path.isAbsolute(value)) {
+    throw new Error(`[config] ${name} must be an absolute path`);
+  }
+
+  return value;
+}
+
 function requireNonEmpty(value: string, fieldName: string): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -75,6 +88,7 @@ export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   importRoot: process.env.TEDOGRAPHY_IMPORT_ROOT,
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
+  derivedRoot: requireAbsolutePathEnv('TEDOGRAPHY_DERIVED_ROOT'),
 
   port: Number(process.env.PORT ?? 4000),
 };

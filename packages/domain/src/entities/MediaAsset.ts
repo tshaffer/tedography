@@ -1,18 +1,40 @@
 import { MediaType } from '../enums/MediaType.js';
 import { PhotoState } from '../enums/PhotoState.js';
 
+export type DisplayStorageType = 'archive-root' | 'derived-root';
+
 export interface MediaAsset {
   id: string;
+
   filename: string;
   mediaType: MediaType;
   photoState: PhotoState;
-  captureDateTime: string;
+  captureDateTime?: string | null;
+  width?: number | null;
+  height?: number | null;
+  importedAt: string;
+
+  // Original/source file reference.
+  originalStorageRootId: string;
+  originalArchivePath: string;
+  originalFileSizeBytes: number;
+  originalContentHash: string;
+  originalFileFormat: string;
+
+  // Display/render file reference.
+  displayStorageType: DisplayStorageType;
+  displayStorageRootId?: string | null;
+  displayArchivePath?: string | null;
+  displayDerivedPath?: string | null;
+  displayFileFormat: string;
+
+  // Legacy compatibility for older v1 frontend/runtime code paths.
+  thumbnailUrl?: string | null;
+
+  // Temporary compatibility fields while API/frontend finish migrating
+  // away from the previous single-file reference naming.
   storageRootId?: string;
   archivePath?: string;
   fileSizeBytes?: number;
   contentHash?: string;
-  importedAt?: string;
-  thumbnailUrl?: string;
-  width?: number;
-  height?: number;
 }

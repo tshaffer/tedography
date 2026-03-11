@@ -1,11 +1,15 @@
 import fs from 'node:fs/promises';
-import type { ScanImportResponse, ScannedCandidateFileDto, ScanFileStatus } from '@tedography/domain';
-import { findByContentHashes, findByStorageRootAndArchivePaths } from '../repositories/assetRepository.js';
+import type { ScanFileStatus, ScannedCandidateFileDto, ScanImportResponse } from '@tedography/domain';
+import {
+  findByOriginalContentHashes,
+  findByOriginalStorageRootAndArchivePaths
+} from '../repositories/assetRepository.js';
+import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { computeSha256ForFile } from './fileHash.js';
 import { type DiscoveredFile, walkImportFiles } from './importFileWalker.js';
-import { resolveSafeAbsolutePath, normalizeRelativePath } from './storagePathUtils.js';
 import { getStorageRootById, getStorageRoots } from './storageRoots.js';
+import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
 
 export type ScanErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'UNAVAILABLE';
@@ -25,6 +29,7 @@ type SupportedScannedFile = {
   captureDateTime: string | null;
   width: number | null;
   height: number | null;
+  requiresDerivedDisplayFile: boolean;
 };
 
 function resolveStatus(input: {
@@ -45,6 +50,14 @@ function resolveStatus(input: {
   }
 
   return 'Importable';
+}
+
+function getOriginalFileFormat(extension: string | null): string {
+  if (!extension) {
+    return 'unknown';
+  }
+
+  return extension.replace('.', '').toLowerCase();
 }
 
 export async function scanImportTarget(input: {
@@ -110,34 +123,39 @@ export async function scanImportTarget(input: {
 
     const contentHash = await computeSha256ForFile(discoveredFile.absolutePath);
     const metadata = await extractImportMetadata(discoveredFile.absolutePath);
+    const displayPlan = buildDisplayFilePlan({
+      originalStorageRootId: root.id,
+      originalArchivePath: discoveredFile.relativePath,
+      originalContentHash: contentHash,
+      originalFileFormat: getOriginalFileFormat(mediaSupport.extension)
+    });
 
     supportedFileMap.set(discoveredFile.relativePath, {
       discovered: discoveredFile,
       contentHash,
       captureDateTime: metadata.captureDateTime ? metadata.captureDateTime.toISOString() : null,
       width: metadata.width,
-      height: metadata.height
+      height: metadata.height,
+      requiresDerivedDisplayFile: displayPlan.requiresDerivedDisplayFile
     });
   }
 
   const archivePaths = walkResult.files.map((file) => file.relativePath);
-  const contentHashes = Array.from(new Set(Array.from(supportedFileMap.values()).map((file) => file.contentHash)));
+  const contentHashes = Array.from(
+    new Set(Array.from(supportedFileMap.values()).map((file) => file.contentHash))
+  );
 
-  const existingByPath = await findByStorageRootAndArchivePaths(root.id, archivePaths);
-  const existingByContentHash = await findByContentHashes(contentHashes);
+  const existingByPath = await findByOriginalStorageRootAndArchivePaths(root.id, archivePaths);
+  const existingByContentHash = await findByOriginalContentHashes(contentHashes);
 
   const existingByPathMap = new Map<string, string>();
   for (const existingAsset of existingByPath) {
-    if (existingAsset.archivePath) {
-      existingByPathMap.set(existingAsset.archivePath, existingAsset.id);
-    }
+    existingByPathMap.set(existingAsset.originalArchivePath, existingAsset.id);
   }
 
   const existingByContentMap = new Map<string, string>();
   for (const existingAsset of existingByContentHash) {
-    if (existingAsset.contentHash) {
-      existingByContentMap.set(existingAsset.contentHash, existingAsset.id);
-    }
+    existingByContentMap.set(existingAsset.originalContentHash, existingAsset.id);
   }
 
   const files: ScannedCandidateFileDto[] = walkResult.files.map((discoveredFile) => {
@@ -177,21 +195,27 @@ export async function scanImportTarget(input: {
             captureDateTime: supported?.captureDateTime ?? null,
             width: supported?.width ?? null,
             height: supported?.height ?? null,
-            contentHash: supported?.contentHash ?? null
+            contentHash: supported?.contentHash ?? null,
+            requiresDerivedDisplayFile: supported?.requiresDerivedDisplayFile ?? false
           }
         : {
             captureDateTime: null,
             width: null,
             height: null,
-            contentHash: null
+            contentHash: null,
+            requiresDerivedDisplayFile: false
           })
     };
   });
 
   const supportedMediaFileCount = files.filter((file) => file.isSupportedMedia).length;
   const unsupportedFileCount = files.filter((file) => file.status === 'Unsupported').length;
-  const alreadyImportedPathCount = files.filter((file) => file.status === 'AlreadyImportedByPath').length;
-  const duplicateContentCount = files.filter((file) => file.status === 'DuplicateByContentHash').length;
+  const alreadyImportedPathCount = files.filter(
+    (file) => file.status === 'AlreadyImportedByPath'
+  ).length;
+  const duplicateContentCount = files.filter(
+    (file) => file.status === 'DuplicateByContentHash'
+  ).length;
   const importableCount = files.filter((file) => file.status === 'Importable').length;
 
   return {
