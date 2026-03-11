@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { extractMetadata } from '@tedography/media-metadata';
 import { upsertImportedAsset } from '../repositories/assetRepository.js';
 
 const supportedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
@@ -53,13 +54,17 @@ export async function importFromLocalFolder(importRoot: string): Promise<LocalIm
 
     const filePath = path.join(importRoot, entry.name);
     const fileStats = await fs.stat(filePath);
-
-    const outcome = await upsertImportedAsset({
+    const extractedMetadata = await extractMetadata(filePath);
+    const upsertAssetInput = {
       id: buildImportAssetId(importRoot, filePath),
       filename: entry.name,
-      captureDateTime: fileStats.mtime.toISOString(),
-      thumbnailUrl: buildImportMediaUrl(importRoot, filePath)
-    });
+      captureDateTime: extractedMetadata.captureDateTime ?? fileStats.mtime.toISOString(),
+      thumbnailUrl: buildImportMediaUrl(importRoot, filePath),
+      ...(typeof extractedMetadata.width === 'number' ? { width: extractedMetadata.width } : {}),
+      ...(typeof extractedMetadata.height === 'number' ? { height: extractedMetadata.height } : {})
+    };
+
+    const outcome = await upsertImportedAsset(upsertAssetInput);
 
     if (outcome === 'inserted') {
       summary.imported += 1;

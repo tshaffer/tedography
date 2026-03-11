@@ -48,9 +48,25 @@ export type ImportAssetInput = {
   filename: string;
   captureDateTime: string;
   thumbnailUrl: string;
+  width?: number;
+  height?: number;
 };
 
 export async function upsertImportedAsset(asset: ImportAssetInput): Promise<ImportUpsertOutcome> {
+  const setFields: Record<string, string | number> = {
+    filename: asset.filename,
+    captureDateTime: asset.captureDateTime,
+    thumbnailUrl: asset.thumbnailUrl
+  };
+
+  if (typeof asset.width === 'number') {
+    setFields.width = asset.width;
+  }
+
+  if (typeof asset.height === 'number') {
+    setFields.height = asset.height;
+  }
+
   const result = await MediaAssetModel.updateOne(
     { id: asset.id },
     {
@@ -59,11 +75,7 @@ export async function upsertImportedAsset(asset: ImportAssetInput): Promise<Impo
         mediaType: MediaType.Photo,
         photoState: PhotoState.Unreviewed
       },
-      $set: {
-        filename: asset.filename,
-        captureDateTime: asset.captureDateTime,
-        thumbnailUrl: asset.thumbnailUrl
-      }
+      $set: setFields
     },
     { upsert: true, runValidators: true }
   );
