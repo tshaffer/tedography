@@ -44,12 +44,27 @@ const selectedCardStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(31, 111, 235, 0.15)'
 };
 
-const imageStyle: CSSProperties = {
+const thumbnailFrameStyle: CSSProperties = {
   aspectRatio: '3 / 2',
   backgroundColor: '#f1f1f1',
-  display: 'block',
-  objectFit: 'cover',
+  display: 'flex',
+  overflow: 'hidden',
+  alignItems: 'center',
+  justifyContent: 'center',
   width: '100%'
+};
+
+const thumbnailImageStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  objectPosition: 'center'
+};
+
+const thumbnailFallbackStyle: CSSProperties = {
+  color: '#666',
+  fontSize: '12px'
 };
 
 const cardBodyStyle: CSSProperties = {
@@ -347,16 +362,30 @@ type AssetCardProps = {
 };
 
 function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState }: AssetCardProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [asset.thumbnailUrl]);
+
   return (
     <article
       style={isSelected ? { ...cardStyle, ...selectedCardStyle } : cardStyle}
       onClick={(event) => onCardClick(event, asset.id)}
     >
-      {asset.thumbnailUrl ? (
-        <img src={asset.thumbnailUrl} alt={asset.filename} style={imageStyle} loading="lazy" />
-      ) : (
-        <div style={imageStyle} />
-      )}
+      <div style={thumbnailFrameStyle}>
+        {asset.thumbnailUrl && !imageFailed ? (
+          <img
+            src={asset.thumbnailUrl}
+            alt={asset.filename}
+            style={thumbnailImageStyle}
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <span style={thumbnailFallbackStyle}>No preview</span>
+        )}
+      </div>
       <div style={cardBodyStyle}>
         <strong>{asset.filename}</strong>
         {isSelected ? <span>Selected</span> : null}
