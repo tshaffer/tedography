@@ -129,6 +129,24 @@ const compareButtonStyle: CSSProperties = {
   padding: '6px 10px'
 };
 
+const emptyStateStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '10px',
+  padding: '24px',
+  backgroundColor: '#fafafa',
+  textAlign: 'center'
+};
+
+const emptyStateHeadingStyle: CSSProperties = {
+  fontSize: '24px',
+  margin: '0 0 8px 0'
+};
+
+const emptyStateTextStyle: CSSProperties = {
+  color: '#4d4d4d',
+  margin: '0 0 16px 0'
+};
+
 
 const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
@@ -779,6 +797,9 @@ export default function App() {
     return compareAssets.findIndex((asset) => asset.id === surveyFocusedAsset.id);
   }, [compareAssets, surveyFocusedAsset]);
 
+  const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
+  const hasFilteredAssets = filteredAssets.length > 0;
+
   useEffect(() => {
     const visibleIds = new Set(filteredAssets.map((asset) => asset.id));
     const prunedSelected = selectedAssetIds.filter((id) => visibleIds.has(id));
@@ -1154,7 +1175,21 @@ export default function App() {
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
       {!assetsLoading && !assetsError ? (
-        filteredAssets.length > 0 ? (
+        hasNoAssets ? (
+          <section style={emptyStateStyle}>
+            <h2 style={emptyStateHeadingStyle}>No media assets yet</h2>
+            <p style={emptyStateTextStyle}>
+              Import photos to start reviewing and organizing your archive.
+            </p>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => setImportDialogOpen(true)}
+            >
+              Import Assets
+            </button>
+          </section>
+        ) : hasFilteredAssets ? (
           <>
             <AssetDetailPanel
               asset={selectedAsset}

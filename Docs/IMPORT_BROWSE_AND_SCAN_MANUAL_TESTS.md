@@ -49,6 +49,11 @@ http://localhost:4000
 
 Use a small test folder first (for example a folder with 3-10 files) to make responses easy to inspect.
 
+Mock-media seeding is no longer part of normal startup.
+
+- if `mediaAssets` is empty, Tedography should remain empty until you import real files
+- no startup path should auto-insert mock assets
+
 ### HEIC conversion mechanism used in v1
 
 Tedography uses macOS `sips` during register/import to convert HEIC originals into derived JPG display files.
@@ -429,6 +434,17 @@ A complete manual flow should now work:
 ## 13. Frontend Flow Check
 
 Use the web app at `http://localhost:3000`.
+
+### Empty DB check
+
+1. Ensure `mediaAssets` is empty.
+2. Start API + web.
+3. Open `http://localhost:3000`.
+4. Verify empty state appears:
+   - heading: `No media assets yet`
+   - supporting text about importing photos
+   - primary button: `Import Assets`
+5. Click `Import Assets` and verify it opens the same import dialog used by the top-level Import button.
 
 1. Click `Import` in the top controls.
 2. In the dialog, choose a storage root.
