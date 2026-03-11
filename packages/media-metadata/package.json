@@ -14,7 +14,8 @@
   "sideEffects": false,
   "dependencies": {
     "@tedography/domain": "workspace:*",
-    "@tedography/shared": "workspace:*"
+    "@tedography/shared": "workspace:*",
+    "exiftool-vendored": "^31.1.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

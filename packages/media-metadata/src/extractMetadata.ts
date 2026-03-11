@@ -45,9 +45,41 @@ function toFiniteNumber(value: unknown): number | undefined {
     if (Number.isFinite(parsed)) {
       return parsed;
     }
+
+    const firstNumericToken = value.match(/-?\d+(\.\d+)?/)?.[0];
+    if (!firstNumericToken) {
+      return undefined;
+    }
+
+    const tokenAsNumber = Number(firstNumericToken);
+    if (Number.isFinite(tokenAsNumber)) {
+      return tokenAsNumber;
+    }
   }
 
   return undefined;
+}
+
+function parseSizePair(value: unknown): { width?: number; height?: number } {
+  if (typeof value !== 'string') {
+    return {};
+  }
+
+  const matched = value.match(/(\d+)\s*[xX]\s*(\d+)/);
+  if (!matched) {
+    return {};
+  }
+
+  const width = Number(matched[1]);
+  const height = Number(matched[2]);
+  const parsed: { width?: number; height?: number } = {};
+  if (Number.isFinite(width)) {
+    parsed.width = width;
+  }
+  if (Number.isFinite(height)) {
+    parsed.height = height;
+  }
+  return parsed;
 }
 
 function toIsoDate(value: unknown): string | undefined {
@@ -85,16 +117,19 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
 
   try {
     const tags = await runtime.read(filePath);
+    const compositeSize = parseSizePair(tags.ImageSize ?? tags.SourceImageSize);
 
     const width =
       toFiniteNumber(tags.ImageWidth) ??
       toFiniteNumber(tags.ExifImageWidth) ??
-      toFiniteNumber(tags.SourceImageWidth);
+      toFiniteNumber(tags.SourceImageWidth) ??
+      compositeSize.width;
 
     const height =
       toFiniteNumber(tags.ImageHeight) ??
       toFiniteNumber(tags.ExifImageHeight) ??
-      toFiniteNumber(tags.SourceImageHeight);
+      toFiniteNumber(tags.SourceImageHeight) ??
+      compositeSize.height;
 
     const captureDateTime =
       toIsoDate(tags.DateTimeOriginal) ??
