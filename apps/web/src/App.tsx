@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { PhotoState, type MediaAsset } from '@tedography/domain';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
+import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
 type AssetFilter = 'All' | PhotoState;
 
@@ -326,9 +327,9 @@ function buildImportedMediaUrl(storageRootId: string, archivePath: string): stri
   return `/api/import/media?rootId=${encodeURIComponent(storageRootId)}&relativePath=${encodeURIComponent(archivePath)}`;
 }
 
-function getAssetImageUrl(asset: MediaAsset): string | null {
+function getAssetDisplayImageUrl(asset: MediaAsset): string | null {
   if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
-    return `/api/media/display/${encodeURIComponent(asset.id)}`;
+    return getDisplayMediaUrl(asset.id);
   }
 
   if (typeof asset.thumbnailUrl === 'string' && asset.thumbnailUrl.trim().length > 0) {
@@ -347,6 +348,14 @@ function getAssetImageUrl(asset: MediaAsset): string | null {
   return null;
 }
 
+function getAssetThumbnailImageUrl(asset: MediaAsset): string | null {
+  if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
+    return getThumbnailMediaUrl(asset.id);
+  }
+
+  return getAssetDisplayImageUrl(asset);
+}
+
 type AssetCardProps = {
   asset: MediaAsset;
   isSelected: boolean;
@@ -357,11 +366,13 @@ type AssetCardProps = {
 
 function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const imageUrl = getAssetImageUrl(asset);
+  const thumbnailImageUrl = getAssetThumbnailImageUrl(asset);
+  const displayImageUrl = getAssetDisplayImageUrl(asset);
+  const imageUrl = imageFailed ? displayImageUrl : thumbnailImageUrl;
 
   useEffect(() => {
     setImageFailed(false);
-  }, [imageUrl]);
+  }, [thumbnailImageUrl, displayImageUrl]);
 
   return (
     <article
@@ -435,7 +446,7 @@ function AssetDetailPanel({
     return <p style={detailPanelStyle}>No asset selected.</p>;
   }
 
-  const imageUrl = getAssetImageUrl(asset);
+  const imageUrl = getAssetDisplayImageUrl(asset);
 
   return (
     <section style={detailPanelStyle}>
@@ -500,7 +511,7 @@ function ImmersiveViewer({
   onPrevious,
   onNext
 }: ImmersiveViewerProps) {
-  const imageUrl = getAssetImageUrl(asset);
+  const imageUrl = getAssetDisplayImageUrl(asset);
 
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
@@ -644,7 +655,7 @@ function SurveyMode({
 
         <div style={surveyGridStyle}>
           {assets.map((asset) => {
-            const imageUrl = getAssetImageUrl(asset);
+            const imageUrl = getAssetDisplayImageUrl(asset);
 
             return (
               <article

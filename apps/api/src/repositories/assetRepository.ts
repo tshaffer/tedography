@@ -89,14 +89,17 @@ export interface CreateMediaAssetInput {
   displayArchivePath: string | null;
   displayDerivedPath: string | null;
   displayFileFormat: string;
+  thumbnailStorageType: 'derived-root' | null;
+  thumbnailDerivedPath: string | null;
+  thumbnailFileFormat: string | null;
   thumbnailUrl: string | null;
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
   const id = randomUUID();
-  const thumbnailUrl = input.thumbnailUrl ?? `/api/media/display/${encodeURIComponent(id)}`;
+  const thumbnailUrl = input.thumbnailUrl ?? `/api/media/thumbnail/${encodeURIComponent(id)}`;
 
-  await MediaAssetModel.create({
+  const createPayload: Record<string, string | number | null | MediaType | PhotoState> = {
     id,
     filename: input.filename,
     mediaType: input.mediaType,
@@ -116,7 +119,21 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayDerivedPath: input.displayDerivedPath,
     displayFileFormat: input.displayFileFormat,
     thumbnailUrl
-  });
+  };
+
+  if (input.thumbnailStorageType) {
+    createPayload.thumbnailStorageType = input.thumbnailStorageType;
+  }
+
+  if (input.thumbnailDerivedPath) {
+    createPayload.thumbnailDerivedPath = input.thumbnailDerivedPath;
+  }
+
+  if (input.thumbnailFileFormat) {
+    createPayload.thumbnailFileFormat = input.thumbnailFileFormat;
+  }
+
+  await MediaAssetModel.create(createPayload);
 
   const createdAsset = await MediaAssetModel.findOne({ id }, { _id: 0 }).lean<MediaAsset | null>();
   if (!createdAsset) {

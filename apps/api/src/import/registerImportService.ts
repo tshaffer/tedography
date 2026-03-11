@@ -15,10 +15,14 @@ import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { computeSha256ForFile } from './fileHash.js';
-import { resolveDerivedAbsolutePath } from './derivedStorage.js';
+import {
+  buildThumbnailDerivedRelativePath,
+  resolveDerivedAbsolutePath
+} from './derivedStorage.js';
 import { getStorageRootById, getStorageRoots } from './storageRoots.js';
 import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
+import { generateJpegThumbnail } from './thumbnailGeneration.js';
 
 export type RegisterErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'UNAVAILABLE';
 
@@ -41,10 +45,6 @@ function toRegisteredAsset(asset: MediaAsset, relativePath: string): {
     filename: asset.filename,
     relativePath
   };
-}
-
-function buildImportedThumbnailUrl(rootId: string, relativePath: string): string {
-  return `/api/import/media?rootId=${encodeURIComponent(rootId)}&relativePath=${encodeURIComponent(relativePath)}`;
 }
 
 function getOriginalFileFormat(extension: string | null): string {
@@ -228,17 +228,41 @@ export async function registerImportedFiles(input: {
         });
       }
 
+      let thumbnailStorageType: 'derived-root' | null = null;
+      let thumbnailDerivedPath: string | null = null;
+      let thumbnailFileFormat: string | null = null;
+      let thumbnailUrl: string | null = null;
+
+      if (mediaSupport.mediaType === MediaType.Photo) {
+        let thumbnailSourceAbsolutePath: string;
+        if (
+          displayPlan.displayStorageType === 'archive-root' &&
+          displayPlan.displayArchivePath &&
+          displayPlan.displayStorageRootId === root.id
+        ) {
+          thumbnailSourceAbsolutePath = resolveSafeAbsolutePath(root, displayPlan.displayArchivePath);
+        } else if (
+          displayPlan.displayStorageType === 'derived-root' &&
+          displayPlan.displayDerivedPath
+        ) {
+          thumbnailSourceAbsolutePath = resolveDerivedAbsolutePath(displayPlan.displayDerivedPath);
+        } else {
+          throw new Error('Unable to determine thumbnail source path for imported photo');
+        }
+
+        thumbnailDerivedPath = buildThumbnailDerivedRelativePath(originalContentHash);
+        const thumbnailAbsolutePath = resolveDerivedAbsolutePath(thumbnailDerivedPath);
+        await generateJpegThumbnail({
+          sourceAbsolutePath: thumbnailSourceAbsolutePath,
+          targetAbsolutePath: thumbnailAbsolutePath
+        });
+
+        thumbnailStorageType = 'derived-root';
+        thumbnailFileFormat = 'jpg';
+      }
+
       const metadata = await extractImportMetadata(absolutePath);
       const importedAt = new Date();
-      const displayUrl =
-        displayPlan.displayStorageType === 'archive-root' &&
-        displayPlan.displayStorageRootId &&
-        displayPlan.displayArchivePath
-          ? buildImportedThumbnailUrl(
-              displayPlan.displayStorageRootId,
-              displayPlan.displayArchivePath
-            )
-          : null;
 
       const createdAsset = await createMediaAsset({
         filename: normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
@@ -258,7 +282,10 @@ export async function registerImportedFiles(input: {
         displayArchivePath: displayPlan.displayArchivePath,
         displayDerivedPath: displayPlan.displayDerivedPath,
         displayFileFormat: displayPlan.displayFileFormat,
-        thumbnailUrl: displayUrl
+        thumbnailStorageType,
+        thumbnailDerivedPath,
+        thumbnailFileFormat,
+        thumbnailUrl
       });
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);

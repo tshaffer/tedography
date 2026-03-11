@@ -73,3 +73,15 @@ export function resolveDisplayAbsolutePathForAsset(asset: MediaAsset): string {
 
   throw new AssetMediaPathResolutionError('Asset does not contain a resolvable display file reference');
 }
+
+export function resolveThumbnailAbsolutePathForAsset(asset: MediaAsset): string | null {
+  if (asset.thumbnailStorageType !== 'derived-root') {
+    return null;
+  }
+
+  if (typeof asset.thumbnailDerivedPath !== 'string' || asset.thumbnailDerivedPath.length === 0) {
+    return null;
+  }
+
+  return resolveDerivedAbsolutePath(asset.thumbnailDerivedPath);
+}

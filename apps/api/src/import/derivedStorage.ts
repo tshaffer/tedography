@@ -37,6 +37,15 @@ export function buildDisplayJpegDerivedRelativePath(originalContentHash: string)
   return `display-jpegs/${normalizedHash}.jpg`;
 }
 
+export function buildThumbnailDerivedRelativePath(originalContentHash: string): string {
+  const normalizedHash = originalContentHash.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalizedHash)) {
+    throw new Error('originalContentHash must be a SHA-256 hex string');
+  }
+
+  return `thumbnails/${normalizedHash}.jpg`;
+}
+
 export function resolveDerivedAbsolutePath(relativeDerivedPath: string): string {
   const normalizedRelativePath = normalizeDerivedRelativePath(relativeDerivedPath);
   const absolutePath = path.resolve(config.derivedRoot, normalizedRelativePath);

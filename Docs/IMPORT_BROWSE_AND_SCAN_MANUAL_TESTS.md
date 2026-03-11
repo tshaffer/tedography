@@ -5,6 +5,9 @@ This guide covers manual API testing for the v1 import flow:
 - `GET /api/import/browse`
 - `POST /api/import/scan`
 - `POST /api/import/register`
+- `GET /api/media/thumbnail/:assetId`
+- `GET /api/media/display/:assetId`
+- `GET /api/media/original/:assetId`
 
 ## 1. Configure Environment
 
@@ -54,6 +57,14 @@ Tedography uses macOS `sips` during register/import to convert HEIC originals in
   - `sips -s format jpeg <source.heic> --out <derived.jpg>`
 - derived JPGs are written under `TEDOGRAPHY_DERIVED_ROOT`
 - if a derived JPG already exists for the same source content hash, it is reused
+
+Tedography also uses macOS `sips` to generate JPG thumbnails from the displayable image source.
+
+- thumbnail output path convention:
+  - `thumbnails/<originalContentHash>.jpg`
+- thumbnail max bound:
+  - 400px (`-Z 400`)
+- thumbnails are reused if already present and non-empty
 
 ## 3. Test `GET /api/import/storage-roots`
 
@@ -220,9 +231,11 @@ Verify per-file statuses:
 Current behavior for HEIC in this step:
 - scan marks HEIC with `requiresDerivedDisplayFile: true`
 - register converts HEIC into a derived JPG under `TEDOGRAPHY_DERIVED_ROOT`
+- register also generates/reuses a thumbnail JPG under `TEDOGRAPHY_DERIVED_ROOT/thumbnails`
 - register creates the asset with:
   - original/source fields pointing to the HEIC
   - display/render fields pointing to the derived JPG
+  - thumbnail fields pointing to the derived thumbnail JPG
 
 HEIC verification example:
 
@@ -241,6 +254,12 @@ After success, verify derived file exists:
 
 ```bash
 find /Volumes/ShMedia/TedographyDerived/display-jpegs -name "*.jpg" | head
+```
+
+Verify thumbnail file exists:
+
+```bash
+find /Volumes/ShMedia/TedographyDerived/thumbnails -name "*.jpg" | head
 ```
 
 ## 7. Verify MongoDB After Register
@@ -276,6 +295,9 @@ db.mediaAssets.find(
     displayArchivePath: 1,
     displayDerivedPath: 1,
     displayFileFormat: 1,
+    thumbnailStorageType: 1,
+    thumbnailDerivedPath: 1,
+    thumbnailFileFormat: 1,
     importedAt: 1,
     captureDateTime: 1,
     width: 1,
@@ -292,6 +314,7 @@ Verify:
 - `width`/`height`/`captureDateTime` are populated when available
 - HEIC originals have `displayStorageType: "derived-root"` and `displayDerivedPath` set
 - JPG/JPEG/PNG originals have `displayStorageType: "archive-root"` with `displayArchivePath`
+- photo assets include thumbnail fields (`thumbnailStorageType`, `thumbnailDerivedPath`, `thumbnailFileFormat`)
 
 ## 8. Test media-serving routes
 
@@ -313,6 +336,16 @@ Verify:
 - display route returns a renderable image (`image/jpeg` for HEIC-derived assets)
 - original route returns original file type (`image/heic` for HEIC originals)
 - 404 when asset id does not exist
+
+Thumbnail media:
+
+```bash
+curl -I http://localhost:4000/api/media/thumbnail/<assetId>
+```
+
+Verify:
+- thumbnail route returns `image/jpeg` when thumbnail exists
+- if thumbnail is missing/unavailable, route falls back to display media
 
 ## 9. Duplicate Guardrail Tests
 
@@ -409,7 +442,8 @@ Use the web app at `http://localhost:3000`.
 10. Confirm grid/assets refresh after successful import (`Imported > 0`).
 
 Also verify in browser devtools:
-- asset images are requested via `/api/media/display/<assetId>`
+- grid thumbnails are requested via `/api/media/thumbnail/<assetId>`
+- focused/detail/loupe/survey/fullscreen rendering uses `/api/media/display/<assetId>`
 
 Frontend error checks:
 - unavailable root should show a clear error message in the dialog

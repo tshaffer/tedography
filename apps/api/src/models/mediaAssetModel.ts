@@ -2,6 +2,7 @@ import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import mongoose, { type Model, Schema } from 'mongoose';
 
 const displayStorageTypes = ['archive-root', 'derived-root'] as const;
+const thumbnailStorageTypes = ['derived-root'] as const;
 
 const mediaAssetSchema = new Schema<MediaAsset>(
   {
@@ -27,6 +28,13 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     displayArchivePath: { type: String, required: false, trim: true },
     displayDerivedPath: { type: String, required: false, trim: true },
     displayFileFormat: { type: String, required: true, trim: true },
+    thumbnailStorageType: {
+      type: String,
+      required: false,
+      enum: thumbnailStorageTypes
+    },
+    thumbnailDerivedPath: { type: String, required: false, trim: true },
+    thumbnailFileFormat: { type: String, required: false, trim: true },
     thumbnailUrl: { type: String, required: false, trim: true }
   },
   {

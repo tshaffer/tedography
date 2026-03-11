@@ -28,7 +28,12 @@ export interface MediaAsset {
   displayDerivedPath?: string | null;
   displayFileFormat: string;
 
-  // Legacy compatibility for older v1 frontend/runtime code paths.
+  // Thumbnail file reference.
+  thumbnailStorageType?: 'derived-root' | null;
+  thumbnailDerivedPath?: string | null;
+  thumbnailFileFormat?: string | null;
+
+  // Legacy compatibility for older compile/runtime paths.
   thumbnailUrl?: string | null;
 
   // Temporary compatibility fields while API/frontend finish migrating
