@@ -46,7 +46,7 @@ const selectedCardStyle: CSSProperties = {
 
 const thumbnailFrameStyle: CSSProperties = {
   aspectRatio: '3 / 2',
-  backgroundColor: '#f1f1f1',
+  backgroundColor: '#1f1f1f',
   display: 'flex',
   overflow: 'hidden',
   alignItems: 'center',
@@ -58,12 +58,12 @@ const thumbnailImageStyle: CSSProperties = {
   display: 'block',
   width: '100%',
   height: '100%',
-  objectFit: 'cover',
+  objectFit: 'contain',
   objectPosition: 'center'
 };
 
 const thumbnailFallbackStyle: CSSProperties = {
-  color: '#666',
+  color: '#c7c7c7',
   fontSize: '12px'
 };
 
