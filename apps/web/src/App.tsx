@@ -341,26 +341,9 @@ function compareRoleFromPhotoState(photoState: PhotoState): string {
   return 'Unreviewed';
 }
 
-function buildImportedMediaUrl(storageRootId: string, archivePath: string): string {
-  return `/api/import/media?rootId=${encodeURIComponent(storageRootId)}&relativePath=${encodeURIComponent(archivePath)}`;
-}
-
 function getAssetDisplayImageUrl(asset: MediaAsset): string | null {
   if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
     return getDisplayMediaUrl(asset.id);
-  }
-
-  if (typeof asset.thumbnailUrl === 'string' && asset.thumbnailUrl.trim().length > 0) {
-    return asset.thumbnailUrl;
-  }
-
-  if (
-    typeof asset.storageRootId === 'string' &&
-    asset.storageRootId.trim().length > 0 &&
-    typeof asset.archivePath === 'string' &&
-    asset.archivePath.trim().length > 0
-  ) {
-    return buildImportedMediaUrl(asset.storageRootId, asset.archivePath);
   }
 
   return null;

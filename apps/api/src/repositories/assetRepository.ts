@@ -97,7 +97,6 @@ export interface CreateMediaAssetInput {
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
   const id = randomUUID();
-  const thumbnailUrl = input.thumbnailUrl ?? `/api/media/thumbnail/${encodeURIComponent(id)}`;
 
   const createPayload: Record<string, string | number | null | MediaType | PhotoState> = {
     id,
@@ -117,8 +116,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayStorageRootId: input.displayStorageRootId,
     displayArchivePath: input.displayArchivePath,
     displayDerivedPath: input.displayDerivedPath,
-    displayFileFormat: input.displayFileFormat,
-    thumbnailUrl
+    displayFileFormat: input.displayFileFormat
   };
 
   if (input.thumbnailStorageType) {
@@ -131,6 +129,10 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
 
   if (input.thumbnailFileFormat) {
     createPayload.thumbnailFileFormat = input.thumbnailFileFormat;
+  }
+
+  if (input.thumbnailUrl) {
+    createPayload.thumbnailUrl = input.thumbnailUrl;
   }
 
   await MediaAssetModel.create(createPayload);

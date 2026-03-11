@@ -460,6 +460,7 @@ Use the web app at `http://localhost:3000`.
 Also verify in browser devtools:
 - grid thumbnails are requested via `/api/media/thumbnail/<assetId>`
 - focused/detail/loupe/survey/fullscreen rendering uses `/api/media/display/<assetId>`
+- primary rendering should not depend on `thumbnailUrl` values in asset JSON
 
 Frontend error checks:
 - unavailable root should show a clear error message in the dialog
