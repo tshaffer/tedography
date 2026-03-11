@@ -90,6 +90,17 @@ export function createServer(): Express {
     }
   });
 
+  app.get('/api/import/local/info', (_req, res) => {
+    if (!config.importRoot) {
+      res.status(400).json({
+        error: 'TEDOGRAPHY_IMPORT_ROOT is required to provide local import info'
+      });
+      return;
+    }
+
+    res.json({ importRoot: config.importRoot });
+  });
+
   app.post('/api/import/local', async (req, res) => {
     if (!config.importRoot) {
       res.status(400).json({

@@ -7,9 +7,11 @@ const supportedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gi
 
 export type LocalImportSummary = {
   scanned: number;
+  selected: number;
   imported: number;
-  updated: number;
-  unchanged: number;
+  skippedAlreadyExists: number;
+  metadataUpdated: number;
+  failed: number;
 };
 
 export type ImportableLocalFile = {
@@ -119,40 +121,47 @@ export async function importFromLocalFolder(
 ): Promise<LocalImportSummary> {
   const summary: LocalImportSummary = {
     scanned: 0,
+    selected: 0,
     imported: 0,
-    updated: 0,
-    unchanged: 0
+    skippedAlreadyExists: 0,
+    metadataUpdated: 0,
+    failed: 0
   };
 
   const filePaths = await resolveImportPaths(importRoot, selectedRelativePaths);
+  summary.selected = filePaths.length;
 
   for (const filePath of filePaths) {
-    summary.scanned += 1;
+    try {
+      summary.scanned += 1;
 
-    const fileStats = await fs.stat(filePath);
-    const extractedMetadata = await extractMetadata(filePath);
-    const upsertAssetInput = {
-      id: buildImportAssetId(importRoot, filePath),
-      filename: path.basename(filePath),
-      captureDateTime: extractedMetadata.captureDateTime ?? fileStats.mtime.toISOString(),
-      thumbnailUrl: buildImportMediaUrl(importRoot, filePath),
-      ...(typeof extractedMetadata.width === 'number' ? { width: extractedMetadata.width } : {}),
-      ...(typeof extractedMetadata.height === 'number' ? { height: extractedMetadata.height } : {})
-    };
+      const fileStats = await fs.stat(filePath);
+      const extractedMetadata = await extractMetadata(filePath);
+      const upsertAssetInput = {
+        id: buildImportAssetId(importRoot, filePath),
+        filename: path.basename(filePath),
+        captureDateTime: extractedMetadata.captureDateTime ?? fileStats.mtime.toISOString(),
+        thumbnailUrl: buildImportMediaUrl(importRoot, filePath),
+        ...(typeof extractedMetadata.width === 'number' ? { width: extractedMetadata.width } : {}),
+        ...(typeof extractedMetadata.height === 'number' ? { height: extractedMetadata.height } : {})
+      };
 
-    const outcome = await upsertImportedAsset(upsertAssetInput);
+      const outcome = await upsertImportedAsset(upsertAssetInput);
 
-    if (outcome === 'inserted') {
-      summary.imported += 1;
-      continue;
+      if (outcome === 'inserted') {
+        summary.imported += 1;
+        continue;
+      }
+
+      if (outcome === 'updated') {
+        summary.metadataUpdated += 1;
+        continue;
+      }
+
+      summary.skippedAlreadyExists += 1;
+    } catch {
+      summary.failed += 1;
     }
-
-    if (outcome === 'updated') {
-      summary.updated += 1;
-      continue;
-    }
-
-    summary.unchanged += 1;
   }
 
   return summary;

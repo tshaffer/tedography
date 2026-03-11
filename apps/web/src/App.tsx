@@ -646,9 +646,11 @@ function SurveyMode({
 export default function App() {
   type ImportSummary = {
     scanned: number;
+    selected: number;
     imported: number;
-    updated: number;
-    unchanged: number;
+    skippedAlreadyExists: number;
+    metadataUpdated: number;
+    failed: number;
   };
 
   type ImportableLocalFile = {
@@ -665,9 +667,11 @@ export default function App() {
   const [importLoading, setImportLoading] = useState(false);
   const [importFilesLoading, setImportFilesLoading] = useState(false);
   const [importPanelOpen, setImportPanelOpen] = useState(false);
+  const [importRoot, setImportRoot] = useState<string | null>(null);
   const [importCandidates, setImportCandidates] = useState<ImportableLocalFile[]>([]);
   const [selectedImportPaths, setSelectedImportPaths] = useState<string[]>([]);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
@@ -914,10 +918,28 @@ export default function App() {
     }
   }
 
+  async function loadImportInfo(): Promise<void> {
+    try {
+      const response = await fetch('/api/import/local/info');
+      const payload = (await response.json()) as { importRoot?: string; error?: string };
+
+      if (!response.ok || typeof payload.importRoot !== 'string') {
+        throw new Error(payload.error ?? `Request failed with status ${response.status}`);
+      }
+
+      setImportRoot(payload.importRoot);
+    } catch {
+      setImportRoot(null);
+      throw new Error('Failed to load import folder info');
+    }
+  }
+
   async function handleImportLocalFolder(selectedRelativePaths?: string[]): Promise<void> {
     setImportLoading(true);
     setImportError(null);
-    setImportMessage(null);
+    setImportSummary(null);
+    const importCount = selectedRelativePaths?.length ?? 0;
+    setImportMessage(`Importing ${importCount} files...`);
 
     try {
       const response = await fetch('/api/import/local', {
@@ -942,17 +964,13 @@ export default function App() {
       }
 
       const summary = payload as ImportSummary;
-      setImportMessage(
-        `Import complete: scanned ${summary.scanned}, imported ${summary.imported}, updated ${summary.updated}, unchanged ${summary.unchanged}.`
-      );
+      setImportMessage(null);
+      setImportSummary(summary);
       await loadAssets({ showLoading: false });
       await loadImportCandidates();
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        setImportError(error.message);
-      } else {
-        setImportError('Failed to import local folder');
-      }
+      setImportMessage(null);
+      setImportError('Import failed. See server logs.');
     } finally {
       setImportLoading(false);
     }
@@ -963,7 +981,13 @@ export default function App() {
     setImportPanelOpen(nextOpen);
 
     if (nextOpen) {
-      await loadImportCandidates();
+      try {
+        await Promise.all([loadImportInfo(), loadImportCandidates()]);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setImportError(error.message);
+        }
+      }
     } else {
       setSelectedImportPaths([]);
       setImportError(null);
@@ -1229,13 +1253,30 @@ export default function App() {
         to multi-select.
       </p>
       {importMessage ? <p>{importMessage}</p> : null}
-      {importError ? <p>Import failed: {importError}</p> : null}
+      {importError ? <p>{importError}</p> : null}
+      {importSummary ? (
+        <section style={importPanelStyle}>
+          <h2 style={{ margin: 0, fontSize: '16px' }}>Import Complete</h2>
+          <p style={{ margin: '8px 0 0 0' }}>Scanned: {importSummary.scanned}</p>
+          <p style={{ margin: '4px 0 0 0' }}>Selected: {importSummary.selected}</p>
+          <p style={{ margin: '4px 0 0 0' }}>Imported: {importSummary.imported}</p>
+          <p style={{ margin: '4px 0 0 0' }}>Already existed: {importSummary.skippedAlreadyExists}</p>
+          <p style={{ margin: '4px 0 0 0' }}>Metadata updated: {importSummary.metadataUpdated}</p>
+          <p style={{ margin: '4px 0 0 0' }}>Failed: {importSummary.failed}</p>
+        </section>
+      ) : null}
 
       {importPanelOpen ? (
         <section style={importPanelStyle}>
           <h2 style={{ margin: 0, fontSize: '16px' }}>Select Local Files</h2>
           <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: '#555' }}>
             Choose files from TEDOGRAPHY_IMPORT_ROOT and import only the selected items.
+          </p>
+          <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '13px' }}>
+            <strong>Import folder:</strong> {importRoot ?? 'Unavailable'}
+          </p>
+          <p style={{ marginTop: '6px', marginBottom: 0, fontSize: '13px' }}>
+            <strong>Files available:</strong> {importCandidates.length}
           </p>
           <div style={{ ...controlsStyle, marginBottom: '0', marginTop: '10px' }}>
             <button
