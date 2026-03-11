@@ -45,7 +45,7 @@ const selectedCardStyle: CSSProperties = {
 };
 
 const thumbnailFrameStyle: CSSProperties = {
-  aspectRatio: '3 / 2',
+  aspectRatio: '4 / 3',
   backgroundColor: '#1f1f1f',
   display: 'flex',
   overflow: 'hidden',
