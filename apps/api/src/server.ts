@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PhotoState } from '@tedography/domain';
 import { config } from './config.js';
-import { importFromLocalFolder } from './import/importFromLocalFolder.js';
+import { importFromLocalFolder, listImportableFiles } from './import/importFromLocalFolder.js';
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 
@@ -73,7 +73,24 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/import/local', async (_req, res) => {
+  app.get('/api/import/local/files', async (_req, res) => {
+    if (!config.importRoot) {
+      res.status(400).json({
+        error: 'TEDOGRAPHY_IMPORT_ROOT is required to list local import files'
+      });
+      return;
+    }
+
+    try {
+      const files = await listImportableFiles(config.importRoot);
+      res.json({ files });
+    } catch (error) {
+      log.error('Failed to list local import files', error);
+      res.status(500).json({ error: 'Failed to list local import files' });
+    }
+  });
+
+  app.post('/api/import/local', async (req, res) => {
     if (!config.importRoot) {
       res.status(400).json({
         error: 'TEDOGRAPHY_IMPORT_ROOT is required to run local import'
@@ -81,10 +98,38 @@ export function createServer(): Express {
       return;
     }
 
+    const selectedRelativePathsValue = (req.body as { selectedRelativePaths?: unknown }).selectedRelativePaths;
+    if (
+      selectedRelativePathsValue !== undefined &&
+      (!Array.isArray(selectedRelativePathsValue) ||
+        selectedRelativePathsValue.some((value) => typeof value !== 'string'))
+    ) {
+      res.status(400).json({ error: 'selectedRelativePaths must be an array of strings' });
+      return;
+    }
+
     try {
-      const summary = await importFromLocalFolder(config.importRoot);
+      const summary = await importFromLocalFolder(
+        config.importRoot,
+        selectedRelativePathsValue as string[] | undefined
+      );
       res.json(summary);
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Invalid selected path')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
+      if (error instanceof Error && error.message.startsWith('Selected file not found')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
+      if (error instanceof Error && error.message.startsWith('Unsupported file type')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
       log.error('Failed to import from local folder', error);
       res.status(500).json({ error: 'Failed to import local folder' });
     }

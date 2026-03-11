@@ -112,6 +112,31 @@ const compareButtonStyle: CSSProperties = {
   padding: '6px 10px'
 };
 
+const importPanelStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '10px',
+  padding: '12px',
+  marginBottom: '14px',
+  backgroundColor: '#fafafa'
+};
+
+const importFileListStyle: CSSProperties = {
+  listStyle: 'none',
+  margin: '10px 0 0 0',
+  maxHeight: '220px',
+  overflow: 'auto',
+  padding: 0
+};
+
+const importFileRowStyle: CSSProperties = {
+  alignItems: 'center',
+  borderBottom: '1px solid #ececec',
+  display: 'grid',
+  gap: '8px',
+  gridTemplateColumns: 'auto 1fr auto auto',
+  padding: '6px 0'
+};
+
 const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -262,6 +287,18 @@ function formatCaptureDate(dateString: string): string {
   }
 
   return parsed.toLocaleString();
+}
+
+function formatBytes(size: number): string {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -614,11 +651,22 @@ export default function App() {
     unchanged: number;
   };
 
+  type ImportableLocalFile = {
+    relativePath: string;
+    filename: string;
+    size: number;
+    modifiedTime: string;
+  };
+
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [importFilesLoading, setImportFilesLoading] = useState(false);
+  const [importPanelOpen, setImportPanelOpen] = useState(false);
+  const [importCandidates, setImportCandidates] = useState<ImportableLocalFile[]>([]);
+  const [selectedImportPaths, setSelectedImportPaths] = useState<string[]>([]);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -832,13 +880,57 @@ export default function App() {
     setSurveyOpen(true);
   }
 
-  async function handleImportLocalFolder(): Promise<void> {
+  async function loadImportCandidates(): Promise<void> {
+    setImportFilesLoading(true);
+    setImportError(null);
+
+    try {
+      const response = await fetch('/api/import/local/files');
+      const payload = (await response.json()) as
+        | { files?: ImportableLocalFile[]; error?: string }
+        | undefined;
+
+      if (!response.ok) {
+        const message =
+          payload && typeof payload.error === 'string'
+            ? payload.error
+            : `Request failed with status ${response.status}`;
+        throw new Error(message);
+      }
+
+      const files = Array.isArray(payload?.files) ? payload.files : [];
+      setImportCandidates(files);
+      setSelectedImportPaths([]);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setImportError(error.message);
+      } else {
+        setImportError('Failed to load import file list');
+      }
+      setImportCandidates([]);
+      setSelectedImportPaths([]);
+    } finally {
+      setImportFilesLoading(false);
+    }
+  }
+
+  async function handleImportLocalFolder(selectedRelativePaths?: string[]): Promise<void> {
     setImportLoading(true);
     setImportError(null);
     setImportMessage(null);
 
     try {
-      const response = await fetch('/api/import/local', { method: 'POST' });
+      const response = await fetch('/api/import/local', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(
+          selectedRelativePaths && selectedRelativePaths.length > 0
+            ? { selectedRelativePaths }
+            : {}
+        )
+      });
       const payload = (await response.json()) as ImportSummary | { error?: string };
 
       if (!response.ok) {
@@ -854,6 +946,7 @@ export default function App() {
         `Import complete: scanned ${summary.scanned}, imported ${summary.imported}, updated ${summary.updated}, unchanged ${summary.unchanged}.`
       );
       await loadAssets({ showLoading: false });
+      await loadImportCandidates();
     } catch (error: unknown) {
       if (error instanceof Error) {
         setImportError(error.message);
@@ -863,6 +956,34 @@ export default function App() {
     } finally {
       setImportLoading(false);
     }
+  }
+
+  async function openImportPanel(): Promise<void> {
+    const nextOpen = !importPanelOpen;
+    setImportPanelOpen(nextOpen);
+
+    if (nextOpen) {
+      await loadImportCandidates();
+    } else {
+      setSelectedImportPaths([]);
+      setImportError(null);
+    }
+  }
+
+  function toggleImportPath(relativePath: string): void {
+    setSelectedImportPaths((previous) =>
+      previous.includes(relativePath)
+        ? previous.filter((pathValue) => pathValue !== relativePath)
+        : [...previous, relativePath]
+    );
+  }
+
+  function selectAllImportPaths(): void {
+    setSelectedImportPaths(importCandidates.map((candidate) => candidate.relativePath));
+  }
+
+  function clearImportSelection(): void {
+    setSelectedImportPaths([]);
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -1099,13 +1220,8 @@ export default function App() {
         >
           Survey ({compareAssets.length})
         </button>
-        <button
-          type="button"
-          style={compareButtonStyle}
-          onClick={() => void handleImportLocalFolder()}
-          disabled={importLoading}
-        >
-          {importLoading ? 'Importing…' : 'Import Local Folder'}
+        <button type="button" style={compareButtonStyle} onClick={() => void openImportPanel()}>
+          {importPanelOpen ? 'Close Import Panel' : 'Import Local Folder'}
         </button>
       </div>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
@@ -1114,6 +1230,77 @@ export default function App() {
       </p>
       {importMessage ? <p>{importMessage}</p> : null}
       {importError ? <p>Import failed: {importError}</p> : null}
+
+      {importPanelOpen ? (
+        <section style={importPanelStyle}>
+          <h2 style={{ margin: 0, fontSize: '16px' }}>Select Local Files</h2>
+          <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: '#555' }}>
+            Choose files from TEDOGRAPHY_IMPORT_ROOT and import only the selected items.
+          </p>
+          <div style={{ ...controlsStyle, marginBottom: '0', marginTop: '10px' }}>
+            <button
+              type="button"
+              style={actionButtonStyle}
+              onClick={() => void loadImportCandidates()}
+              disabled={importFilesLoading || importLoading}
+            >
+              {importFilesLoading ? 'Loading…' : 'Refresh Files'}
+            </button>
+            <button
+              type="button"
+              style={actionButtonStyle}
+              onClick={selectAllImportPaths}
+              disabled={importFilesLoading || importCandidates.length === 0}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              style={actionButtonStyle}
+              onClick={clearImportSelection}
+              disabled={selectedImportPaths.length === 0}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => void handleImportLocalFolder(selectedImportPaths)}
+              disabled={importLoading || selectedImportPaths.length === 0}
+            >
+              {importLoading
+                ? 'Importing…'
+                : `Import Selected (${selectedImportPaths.length})`}
+            </button>
+          </div>
+          {importFilesLoading ? <p>Loading importable files...</p> : null}
+          {!importFilesLoading && importCandidates.length === 0 ? (
+            <p>No importable files found in the configured import folder.</p>
+          ) : null}
+          {!importFilesLoading && importCandidates.length > 0 ? (
+            <ul style={importFileListStyle}>
+              {importCandidates.map((candidate) => {
+                const checked = selectedImportPaths.includes(candidate.relativePath);
+                return (
+                  <li key={candidate.relativePath} style={importFileRowStyle}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleImportPath(candidate.relativePath)}
+                      disabled={importLoading}
+                    />
+                    <span>{candidate.filename}</span>
+                    <span style={{ color: '#666', fontSize: '12px' }}>{formatBytes(candidate.size)}</span>
+                    <span style={{ color: '#777', fontSize: '12px' }}>
+                      {formatCaptureDate(candidate.modifiedTime)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
