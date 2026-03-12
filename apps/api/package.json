@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "debug": "tsx src/index.ts",
+    "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",
+    "thumbnails:repair": "tsx src/tools/thumbnailMaintenance.ts --mode repair",
+    "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",

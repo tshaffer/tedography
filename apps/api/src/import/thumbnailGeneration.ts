@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 export interface GenerateThumbnailInput {
   sourceAbsolutePath: string;
   targetAbsolutePath: string;
+  forceRegenerate?: boolean;
 }
 
 const THUMBNAIL_MAX_BOUND = 400;
@@ -56,7 +57,7 @@ async function hasReusableTarget(targetAbsolutePath: string): Promise<boolean> {
 }
 
 export async function generateJpegThumbnail(input: GenerateThumbnailInput): Promise<void> {
-  if (await hasReusableTarget(input.targetAbsolutePath)) {
+  if (!input.forceRegenerate && (await hasReusableTarget(input.targetAbsolutePath))) {
     return;
   }
 

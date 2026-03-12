@@ -7,6 +7,9 @@
     "dev:web": "pnpm --filter @tedography/web dev",
     "dev:api": "pnpm --filter @tedography/api dev",
     "dev": "concurrently \"pnpm:dev:web\" \"pnpm:dev:api\"",
+    "thumbnails:verify": "pnpm --filter @tedography/api thumbnails:verify",
+    "thumbnails:repair": "pnpm --filter @tedography/api thumbnails:repair",
+    "thumbnails:rebuild": "pnpm --filter @tedography/api thumbnails:rebuild",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },

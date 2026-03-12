@@ -70,6 +70,12 @@ export async function findByOriginalContentHashes(
   ).lean<MediaAsset[]>();
 }
 
+export async function findPhotoAssets(): Promise<MediaAsset[]> {
+  return MediaAssetModel.find({ mediaType: MediaType.Photo }, { _id: 0 })
+    .sort({ id: 1 })
+    .lean<MediaAsset[]>();
+}
+
 export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;
@@ -148,6 +154,25 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
   return MediaAssetModel.findOneAndUpdate(
     { id },
     { $set: { photoState } },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+}
+
+export async function updateThumbnailReferenceFields(input: {
+  id: string;
+  thumbnailStorageType: 'derived-root';
+  thumbnailDerivedPath: string;
+  thumbnailFileFormat: string;
+}): Promise<MediaAsset | null> {
+  return MediaAssetModel.findOneAndUpdate(
+    { id: input.id },
+    {
+      $set: {
+        thumbnailStorageType: input.thumbnailStorageType,
+        thumbnailDerivedPath: input.thumbnailDerivedPath,
+        thumbnailFileFormat: input.thumbnailFileFormat
+      }
+    },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
 }
