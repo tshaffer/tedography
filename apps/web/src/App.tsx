@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
+import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
 import { prefetchImage } from './utilities/imagePrefetch';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
@@ -648,6 +649,8 @@ function SurveyMode({
           </button>
         </div>
 
+        <AssetQuickBar asset={focusedAsset} currentIndex={focusedIndex} totalCount={assets.length} />
+
         <div style={surveyDetailStyle}>
           <p>
             <strong>Focused:</strong> {focusedAsset.filename}
@@ -1294,6 +1297,13 @@ export default function App() {
           </section>
         ) : hasFilteredAssets ? (
           <>
+            {!immersiveOpen ? (
+              <AssetQuickBar
+                asset={selectedAsset}
+                currentIndex={selectedAssetIndex}
+                totalCount={filteredAssets.length}
+              />
+            ) : null}
             <AssetDetailPanel
               asset={selectedAsset}
               isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}

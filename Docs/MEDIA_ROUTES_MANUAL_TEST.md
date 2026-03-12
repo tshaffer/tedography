@@ -68,3 +68,13 @@ Cache-Control: public, max-age=86400
 7. Apply filters that match nothing and verify the no-match message appears with a `Clear Filters` action.
 8. Click `Clear Filters` and verify all assets return.
 9. With no checkboxes selected in either group, verify this is treated as `show all` rather than `show none`.
+
+## Testing Asset Quick Bar
+
+1. Open an asset in normal review view and verify quick bar appears above focused asset details.
+2. Verify quick bar shows: filename, position, state, type, dimensions, capture time, original format.
+3. Open a HEIC-backed asset and verify original format is `heic` and display hint reflects conversion (for example `HEIC → JPG`).
+4. Navigate next/previous and verify quick bar updates immediately with current position and metadata.
+5. Apply filters and verify quick bar position reflects the filtered visible set.
+6. Open immersive fullscreen and verify quick bar is hidden in immersive view.
+7. Open survey mode and verify quick bar reflects the focused survey asset and compare-set position.
