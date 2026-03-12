@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
@@ -1180,6 +1181,7 @@ export default function App() {
               onOpenImmersive={openImmersive}
               onSetPhotoState={handleSetPhotoState}
             />
+            <AssetDetailsPanel asset={selectedAsset} />
             <div style={gridStyle}>
               {filteredAssets.map((asset) => (
                 <AssetCard
@@ -1201,6 +1203,7 @@ export default function App() {
               onOpenImmersive={openImmersive}
               onSetPhotoState={handleSetPhotoState}
             />
+            <AssetDetailsPanel asset={null} />
             <p>No assets match this filter.</p>
           </>
         )

@@ -464,6 +464,24 @@ Also verify in browser devtools:
 - focused/detail/loupe/survey/fullscreen rendering uses `/api/media/display/<assetId>`
 - primary rendering should not depend on `thumbnailUrl` values in asset JSON
 
+### Asset details panel check
+
+1. Select a JPG asset in the grid.
+2. Verify an `Asset Details` panel is visible in the normal non-fullscreen view.
+3. Verify fields are shown for:
+   - filename, photoState, mediaType
+   - capture date/time and dimensions
+   - original format/root/path
+   - display storage/format
+   - thumbnail presence
+4. Select a HEIC-backed asset and verify:
+   - `Original Format` shows `heic`
+   - `Display Format` shows `jpg`
+   - `Display Storage` reflects derived display behavior
+5. Apply a filter that leaves no selected asset and verify placeholder behavior:
+   - `Select a photo to view details.`
+6. Open immersive fullscreen and verify the panel is not shown in immersive overlay UI.
+
 Frontend error checks:
 - unavailable root should show a clear error message in the dialog
 - scan failure should show scan error text
