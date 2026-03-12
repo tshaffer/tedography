@@ -208,3 +208,18 @@ pnpm --filter @tedography/api assets:verify --json
 7. Click an asset in Timeline mode and verify focused asset, loupe, quick bar, and filmstrip continue to work normally.
 8. Reload the app and verify `Library View` mode persists.
 9. Verify assets without capture date appear under `Unknown Date`.
+
+## Testing Library Albums Mode
+
+1. Switch to `Library` and verify default scope remains `Select` assets.
+2. Switch `Library View` to `Albums` and verify album tree is the primary navigator.
+3. With no albums checked, verify scoped empty state appears: `Check one or more albums to browse their photos.`
+4. Check one leaf album and verify only that album's assets are shown.
+5. Check multiple leaf albums and verify visible assets become the union of checked albums.
+6. Set `Album Results` to `Merged` and verify duplicates across albums are deduplicated.
+7. Set `Album Results` to `Grouped by Album` and verify sections render per checked album.
+8. In `Grouped by Album`, verify an asset can appear in multiple sections if it belongs to multiple checked albums.
+9. Apply PhotoState/MediaType/Hide Reject filters and verify album-scoped results update correctly.
+10. Click assets in Albums mode and verify loupe, quick bar, filmstrip, and keyboard navigation remain coherent.
+11. Reload the app and verify `Library View` mode and `Album Results` presentation persist.
+12. Reload and verify checked album ids / expanded groups still restore correctly.
