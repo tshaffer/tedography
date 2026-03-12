@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
+import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
 import { prefetchImage } from './utilities/imagePrefetch';
@@ -980,6 +981,10 @@ export default function App() {
     setMediaTypeFilters([]);
   }
 
+  function handleFilmstripSelectAsset(assetId: string): void {
+    setSelectedAssetId(assetId);
+  }
+
   function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
     if (!immersiveOpen) {
       return;
@@ -1309,6 +1314,11 @@ export default function App() {
               isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
               onOpenImmersive={openImmersive}
               onSetPhotoState={handleSetPhotoState}
+            />
+            <AssetFilmstrip
+              assets={filteredAssets}
+              activeAssetId={selectedAssetId}
+              onSelectAsset={handleFilmstripSelectAsset}
             />
             <AssetDetailsPanel asset={selectedAsset} />
             <div style={gridStyle}>

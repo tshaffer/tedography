@@ -78,3 +78,14 @@ Cache-Control: public, max-age=86400
 5. Apply filters and verify quick bar position reflects the filtered visible set.
 6. Open immersive fullscreen and verify quick bar is hidden in immersive view.
 7. Open survey mode and verify quick bar reflects the focused survey asset and compare-set position.
+
+## Testing Filmstrip Navigation
+
+1. Open the focused review/loupe section.
+2. Verify filmstrip appears below the focused image panel.
+3. Verify filmstrip thumbnails match the currently visible asset set.
+4. Click a filmstrip thumbnail and verify focused asset updates.
+5. Verify active filmstrip thumbnail highlight moves with selection.
+6. Use keyboard left/right navigation and verify filmstrip highlight updates.
+7. Navigate across distant items and verify filmstrip auto-scroll keeps active thumbnail visible.
+8. Apply filters and verify filmstrip updates to only filtered assets.
