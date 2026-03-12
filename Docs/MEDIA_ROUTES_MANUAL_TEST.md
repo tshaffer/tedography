@@ -141,3 +141,29 @@ Cache-Control: public, max-age=86400
    - removed album membership no longer appears on assets.
 10. Attempt to delete a non-empty group and verify deletion is blocked with a clear error.
 11. Reload and verify checked album ids persist; stale ids from deleted albums are ignored safely.
+
+## Testing Asset Integrity Verification
+
+1. Run:
+
+```bash
+pnpm --filter @tedography/api assets:verify
+```
+
+2. Verify summary includes counts for:
+   - assets checked
+   - missing original/display/thumbnail files
+   - invalid original/display/thumbnail references
+   - missing storage roots
+   - file size mismatches
+3. Verify sample problem lines include asset id, filename, category, and message.
+4. Optional JSON output:
+
+```bash
+pnpm --filter @tedography/api assets:verify --json
+```
+
+5. Safe missing-thumbnail simulation (test copy only): temporarily rename one derived thumbnail file under `TEDOGRAPHY_DERIVED_ROOT/thumbnails`, run verify, then restore the file. Expect `MissingThumbnailFile`.
+6. Safe missing-display simulation (test copy only): for a HEIC-backed asset, temporarily rename its derived display file under `TEDOGRAPHY_DERIVED_ROOT/display-jpegs`, run verify, then restore. Expect `MissingDisplayFile`.
+7. Safe missing-original simulation (test copy only): temporarily rename an original file in a non-production test folder, run verify, then restore. Expect `MissingOriginalFile`.
+8. Optional file size mismatch simulation (test copy only): replace a test original with a different-size file at the same path, run verify, then restore. Expect `FileSizeMismatch`.
