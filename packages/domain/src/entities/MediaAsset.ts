@@ -37,7 +37,7 @@ export interface MediaAsset {
   thumbnailUrl?: string | null;
 
   // Virtual organization only; does not affect filesystem storage layout.
-  collectionIds?: string[];
+  albumIds?: string[];
 
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.

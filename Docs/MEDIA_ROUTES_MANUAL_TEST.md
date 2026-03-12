@@ -125,16 +125,19 @@ Cache-Control: public, max-age=86400
 7. Verify filmstrip/loupe navigation uses the same visible ordered set while grouped view is enabled.
 8. Reload the app and verify `Group by Date` preference persists.
 
-## Testing Collections (Virtual Organization)
+## Testing Album Tree (Groups + Albums)
 
-1. Create a collection and verify it appears in the Collections list.
-2. Rename the collection and verify the new name appears immediately.
-3. Delete a collection and verify:
-   - the collection disappears,
-   - assets are not deleted from All Photos,
-   - membership is removed.
-4. Select one or more assets, click `Add to Collection`, and verify they appear when that collection is selected.
-5. While inside a collection scope, select assets and click `Remove from Collection`; verify they disappear from that collection but remain in All Photos.
-6. Switch between `All Photos` and a specific collection and verify visible asset set and navigation update coherently.
-7. Select an empty collection and verify clean empty state appears.
-8. Reload app and verify selected collection scope is restored, or safely falls back to All Photos if the saved collection no longer exists.
+1. Create a `Group` node and a child `Album` node; verify tree renders hierarchy.
+2. Expand/collapse group nodes and reload; verify expanded group ids persist.
+3. Check one album and switch to `Checked Albums` mode; verify visible assets are scoped to that album.
+4. Check two albums with overlapping assets and verify visible set is a deduplicated union.
+5. Uncheck all albums in `Checked Albums` mode and verify the scoped empty message appears.
+6. Click `All Photos` and verify full library returns (still subject to filters).
+7. Select one or more assets and click `Add to Album`; verify album count and scoped view update.
+8. Select an album node, remove selected assets via `Remove from Album`, and verify they leave that album but remain in library.
+9. Delete an album and verify:
+   - album node is removed,
+   - assets remain,
+   - removed album membership no longer appears on assets.
+10. Attempt to delete a non-empty group and verify deletion is blocked with a clear error.
+11. Reload and verify checked album ids persist; stale ids from deleted albums are ignored safely.

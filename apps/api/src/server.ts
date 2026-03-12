@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { PhotoState } from '@tedography/domain';
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
-import { collectionRoutes } from './routes/collectionRoutes.js';
+import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 
@@ -33,7 +33,8 @@ export function createServer(): Express {
   app.use(express.json());
   app.use('/api/import', importRoutes);
   app.use('/api/media', mediaRoutes);
-  app.use('/api/collections', collectionRoutes);
+  app.use('/api/album-tree', albumTreeRoutes);
+  app.use('/api/albums', albumMembershipRoutes);
   app.use('/media', express.static(mockMediaDir));
 
   app.get('/api/health', (_req, res) => {

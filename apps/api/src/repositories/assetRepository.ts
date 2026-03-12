@@ -98,7 +98,7 @@ export interface CreateMediaAssetInput {
   thumbnailDerivedPath: string | null;
   thumbnailFileFormat: string | null;
   thumbnailUrl: string | null;
-  collectionIds?: string[];
+  albumIds?: string[];
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
@@ -126,7 +126,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayArchivePath: input.displayArchivePath,
     displayDerivedPath: input.displayDerivedPath,
     displayFileFormat: input.displayFileFormat,
-    collectionIds: input.collectionIds ?? []
+    albumIds: input.albumIds ?? []
   };
 
   if (input.thumbnailStorageType) {
@@ -182,50 +182,50 @@ export async function updateThumbnailReferenceFields(input: {
   ).lean<MediaAsset | null>();
 }
 
-export async function addAssetToCollection(assetId: string, collectionId: string): Promise<void> {
+export async function addAssetToAlbum(assetId: string, albumId: string): Promise<void> {
   await MediaAssetModel.updateOne(
     { id: assetId },
-    { $addToSet: { collectionIds: collectionId } },
+    { $addToSet: { albumIds: albumId } },
     { runValidators: true }
   );
 }
 
-export async function removeAssetFromCollection(assetId: string, collectionId: string): Promise<void> {
+export async function removeAssetFromAlbum(assetId: string, albumId: string): Promise<void> {
   await MediaAssetModel.updateOne(
     { id: assetId },
-    { $pull: { collectionIds: collectionId } },
+    { $pull: { albumIds: albumId } },
     { runValidators: true }
   );
 }
 
-export async function addAssetsToCollection(assetIds: string[], collectionId: string): Promise<void> {
+export async function addAssetsToAlbum(assetIds: string[], albumId: string): Promise<void> {
   if (assetIds.length === 0) {
     return;
   }
 
   await MediaAssetModel.updateMany(
     { id: { $in: assetIds } },
-    { $addToSet: { collectionIds: collectionId } },
+    { $addToSet: { albumIds: albumId } },
     { runValidators: true }
   );
 }
 
-export async function removeAssetsFromCollection(assetIds: string[], collectionId: string): Promise<void> {
+export async function removeAssetsFromAlbum(assetIds: string[], albumId: string): Promise<void> {
   if (assetIds.length === 0) {
     return;
   }
 
   await MediaAssetModel.updateMany(
     { id: { $in: assetIds } },
-    { $pull: { collectionIds: collectionId } },
+    { $pull: { albumIds: albumId } },
     { runValidators: true }
   );
 }
 
-export async function removeCollectionIdFromAllAssets(collectionId: string): Promise<void> {
+export async function removeAlbumIdFromAllAssets(albumId: string): Promise<void> {
   await MediaAssetModel.updateMany(
-    { collectionIds: collectionId },
-    { $pull: { collectionIds: collectionId } },
+    { albumIds: albumId },
+    { $pull: { albumIds: albumId } },
     { runValidators: true }
   );
 }

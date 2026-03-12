@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
-import { MediaType, PhotoState, type Collection, type MediaAsset } from '@tedography/domain';
+import { MediaType, PhotoState, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
 import {
-  addAssetsToCollection,
-  createCollection,
-  deleteCollection,
-  listCollections,
-  removeAssetsFromCollection,
-  renameCollection
-} from './api/collectionApi';
+  addAssetsToAlbum,
+  createAlbumTreeNode,
+  deleteAlbumTreeNode,
+  listAlbumTreeNodes,
+  removeAssetsFromAlbum,
+  renameAlbumTreeNode
+} from './api/albumTreeApi';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -27,8 +27,9 @@ const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 const hideRejectStorageKey = 'tedography.hideReject';
 const groupByDateStorageKey = 'tedography.groupByDate';
-const selectedCollectionStorageKey = 'tedography.selectedCollectionId';
-const allPhotosCollectionScopeId = 'all';
+const checkedAlbumIdsStorageKey = 'tedography.checkedAlbumIds';
+const expandedAlbumTreeGroupIdsStorageKey = 'tedography.expandedAlbumTreeGroupIds';
+const albumScopeModeStorageKey = 'tedography.albumScopeMode';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -52,7 +53,7 @@ const filterSectionStyle: CSSProperties = {
   backgroundColor: '#fafafa'
 };
 
-const collectionsSectionStyle: CSSProperties = {
+const albumTreeSectionStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '8px',
   padding: '10px',
@@ -60,13 +61,13 @@ const collectionsSectionStyle: CSSProperties = {
   backgroundColor: '#fafafa'
 };
 
-const collectionsListStyle: CSSProperties = {
+const albumTreeListStyle: CSSProperties = {
   display: 'grid',
   gap: '6px',
   marginTop: '8px'
 };
 
-const collectionRowStyle: CSSProperties = {
+const albumTreeRowStyle: CSSProperties = {
   display: 'flex',
   gap: '6px',
   alignItems: 'center',
@@ -465,6 +466,49 @@ function getReplacementAssetIdWhenHidingReject(
   return null;
 }
 
+type AlbumTreeNodeWithDepth = AlbumTreeNode & {
+  depth: number;
+};
+
+function buildAlbumTreeDisplayList(
+  nodes: AlbumTreeNode[],
+  expandedGroupIds: string[]
+): AlbumTreeNodeWithDepth[] {
+  const expandedSet = new Set(expandedGroupIds);
+  const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
+
+  for (const node of nodes) {
+    const siblings = childrenByParent.get(node.parentId) ?? [];
+    siblings.push(node);
+    childrenByParent.set(node.parentId, siblings);
+  }
+
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+
+      return left.label.localeCompare(right.label);
+    });
+  }
+
+  const ordered: AlbumTreeNodeWithDepth[] = [];
+
+  function appendChildren(parentId: string | null, depth: number): void {
+    const children = childrenByParent.get(parentId) ?? [];
+    for (const child of children) {
+      ordered.push({ ...child, depth });
+      if (child.nodeType === 'Group' && expandedSet.has(child.id)) {
+        appendChildren(child.id, depth + 1);
+      }
+    }
+  }
+
+  appendChildren(null, 0);
+  return ordered;
+}
+
 function compareRoleFromPhotoState(photoState: PhotoState): string {
   if (photoState === PhotoState.Select) {
     return 'Winner';
@@ -840,11 +884,11 @@ function SurveyMode({
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [albumTreeNodes, setAlbumTreeNodes] = useState<AlbumTreeNode[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
-  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const [albumTreeLoading, setAlbumTreeLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
-  const [collectionsError, setCollectionsError] = useState<string | null>(null);
+  const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
@@ -875,13 +919,56 @@ export default function App() {
 
     return window.localStorage.getItem(groupByDateStorageKey) === 'true';
   });
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(() => {
+  const [albumScopeMode, setAlbumScopeMode] = useState<'all' | 'checked'>(() => {
     if (typeof window === 'undefined') {
-      return allPhotosCollectionScopeId;
+      return 'all';
     }
 
-    return window.localStorage.getItem(selectedCollectionStorageKey) ?? allPhotosCollectionScopeId;
+    return window.localStorage.getItem(albumScopeModeStorageKey) === 'checked' ? 'checked' : 'all';
   });
+  const [checkedAlbumIds, setCheckedAlbumIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const stored = window.localStorage.getItem(checkedAlbumIdsStorageKey);
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter((entry): entry is string => typeof entry === 'string');
+    } catch {
+      return [];
+    }
+  });
+  const [expandedGroupIds, setExpandedGroupIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const stored = window.localStorage.getItem(expandedAlbumTreeGroupIdsStorageKey);
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter((entry): entry is string => typeof entry === 'string');
+    } catch {
+      return [];
+    }
+  });
+  const [selectedTreeNodeId, setSelectedTreeNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -909,8 +996,16 @@ export default function App() {
   }, [groupByDate]);
 
   useEffect(() => {
-    window.localStorage.setItem(selectedCollectionStorageKey, selectedCollectionId);
-  }, [selectedCollectionId]);
+    window.localStorage.setItem(albumScopeModeStorageKey, albumScopeMode);
+  }, [albumScopeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(checkedAlbumIdsStorageKey, JSON.stringify(checkedAlbumIds));
+  }, [checkedAlbumIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(expandedAlbumTreeGroupIdsStorageKey, JSON.stringify(expandedGroupIds));
+  }, [expandedGroupIds]);
 
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
@@ -938,44 +1033,59 @@ export default function App() {
     }
   }
 
-  async function loadCollections(options?: { showLoading?: boolean }): Promise<void> {
+  async function loadAlbumTreeNodes(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
-      setCollectionsLoading(true);
+      setAlbumTreeLoading(true);
     }
 
-    setCollectionsError(null);
+    setAlbumTreeError(null);
 
     try {
-      const data = await listCollections();
-      setCollections(data);
+      const data = await listAlbumTreeNodes();
+      setAlbumTreeNodes(data);
     } catch (error: unknown) {
       if (error instanceof Error) {
-        setCollectionsError(error.message);
+        setAlbumTreeError(error.message);
       } else {
-        setCollectionsError('Unknown error');
+        setAlbumTreeError('Unknown error');
       }
     } finally {
-      setCollectionsLoading(false);
+      setAlbumTreeLoading(false);
     }
   }
 
   useEffect(() => {
     void loadAssets({ showLoading: true });
-    void loadCollections({ showLoading: true });
+    void loadAlbumTreeNodes({ showLoading: true });
   }, []);
 
   useEffect(() => {
-    if (selectedCollectionId === allPhotosCollectionScopeId) {
-      return;
+    const albumNodeIds = new Set(
+      albumTreeNodes.filter((node) => node.nodeType === 'Album').map((node) => node.id)
+    );
+
+    const nextCheckedIds = checkedAlbumIds.filter((id) => albumNodeIds.has(id));
+    if (!arraysEqual(nextCheckedIds, checkedAlbumIds)) {
+      setCheckedAlbumIds(nextCheckedIds);
     }
 
-    const exists = collections.some((collection) => collection.id === selectedCollectionId);
-    if (!exists) {
-      setSelectedCollectionId(allPhotosCollectionScopeId);
+    const groupNodeIds = new Set(
+      albumTreeNodes.filter((node) => node.nodeType === 'Group').map((node) => node.id)
+    );
+    const nextExpandedIds = expandedGroupIds.filter((id) => groupNodeIds.has(id));
+    if (!arraysEqual(nextExpandedIds, expandedGroupIds)) {
+      setExpandedGroupIds(nextExpandedIds);
     }
-  }, [collections, selectedCollectionId]);
 
-  const selectedAssetIdsForCollectionAction = useMemo(() => {
+    if (selectedTreeNodeId) {
+      const exists = albumTreeNodes.some((node) => node.id === selectedTreeNodeId);
+      if (!exists) {
+        setSelectedTreeNodeId(null);
+      }
+    }
+  }, [albumTreeNodes, checkedAlbumIds, expandedGroupIds, selectedTreeNodeId]);
+
+  const selectedAssetIdsForAlbumAction = useMemo(() => {
     if (selectedAssetIds.length > 0) {
       return selectedAssetIds;
     }
@@ -983,33 +1093,56 @@ export default function App() {
     return selectedAssetId ? [selectedAssetId] : [];
   }, [selectedAssetId, selectedAssetIds]);
 
-  const selectedCollection = useMemo(
-    () => collections.find((collection) => collection.id === selectedCollectionId) ?? null,
-    [collections, selectedCollectionId]
+  const albumNodesById = useMemo(
+    () =>
+      new Map<string, AlbumTreeNode>(
+        albumTreeNodes.map((node) => [node.id, node])
+      ),
+    [albumTreeNodes]
   );
 
-  const collectionAssetCounts = useMemo(() => {
+  const albumNodes = useMemo(
+    () => albumTreeNodes.filter((node) => node.nodeType === 'Album'),
+    [albumTreeNodes]
+  );
+
+  const albumAssetCounts = useMemo(() => {
     const counts = new Map<string, number>();
 
     for (const asset of assets) {
-      for (const collectionId of asset.collectionIds ?? []) {
-        counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1);
+      for (const albumId of asset.albumIds ?? []) {
+        counts.set(albumId, (counts.get(albumId) ?? 0) + 1);
       }
     }
 
     return counts;
   }, [assets]);
 
-  const collectionScopedAssets = useMemo(() => {
-    if (selectedCollectionId === allPhotosCollectionScopeId) {
+  const hasCheckedAlbums = checkedAlbumIds.length > 0;
+
+  const albumScopedAssets = useMemo(() => {
+    if (albumScopeMode === 'all') {
       return assets;
     }
 
-    return assets.filter((asset) => (asset.collectionIds ?? []).includes(selectedCollectionId));
-  }, [assets, selectedCollectionId]);
+    if (checkedAlbumIds.length === 0) {
+      return [];
+    }
+
+    const checkedSet = new Set(checkedAlbumIds);
+    const deduped = new Map<string, MediaAsset>();
+    for (const asset of assets) {
+      const belongsToCheckedAlbum = (asset.albumIds ?? []).some((albumId) => checkedSet.has(albumId));
+      if (belongsToCheckedAlbum) {
+        deduped.set(asset.id, asset);
+      }
+    }
+
+    return [...deduped.values()];
+  }, [albumScopeMode, assets, checkedAlbumIds]);
 
   const filteredAssets = useMemo(() => {
-    return collectionScopedAssets.filter((asset) => {
+    return albumScopedAssets.filter((asset) => {
       const matchesPhotoState =
         photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
       const matchesMediaType =
@@ -1018,7 +1151,7 @@ export default function App() {
 
       return matchesPhotoState && matchesMediaType && matchesHideReject;
     });
-  }, [collectionScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
+  }, [albumScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
 
   const visibleAssets = useMemo(
     () => sortVisibleAssetsForTimeline(filteredAssets),
@@ -1061,7 +1194,11 @@ export default function App() {
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
   const hasFilteredAssets = visibleAssets.length > 0;
   const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
-  const hasCollectionScope = selectedCollectionId !== allPhotosCollectionScopeId;
+  const isAlbumScopeMode = albumScopeMode === 'checked';
+  const treeDisplayNodes = useMemo(
+    () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
+    [albumTreeNodes, expandedGroupIds]
+  );
 
   useEffect(() => {
     const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
@@ -1251,132 +1388,194 @@ export default function App() {
     setHideReject(nextValue);
   }
 
-  function handleSelectCollectionScope(collectionId: string): void {
-    setSelectedCollectionId(collectionId);
+  function handleSetAllPhotosScope(): void {
+    setAlbumScopeMode('all');
   }
 
-  async function handleCreateCollection(): Promise<void> {
-    const input = window.prompt('Collection name');
+  function handleSetCheckedAlbumScope(): void {
+    setAlbumScopeMode('checked');
+  }
+
+  function toggleGroupExpanded(groupId: string): void {
+    setExpandedGroupIds((previous) =>
+      previous.includes(groupId)
+        ? previous.filter((id) => id !== groupId)
+        : [...previous, groupId]
+    );
+  }
+
+  function toggleAlbumChecked(albumId: string): void {
+    setAlbumScopeMode('checked');
+    setCheckedAlbumIds((previous) =>
+      previous.includes(albumId)
+        ? previous.filter((id) => id !== albumId)
+        : [...previous, albumId]
+    );
+  }
+
+  async function handleCreateGroup(): Promise<void> {
+    const input = window.prompt('Group label');
     if (!input) {
       return;
     }
 
-    const name = input.trim();
-    if (name.length === 0) {
+    const label = input.trim();
+    if (label.length === 0) {
       return;
     }
 
+    const selectedNode = selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) : null;
+    const parentId =
+      selectedNode && selectedNode.nodeType === 'Group' ? selectedNode.id : selectedNode?.parentId ?? null;
+
     try {
-      const created = await createCollection(name);
-      setCollections((previous) => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedCollectionId(created.id);
+      await createAlbumTreeNode({ label, nodeType: 'Group', parentId });
+      await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to create collection');
+      setUpdateError(error instanceof Error ? error.message : 'Failed to create group');
     }
   }
 
-  async function handleRenameCollection(collectionId: string): Promise<void> {
-    const current = collections.find((collection) => collection.id === collectionId);
-    if (!current) {
-      return;
-    }
-
-    const input = window.prompt('Rename collection', current.name);
+  async function handleCreateAlbum(): Promise<void> {
+    const input = window.prompt('Album label');
     if (!input) {
       return;
     }
 
-    const name = input.trim();
-    if (name.length === 0) {
+    const label = input.trim();
+    if (label.length === 0) {
       return;
     }
 
+    const selectedNode = selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) : null;
+    const parentId =
+      selectedNode && selectedNode.nodeType === 'Group' ? selectedNode.id : selectedNode?.parentId ?? null;
+
     try {
-      const updated = await renameCollection(collectionId, name);
-      setCollections((previous) =>
-        previous
-          .map((collection) => (collection.id === collectionId ? updated : collection))
-          .sort((a, b) => a.name.localeCompare(b.name))
+      const created = await createAlbumTreeNode({ label, nodeType: 'Album', parentId });
+      setAlbumScopeMode('checked');
+      setCheckedAlbumIds((previous) => (previous.includes(created.id) ? previous : [...previous, created.id]));
+      setExpandedGroupIds((previous) =>
+        parentId && !previous.includes(parentId) ? [...previous, parentId] : previous
       );
+      await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to rename collection');
+      setUpdateError(error instanceof Error ? error.message : 'Failed to create album');
     }
   }
 
-  async function handleDeleteCollection(collectionId: string): Promise<void> {
-    const current = collections.find((collection) => collection.id === collectionId);
+  async function handleRenameSelectedTreeNode(): Promise<void> {
+    if (!selectedTreeNodeId) {
+      return;
+    }
+
+    const current = albumNodesById.get(selectedTreeNodeId);
     if (!current) {
       return;
     }
 
-    const confirmed = window.confirm(`Delete collection "${current.name}"?`);
+    const input = window.prompt('Rename node', current.label);
+    if (!input) {
+      return;
+    }
+
+    const label = input.trim();
+    if (label.length === 0) {
+      return;
+    }
+
+    try {
+      await renameAlbumTreeNode(selectedTreeNodeId, label);
+      await loadAlbumTreeNodes({ showLoading: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to rename node');
+    }
+  }
+
+  async function handleDeleteSelectedTreeNode(): Promise<void> {
+    if (!selectedTreeNodeId) {
+      return;
+    }
+
+    const current = albumNodesById.get(selectedTreeNodeId);
+    if (!current) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${current.nodeType.toLowerCase()} "${current.label}"?`);
     if (!confirmed) {
       return;
     }
 
     try {
-      await deleteCollection(collectionId);
-      setCollections((previous) => previous.filter((collection) => collection.id !== collectionId));
-      if (selectedCollectionId === collectionId) {
-        setSelectedCollectionId(allPhotosCollectionScopeId);
+      await deleteAlbumTreeNode(current.id);
+      setSelectedTreeNodeId(null);
+      if (current.nodeType === 'Album') {
+        setCheckedAlbumIds((previous) => previous.filter((id) => id !== current.id));
       }
+      await loadAlbumTreeNodes({ showLoading: false });
       await loadAssets({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to delete collection');
+      setUpdateError(error instanceof Error ? error.message : 'Failed to delete node');
     }
   }
 
-  async function handleAddSelectedToCollection(): Promise<void> {
-    if (selectedAssetIdsForCollectionAction.length === 0) {
+  async function handleAddSelectedToAlbum(): Promise<void> {
+    if (selectedAssetIdsForAlbumAction.length === 0) {
       return;
     }
 
-    if (collections.length === 0) {
-      setUpdateError('Create a collection first');
+    if (albumNodes.length === 0) {
+      setUpdateError('Create an album first');
       return;
     }
 
-    const options = collections.map((collection) => collection.name).join(', ');
-    const input = window.prompt(`Add selected assets to collection (name)\n${options}`);
+    const options = albumNodes.map((album) => album.label).join(', ');
+    const input = window.prompt(`Add selected assets to album (label)\n${options}`);
     if (!input) {
       return;
     }
 
-    const selectedName = input.trim().toLowerCase();
-    const targetCollection = collections.find(
-      (collection) => collection.name.trim().toLowerCase() === selectedName
+    const selectedLabel = input.trim().toLowerCase();
+    const targetAlbum = albumNodes.find(
+      (album) => album.label.trim().toLowerCase() === selectedLabel
     );
-    if (!targetCollection) {
-      setUpdateError('Collection not found');
+    if (!targetAlbum) {
+      setUpdateError('Album not found');
       return;
     }
 
     try {
-      await addAssetsToCollection(targetCollection.id, {
-        assetIds: selectedAssetIdsForCollectionAction
+      await addAssetsToAlbum(targetAlbum.id, {
+        assetIds: selectedAssetIdsForAlbumAction
       });
       await loadAssets({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to add assets to collection');
+      setUpdateError(error instanceof Error ? error.message : 'Failed to add assets to album');
     }
   }
 
-  async function handleRemoveSelectedFromCurrentCollection(): Promise<void> {
-    if (selectedCollectionId === allPhotosCollectionScopeId) {
+  async function handleRemoveSelectedFromFocusedAlbum(): Promise<void> {
+    if (!selectedTreeNodeId) {
       return;
     }
 
-    if (selectedAssetIdsForCollectionAction.length === 0) {
+    const focusedNode = albumNodesById.get(selectedTreeNodeId);
+    if (!focusedNode || focusedNode.nodeType !== 'Album') {
+      return;
+    }
+
+    if (selectedAssetIdsForAlbumAction.length === 0) {
       return;
     }
 
     try {
-      await removeAssetsFromCollection(selectedCollectionId, {
-        assetIds: selectedAssetIdsForCollectionAction
+      await removeAssetsFromAlbum(focusedNode.id, {
+        assetIds: selectedAssetIdsForAlbumAction
       });
       await loadAssets({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to remove assets from collection');
+      setUpdateError(error instanceof Error ? error.message : 'Failed to remove assets from album');
     }
   }
 
@@ -1639,23 +1838,42 @@ export default function App() {
         <button
           type="button"
           style={compareButtonStyle}
-          onClick={() => void handleAddSelectedToCollection()}
-          disabled={selectedAssetIdsForCollectionAction.length === 0}
+          onClick={() => void handleAddSelectedToAlbum()}
+          disabled={selectedAssetIdsForAlbumAction.length === 0}
         >
-          Add to Collection ({selectedAssetIdsForCollectionAction.length})
+          Add to Album ({selectedAssetIdsForAlbumAction.length})
         </button>
-        {hasCollectionScope ? (
+        {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
           <button
             type="button"
             style={compareButtonStyle}
-            onClick={() => void handleRemoveSelectedFromCurrentCollection()}
-            disabled={selectedAssetIdsForCollectionAction.length === 0}
+            onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
+            disabled={selectedAssetIdsForAlbumAction.length === 0}
           >
-            Remove from Collection
+            Remove from Album
           </button>
         ) : null}
-        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateCollection()}>
-          New Collection
+        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateGroup()}>
+          New Group
+        </button>
+        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateAlbum()}>
+          New Album
+        </button>
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={() => void handleRenameSelectedTreeNode()}
+          disabled={!selectedTreeNodeId}
+        >
+          Rename Node
+        </button>
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={() => void handleDeleteSelectedTreeNode()}
+          disabled={!selectedTreeNodeId}
+        >
+          Delete Node
         </button>
         <label style={toggleOptionLabelStyle}>
           <input
@@ -1682,49 +1900,74 @@ export default function App() {
           Group by Date
         </label>
       </div>
-      <section style={collectionsSectionStyle}>
-        <strong>Collections</strong>
-        {collectionsLoading ? <p>Loading collections...</p> : null}
-        {collectionsError ? <p>Failed to load collections: {collectionsError}</p> : null}
-        {!collectionsLoading ? (
-          <div style={collectionsListStyle}>
-            <div style={collectionRowStyle}>
-              <button
-                type="button"
-                style={compareButtonStyle}
-                onClick={() => handleSelectCollectionScope(allPhotosCollectionScopeId)}
-                disabled={selectedCollectionId === allPhotosCollectionScopeId}
-              >
-                All Photos ({assets.length})
-              </button>
-            </div>
-            {collections.map((collection) => (
-              <div key={collection.id} style={collectionRowStyle}>
-                <button
-                  type="button"
-                  style={compareButtonStyle}
-                  onClick={() => handleSelectCollectionScope(collection.id)}
-                  disabled={selectedCollectionId === collection.id}
-                >
-                  {collection.name} ({collectionAssetCounts.get(collection.id) ?? 0})
-                </button>
-                <button
-                  type="button"
-                  style={compareButtonStyle}
-                  onClick={() => void handleRenameCollection(collection.id)}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  style={compareButtonStyle}
-                  onClick={() => void handleDeleteCollection(collection.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
-            {collections.length === 0 ? <p>No collections yet. Create one to organize assets.</p> : null}
+      <section style={albumTreeSectionStyle}>
+        <strong>Albums</strong>
+        <div style={albumTreeRowStyle}>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={handleSetAllPhotosScope}
+            disabled={albumScopeMode === 'all'}
+          >
+            All Photos ({assets.length})
+          </button>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={handleSetCheckedAlbumScope}
+            disabled={albumScopeMode === 'checked'}
+          >
+            Checked Albums ({checkedAlbumIds.length})
+          </button>
+        </div>
+        {albumTreeLoading ? <p>Loading album tree...</p> : null}
+        {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
+        {!albumTreeLoading ? (
+          <div style={albumTreeListStyle}>
+            {treeDisplayNodes.length === 0 ? (
+              <p>No tree nodes yet. Create a Group or Album.</p>
+            ) : (
+              treeDisplayNodes.map((node) => {
+                const isGroup = node.nodeType === 'Group';
+                const isExpanded = expandedGroupIds.includes(node.id);
+                const isChecked = checkedAlbumIds.includes(node.id);
+                const isSelected = selectedTreeNodeId === node.id;
+                const childPrefix = ' '.repeat(node.depth * 2);
+
+                return (
+                  <div key={node.id} style={albumTreeRowStyle}>
+                    <span style={{ minWidth: `${node.depth * 18}px` }}>{childPrefix}</span>
+                    {isGroup ? (
+                      <button
+                        type="button"
+                        style={compareButtonStyle}
+                        onClick={() => toggleGroupExpanded(node.id)}
+                      >
+                        {isExpanded ? '▾' : '▸'}
+                      </button>
+                    ) : (
+                      <span style={{ width: '34px' }} />
+                    )}
+                    {!isGroup ? (
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleAlbumChecked(node.id)}
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      style={compareButtonStyle}
+                      onClick={() => setSelectedTreeNodeId(node.id)}
+                      disabled={isSelected}
+                    >
+                      {node.label}
+                      {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         ) : null}
       </section>
@@ -1860,8 +2103,10 @@ export default function App() {
               onSetPhotoState={handleSetPhotoState}
             />
             <AssetDetailsPanel asset={null} />
-            {hasCollectionScope && collectionScopedAssets.length === 0 ? (
-              <p>This collection has no assets yet.</p>
+            {isAlbumScopeMode && !hasCheckedAlbums ? (
+              <p>Check one or more albums to view their media.</p>
+            ) : isAlbumScopeMode && albumScopedAssets.length === 0 ? (
+              <p>The checked albums contain no assets yet.</p>
             ) : (
               <p>No visible assets match the current filters.</p>
             )}
@@ -1881,11 +2126,11 @@ export default function App() {
                 ) : null}
               </div>
             ) : null}
-            {hasCollectionScope ? (
+            {isAlbumScopeMode ? (
               <button
                 type="button"
                 style={compareButtonStyle}
-                onClick={() => handleSelectCollectionScope(allPhotosCollectionScopeId)}
+                onClick={handleSetAllPhotosScope}
               >
                 All Photos
               </button>
@@ -1930,7 +2175,7 @@ export default function App() {
         onClose={() => setImportDialogOpen(false)}
         onImportCompleted={() => {
           void loadAssets({ showLoading: false });
-          void loadCollections({ showLoading: false });
+          void loadAlbumTreeNodes({ showLoading: false });
         }}
       />
     </div>

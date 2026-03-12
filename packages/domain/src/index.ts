@@ -1,6 +1,6 @@
 export * from './entities/Album.js';
+export * from './entities/AlbumTreeNode.js';
 export * from './entities/AssetEvent.js';
-export * from './entities/Collection.js';
 export * from './entities/MediaAsset.js';
 export * from './entities/PendingGroup.js';
 export * from './entities/Person.js';
