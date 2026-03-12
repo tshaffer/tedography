@@ -56,3 +56,15 @@ Cache-Control: public, max-age=86400
 6. After image `N` load succeeds, verify background requests are made for image `N+1` first and image `N-1` second (when those neighbors exist).
 7. Navigate quickly with left/right keys across several images and verify stale older loads do not trigger obviously wrong neighbor prefetches.
 8. Navigate to next/previous using arrow keys or viewer controls and verify the viewed image is already cached (no extra network fetch for that same display URL).
+
+## Testing Asset Filtering
+
+1. Start with no filters selected and verify all assets are visible.
+2. Under `Filters`, select one photo state (for example `Unreviewed`) and verify only that state remains.
+3. Select multiple photo states and verify the result is a union within photo state.
+4. Select one media type (`Photo` or `Video`) and verify only that media type remains.
+5. Combine photo state + media type selections and verify AND behavior across categories.
+6. If current focused asset is filtered out, verify focus/selection moves to a visible asset when available.
+7. Apply filters that match nothing and verify the no-match message appears with a `Clear Filters` action.
+8. Click `Clear Filters` and verify all assets return.
+9. With no checkboxes selected in either group, verify this is treated as `show all` rather than `show none`.

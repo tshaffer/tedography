@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
-import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
 import { prefetchImage } from './utilities/imagePrefetch';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
-type AssetFilter = 'All' | PhotoState;
-
-const filterOptions: AssetFilter[] = [
-  'All',
+const photoStateFilterOptions: PhotoState[] = [
   PhotoState.Unreviewed,
   PhotoState.Pending,
   PhotoState.Select,
   PhotoState.Reject
 ];
+
+const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -26,7 +25,42 @@ const controlsStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   gap: '10px',
-  marginBottom: '16px'
+  marginBottom: '10px'
+};
+
+const filterSectionStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '8px',
+  padding: '10px',
+  marginBottom: '14px',
+  backgroundColor: '#fafafa'
+};
+
+const filterRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: '12px',
+  marginTop: '8px'
+};
+
+const filterGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: '8px'
+};
+
+const filterLabelStyle: CSSProperties = {
+  fontWeight: 600,
+  fontSize: '13px'
+};
+
+const filterOptionLabelStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  fontSize: '13px'
 };
 
 const gridStyle: CSSProperties = {
@@ -705,7 +739,8 @@ export default function App() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
-  const [filter, setFilter] = useState<AssetFilter>('All');
+  const [photoStateFilters, setPhotoStateFilters] = useState<PhotoState[]>([]);
+  const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [immersiveOpen, setImmersiveOpen] = useState(false);
@@ -755,12 +790,15 @@ export default function App() {
   }, []);
 
   const filteredAssets = useMemo(() => {
-    if (filter === 'All') {
-      return assets;
-    }
+    return assets.filter((asset) => {
+      const matchesPhotoState =
+        photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
+      const matchesMediaType =
+        mediaTypeFilters.length === 0 || mediaTypeFilters.includes(asset.mediaType);
 
-    return assets.filter((asset) => asset.photoState === filter);
-  }, [assets, filter]);
+      return matchesPhotoState && matchesMediaType;
+    });
+  }, [assets, mediaTypeFilters, photoStateFilters]);
 
   const selectedAsset = useMemo(
     () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -792,6 +830,7 @@ export default function App() {
 
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
   const hasFilteredAssets = filteredAssets.length > 0;
+  const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0;
 
   useEffect(() => {
     const visibleIds = new Set(filteredAssets.map((asset) => asset.id));
@@ -915,6 +954,27 @@ export default function App() {
 
     setImmersiveOpen(false);
     setSurveyOpen(true);
+  }
+
+  function togglePhotoStateFilter(photoState: PhotoState): void {
+    setPhotoStateFilters((previous) =>
+      previous.includes(photoState)
+        ? previous.filter((state) => state !== photoState)
+        : [...previous, photoState]
+    );
+  }
+
+  function toggleMediaTypeFilter(mediaType: MediaType): void {
+    setMediaTypeFilters((previous) =>
+      previous.includes(mediaType)
+        ? previous.filter((type) => type !== mediaType)
+        : [...previous, mediaType]
+    );
+  }
+
+  function clearFilters(): void {
+    setPhotoStateFilters([]);
+    setMediaTypeFilters([]);
   }
 
   function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
@@ -1154,18 +1214,6 @@ export default function App() {
       <p>API status: {healthStatus}</p>
 
       <div style={controlsStyle}>
-        <label htmlFor="asset-filter">Photo state:</label>
-        <select
-          id="asset-filter"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as AssetFilter)}
-        >
-          {filterOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
           style={compareButtonStyle}
@@ -1182,6 +1230,45 @@ export default function App() {
           Import
         </button>
       </div>
+      <section style={filterSectionStyle}>
+        <strong>Filters</strong>
+        <div style={filterRowStyle}>
+          <div style={filterGroupStyle}>
+            <span style={filterLabelStyle}>Photo State:</span>
+            {photoStateFilterOptions.map((option) => (
+              <label key={option} style={filterOptionLabelStyle}>
+                <input
+                  type="checkbox"
+                  checked={photoStateFilters.includes(option)}
+                  onChange={() => togglePhotoStateFilter(option)}
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+          <div style={filterGroupStyle}>
+            <span style={filterLabelStyle}>Media Type:</span>
+            {mediaTypeFilterOptions.map((option) => (
+              <label key={option} style={filterOptionLabelStyle}>
+                <input
+                  type="checkbox"
+                  checked={mediaTypeFilters.includes(option)}
+                  onChange={() => toggleMediaTypeFilter(option)}
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
+        </div>
+      </section>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click
         to multi-select.
@@ -1236,7 +1323,12 @@ export default function App() {
               onSetPhotoState={handleSetPhotoState}
             />
             <AssetDetailsPanel asset={null} />
-            <p>No assets match this filter.</p>
+            <p>No assets match the current filters.</p>
+            {hasActiveFilters ? (
+              <button type="button" style={compareButtonStyle} onClick={clearFilters}>
+                Clear Filters
+              </button>
+            ) : null}
           </>
         )
       ) : null}
