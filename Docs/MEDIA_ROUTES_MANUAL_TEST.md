@@ -91,3 +91,14 @@ Cache-Control: public, max-age=86400
 8. Click a distant thumbnail and verify loupe updates and the strip recenters to that item.
 9. Manually scroll the filmstrip and verify the UI does not continuously fight that manual scroll.
 10. Apply filters and verify filmstrip updates to only filtered assets.
+
+## Testing Advance-After-Rating
+
+1. Disable `Advance after rating`.
+2. Set current asset to `Select`, `Pending`, and `Reject`; verify state changes and active asset stays on the same item.
+3. Enable `Advance after rating`.
+4. Set current asset to `Select`, `Pending`, and `Reject`; verify state changes and active asset advances to the next visible asset.
+5. On the last visible asset, rate it and verify there is no wraparound.
+6. Filter to `Unreviewed` only, enable advance-after-rating, and rate current asset so it leaves filter; verify focus advances to the next remaining visible item or clean no-match state.
+7. Verify keyboard review shortcuts (S/P/R/U) also advance when the option is enabled.
+8. Reload the page and verify `Advance after rating` persists using the previous toggle value.

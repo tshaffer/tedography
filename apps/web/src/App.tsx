@@ -15,6 +15,7 @@ const photoStateFilterOptions: PhotoState[] = [
 ];
 
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
+const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -62,6 +63,13 @@ const filterOptionLabelStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: '4px',
+  fontSize: '13px'
+};
+
+const toggleOptionLabelStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
   fontSize: '13px'
 };
 
@@ -749,6 +757,13 @@ export default function App() {
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [immersiveOpen, setImmersiveOpen] = useState(false);
   const [surveyOpen, setSurveyOpen] = useState(false);
+  const [advanceAfterRating, setAdvanceAfterRating] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(advanceAfterRatingStorageKey) === 'true';
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -762,6 +777,10 @@ export default function App() {
       })
       .catch(() => setHealthStatus('error'));
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(advanceAfterRatingStorageKey, advanceAfterRating ? 'true' : 'false');
+  }, [advanceAfterRating]);
 
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
@@ -882,6 +901,14 @@ export default function App() {
   }
 
   async function handleSetPhotoState(assetId: string, photoState: PhotoState): Promise<void> {
+    const shouldAdvanceActiveAsset = advanceAfterRating && assetId === selectedAssetId;
+    const navigationList = surveyOpen ? compareAssets : filteredAssets;
+    const currentIndex = navigationList.findIndex((asset) => asset.id === assetId);
+    const nextAssetId =
+      shouldAdvanceActiveAsset && currentIndex >= 0 && currentIndex < navigationList.length - 1
+        ? navigationList[currentIndex + 1]?.id ?? null
+        : null;
+
     setAssetUpdating(assetId, true);
     setUpdateError(null);
 
@@ -902,6 +929,10 @@ export default function App() {
       setAssets((previous) =>
         previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
       );
+
+      if (nextAssetId) {
+        setSelectedAssetId(nextAssetId);
+      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         setUpdateError(`Failed to update asset ${assetId}: ${error.message}`);
@@ -1237,6 +1268,14 @@ export default function App() {
         >
           Import
         </button>
+        <label style={toggleOptionLabelStyle}>
+          <input
+            type="checkbox"
+            checked={advanceAfterRating}
+            onChange={(event) => setAdvanceAfterRating(event.target.checked)}
+          />
+          Advance after rating
+        </label>
       </div>
       <section style={filterSectionStyle}>
         <strong>Filters</strong>
