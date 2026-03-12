@@ -102,3 +102,14 @@ Cache-Control: public, max-age=86400
 6. Filter to `Unreviewed` only, enable advance-after-rating, and rate current asset so it leaves filter; verify focus advances to the next remaining visible item or clean no-match state.
 7. Verify keyboard review shortcuts (S/P/R/U) also advance when the option is enabled.
 8. Reload the page and verify `Advance after rating` persists using the previous toggle value.
+
+## Testing Hide Reject
+
+1. With `Hide Reject` OFF, verify rejected assets remain visible in grid, review context, and filmstrip.
+2. Turn `Hide Reject` ON and verify rejected assets disappear from the current visible set.
+3. If current active asset is rejected when turning ON, verify selection moves to next visible asset, otherwise previous, otherwise clears cleanly.
+4. With `Hide Reject` ON, rate current asset to `Reject` and verify it disappears immediately and focus moves to next visible asset (or previous/none if needed).
+5. Verify loupe navigation and filmstrip stay consistent with the same post-hide visible set.
+6. Combine `Hide Reject` with existing PhotoState/MediaType filters and verify behavior remains coherent.
+7. Force a no-visible-assets state and verify message appears with recovery actions (`Clear Filters` and `Show Rejects` when applicable).
+8. Reload the app and verify `Hide Reject` preference persists.

@@ -16,6 +16,7 @@ const photoStateFilterOptions: PhotoState[] = [
 
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
+const hideRejectStorageKey = 'tedography.hideReject';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -369,6 +370,51 @@ function arraysEqual(left: string[], right: string[]): boolean {
   }
 
   return left.every((id, index) => id === right[index]);
+}
+
+function getAdjacentReplacementAssetId(list: MediaAsset[], currentAssetId: string): string | null {
+  const currentIndex = list.findIndex((asset) => asset.id === currentAssetId);
+  if (currentIndex < 0) {
+    return null;
+  }
+
+  const nextAsset = list[currentIndex + 1];
+  if (nextAsset) {
+    return nextAsset.id;
+  }
+
+  const previousAsset = list[currentIndex - 1];
+  if (previousAsset) {
+    return previousAsset.id;
+  }
+
+  return null;
+}
+
+function getReplacementAssetIdWhenHidingReject(
+  list: MediaAsset[],
+  currentAssetId: string
+): string | null {
+  const currentIndex = list.findIndex((asset) => asset.id === currentAssetId);
+  if (currentIndex < 0) {
+    return null;
+  }
+
+  for (let index = currentIndex + 1; index < list.length; index += 1) {
+    const candidate = list[index];
+    if (candidate && candidate.photoState !== PhotoState.Reject) {
+      return candidate.id;
+    }
+  }
+
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    const candidate = list[index];
+    if (candidate && candidate.photoState !== PhotoState.Reject) {
+      return candidate.id;
+    }
+  }
+
+  return null;
 }
 
 function compareRoleFromPhotoState(photoState: PhotoState): string {
@@ -764,6 +810,13 @@ export default function App() {
 
     return window.localStorage.getItem(advanceAfterRatingStorageKey) === 'true';
   });
+  const [hideReject, setHideReject] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(hideRejectStorageKey) === 'true';
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -781,6 +834,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(advanceAfterRatingStorageKey, advanceAfterRating ? 'true' : 'false');
   }, [advanceAfterRating]);
+
+  useEffect(() => {
+    window.localStorage.setItem(hideRejectStorageKey, hideReject ? 'true' : 'false');
+  }, [hideReject]);
 
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
@@ -818,10 +875,11 @@ export default function App() {
         photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
       const matchesMediaType =
         mediaTypeFilters.length === 0 || mediaTypeFilters.includes(asset.mediaType);
+      const matchesHideReject = !hideReject || asset.photoState !== PhotoState.Reject;
 
-      return matchesPhotoState && matchesMediaType;
+      return matchesPhotoState && matchesMediaType && matchesHideReject;
     });
-  }, [assets, mediaTypeFilters, photoStateFilters]);
+  }, [assets, hideReject, mediaTypeFilters, photoStateFilters]);
 
   const selectedAsset = useMemo(
     () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -853,7 +911,7 @@ export default function App() {
 
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
   const hasFilteredAssets = filteredAssets.length > 0;
-  const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0;
+  const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
 
   useEffect(() => {
     const visibleIds = new Set(filteredAssets.map((asset) => asset.id));
@@ -901,13 +959,9 @@ export default function App() {
   }
 
   async function handleSetPhotoState(assetId: string, photoState: PhotoState): Promise<void> {
-    const shouldAdvanceActiveAsset = advanceAfterRating && assetId === selectedAssetId;
+    const isActiveAssetUpdate = assetId === selectedAssetId;
     const navigationList = surveyOpen ? compareAssets : filteredAssets;
     const currentIndex = navigationList.findIndex((asset) => asset.id === assetId);
-    const nextAssetId =
-      shouldAdvanceActiveAsset && currentIndex >= 0 && currentIndex < navigationList.length - 1
-        ? navigationList[currentIndex + 1]?.id ?? null
-        : null;
 
     setAssetUpdating(assetId, true);
     setUpdateError(null);
@@ -930,8 +984,30 @@ export default function App() {
         previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
       );
 
-      if (nextAssetId) {
-        setSelectedAssetId(nextAssetId);
+      const matchesPhotoStateAfterUpdate =
+        photoStateFilters.length === 0 || photoStateFilters.includes(updatedAsset.photoState);
+      const matchesMediaTypeAfterUpdate =
+        mediaTypeFilters.length === 0 || mediaTypeFilters.includes(updatedAsset.mediaType);
+      const matchesHideRejectAfterUpdate =
+        !hideReject || updatedAsset.photoState !== PhotoState.Reject;
+      const remainsVisibleAfterUpdate =
+        matchesPhotoStateAfterUpdate &&
+        matchesMediaTypeAfterUpdate &&
+        matchesHideRejectAfterUpdate;
+
+      if (isActiveAssetUpdate) {
+        if (!remainsVisibleAfterUpdate) {
+          const replacementAssetId = getAdjacentReplacementAssetId(navigationList, assetId);
+          setSelectedAssetId(replacementAssetId);
+        } else if (advanceAfterRating) {
+          const nextAsset =
+            currentIndex >= 0 && currentIndex < navigationList.length - 1
+              ? navigationList[currentIndex + 1]
+              : undefined;
+          if (nextAsset) {
+            setSelectedAssetId(nextAsset.id);
+          }
+        }
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -1010,6 +1086,19 @@ export default function App() {
   function clearFilters(): void {
     setPhotoStateFilters([]);
     setMediaTypeFilters([]);
+    setHideReject(false);
+  }
+
+  function handleToggleHideReject(nextValue: boolean): void {
+    if (nextValue && selectedAssetId) {
+      const currentAsset = filteredAssets.find((asset) => asset.id === selectedAssetId);
+      if (currentAsset && currentAsset.photoState === PhotoState.Reject) {
+        const replacementAssetId = getReplacementAssetIdWhenHidingReject(filteredAssets, selectedAssetId);
+        setSelectedAssetId(replacementAssetId);
+      }
+    }
+
+    setHideReject(nextValue);
   }
 
   function handleFilmstripSelectAsset(assetId: string): void {
@@ -1276,6 +1365,14 @@ export default function App() {
           />
           Advance after rating
         </label>
+        <label style={toggleOptionLabelStyle}>
+          <input
+            type="checkbox"
+            checked={hideReject}
+            onChange={(event) => handleToggleHideReject(event.target.checked)}
+          />
+          Hide Reject
+        </label>
       </div>
       <section style={filterSectionStyle}>
         <strong>Filters</strong>
@@ -1382,11 +1479,22 @@ export default function App() {
               onSetPhotoState={handleSetPhotoState}
             />
             <AssetDetailsPanel asset={null} />
-            <p>No assets match the current filters.</p>
+            <p>No visible assets match the current filters.</p>
             {hasActiveFilters ? (
-              <button type="button" style={compareButtonStyle} onClick={clearFilters}>
-                Clear Filters
-              </button>
+              <div style={actionsStyle}>
+                <button type="button" style={compareButtonStyle} onClick={clearFilters}>
+                  Clear Filters
+                </button>
+                {hideReject ? (
+                  <button
+                    type="button"
+                    style={compareButtonStyle}
+                    onClick={() => handleToggleHideReject(false)}
+                  >
+                    Show Rejects
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </>
         )
