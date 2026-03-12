@@ -1060,6 +1060,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (albumTreeLoading) {
+      return;
+    }
+
     const albumNodeIds = new Set(
       albumTreeNodes.filter((node) => node.nodeType === 'Album').map((node) => node.id)
     );
@@ -1083,7 +1087,7 @@ export default function App() {
         setSelectedTreeNodeId(null);
       }
     }
-  }, [albumTreeNodes, checkedAlbumIds, expandedGroupIds, selectedTreeNodeId]);
+  }, [albumTreeLoading, albumTreeNodes, checkedAlbumIds, expandedGroupIds, selectedTreeNodeId]);
 
   const selectedAssetIdsForAlbumAction = useMemo(() => {
     if (selectedAssetIds.length > 0) {
