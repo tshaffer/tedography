@@ -113,3 +113,14 @@ Cache-Control: public, max-age=86400
 6. Combine `Hide Reject` with existing PhotoState/MediaType filters and verify behavior remains coherent.
 7. Force a no-visible-assets state and verify message appears with recovery actions (`Clear Filters` and `Show Rejects` when applicable).
 8. Reload the app and verify `Hide Reject` preference persists.
+
+## Testing Timeline Grouping
+
+1. Turn `Group by Date` OFF and verify flat grid behavior remains.
+2. Turn `Group by Date` ON and verify assets render under day headers.
+3. Verify newer date groups appear first and assets within each group are in descending capture order.
+4. Apply PhotoState/MediaType filters and verify grouping reflects only filtered visible assets.
+5. Verify assets missing `captureDateTime` appear under `Unknown Date`.
+6. Click an asset inside a grouped section and verify normal selection/loupe behavior works.
+7. Verify filmstrip/loupe navigation uses the same visible ordered set while grouped view is enabled.
+8. Reload the app and verify `Group by Date` preference persists.

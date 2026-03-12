@@ -4,6 +4,7 @@ import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
+import { groupAssetsByDate, sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
@@ -17,6 +18,7 @@ const photoStateFilterOptions: PhotoState[] = [
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 const hideRejectStorageKey = 'tedography.hideReject';
+const groupByDateStorageKey = 'tedography.groupByDate';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -78,6 +80,21 @@ const gridStyle: CSSProperties = {
   display: 'grid',
   gap: '16px',
   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))'
+};
+
+const groupSectionStyle: CSSProperties = {
+  marginBottom: '18px'
+};
+
+const groupHeaderStyle: CSSProperties = {
+  margin: '0 0 8px 0',
+  fontSize: '16px'
+};
+
+const groupMetaStyle: CSSProperties = {
+  color: '#666',
+  fontSize: '12px',
+  marginLeft: '6px'
 };
 
 const cardStyle: CSSProperties = {
@@ -817,6 +834,13 @@ export default function App() {
 
     return window.localStorage.getItem(hideRejectStorageKey) === 'true';
   });
+  const [groupByDate, setGroupByDate] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(groupByDateStorageKey) === 'true';
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -838,6 +862,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(hideRejectStorageKey, hideReject ? 'true' : 'false');
   }, [hideReject]);
+
+  useEffect(() => {
+    window.localStorage.setItem(groupByDateStorageKey, groupByDate ? 'true' : 'false');
+  }, [groupByDate]);
 
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
@@ -881,19 +909,29 @@ export default function App() {
     });
   }, [assets, hideReject, mediaTypeFilters, photoStateFilters]);
 
+  const visibleAssets = useMemo(
+    () => sortVisibleAssetsForTimeline(filteredAssets),
+    [filteredAssets]
+  );
+
+  const groupedVisibleAssets = useMemo(
+    () => groupAssetsByDate(visibleAssets),
+    [visibleAssets]
+  );
+
   const selectedAsset = useMemo(
-    () => filteredAssets.find((asset) => asset.id === selectedAssetId) ?? null,
-    [filteredAssets, selectedAssetId]
+    () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
+    [visibleAssets, selectedAssetId]
   );
 
   const compareAssets = useMemo(
-    () => filteredAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
-    [filteredAssets, selectedAssetIds]
+    () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
+    [visibleAssets, selectedAssetIds]
   );
 
   const selectedAssetIndex = useMemo(
-    () => filteredAssets.findIndex((asset) => asset.id === selectedAssetId),
-    [filteredAssets, selectedAssetId]
+    () => visibleAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [visibleAssets, selectedAssetId]
   );
 
   const surveyFocusedAsset = useMemo(
@@ -910,16 +948,16 @@ export default function App() {
   }, [compareAssets, surveyFocusedAsset]);
 
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
-  const hasFilteredAssets = filteredAssets.length > 0;
+  const hasFilteredAssets = visibleAssets.length > 0;
   const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
 
   useEffect(() => {
-    const visibleIds = new Set(filteredAssets.map((asset) => asset.id));
+    const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
     const prunedSelected = selectedAssetIds.filter((id) => visibleIds.has(id));
 
     let nextFocused: string | null = selectedAssetId;
     if (!nextFocused || !visibleIds.has(nextFocused)) {
-      nextFocused = prunedSelected[0] ?? filteredAssets[0]?.id ?? null;
+      nextFocused = prunedSelected[0] ?? visibleAssets[0]?.id ?? null;
     }
 
     let nextSelected = prunedSelected;
@@ -934,7 +972,7 @@ export default function App() {
     if (selectedAssetId !== nextFocused) {
       setSelectedAssetId(nextFocused);
     }
-  }, [filteredAssets, selectedAssetId, selectedAssetIds]);
+  }, [visibleAssets, selectedAssetId, selectedAssetIds]);
 
   useEffect(() => {
     if (immersiveOpen && !selectedAsset) {
@@ -960,7 +998,7 @@ export default function App() {
 
   async function handleSetPhotoState(assetId: string, photoState: PhotoState): Promise<void> {
     const isActiveAssetUpdate = assetId === selectedAssetId;
-    const navigationList = surveyOpen ? compareAssets : filteredAssets;
+    const navigationList = surveyOpen ? compareAssets : visibleAssets;
     const currentIndex = navigationList.findIndex((asset) => asset.id === assetId);
 
     setAssetUpdating(assetId, true);
@@ -1038,12 +1076,12 @@ export default function App() {
   }
 
   function handleSelectAbsolute(position: 'first' | 'last'): void {
-    if (filteredAssets.length === 0) {
+    if (visibleAssets.length === 0) {
       return;
     }
 
     const nextAsset =
-      position === 'first' ? filteredAssets[0] : filteredAssets[filteredAssets.length - 1];
+      position === 'first' ? visibleAssets[0] : visibleAssets[visibleAssets.length - 1];
     if (nextAsset) {
       setSelectedAssetId(nextAsset.id);
     }
@@ -1091,9 +1129,9 @@ export default function App() {
 
   function handleToggleHideReject(nextValue: boolean): void {
     if (nextValue && selectedAssetId) {
-      const currentAsset = filteredAssets.find((asset) => asset.id === selectedAssetId);
+      const currentAsset = visibleAssets.find((asset) => asset.id === selectedAssetId);
       if (currentAsset && currentAsset.photoState === PhotoState.Reject) {
-        const replacementAssetId = getReplacementAssetIdWhenHidingReject(filteredAssets, selectedAssetId);
+        const replacementAssetId = getReplacementAssetIdWhenHidingReject(visibleAssets, selectedAssetId);
         setSelectedAssetId(replacementAssetId);
       }
     }
@@ -1115,8 +1153,8 @@ export default function App() {
       return;
     }
 
-    const nextAsset = filteredAssets[selectedAssetIndex + 1];
-    const previousAsset = filteredAssets[selectedAssetIndex - 1];
+    const nextAsset = visibleAssets[selectedAssetIndex + 1];
+    const previousAsset = visibleAssets[selectedAssetIndex - 1];
 
     // Prefetch forward first because next-image navigation is the primary review flow.
     if (nextAsset) {
@@ -1230,7 +1268,7 @@ export default function App() {
         return;
       }
 
-      if (filteredAssets.length === 0 || selectedAssetId === null) {
+      if (visibleAssets.length === 0 || selectedAssetId === null) {
         return;
       }
 
@@ -1282,12 +1320,12 @@ export default function App() {
       if (immersiveOpen) {
         if (event.key === 'ArrowRight') {
           event.preventDefault();
-          handleSelectRelativeInList(filteredAssets, 1);
+          handleSelectRelativeInList(visibleAssets, 1);
         }
 
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          handleSelectRelativeInList(filteredAssets, -1);
+          handleSelectRelativeInList(visibleAssets, -1);
         }
 
         void handleKeyboardReview(event.key);
@@ -1296,12 +1334,12 @@ export default function App() {
 
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
         event.preventDefault();
-        handleSelectRelativeInList(filteredAssets, 1);
+        handleSelectRelativeInList(visibleAssets, 1);
       }
 
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
         event.preventDefault();
-        handleSelectRelativeInList(filteredAssets, -1);
+        handleSelectRelativeInList(visibleAssets, -1);
       }
 
       if (event.key === 'Home') {
@@ -1328,7 +1366,7 @@ export default function App() {
     };
   }, [
     compareAssets,
-    filteredAssets,
+    visibleAssets,
     immersiveOpen,
     selectedAsset,
     selectedAssetId,
@@ -1372,6 +1410,14 @@ export default function App() {
             onChange={(event) => handleToggleHideReject(event.target.checked)}
           />
           Hide Reject
+        </label>
+        <label style={toggleOptionLabelStyle}>
+          <input
+            type="checkbox"
+            checked={groupByDate}
+            onChange={(event) => setGroupByDate(event.target.checked)}
+          />
+          Group by Date
         </label>
       </div>
       <section style={filterSectionStyle}>
@@ -1442,7 +1488,7 @@ export default function App() {
               <AssetQuickBar
                 asset={selectedAsset}
                 currentIndex={selectedAssetIndex}
-                totalCount={filteredAssets.length}
+                totalCount={visibleAssets.length}
               />
             ) : null}
             <AssetDetailPanel
@@ -1452,23 +1498,50 @@ export default function App() {
               onSetPhotoState={handleSetPhotoState}
             />
             <AssetFilmstrip
-              assets={filteredAssets}
+              assets={visibleAssets}
               activeAssetId={selectedAssetId}
               onSelectAsset={handleFilmstripSelectAsset}
             />
             <AssetDetailsPanel asset={selectedAsset} />
-            <div style={gridStyle}>
-              {filteredAssets.map((asset) => (
-                <AssetCard
-                  key={asset.id}
-                  asset={asset}
-                  isSelected={selectedAssetIds.includes(asset.id)}
-                  isUpdating={updatingAssetIds[asset.id] === true}
-                  onCardClick={handleCardClick}
-                  onSetPhotoState={handleSetPhotoState}
-                />
-              ))}
-            </div>
+            {groupByDate ? (
+              <>
+                {groupedVisibleAssets.map((group) => (
+                  <section key={group.key} style={groupSectionStyle}>
+                    <h3 style={groupHeaderStyle}>
+                      {group.label}
+                      <span style={groupMetaStyle}>
+                        · {group.assets.length} {group.assets.length === 1 ? 'asset' : 'assets'}
+                      </span>
+                    </h3>
+                    <div style={gridStyle}>
+                      {group.assets.map((asset) => (
+                        <AssetCard
+                          key={asset.id}
+                          asset={asset}
+                          isSelected={selectedAssetIds.includes(asset.id)}
+                          isUpdating={updatingAssetIds[asset.id] === true}
+                          onCardClick={handleCardClick}
+                          onSetPhotoState={handleSetPhotoState}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </>
+            ) : (
+              <div style={gridStyle}>
+                {visibleAssets.map((asset) => (
+                  <AssetCard
+                    key={asset.id}
+                    asset={asset}
+                    isSelected={selectedAssetIds.includes(asset.id)}
+                    isUpdating={updatingAssetIds[asset.id] === true}
+                    onCardClick={handleCardClick}
+                    onSetPhotoState={handleSetPhotoState}
+                  />
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -1504,12 +1577,12 @@ export default function App() {
         <ImmersiveViewer
           asset={selectedAsset}
           index={selectedAssetIndex}
-          total={filteredAssets.length}
+          total={visibleAssets.length}
           hasPrevious={selectedAssetIndex > 0}
-          hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < filteredAssets.length - 1}
+          hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
           onClose={() => setImmersiveOpen(false)}
-          onPrevious={() => handleSelectRelativeInList(filteredAssets, -1)}
-          onNext={() => handleSelectRelativeInList(filteredAssets, 1)}
+          onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
+          onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
