@@ -98,12 +98,16 @@ export interface CreateMediaAssetInput {
   thumbnailDerivedPath: string | null;
   thumbnailFileFormat: string | null;
   thumbnailUrl: string | null;
+  collectionIds?: string[];
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
   const id = randomUUID();
 
-  const createPayload: Record<string, string | number | null | MediaType | PhotoState> = {
+  const createPayload: Record<
+    string,
+    string | number | null | string[] | MediaType | PhotoState
+  > = {
     id,
     filename: input.filename,
     mediaType: input.mediaType,
@@ -121,7 +125,8 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayStorageRootId: input.displayStorageRootId,
     displayArchivePath: input.displayArchivePath,
     displayDerivedPath: input.displayDerivedPath,
-    displayFileFormat: input.displayFileFormat
+    displayFileFormat: input.displayFileFormat,
+    collectionIds: input.collectionIds ?? []
   };
 
   if (input.thumbnailStorageType) {
@@ -175,4 +180,52 @@ export async function updateThumbnailReferenceFields(input: {
     },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
+}
+
+export async function addAssetToCollection(assetId: string, collectionId: string): Promise<void> {
+  await MediaAssetModel.updateOne(
+    { id: assetId },
+    { $addToSet: { collectionIds: collectionId } },
+    { runValidators: true }
+  );
+}
+
+export async function removeAssetFromCollection(assetId: string, collectionId: string): Promise<void> {
+  await MediaAssetModel.updateOne(
+    { id: assetId },
+    { $pull: { collectionIds: collectionId } },
+    { runValidators: true }
+  );
+}
+
+export async function addAssetsToCollection(assetIds: string[], collectionId: string): Promise<void> {
+  if (assetIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: assetIds } },
+    { $addToSet: { collectionIds: collectionId } },
+    { runValidators: true }
+  );
+}
+
+export async function removeAssetsFromCollection(assetIds: string[], collectionId: string): Promise<void> {
+  if (assetIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: assetIds } },
+    { $pull: { collectionIds: collectionId } },
+    { runValidators: true }
+  );
+}
+
+export async function removeCollectionIdFromAllAssets(collectionId: string): Promise<void> {
+  await MediaAssetModel.updateMany(
+    { collectionIds: collectionId },
+    { $pull: { collectionIds: collectionId } },
+    { runValidators: true }
+  );
 }

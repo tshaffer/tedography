@@ -124,3 +124,17 @@ Cache-Control: public, max-age=86400
 6. Click an asset inside a grouped section and verify normal selection/loupe behavior works.
 7. Verify filmstrip/loupe navigation uses the same visible ordered set while grouped view is enabled.
 8. Reload the app and verify `Group by Date` preference persists.
+
+## Testing Collections (Virtual Organization)
+
+1. Create a collection and verify it appears in the Collections list.
+2. Rename the collection and verify the new name appears immediately.
+3. Delete a collection and verify:
+   - the collection disappears,
+   - assets are not deleted from All Photos,
+   - membership is removed.
+4. Select one or more assets, click `Add to Collection`, and verify they appear when that collection is selected.
+5. While inside a collection scope, select assets and click `Remove from Collection`; verify they disappear from that collection but remain in All Photos.
+6. Switch between `All Photos` and a specific collection and verify visible asset set and navigation update coherently.
+7. Select an empty collection and verify clean empty state appears.
+8. Reload app and verify selected collection scope is restored, or safely falls back to All Photos if the saved collection no longer exists.

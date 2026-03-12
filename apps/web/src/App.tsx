@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
-import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
+import { MediaType, PhotoState, type Collection, type MediaAsset } from '@tedography/domain';
+import {
+  addAssetsToCollection,
+  createCollection,
+  deleteCollection,
+  listCollections,
+  removeAssetsFromCollection,
+  renameCollection
+} from './api/collectionApi';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -19,6 +27,8 @@ const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 const hideRejectStorageKey = 'tedography.hideReject';
 const groupByDateStorageKey = 'tedography.groupByDate';
+const selectedCollectionStorageKey = 'tedography.selectedCollectionId';
+const allPhotosCollectionScopeId = 'all';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -40,6 +50,27 @@ const filterSectionStyle: CSSProperties = {
   padding: '10px',
   marginBottom: '14px',
   backgroundColor: '#fafafa'
+};
+
+const collectionsSectionStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '8px',
+  padding: '10px',
+  marginBottom: '14px',
+  backgroundColor: '#fafafa'
+};
+
+const collectionsListStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  marginTop: '8px'
+};
+
+const collectionRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '6px',
+  alignItems: 'center',
+  flexWrap: 'wrap'
 };
 
 const filterRowStyle: CSSProperties = {
@@ -809,8 +840,11 @@ function SurveyMode({
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [collectionsError, setCollectionsError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
@@ -841,6 +875,13 @@ export default function App() {
 
     return window.localStorage.getItem(groupByDateStorageKey) === 'true';
   });
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return allPhotosCollectionScopeId;
+    }
+
+    return window.localStorage.getItem(selectedCollectionStorageKey) ?? allPhotosCollectionScopeId;
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -866,6 +907,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(groupByDateStorageKey, groupByDate ? 'true' : 'false');
   }, [groupByDate]);
+
+  useEffect(() => {
+    window.localStorage.setItem(selectedCollectionStorageKey, selectedCollectionId);
+  }, [selectedCollectionId]);
 
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
@@ -893,12 +938,78 @@ export default function App() {
     }
   }
 
+  async function loadCollections(options?: { showLoading?: boolean }): Promise<void> {
+    if (options?.showLoading ?? true) {
+      setCollectionsLoading(true);
+    }
+
+    setCollectionsError(null);
+
+    try {
+      const data = await listCollections();
+      setCollections(data);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setCollectionsError(error.message);
+      } else {
+        setCollectionsError('Unknown error');
+      }
+    } finally {
+      setCollectionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadAssets({ showLoading: true });
+    void loadCollections({ showLoading: true });
   }, []);
 
+  useEffect(() => {
+    if (selectedCollectionId === allPhotosCollectionScopeId) {
+      return;
+    }
+
+    const exists = collections.some((collection) => collection.id === selectedCollectionId);
+    if (!exists) {
+      setSelectedCollectionId(allPhotosCollectionScopeId);
+    }
+  }, [collections, selectedCollectionId]);
+
+  const selectedAssetIdsForCollectionAction = useMemo(() => {
+    if (selectedAssetIds.length > 0) {
+      return selectedAssetIds;
+    }
+
+    return selectedAssetId ? [selectedAssetId] : [];
+  }, [selectedAssetId, selectedAssetIds]);
+
+  const selectedCollection = useMemo(
+    () => collections.find((collection) => collection.id === selectedCollectionId) ?? null,
+    [collections, selectedCollectionId]
+  );
+
+  const collectionAssetCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const asset of assets) {
+      for (const collectionId of asset.collectionIds ?? []) {
+        counts.set(collectionId, (counts.get(collectionId) ?? 0) + 1);
+      }
+    }
+
+    return counts;
+  }, [assets]);
+
+  const collectionScopedAssets = useMemo(() => {
+    if (selectedCollectionId === allPhotosCollectionScopeId) {
+      return assets;
+    }
+
+    return assets.filter((asset) => (asset.collectionIds ?? []).includes(selectedCollectionId));
+  }, [assets, selectedCollectionId]);
+
   const filteredAssets = useMemo(() => {
-    return assets.filter((asset) => {
+    return collectionScopedAssets.filter((asset) => {
       const matchesPhotoState =
         photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
       const matchesMediaType =
@@ -907,7 +1018,7 @@ export default function App() {
 
       return matchesPhotoState && matchesMediaType && matchesHideReject;
     });
-  }, [assets, hideReject, mediaTypeFilters, photoStateFilters]);
+  }, [collectionScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
 
   const visibleAssets = useMemo(
     () => sortVisibleAssetsForTimeline(filteredAssets),
@@ -950,6 +1061,7 @@ export default function App() {
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
   const hasFilteredAssets = visibleAssets.length > 0;
   const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
+  const hasCollectionScope = selectedCollectionId !== allPhotosCollectionScopeId;
 
   useEffect(() => {
     const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
@@ -1137,6 +1249,135 @@ export default function App() {
     }
 
     setHideReject(nextValue);
+  }
+
+  function handleSelectCollectionScope(collectionId: string): void {
+    setSelectedCollectionId(collectionId);
+  }
+
+  async function handleCreateCollection(): Promise<void> {
+    const input = window.prompt('Collection name');
+    if (!input) {
+      return;
+    }
+
+    const name = input.trim();
+    if (name.length === 0) {
+      return;
+    }
+
+    try {
+      const created = await createCollection(name);
+      setCollections((previous) => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedCollectionId(created.id);
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to create collection');
+    }
+  }
+
+  async function handleRenameCollection(collectionId: string): Promise<void> {
+    const current = collections.find((collection) => collection.id === collectionId);
+    if (!current) {
+      return;
+    }
+
+    const input = window.prompt('Rename collection', current.name);
+    if (!input) {
+      return;
+    }
+
+    const name = input.trim();
+    if (name.length === 0) {
+      return;
+    }
+
+    try {
+      const updated = await renameCollection(collectionId, name);
+      setCollections((previous) =>
+        previous
+          .map((collection) => (collection.id === collectionId ? updated : collection))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to rename collection');
+    }
+  }
+
+  async function handleDeleteCollection(collectionId: string): Promise<void> {
+    const current = collections.find((collection) => collection.id === collectionId);
+    if (!current) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete collection "${current.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteCollection(collectionId);
+      setCollections((previous) => previous.filter((collection) => collection.id !== collectionId));
+      if (selectedCollectionId === collectionId) {
+        setSelectedCollectionId(allPhotosCollectionScopeId);
+      }
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to delete collection');
+    }
+  }
+
+  async function handleAddSelectedToCollection(): Promise<void> {
+    if (selectedAssetIdsForCollectionAction.length === 0) {
+      return;
+    }
+
+    if (collections.length === 0) {
+      setUpdateError('Create a collection first');
+      return;
+    }
+
+    const options = collections.map((collection) => collection.name).join(', ');
+    const input = window.prompt(`Add selected assets to collection (name)\n${options}`);
+    if (!input) {
+      return;
+    }
+
+    const selectedName = input.trim().toLowerCase();
+    const targetCollection = collections.find(
+      (collection) => collection.name.trim().toLowerCase() === selectedName
+    );
+    if (!targetCollection) {
+      setUpdateError('Collection not found');
+      return;
+    }
+
+    try {
+      await addAssetsToCollection(targetCollection.id, {
+        assetIds: selectedAssetIdsForCollectionAction
+      });
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to add assets to collection');
+    }
+  }
+
+  async function handleRemoveSelectedFromCurrentCollection(): Promise<void> {
+    if (selectedCollectionId === allPhotosCollectionScopeId) {
+      return;
+    }
+
+    if (selectedAssetIdsForCollectionAction.length === 0) {
+      return;
+    }
+
+    try {
+      await removeAssetsFromCollection(selectedCollectionId, {
+        assetIds: selectedAssetIdsForCollectionAction
+      });
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to remove assets from collection');
+    }
   }
 
   function handleFilmstripSelectAsset(assetId: string): void {
@@ -1395,6 +1636,27 @@ export default function App() {
         >
           Import
         </button>
+        <button
+          type="button"
+          style={compareButtonStyle}
+          onClick={() => void handleAddSelectedToCollection()}
+          disabled={selectedAssetIdsForCollectionAction.length === 0}
+        >
+          Add to Collection ({selectedAssetIdsForCollectionAction.length})
+        </button>
+        {hasCollectionScope ? (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => void handleRemoveSelectedFromCurrentCollection()}
+            disabled={selectedAssetIdsForCollectionAction.length === 0}
+          >
+            Remove from Collection
+          </button>
+        ) : null}
+        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateCollection()}>
+          New Collection
+        </button>
         <label style={toggleOptionLabelStyle}>
           <input
             type="checkbox"
@@ -1420,6 +1682,52 @@ export default function App() {
           Group by Date
         </label>
       </div>
+      <section style={collectionsSectionStyle}>
+        <strong>Collections</strong>
+        {collectionsLoading ? <p>Loading collections...</p> : null}
+        {collectionsError ? <p>Failed to load collections: {collectionsError}</p> : null}
+        {!collectionsLoading ? (
+          <div style={collectionsListStyle}>
+            <div style={collectionRowStyle}>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                onClick={() => handleSelectCollectionScope(allPhotosCollectionScopeId)}
+                disabled={selectedCollectionId === allPhotosCollectionScopeId}
+              >
+                All Photos ({assets.length})
+              </button>
+            </div>
+            {collections.map((collection) => (
+              <div key={collection.id} style={collectionRowStyle}>
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  onClick={() => handleSelectCollectionScope(collection.id)}
+                  disabled={selectedCollectionId === collection.id}
+                >
+                  {collection.name} ({collectionAssetCounts.get(collection.id) ?? 0})
+                </button>
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  onClick={() => void handleRenameCollection(collection.id)}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  onClick={() => void handleDeleteCollection(collection.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+            {collections.length === 0 ? <p>No collections yet. Create one to organize assets.</p> : null}
+          </div>
+        ) : null}
+      </section>
       <section style={filterSectionStyle}>
         <strong>Filters</strong>
         <div style={filterRowStyle}>
@@ -1552,7 +1860,11 @@ export default function App() {
               onSetPhotoState={handleSetPhotoState}
             />
             <AssetDetailsPanel asset={null} />
-            <p>No visible assets match the current filters.</p>
+            {hasCollectionScope && collectionScopedAssets.length === 0 ? (
+              <p>This collection has no assets yet.</p>
+            ) : (
+              <p>No visible assets match the current filters.</p>
+            )}
             {hasActiveFilters ? (
               <div style={actionsStyle}>
                 <button type="button" style={compareButtonStyle} onClick={clearFilters}>
@@ -1568,6 +1880,15 @@ export default function App() {
                   </button>
                 ) : null}
               </div>
+            ) : null}
+            {hasCollectionScope ? (
+              <button
+                type="button"
+                style={compareButtonStyle}
+                onClick={() => handleSelectCollectionScope(allPhotosCollectionScopeId)}
+              >
+                All Photos
+              </button>
             ) : null}
           </>
         )
@@ -1609,6 +1930,7 @@ export default function App() {
         onClose={() => setImportDialogOpen(false)}
         onImportCompleted={() => {
           void loadAssets({ showLoading: false });
+          void loadCollections({ showLoading: false });
         }}
       />
     </div>

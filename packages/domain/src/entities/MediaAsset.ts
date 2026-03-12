@@ -36,6 +36,9 @@ export interface MediaAsset {
   // Legacy compatibility for older compile/runtime paths.
   thumbnailUrl?: string | null;
 
+  // Virtual organization only; does not affect filesystem storage layout.
+  collectionIds?: string[];
+
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.
   storageRootId?: string;
