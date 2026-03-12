@@ -45,3 +45,12 @@ Cache-Control: public, max-age=86400
 1. Request media with a valid id and verify a `200` response.
 2. Request media with a non-existent asset id and verify `404` is unchanged.
 3. Request media where the backing file is missing and verify `404` is unchanged.
+
+## Testing Loupe Prefetching
+
+1. Open the grid and select an asset.
+2. Enter loupe/immersive mode.
+3. Open browser DevTools and go to the Network tab.
+4. Keep the media filter focused on `/api/media/display/`.
+5. While viewing image `N`, verify background requests are made for image `N+1` and image `N-1` when those neighbors exist.
+6. Navigate to next/previous using arrow keys or viewer controls and verify the viewed image is already cached (no extra network fetch for that same display URL).

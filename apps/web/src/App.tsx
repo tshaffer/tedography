@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as Re
 import { PhotoState, type MediaAsset } from '@tedography/domain';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
+import { prefetchImage } from './utilities/imagePrefetch';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
 type AssetFilter = 'All' | PhotoState;
@@ -824,6 +825,23 @@ export default function App() {
       setSelectedAssetId(surveyFocusedAsset.id);
     }
   }, [selectedAssetId, surveyFocusedAsset, surveyOpen]);
+
+  useEffect(() => {
+    if (!immersiveOpen || selectedAssetIndex < 0) {
+      return;
+    }
+
+    const nextAsset = filteredAssets[selectedAssetIndex + 1];
+    const previousAsset = filteredAssets[selectedAssetIndex - 1];
+
+    if (nextAsset) {
+      prefetchImage(getDisplayMediaUrl(nextAsset.id));
+    }
+
+    if (previousAsset) {
+      prefetchImage(getDisplayMediaUrl(previousAsset.id));
+    }
+  }, [filteredAssets, immersiveOpen, selectedAssetIndex]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
