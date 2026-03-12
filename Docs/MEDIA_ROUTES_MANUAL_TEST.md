@@ -52,5 +52,7 @@ Cache-Control: public, max-age=86400
 2. Enter loupe/immersive mode.
 3. Open browser DevTools and go to the Network tab.
 4. Keep the media filter focused on `/api/media/display/`.
-5. While viewing image `N`, verify background requests are made for image `N+1` and image `N-1` when those neighbors exist.
-6. Navigate to next/previous using arrow keys or viewer controls and verify the viewed image is already cached (no extra network fetch for that same display URL).
+5. Verify the active image `N` loads first.
+6. After image `N` load succeeds, verify background requests are made for image `N+1` first and image `N-1` second (when those neighbors exist).
+7. Navigate quickly with left/right keys across several images and verify stale older loads do not trigger obviously wrong neighbor prefetches.
+8. Navigate to next/previous using arrow keys or viewer controls and verify the viewed image is already cached (no extra network fetch for that same display URL).

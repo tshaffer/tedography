@@ -502,6 +502,7 @@ type ImmersiveViewerProps = {
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  onActiveImageLoad: (assetId: string) => void;
 };
 
 function ImmersiveViewer({
@@ -512,7 +513,8 @@ function ImmersiveViewer({
   hasNext,
   onClose,
   onPrevious,
-  onNext
+  onNext,
+  onActiveImageLoad
 }: ImmersiveViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
 
@@ -551,7 +553,13 @@ function ImmersiveViewer({
         </div>
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
-            <img src={imageUrl} alt={asset.filename} style={immersiveImageStyle} />
+            <img
+              key={asset.id}
+              src={imageUrl}
+              alt={asset.filename}
+              style={immersiveImageStyle}
+              onLoad={() => onActiveImageLoad(asset.id)}
+            />
           ) : (
             <div style={immersiveImageStyle} />
           )}
@@ -826,23 +834,6 @@ export default function App() {
     }
   }, [selectedAssetId, surveyFocusedAsset, surveyOpen]);
 
-  useEffect(() => {
-    if (!immersiveOpen || selectedAssetIndex < 0) {
-      return;
-    }
-
-    const nextAsset = filteredAssets[selectedAssetIndex + 1];
-    const previousAsset = filteredAssets[selectedAssetIndex - 1];
-
-    if (nextAsset) {
-      prefetchImage(getDisplayMediaUrl(nextAsset.id));
-    }
-
-    if (previousAsset) {
-      prefetchImage(getDisplayMediaUrl(previousAsset.id));
-    }
-  }, [filteredAssets, immersiveOpen, selectedAssetIndex]);
-
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
   }
@@ -924,6 +915,29 @@ export default function App() {
 
     setImmersiveOpen(false);
     setSurveyOpen(true);
+  }
+
+  function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
+    if (!immersiveOpen) {
+      return;
+    }
+
+    // Guard against stale load events when fast navigation changes the active asset.
+    if (!selectedAssetId || loadedAssetId !== selectedAssetId || selectedAssetIndex < 0) {
+      return;
+    }
+
+    const nextAsset = filteredAssets[selectedAssetIndex + 1];
+    const previousAsset = filteredAssets[selectedAssetIndex - 1];
+
+    // Prefetch forward first because next-image navigation is the primary review flow.
+    if (nextAsset) {
+      prefetchImage(getDisplayMediaUrl(nextAsset.id));
+    }
+
+    if (previousAsset) {
+      prefetchImage(getDisplayMediaUrl(previousAsset.id));
+    }
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
@@ -1237,6 +1251,7 @@ export default function App() {
           onClose={() => setImmersiveOpen(false)}
           onPrevious={() => handleSelectRelativeInList(filteredAssets, -1)}
           onNext={() => handleSelectRelativeInList(filteredAssets, 1)}
+          onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
 
