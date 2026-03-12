@@ -30,12 +30,17 @@ function getContentTypeForFile(absolutePath: string): string {
   return 'application/octet-stream';
 }
 
-async function sendResolvedFile(res: Response, absolutePath: string): Promise<void> {
+async function sendResolvedFile(
+  res: Response,
+  absolutePath: string,
+  cacheControl: string
+): Promise<void> {
   const targetStat = await fs.stat(absolutePath);
   if (!targetStat.isFile()) {
     throw new Error('File not found');
   }
 
+  res.setHeader('Cache-Control', cacheControl);
   res.type(getContentTypeForFile(absolutePath));
   res.sendFile(absolutePath);
 }
@@ -57,7 +62,7 @@ mediaRoutes.get('/display/:assetId', async (req, res) => {
 
   try {
     const absolutePath = resolveDisplayAbsolutePathForAsset(asset);
-    await sendResolvedFile(res, absolutePath);
+    await sendResolvedFile(res, absolutePath, 'public, max-age=31536000, immutable');
   } catch (error) {
     log.error('Failed to resolve display media path', error);
     const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
@@ -94,11 +99,11 @@ mediaRoutes.get('/thumbnail/:assetId', async (req, res) => {
   }
 
   try {
-    await sendResolvedFile(res, absolutePath);
+    await sendResolvedFile(res, absolutePath, 'public, max-age=31536000, immutable');
   } catch (error) {
     try {
       const displayAbsolutePath = resolveDisplayAbsolutePathForAsset(asset);
-      await sendResolvedFile(res, displayAbsolutePath);
+      await sendResolvedFile(res, displayAbsolutePath, 'public, max-age=31536000, immutable');
     } catch (fallbackError) {
       log.error('Failed to resolve thumbnail fallback display path after thumbnail miss', fallbackError);
       const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
@@ -124,7 +129,7 @@ mediaRoutes.get('/original/:assetId', async (req, res) => {
 
   try {
     const absolutePath = resolveOriginalAbsolutePathForAsset(asset);
-    await sendResolvedFile(res, absolutePath);
+    await sendResolvedFile(res, absolutePath, 'public, max-age=86400');
   } catch (error) {
     log.error('Failed to resolve original media path', error);
     const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
