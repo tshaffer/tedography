@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { type MediaAsset } from '@tedography/domain';
+import { PhotoState, type MediaAsset } from '@tedography/domain';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 type AssetFilmstripProps = {
@@ -20,6 +20,7 @@ const stripStyle: CSSProperties = {
 };
 
 const itemButtonStyle: CSSProperties = {
+  position: 'relative',
   width: '88px',
   height: '88px',
   minWidth: '88px',
@@ -36,6 +37,14 @@ const activeItemButtonStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(31, 111, 235, 0.15)'
 };
 
+const stateMarkerStyle: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: '4px'
+};
+
 const imageStyle: CSSProperties = {
   width: '100%',
   height: '100%',
@@ -43,11 +52,33 @@ const imageStyle: CSSProperties = {
   display: 'block'
 };
 
+function getPhotoStateMarkerColor(photoState: PhotoState): string | null {
+  if (photoState === PhotoState.Select) {
+    return '#1f8f4d';
+  }
+
+  if (photoState === PhotoState.Pending) {
+    return '#b58813';
+  }
+
+  if (photoState === PhotoState.Reject) {
+    return '#b4232f';
+  }
+
+  return null;
+}
+
 export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFilmstripProps) {
+  const containerRef = useRef<HTMLElement | null>(null);
   const thumbnailRefs = useRef(new Map<string, HTMLButtonElement>());
 
   useEffect(() => {
     if (!activeAssetId) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
       return;
     }
 
@@ -56,7 +87,17 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
       return;
     }
 
-    element.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const itemCenter = element.offsetLeft + element.clientWidth / 2;
+    const containerCenter = container.clientWidth / 2;
+    const targetScrollLeft = itemCenter - containerCenter;
+    const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0);
+    const clampedScrollLeft = Math.min(Math.max(targetScrollLeft, 0), maxScrollLeft);
+
+    if (Math.abs(container.scrollLeft - clampedScrollLeft) < 1) {
+      return;
+    }
+
+    container.scrollTo({ left: clampedScrollLeft, behavior: 'smooth' });
   }, [activeAssetId]);
 
   if (assets.length === 0) {
@@ -64,7 +105,7 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
   }
 
   return (
-    <section style={stripStyle}>
+    <section style={stripStyle} ref={containerRef}>
       {assets.map((asset) => (
         <button
           key={asset.id}
@@ -80,6 +121,14 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
           }}
           aria-label={`Navigate to ${asset.filename}`}
         >
+          {getPhotoStateMarkerColor(asset.photoState) ? (
+            <span
+              style={{
+                ...stateMarkerStyle,
+                backgroundColor: getPhotoStateMarkerColor(asset.photoState) ?? undefined
+              }}
+            />
+          ) : null}
           <img src={getThumbnailMediaUrl(asset.id)} alt={asset.filename} style={imageStyle} loading="lazy" />
         </button>
       ))}

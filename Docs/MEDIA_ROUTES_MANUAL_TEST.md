@@ -87,5 +87,7 @@ Cache-Control: public, max-age=86400
 4. Click a filmstrip thumbnail and verify focused asset updates.
 5. Verify active filmstrip thumbnail highlight moves with selection.
 6. Use keyboard left/right navigation and verify filmstrip highlight updates.
-7. Navigate across distant items and verify filmstrip auto-scroll keeps active thumbnail visible.
-8. Apply filters and verify filmstrip updates to only filtered assets.
+7. Verify active thumbnail auto-centers when navigating, with neighboring thumbnails visible on both sides when possible.
+8. Click a distant thumbnail and verify loupe updates and the strip recenters to that item.
+9. Manually scroll the filmstrip and verify the UI does not continuously fight that manual scroll.
+10. Apply filters and verify filmstrip updates to only filtered assets.
