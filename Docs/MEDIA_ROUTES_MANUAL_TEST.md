@@ -167,3 +167,44 @@ pnpm --filter @tedography/api assets:verify --json
 6. Safe missing-display simulation (test copy only): for a HEIC-backed asset, temporarily rename its derived display file under `TEDOGRAPHY_DERIVED_ROOT/display-jpegs`, run verify, then restore. Expect `MissingDisplayFile`.
 7. Safe missing-original simulation (test copy only): temporarily rename an original file in a non-production test folder, run verify, then restore. Expect `MissingOriginalFile`.
 8. Optional file size mismatch simulation (test copy only): replace a test original with a different-size file at the same path, run verify, then restore. Expect `FileSizeMismatch`.
+
+## Testing Review vs Library Areas
+
+1. Open app with no stored area preference and verify `Review` is the default.
+2. In `Review`, verify default scope shows only `Unreviewed` + `Pending` assets.
+3. In `Review`, verify `Select` assets are excluded unless additional logic explicitly includes them.
+4. Switch to `Library` and verify default scope shows `Select` assets.
+5. In `Library`, verify `Unreviewed`/`Pending` assets are excluded by default.
+6. Switch between `Review` and `Library` and verify active asset stays if still visible, otherwise moves to a valid replacement or clears cleanly.
+7. Verify `Review` area empty message appears when no assets are in `Unreviewed`/`Pending` scope.
+8. Verify `Library` area empty message appears when no assets are in `Select` scope.
+9. Verify true no-assets state still shows import-focused empty state.
+10. Reload app and verify last selected area persists.
+
+## Testing Area-Aware Toolbar Emphasis
+
+1. Switch to `Review` and verify curation controls are emphasized:
+   - `Survey`
+   - `Advance after rating`
+   - `Hide Reject`
+2. In `Review`, verify album tree management controls are not dominant in the top row.
+3. Switch to `Library` and verify browsing controls are emphasized:
+   - `Import`
+   - `Group by Date`
+   - album tree management controls (`New Group`, `New Album`, `Rename Node`, `Delete Node`)
+4. In `Library`, verify review toggles remain available but visually de-emphasized.
+5. Verify selection-dependent actions (`Add to Album`, `Remove from Album`) still work in both areas.
+6. Switch Review ↔ Library and verify toolbar groups update immediately without breaking active asset navigation.
+7. Enter immersive fullscreen and verify the area-aware toolbar changes do not clutter fullscreen UI.
+
+## Testing Library Timeline Mode
+
+1. Switch to `Library` and verify default Library scope still shows only `Select` assets.
+2. In `Library View`, switch between `Flat` and `Timeline`.
+3. In `Timeline`, verify month sections render (for example `March 2026`) with per-section asset counts.
+4. Verify month sections are ordered newest-first and assets within each month remain in descending chronological order.
+5. In the timeline left panel, expand/collapse year groups and click a month; verify main content scrolls to that month section.
+6. Apply PhotoState/MediaType/Hide Reject filters and verify timeline sections and counts reflect only filtered visible assets.
+7. Click an asset in Timeline mode and verify focused asset, loupe, quick bar, and filmstrip continue to work normally.
+8. Reload the app and verify `Library View` mode persists.
+9. Verify assets without capture date appear under `Unknown Date`.

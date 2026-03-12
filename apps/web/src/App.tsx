@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent
+} from 'react';
 import { MediaType, PhotoState, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
 import {
   addAssetsToAlbum,
@@ -12,8 +19,13 @@ import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
-import { groupAssetsByDate, sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
+import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
+import {
+  buildTimelineNavigationYears,
+  groupAssetsByCaptureMonth,
+  type TimelineNavigationYear
+} from './utilities/libraryTimeline';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
 const photoStateFilterOptions: PhotoState[] = [
@@ -26,10 +38,15 @@ const photoStateFilterOptions: PhotoState[] = [
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
 const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 const hideRejectStorageKey = 'tedography.hideReject';
-const groupByDateStorageKey = 'tedography.groupByDate';
 const checkedAlbumIdsStorageKey = 'tedography.checkedAlbumIds';
 const expandedAlbumTreeGroupIdsStorageKey = 'tedography.expandedAlbumTreeGroupIds';
 const albumScopeModeStorageKey = 'tedography.albumScopeMode';
+const primaryAreaStorageKey = 'tedography.primaryArea';
+const libraryBrowseModeStorageKey = 'tedography.libraryBrowseMode';
+const timelineNavExpandedYearKeysStorageKey = 'tedography.timelineNavExpandedYears';
+
+type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
+type LibraryBrowseMode = 'Flat' | 'Timeline';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -43,6 +60,13 @@ const controlsStyle: CSSProperties = {
   display: 'flex',
   gap: '10px',
   marginBottom: '10px'
+};
+
+const primaryAreaControlsStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  gap: '10px',
+  marginBottom: '12px'
 };
 
 const filterSectionStyle: CSSProperties = {
@@ -108,6 +132,11 @@ const toggleOptionLabelStyle: CSSProperties = {
   fontSize: '13px'
 };
 
+const secondaryToggleOptionLabelStyle: CSSProperties = {
+  ...toggleOptionLabelStyle,
+  opacity: 0.65
+};
+
 const gridStyle: CSSProperties = {
   display: 'grid',
   gap: '16px',
@@ -127,6 +156,42 @@ const groupMetaStyle: CSSProperties = {
   color: '#666',
   fontSize: '12px',
   marginLeft: '6px'
+};
+
+const timelineLayoutStyle: CSSProperties = {
+  display: 'grid',
+  gap: '14px',
+  gridTemplateColumns: '220px 1fr',
+  alignItems: 'start'
+};
+
+const timelineNavPanelStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '8px',
+  backgroundColor: '#fafafa',
+  padding: '10px',
+  position: 'sticky',
+  top: '10px'
+};
+
+const timelineYearHeaderStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  gap: '8px',
+  marginBottom: '4px'
+};
+
+const timelineMonthButtonStyle: CSSProperties = {
+  backgroundColor: '#f4f4f4',
+  border: '1px solid #c8c8c8',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  display: 'block',
+  fontSize: '12px',
+  margin: '4px 0 4px 24px',
+  padding: '4px 8px',
+  textAlign: 'left',
+  width: 'calc(100% - 24px)'
 };
 
 const cardStyle: CSSProperties = {
@@ -398,6 +463,30 @@ function formatCaptureDate(dateString?: string | null): string {
   }
 
   return parsed.toLocaleString();
+}
+
+function parsePrimaryAreaFromStorage(value: string | null): TedographyPrimaryArea {
+  if (value === 'Review' || value === 'Library') {
+    return value;
+  }
+
+  return 'Review';
+}
+
+function parseLibraryBrowseModeFromStorage(value: string | null): LibraryBrowseMode {
+  if (value === 'Flat' || value === 'Timeline') {
+    return value;
+  }
+
+  return 'Timeline';
+}
+
+function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] {
+  if (area === 'Library') {
+    return [PhotoState.Select];
+  }
+
+  return [PhotoState.Unreviewed, PhotoState.Pending];
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -912,12 +1001,12 @@ export default function App() {
 
     return window.localStorage.getItem(hideRejectStorageKey) === 'true';
   });
-  const [groupByDate, setGroupByDate] = useState<boolean>(() => {
+  const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
-      return false;
+      return 'Review';
     }
 
-    return window.localStorage.getItem(groupByDateStorageKey) === 'true';
+    return parsePrimaryAreaFromStorage(window.localStorage.getItem(primaryAreaStorageKey));
   });
   const [albumScopeMode, setAlbumScopeMode] = useState<'all' | 'checked'>(() => {
     if (typeof window === 'undefined') {
@@ -969,6 +1058,37 @@ export default function App() {
     }
   });
   const [selectedTreeNodeId, setSelectedTreeNodeId] = useState<string | null>(null);
+  const [libraryBrowseMode, setLibraryBrowseMode] = useState<LibraryBrowseMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'Timeline';
+    }
+
+    return parseLibraryBrowseModeFromStorage(
+      window.localStorage.getItem(libraryBrowseModeStorageKey)
+    );
+  });
+  const [timelineNavExpandedYearKeys, setTimelineNavExpandedYearKeys] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const stored = window.localStorage.getItem(timelineNavExpandedYearKeysStorageKey);
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter((entry): entry is string => typeof entry === 'string');
+    } catch {
+      return [];
+    }
+  });
+  const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
     fetch('/api/health')
@@ -992,8 +1112,19 @@ export default function App() {
   }, [hideReject]);
 
   useEffect(() => {
-    window.localStorage.setItem(groupByDateStorageKey, groupByDate ? 'true' : 'false');
-  }, [groupByDate]);
+    window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
+  }, [primaryArea]);
+
+  useEffect(() => {
+    window.localStorage.setItem(libraryBrowseModeStorageKey, libraryBrowseMode);
+  }, [libraryBrowseMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      timelineNavExpandedYearKeysStorageKey,
+      JSON.stringify(timelineNavExpandedYearKeys)
+    );
+  }, [timelineNavExpandedYearKeys]);
 
   useEffect(() => {
     window.localStorage.setItem(albumScopeModeStorageKey, albumScopeMode);
@@ -1145,8 +1276,18 @@ export default function App() {
     return [...deduped.values()];
   }, [albumScopeMode, assets, checkedAlbumIds]);
 
+  const areaDefaultPhotoStates = useMemo(
+    () => getDefaultPhotoStatesForPrimaryArea(primaryArea),
+    [primaryArea]
+  );
+
+  const areaScopedAssets = useMemo(
+    () => albumScopedAssets.filter((asset) => areaDefaultPhotoStates.includes(asset.photoState)),
+    [albumScopedAssets, areaDefaultPhotoStates]
+  );
+
   const filteredAssets = useMemo(() => {
-    return albumScopedAssets.filter((asset) => {
+    return areaScopedAssets.filter((asset) => {
       const matchesPhotoState =
         photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
       const matchesMediaType =
@@ -1155,17 +1296,23 @@ export default function App() {
 
       return matchesPhotoState && matchesMediaType && matchesHideReject;
     });
-  }, [albumScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
+  }, [areaScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
 
   const visibleAssets = useMemo(
     () => sortVisibleAssetsForTimeline(filteredAssets),
     [filteredAssets]
   );
 
-  const groupedVisibleAssets = useMemo(
-    () => groupAssetsByDate(visibleAssets),
+  const timelineMonthGroups = useMemo(
+    () => groupAssetsByCaptureMonth(visibleAssets),
     [visibleAssets]
   );
+
+  const timelineNavigationYears = useMemo<TimelineNavigationYear[]>(
+    () => buildTimelineNavigationYears(timelineMonthGroups),
+    [timelineMonthGroups]
+  );
+
 
   const selectedAsset = useMemo(
     () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -1196,13 +1343,33 @@ export default function App() {
   }, [compareAssets, surveyFocusedAsset]);
 
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
+  const hasAreaScopedAssets = areaScopedAssets.length > 0;
   const hasFilteredAssets = visibleAssets.length > 0;
   const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
   const isAlbumScopeMode = albumScopeMode === 'checked';
+  const isReviewArea = primaryArea === 'Review';
+  const isLibraryArea = primaryArea === 'Library';
+  const isTimelineMode = isLibraryArea && libraryBrowseMode === 'Timeline';
   const treeDisplayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
     [albumTreeNodes, expandedGroupIds]
   );
+
+  useEffect(() => {
+    const validYearKeys = new Set(timelineNavigationYears.map((year) => year.key));
+    const pruned = timelineNavExpandedYearKeys.filter((key) => validYearKeys.has(key));
+    if (!arraysEqual(pruned, timelineNavExpandedYearKeys)) {
+      setTimelineNavExpandedYearKeys(pruned);
+    }
+  }, [timelineNavExpandedYearKeys, timelineNavigationYears]);
+
+  useEffect(() => {
+    if (timelineNavigationYears.length === 0 || timelineNavExpandedYearKeys.length > 0) {
+      return;
+    }
+
+    setTimelineNavExpandedYearKeys(timelineNavigationYears.map((year) => year.key));
+  }, [timelineNavExpandedYearKeys.length, timelineNavigationYears]);
 
   useEffect(() => {
     const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
@@ -1398,6 +1565,25 @@ export default function App() {
 
   function handleSetCheckedAlbumScope(): void {
     setAlbumScopeMode('checked');
+  }
+
+  function handleSetLibraryBrowseMode(mode: LibraryBrowseMode): void {
+    setLibraryBrowseMode(mode);
+  }
+
+  function toggleTimelineYearExpanded(yearKey: string): void {
+    setTimelineNavExpandedYearKeys((previous) =>
+      previous.includes(yearKey)
+        ? previous.filter((key) => key !== yearKey)
+        : [...previous, yearKey]
+    );
+  }
+
+  function handleJumpToTimelineMonth(groupKey: string): void {
+    const sectionElement = timelineSectionRefs.current[groupKey];
+    if (sectionElement) {
+      sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   function toggleGroupExpanded(groupId: string): void {
@@ -1823,22 +2009,62 @@ export default function App() {
       <h1>Tedography</h1>
       <p>API status: {healthStatus}</p>
 
+      <div style={primaryAreaControlsStyle}>
+        <button
+          type="button"
+          style={
+            primaryArea === 'Review'
+              ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+              : compareButtonStyle
+          }
+          onClick={() => setPrimaryArea('Review')}
+          disabled={primaryArea === 'Review'}
+        >
+          Review
+        </button>
+        <button
+          type="button"
+          style={
+            primaryArea === 'Library'
+              ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+              : compareButtonStyle
+          }
+          onClick={() => setPrimaryArea('Library')}
+          disabled={primaryArea === 'Library'}
+        >
+          Library
+        </button>
+      </div>
+      <p style={{ color: '#666', fontSize: '13px', margin: '-4px 0 10px 0' }}>
+        {isReviewArea
+          ? 'Review — curate unreviewed and pending photos quickly.'
+          : 'Library — browse selected keeper photos.'}
+      </p>
+      {isLibraryArea && isTimelineMode ? (
+        <p style={{ color: '#666', fontSize: '12px', margin: '-2px 0 10px 0' }}>
+          Browse selected photos by month and jump quickly through your archive timeline.
+        </p>
+      ) : null}
+
       <div style={controlsStyle}>
-        <button
-          type="button"
-          style={compareButtonStyle}
-          onClick={openSurveyMode}
-          disabled={compareAssets.length < 2}
-        >
-          Survey ({compareAssets.length})
-        </button>
-        <button
-          type="button"
-          style={compareButtonStyle}
-          onClick={() => setImportDialogOpen(true)}
-        >
-          Import
-        </button>
+        {isReviewArea ? (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={openSurveyMode}
+            disabled={compareAssets.length < 2}
+          >
+            Survey ({compareAssets.length})
+          </button>
+        ) : (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => setImportDialogOpen(true)}
+          >
+            Import
+          </button>
+        )}
         <button
           type="button"
           style={compareButtonStyle}
@@ -1857,29 +2083,33 @@ export default function App() {
             Remove from Album
           </button>
         ) : null}
-        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateGroup()}>
-          New Group
-        </button>
-        <button type="button" style={compareButtonStyle} onClick={() => void handleCreateAlbum()}>
-          New Album
-        </button>
-        <button
-          type="button"
-          style={compareButtonStyle}
-          onClick={() => void handleRenameSelectedTreeNode()}
-          disabled={!selectedTreeNodeId}
-        >
-          Rename Node
-        </button>
-        <button
-          type="button"
-          style={compareButtonStyle}
-          onClick={() => void handleDeleteSelectedTreeNode()}
-          disabled={!selectedTreeNodeId}
-        >
-          Delete Node
-        </button>
-        <label style={toggleOptionLabelStyle}>
+        {isLibraryArea ? (
+          <>
+            <button type="button" style={compareButtonStyle} onClick={() => void handleCreateGroup()}>
+              New Group
+            </button>
+            <button type="button" style={compareButtonStyle} onClick={() => void handleCreateAlbum()}>
+              New Album
+            </button>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => void handleRenameSelectedTreeNode()}
+              disabled={!selectedTreeNodeId}
+            >
+              Rename Node
+            </button>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => void handleDeleteSelectedTreeNode()}
+              disabled={!selectedTreeNodeId}
+            >
+              Delete Node
+            </button>
+          </>
+        ) : null}
+        <label style={isReviewArea ? toggleOptionLabelStyle : secondaryToggleOptionLabelStyle}>
           <input
             type="checkbox"
             checked={advanceAfterRating}
@@ -1887,7 +2117,7 @@ export default function App() {
           />
           Advance after rating
         </label>
-        <label style={toggleOptionLabelStyle}>
+        <label style={isReviewArea ? toggleOptionLabelStyle : secondaryToggleOptionLabelStyle}>
           <input
             type="checkbox"
             checked={hideReject}
@@ -1895,14 +2125,53 @@ export default function App() {
           />
           Hide Reject
         </label>
-        <label style={toggleOptionLabelStyle}>
-          <input
-            type="checkbox"
-            checked={groupByDate}
-            onChange={(event) => setGroupByDate(event.target.checked)}
-          />
-          Group by Date
-        </label>
+        {isLibraryArea ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={filterLabelStyle}>Library View:</span>
+            <button
+              type="button"
+              style={
+                libraryBrowseMode === 'Flat'
+                  ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+                  : compareButtonStyle
+              }
+              onClick={() => handleSetLibraryBrowseMode('Flat')}
+              disabled={libraryBrowseMode === 'Flat'}
+            >
+              Flat
+            </button>
+            <button
+              type="button"
+              style={
+                libraryBrowseMode === 'Timeline'
+                  ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+                  : compareButtonStyle
+              }
+              onClick={() => handleSetLibraryBrowseMode('Timeline')}
+              disabled={libraryBrowseMode === 'Timeline'}
+            >
+              Timeline
+            </button>
+          </div>
+        ) : null}
+        {isLibraryArea ? (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={openSurveyMode}
+            disabled={compareAssets.length < 2}
+          >
+            Survey ({compareAssets.length})
+          </button>
+        ) : (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => setImportDialogOpen(true)}
+          >
+            Import
+          </button>
+        )}
       </div>
       <section style={albumTreeSectionStyle}>
         <strong>Albums</strong>
@@ -2015,8 +2284,9 @@ export default function App() {
         </div>
       </section>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
-        Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click
-        to multi-select.
+        {isReviewArea
+          ? 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click to multi-select.'
+          : 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive. Cmd/Ctrl-click to multi-select.'}
       </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -2058,31 +2328,71 @@ export default function App() {
               onSelectAsset={handleFilmstripSelectAsset}
             />
             <AssetDetailsPanel asset={selectedAsset} />
-            {groupByDate ? (
-              <>
-                {groupedVisibleAssets.map((group) => (
-                  <section key={group.key} style={groupSectionStyle}>
-                    <h3 style={groupHeaderStyle}>
-                      {group.label}
-                      <span style={groupMetaStyle}>
-                        · {group.assets.length} {group.assets.length === 1 ? 'asset' : 'assets'}
-                      </span>
-                    </h3>
-                    <div style={gridStyle}>
-                      {group.assets.map((asset) => (
-                        <AssetCard
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={selectedAssetIds.includes(asset.id)}
-                          isUpdating={updatingAssetIds[asset.id] === true}
-                          onCardClick={handleCardClick}
-                          onSetPhotoState={handleSetPhotoState}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </>
+            {isTimelineMode ? (
+              <div style={timelineLayoutStyle}>
+                <aside style={timelineNavPanelStyle}>
+                  <strong>Timeline</strong>
+                  {timelineNavigationYears.map((year) => {
+                    const isExpanded = timelineNavExpandedYearKeys.includes(year.key);
+                    return (
+                      <section key={year.key} style={{ marginTop: '8px' }}>
+                        <div style={timelineYearHeaderStyle}>
+                          <button
+                            type="button"
+                            style={compareButtonStyle}
+                            onClick={() => toggleTimelineYearExpanded(year.key)}
+                          >
+                            {isExpanded ? '▾' : '▸'}
+                          </button>
+                          <strong>{year.label}</strong>
+                        </div>
+                        {isExpanded
+                          ? year.months.map((month) => (
+                              <button
+                                key={month.key}
+                                type="button"
+                                style={timelineMonthButtonStyle}
+                                onClick={() => handleJumpToTimelineMonth(month.key)}
+                              >
+                                {month.label} ({month.assetCount})
+                              </button>
+                            ))
+                          : null}
+                      </section>
+                    );
+                  })}
+                </aside>
+                <div>
+                  {timelineMonthGroups.map((group) => (
+                    <section
+                      key={group.key}
+                      style={groupSectionStyle}
+                      ref={(element) => {
+                        timelineSectionRefs.current[group.key] = element;
+                      }}
+                    >
+                      <h3 style={groupHeaderStyle}>
+                        {group.label}
+                        <span style={groupMetaStyle}>
+                          · {group.assets.length} {group.assets.length === 1 ? 'asset' : 'assets'}
+                        </span>
+                      </h3>
+                      <div style={gridStyle}>
+                        {group.assets.map((asset) => (
+                          <AssetCard
+                            key={asset.id}
+                            asset={asset}
+                            isSelected={selectedAssetIds.includes(asset.id)}
+                            isUpdating={updatingAssetIds[asset.id] === true}
+                            onCardClick={handleCardClick}
+                            onSetPhotoState={handleSetPhotoState}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div style={gridStyle}>
                 {visibleAssets.map((asset) => (
@@ -2111,6 +2421,10 @@ export default function App() {
               <p>Check one or more albums to view their media.</p>
             ) : isAlbumScopeMode && albumScopedAssets.length === 0 ? (
               <p>The checked albums contain no assets yet.</p>
+            ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
+              <p>No photos need review right now. Switch to Library to browse selected photos.</p>
+            ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
+              <p>No selected photos in the library yet. Mark keepers as Select in Review.</p>
             ) : (
               <p>No visible assets match the current filters.</p>
             )}
