@@ -83,6 +83,9 @@ export interface CreateMediaAssetInput {
   captureDateTime: Date | null;
   width: number | null;
   height: number | null;
+  locationLabel: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
   importedAt: Date;
   originalStorageRootId: string;
   originalArchivePath: string;
@@ -115,6 +118,9 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     captureDateTime: input.captureDateTime?.toISOString() ?? null,
     width: input.width,
     height: input.height,
+    locationLabel: input.locationLabel,
+    locationLatitude: input.locationLatitude,
+    locationLongitude: input.locationLongitude,
     importedAt: input.importedAt.toISOString(),
     originalStorageRootId: input.originalStorageRootId,
     originalArchivePath: input.originalArchivePath,

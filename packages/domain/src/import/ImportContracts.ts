@@ -85,6 +85,9 @@ export interface ScannedCandidateFileDto {
   captureDateTime?: string | null;
   width?: number | null;
   height?: number | null;
+  locationLabel?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
   contentHash?: string | null;
   requiresDerivedDisplayFile?: boolean;
 }

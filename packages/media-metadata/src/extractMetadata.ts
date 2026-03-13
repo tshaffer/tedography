@@ -3,6 +3,9 @@ export interface ExtractedMetadata {
   width?: number;
   height?: number;
   captureDateTime?: string;
+  locationLabel?: string;
+  locationLatitude?: number;
+  locationLongitude?: number;
 }
 
 type ExifDateLike = {
@@ -60,6 +63,15 @@ function toFiniteNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function toTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function parseSizePair(value: unknown): { width?: number; height?: number } {
   if (typeof value !== 'string') {
     return {};
@@ -109,6 +121,65 @@ function toIsoDate(value: unknown): string | undefined {
   return undefined;
 }
 
+function parseGpsCoordinate(value: unknown): number | undefined {
+  const numericValue = toFiniteNumber(value);
+  if (numericValue !== undefined) {
+    return numericValue;
+  }
+
+  const stringValue = toTrimmedString(value);
+  if (!stringValue) {
+    return undefined;
+  }
+
+  const hemisphereMatch = stringValue.match(/\b([NSEW])\b/i);
+  const hemisphere = hemisphereMatch?.[1]?.toUpperCase() ?? undefined;
+
+  const degreeMinuteSecondMatch = stringValue.match(
+    /(-?\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)?\D*(\d+(?:\.\d+)?)?\D*([NSEW])?/i
+  );
+
+  if (!degreeMinuteSecondMatch) {
+    return undefined;
+  }
+
+  const degrees = Number(degreeMinuteSecondMatch[1]);
+  const minutes = Number(degreeMinuteSecondMatch[2] ?? '0');
+  const seconds = Number(degreeMinuteSecondMatch[3] ?? '0');
+
+  if (!Number.isFinite(degrees) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
+    return undefined;
+  }
+
+  let decimalDegrees = Math.abs(degrees) + minutes / 60 + seconds / 3600;
+  if (degrees < 0) {
+    decimalDegrees *= -1;
+  }
+
+  const direction = (degreeMinuteSecondMatch[4] ?? hemisphere)?.toUpperCase();
+  if (direction === 'S' || direction === 'W') {
+    decimalDegrees = -Math.abs(decimalDegrees);
+  }
+
+  return decimalDegrees;
+}
+
+function deriveLocationLabel(tags: Record<string, unknown>): string | undefined {
+  const locationParts = [
+    toTrimmedString(tags.SubLocation),
+    toTrimmedString(tags.City),
+    toTrimmedString(tags.State),
+    toTrimmedString(tags['Country-PrimaryLocationName']),
+    toTrimmedString(tags.Country)
+  ].filter((value, index, all): value is string => value !== undefined && all.indexOf(value) === index);
+
+  if (locationParts.length > 0) {
+    return locationParts.join(', ');
+  }
+
+  return toTrimmedString(tags.GPSPosition);
+}
+
 export async function extractMetadata(filePath: string): Promise<ExtractedMetadata> {
   const runtime = await getExiftoolRuntime();
   if (!runtime) {
@@ -139,6 +210,16 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
       toIsoDate(tags.TrackCreateDate) ??
       toIsoDate(tags.ModifyDate);
 
+    const locationLatitude =
+      parseGpsCoordinate(tags['GPSLatitude#']) ??
+      parseGpsCoordinate(tags.GPSLatitude);
+
+    const locationLongitude =
+      parseGpsCoordinate(tags['GPSLongitude#']) ??
+      parseGpsCoordinate(tags.GPSLongitude);
+
+    const locationLabel = deriveLocationLabel(tags);
+
     const metadata: ExtractedMetadata = {};
     if (width !== undefined) {
       metadata.width = width;
@@ -148,6 +229,15 @@ export async function extractMetadata(filePath: string): Promise<ExtractedMetada
     }
     if (captureDateTime !== undefined) {
       metadata.captureDateTime = captureDateTime;
+    }
+    if (locationLabel !== undefined) {
+      metadata.locationLabel = locationLabel;
+    }
+    if (locationLatitude !== undefined) {
+      metadata.locationLatitude = locationLatitude;
+    }
+    if (locationLongitude !== undefined) {
+      metadata.locationLongitude = locationLongitude;
     }
 
     return metadata;

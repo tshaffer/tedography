@@ -29,6 +29,9 @@ type SupportedScannedFile = {
   captureDateTime: string | null;
   width: number | null;
   height: number | null;
+  locationLabel: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
   requiresDerivedDisplayFile: boolean;
 };
 
@@ -136,6 +139,9 @@ export async function scanImportTarget(input: {
       captureDateTime: metadata.captureDateTime ? metadata.captureDateTime.toISOString() : null,
       width: metadata.width,
       height: metadata.height,
+      locationLabel: metadata.locationLabel,
+      locationLatitude: metadata.locationLatitude,
+      locationLongitude: metadata.locationLongitude,
       requiresDerivedDisplayFile: displayPlan.requiresDerivedDisplayFile
     });
   }
@@ -195,6 +201,9 @@ export async function scanImportTarget(input: {
             captureDateTime: supported?.captureDateTime ?? null,
             width: supported?.width ?? null,
             height: supported?.height ?? null,
+            locationLabel: supported?.locationLabel ?? null,
+            locationLatitude: supported?.locationLatitude ?? null,
+            locationLongitude: supported?.locationLongitude ?? null,
             contentHash: supported?.contentHash ?? null,
             requiresDerivedDisplayFile: supported?.requiresDerivedDisplayFile ?? false
           }
@@ -202,6 +211,9 @@ export async function scanImportTarget(input: {
             captureDateTime: null,
             width: null,
             height: null,
+            locationLabel: null,
+            locationLatitude: null,
+            locationLongitude: null,
             contentHash: null,
             requiresDerivedDisplayFile: false
           })
