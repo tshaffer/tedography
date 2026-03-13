@@ -257,3 +257,15 @@ pnpm --filter @tedography/api assets:verify --json
 11. Press `Space` and verify play/pause toggles.
 12. Press `Right` and `Left` arrows and verify next/previous navigation.
 13. Press `Escape` and verify slideshow exits cleanly back to normal viewer state on the current asset.
+
+## Testing RL-FC Review / Library Completion
+
+1. Switch between `Grid` and `Loupe` in both `Review` and `Library`; verify Loupe shows one large in-app image while the rest of the app UI remains visible.
+2. In `Loupe`, use left/right arrows and verify adjacent visible-asset navigation remains stable.
+3. Enter `Full Screen` from the focused asset panel or Loupe and verify the browser enters real fullscreen, app chrome is hidden by the fullscreen viewer, and `Escape` exits cleanly back to the prior context.
+4. In `Review`, select multiple assets and use `Apply to Selected`; verify `Unreviewed`, `Pending`, `Select`, and `Reject` apply to the whole selected set.
+5. In `Review`, toggle `Include Rejects`; verify Reject assets can be brought back into Review scope without conflicting with Library `Hide Reject`.
+6. In any grid presentation, click one asset, then Shift-click another; verify the full contiguous range is selected.
+7. Toggle `Hide Details` / `Show Details`; verify focused-asset/details panels collapse and return cleanly without breaking navigation.
+8. Open `Asset Details` for an asset with album memberships and verify album labels are listed.
+9. If any asset includes location metadata, verify it appears in `Asset Details`; if no location metadata exists, verify no broken placeholder/UI regression appears.

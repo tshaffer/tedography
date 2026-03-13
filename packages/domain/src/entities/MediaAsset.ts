@@ -39,6 +39,11 @@ export interface MediaAsset {
   // Virtual organization only; does not affect filesystem storage layout.
   albumIds?: string[];
 
+  // Optional capture location metadata when available.
+  locationLabel?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
+
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.
   storageRootId?: string;

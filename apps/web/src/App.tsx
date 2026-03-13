@@ -50,10 +50,13 @@ const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
+const reviewIncludeRejectsStorageKey = 'tedography.reviewIncludeRejects';
+const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
+type ViewerMode = 'Grid' | 'Loupe';
 
 const timelineStickyTopPx = 10;
 const timelineActiveMonthOffsetPx = timelineStickyTopPx + 16;
@@ -240,6 +243,10 @@ const selectedCardStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(31, 111, 235, 0.15)'
 };
 
+const activeCardStyle: CSSProperties = {
+  boxShadow: '0 0 0 2px rgba(214, 142, 0, 0.22)'
+};
+
 const thumbnailFrameStyle: CSSProperties = {
   aspectRatio: '4 / 3',
   backgroundColor: '#1f1f1f',
@@ -284,6 +291,32 @@ const actionsStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: '6px',
   marginTop: '8px'
+};
+
+const loupeViewerStyle: CSSProperties = {
+  border: '1px solid #d6d6d6',
+  borderRadius: '10px',
+  backgroundColor: '#fff',
+  padding: '12px',
+  marginBottom: '12px'
+};
+
+const loupeImageWrapStyle: CSSProperties = {
+  aspectRatio: '4 / 3',
+  backgroundColor: '#1f1f1f',
+  borderRadius: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  marginBottom: '10px'
+};
+
+const loupeImageStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain',
+  display: 'block'
 };
 
 const actionButtonStyle: CSSProperties = {
@@ -568,7 +601,10 @@ function getTimelineContentSignature(groups: TimelineMonthGroup[]): string {
     .join('|');
 }
 
-function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] | null {
+function getDefaultPhotoStatesForPrimaryArea(
+  area: TedographyPrimaryArea,
+  reviewIncludeRejects: boolean
+): PhotoState[] | null {
   if (area === 'Library') {
     return [PhotoState.Select];
   }
@@ -577,7 +613,9 @@ function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): Photo
     return null;
   }
 
-  return [PhotoState.Unreviewed, PhotoState.Pending];
+  return reviewIncludeRejects
+    ? [PhotoState.Unreviewed, PhotoState.Pending, PhotoState.Reject]
+    : [PhotoState.Unreviewed, PhotoState.Pending];
 }
 
 function parseLocalDate(value: string): Date | null {
@@ -778,12 +816,20 @@ function getAssetThumbnailImageUrl(asset: MediaAsset): string | null {
 type AssetCardProps = {
   asset: MediaAsset;
   isSelected: boolean;
+  isActive: boolean;
   isUpdating: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onSetPhotoState: (assetId: string, photoState: PhotoState) => void;
 };
 
-function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState }: AssetCardProps) {
+function AssetCard({
+  asset,
+  isSelected,
+  isActive,
+  isUpdating,
+  onCardClick,
+  onSetPhotoState
+}: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const thumbnailImageUrl = getAssetThumbnailImageUrl(asset);
   const displayImageUrl = getAssetDisplayImageUrl(asset);
@@ -795,7 +841,17 @@ function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState
 
   return (
     <article
-      style={isSelected ? { ...cardStyle, ...selectedCardStyle } : cardStyle}
+      style={
+        isActive
+          ? {
+              ...cardStyle,
+              ...(isSelected ? selectedCardStyle : {}),
+              ...activeCardStyle
+            }
+          : isSelected
+            ? { ...cardStyle, ...selectedCardStyle }
+            : cardStyle
+      }
       onClick={(event) => onCardClick(event, asset.id)}
     >
       <div style={thumbnailFrameStyle}>
@@ -813,6 +869,7 @@ function AssetCard({ asset, isSelected, isUpdating, onCardClick, onSetPhotoState
       </div>
       <div style={cardBodyStyle}>
         <strong>{asset.filename}</strong>
+        {isActive ? <span>Focused</span> : null}
         {isSelected ? <span>Selected</span> : null}
         <span>State: {asset.photoState}</span>
         <span>Type: {asset.mediaType}</span>
@@ -890,7 +947,7 @@ function AssetDetailPanel({
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
       <button type="button" style={immersiveButtonStyle} onClick={onOpenImmersive}>
-        Immersive
+        Full Screen
       </button>
       <div style={actionsStyle}>
         {reviewActions.map((state) => (
@@ -905,6 +962,53 @@ function AssetDetailPanel({
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+type LoupeViewerProps = {
+  asset: MediaAsset;
+  index: number;
+  total: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+  onOpenFullscreen: () => void;
+};
+
+function LoupeViewer({
+  asset,
+  index,
+  total,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
+  onOpenFullscreen
+}: LoupeViewerProps) {
+  const imageUrl = getAssetDisplayImageUrl(asset);
+
+  return (
+    <section style={loupeViewerStyle}>
+      <h2 style={{ marginTop: 0 }}>Loupe</h2>
+      <div style={loupeImageWrapStyle}>
+        {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
+      </div>
+      <div style={actionsStyle}>
+        <button type="button" style={compareButtonStyle} onClick={onPrevious} disabled={!hasPrevious}>
+          Previous
+        </button>
+        <button type="button" style={compareButtonStyle} onClick={onNext} disabled={!hasNext}>
+          Next
+        </button>
+        <button type="button" style={compareButtonStyle} onClick={onOpenFullscreen}>
+          Full Screen
+        </button>
+      </div>
+      <p style={{ marginBottom: 0, color: '#666', fontSize: '13px' }}>
+        {asset.filename} · {index + 1} / {total} · {asset.photoState} · {asset.mediaType}
+      </p>
     </section>
   );
 }
@@ -1236,6 +1340,8 @@ export default function App() {
   });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [selectionAnchorAssetId, setSelectionAnchorAssetId] = useState<string | null>(null);
+  const [viewerMode, setViewerMode] = useState<ViewerMode>('Grid');
   const [immersiveOpen, setImmersiveOpen] = useState(false);
   const [surveyOpen, setSurveyOpen] = useState(false);
   const [slideshowActive, setSlideshowActive] = useState(false);
@@ -1254,6 +1360,21 @@ export default function App() {
     }
 
     return window.localStorage.getItem(hideRejectStorageKey) === 'true';
+  });
+  const [reviewIncludeRejects, setReviewIncludeRejects] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(reviewIncludeRejectsStorageKey) === 'true';
+  });
+  const [detailsPanelsVisible, setDetailsPanelsVisible] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(detailsPanelsVisibleStorageKey);
+    return stored === null ? true : stored === 'true';
   });
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
@@ -1381,6 +1502,14 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(hideRejectStorageKey, hideReject ? 'true' : 'false');
   }, [hideReject]);
+
+  useEffect(() => {
+    window.localStorage.setItem(reviewIncludeRejectsStorageKey, reviewIncludeRejects ? 'true' : 'false');
+  }, [reviewIncludeRejects]);
+
+  useEffect(() => {
+    window.localStorage.setItem(detailsPanelsVisibleStorageKey, detailsPanelsVisible ? 'true' : 'false');
+  }, [detailsPanelsVisible]);
 
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
@@ -1557,8 +1686,8 @@ export default function App() {
   }, [assets]);
 
   const areaDefaultPhotoStates = useMemo(
-    () => getDefaultPhotoStatesForPrimaryArea(primaryArea),
-    [primaryArea]
+    () => getDefaultPhotoStatesForPrimaryArea(primaryArea, reviewIncludeRejects),
+    [primaryArea, reviewIncludeRejects]
   );
 
   const areaScopedAssets = useMemo(
@@ -1602,11 +1731,12 @@ export default function App() {
         photoStateFilters.length === 0 || photoStateFilters.includes(asset.photoState);
       const matchesMediaType =
         mediaTypeFilters.length === 0 || mediaTypeFilters.includes(asset.mediaType);
-      const matchesHideReject = !hideReject || asset.photoState !== PhotoState.Reject;
+      const matchesHideReject =
+        primaryArea === 'Review' || !hideReject || asset.photoState !== PhotoState.Reject;
 
       return matchesPhotoState && matchesMediaType && matchesHideReject;
     });
-  }, [areaScopedAssets, hideReject, mediaTypeFilters, photoStateFilters]);
+  }, [areaScopedAssets, hideReject, mediaTypeFilters, photoStateFilters, primaryArea]);
 
   const checkedAlbumIdsSet = useMemo(() => new Set(checkedAlbumIds), [checkedAlbumIds]);
 
@@ -1748,6 +1878,16 @@ export default function App() {
     () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [visibleAssets, selectedAssetId]
   );
+  const selectedAssetAlbumLabels = useMemo(() => {
+    if (!selectedAsset) {
+      return [];
+    }
+
+    return (selectedAsset.albumIds ?? [])
+      .map((albumId) => albumNodesById.get(albumId))
+      .filter((node): node is AlbumTreeNode => node?.nodeType === 'Album')
+      .map((node) => node.label);
+  }, [albumNodesById, selectedAsset]);
 
   const compareAssets = useMemo(
     () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
@@ -1785,7 +1925,10 @@ export default function App() {
   const hasNoAssets = !assetsLoading && !assetsError && assets.length === 0;
   const hasAreaScopedAssets = areaScopedAssets.length > 0;
   const hasFilteredAssets = visibleAssets.length > 0;
-  const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
+  const hasActiveFilters =
+    photoStateFilters.length > 0 ||
+    mediaTypeFilters.length > 0 ||
+    (primaryArea !== 'Review' && hideReject);
   const hasActiveSearchFilters =
     searchPhotoStates.length > 0 ||
     searchAlbumIds.length > 0 ||
@@ -1797,9 +1940,12 @@ export default function App() {
   const isLibraryArea = primaryArea === 'Library';
   const isSearchArea = primaryArea === 'Search';
   const isTimelineMode = isLibraryArea && libraryBrowseMode === 'Timeline';
+  const isTimelineGridMode = isTimelineMode && viewerMode === 'Grid';
   const isLibraryAlbumsMode = isLibraryArea && libraryBrowseMode === 'Albums';
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
+  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea);
+  const showDetailsPanels = isSearchArea || detailsPanelsVisible;
   const treeDisplayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
     [albumTreeNodes, expandedGroupIds]
@@ -1850,7 +1996,7 @@ export default function App() {
   }, [timelineNavExpandedYearKeys.length, timelineNavigationYears]);
 
   useEffect(() => {
-    if (!isTimelineMode) {
+    if (!isTimelineGridMode) {
       setActiveTimelineMonthKey(null);
       return;
     }
@@ -1881,30 +2027,30 @@ export default function App() {
       window.removeEventListener('scroll', handleScrollOrResize);
       window.removeEventListener('resize', handleScrollOrResize);
     };
-  }, [isTimelineMode, timelineContentSignature, timelineMonthGroups]);
+  }, [isTimelineGridMode, timelineContentSignature, timelineMonthGroups]);
 
   useEffect(() => {
     const wasTimelineMode = previousIsTimelineModeRef.current;
 
-    if (wasTimelineMode && !isTimelineMode) {
+    if (wasTimelineMode && !isTimelineGridMode) {
       timelineScrollMemoryRef.current = {
         scrollY: window.scrollY,
         contentSignature: timelineContentSignature
       };
     }
 
-    if (!wasTimelineMode && isTimelineMode) {
+    if (!wasTimelineMode && isTimelineGridMode) {
       const stored = timelineScrollMemoryRef.current;
       if (stored && stored.contentSignature === timelineContentSignature) {
         pendingTimelineRestoreRef.current = stored;
       }
     }
 
-    previousIsTimelineModeRef.current = isTimelineMode;
-  }, [isTimelineMode, timelineContentSignature]);
+    previousIsTimelineModeRef.current = isTimelineGridMode;
+  }, [isTimelineGridMode, timelineContentSignature]);
 
   useEffect(() => {
-    if (!isTimelineMode) {
+    if (!isTimelineGridMode) {
       return;
     }
 
@@ -1929,7 +2075,7 @@ export default function App() {
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: pendingRestore.scrollY });
     });
-  }, [isTimelineMode, timelineContentSignature, timelineZoomLevel]);
+  }, [isTimelineGridMode, timelineContentSignature, timelineZoomLevel]);
 
   useEffect(() => {
     const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
@@ -1952,13 +2098,30 @@ export default function App() {
     if (selectedAssetId !== nextFocused) {
       setSelectedAssetId(nextFocused);
     }
-  }, [visibleAssets, selectedAssetId, selectedAssetIds]);
+
+    if (selectionAnchorAssetId && !visibleIds.has(selectionAnchorAssetId)) {
+      setSelectionAnchorAssetId(nextFocused);
+    }
+  }, [selectionAnchorAssetId, visibleAssets, selectedAssetId, selectedAssetIds]);
 
   useEffect(() => {
     if (immersiveOpen && !selectedAsset) {
-      setImmersiveOpen(false);
+      closeImmersive();
     }
   }, [immersiveOpen, selectedAsset]);
+
+  useEffect(() => {
+    const handleFullscreenChange = (): void => {
+      if (!document.fullscreenElement) {
+        setImmersiveOpen(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (surveyOpen && compareAssets.length < 2) {
@@ -1978,6 +2141,12 @@ export default function App() {
       setSlideshowPlaying(false);
     }
   }, [slideshowActive, slideshowAssets]);
+
+  useEffect(() => {
+    if (viewerMode === 'Loupe' && !selectedAsset) {
+      setViewerMode('Grid');
+    }
+  }, [selectedAsset, viewerMode]);
 
   useEffect(() => {
     if (!slideshowActive || !slideshowPlaying || slideshowAssets.length < 2) {
@@ -2056,7 +2225,7 @@ export default function App() {
         const matchesMediaTypeAfterUpdate =
           mediaTypeFilters.length === 0 || mediaTypeFilters.includes(updatedAsset.mediaType);
         const matchesHideRejectAfterUpdate =
-          !hideReject || updatedAsset.photoState !== PhotoState.Reject;
+          primaryArea === 'Review' || !hideReject || updatedAsset.photoState !== PhotoState.Reject;
         return (
           matchesPhotoStateAfterUpdate &&
           matchesMediaTypeAfterUpdate &&
@@ -2089,6 +2258,55 @@ export default function App() {
     }
   }
 
+  async function handleApplyPhotoStateToSelectedAssets(photoState: PhotoState): Promise<void> {
+    const assetIds =
+      selectedAssetIds.length > 1
+        ? selectedAssetIds
+        : selectedAssetId
+          ? [selectedAssetId]
+          : [];
+
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    for (const assetId of assetIds) {
+      setAssetUpdating(assetId, true);
+    }
+    setUpdateError(null);
+
+    try {
+      const updatedAssets = await Promise.all(
+        assetIds.map(async (assetId) => {
+          const response = await fetch(`/api/assets/${assetId}/photoState`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ photoState })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+
+          return (await response.json()) as MediaAsset;
+        })
+      );
+
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) =>
+        previous.map((asset) => updatesById.get(asset.id) ?? asset)
+      );
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to update selected assets');
+    } finally {
+      for (const assetId of assetIds) {
+        setAssetUpdating(assetId, false);
+      }
+    }
+  }
+
   function handleSelectRelativeInList(list: MediaAsset[], offset: number): void {
     if (selectedAssetId === null || list.length === 0) {
       return;
@@ -2118,6 +2336,35 @@ export default function App() {
     }
   }
 
+  async function requestBrowserFullscreen(): Promise<void> {
+    if (document.fullscreenElement) {
+      return;
+    }
+
+    const fullscreenTarget = document.documentElement;
+    if (typeof fullscreenTarget.requestFullscreen !== 'function') {
+      return;
+    }
+
+    try {
+      await fullscreenTarget.requestFullscreen();
+    } catch {
+      // Ignore browser/fullscreen permission failures and continue with overlay fallback.
+    }
+  }
+
+  async function exitBrowserFullscreenIfNeeded(): Promise<void> {
+    if (!document.fullscreenElement || typeof document.exitFullscreen !== 'function') {
+      return;
+    }
+
+    try {
+      await document.exitFullscreen();
+    } catch {
+      // Ignore browser/fullscreen permission failures during cleanup.
+    }
+  }
+
   function openImmersive(): void {
     if (!selectedAsset) {
       return;
@@ -2127,6 +2374,12 @@ export default function App() {
     setSlideshowPlaying(false);
     setSurveyOpen(false);
     setImmersiveOpen(true);
+    void requestBrowserFullscreen();
+  }
+
+  function closeImmersive(): void {
+    setImmersiveOpen(false);
+    void exitBrowserFullscreenIfNeeded();
   }
 
   function openSurveyMode(): void {
@@ -2137,6 +2390,7 @@ export default function App() {
     setSlideshowActive(false);
     setSlideshowPlaying(false);
     setImmersiveOpen(false);
+    void exitBrowserFullscreenIfNeeded();
     setSurveyOpen(true);
   }
 
@@ -2147,6 +2401,7 @@ export default function App() {
 
     setSurveyOpen(false);
     setImmersiveOpen(false);
+    void exitBrowserFullscreenIfNeeded();
     setSlideshowActive(true);
     setSlideshowPlaying(true);
 
@@ -2547,11 +2802,27 @@ export default function App() {
   }
 
   function handleCardClick(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
+    if (event.shiftKey) {
+      const anchorId = selectionAnchorAssetId ?? selectedAssetId ?? assetId;
+      const anchorIndex = visibleAssets.findIndex((asset) => asset.id === anchorId);
+      const targetIndex = visibleAssets.findIndex((asset) => asset.id === assetId);
+
+      if (anchorIndex >= 0 && targetIndex >= 0) {
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        const rangeSelection = visibleAssets.slice(start, end + 1).map((asset) => asset.id);
+        setSelectedAssetIds(rangeSelection);
+        setSelectedAssetId(assetId);
+        return;
+      }
+    }
+
     const isToggleSelection = event.metaKey || event.ctrlKey;
 
     if (!isToggleSelection) {
       setSelectedAssetId(assetId);
       setSelectedAssetIds([assetId]);
+      setSelectionAnchorAssetId(assetId);
       return;
     }
 
@@ -2559,11 +2830,13 @@ export default function App() {
     if (!alreadySelected) {
       setSelectedAssetIds([...selectedAssetIds, assetId]);
       setSelectedAssetId(assetId);
+      setSelectionAnchorAssetId(assetId);
       return;
     }
 
     const nextSelectedIds = selectedAssetIds.filter((id) => id !== assetId);
     setSelectedAssetIds(nextSelectedIds);
+    setSelectionAnchorAssetId(assetId);
 
     if (selectedAssetId === assetId) {
       setSelectedAssetId(nextSelectedIds[0] ?? null);
@@ -2588,7 +2861,7 @@ export default function App() {
       }
 
       if (event.key === 'Escape' && immersiveOpen) {
-        setImmersiveOpen(false);
+        closeImmersive();
         return;
       }
 
@@ -2771,7 +3044,7 @@ export default function App() {
             ? 'Library — browse selected keeper photos.'
             : 'Search — find photos by state, album, and capture date.'}
       </p>
-      {isLibraryArea && isTimelineMode ? (
+      {isLibraryArea && isTimelineGridMode ? (
         <p style={{ color: '#666', fontSize: '12px', margin: '-2px 0 10px 0' }}>
           Browse selected photos by month and jump quickly through your archive timeline.
         </p>
@@ -2845,6 +3118,21 @@ export default function App() {
             </button>
           </>
         ) : null}
+        {isReviewArea && selectedAssetIds.length > 1 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={filterLabelStyle}>Apply to Selected ({selectedAssetIds.length}):</span>
+            {reviewActions.map((state) => (
+              <button
+                key={state}
+                type="button"
+                style={compareButtonStyle}
+                onClick={() => void handleApplyPhotoStateToSelectedAssets(state)}
+              >
+                {state}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <label style={isReviewArea ? toggleOptionLabelStyle : secondaryToggleOptionLabelStyle}>
           <input
             type="checkbox"
@@ -2853,14 +3141,63 @@ export default function App() {
           />
           Advance after rating
         </label>
-        <label style={isReviewArea ? toggleOptionLabelStyle : secondaryToggleOptionLabelStyle}>
-          <input
-            type="checkbox"
-            checked={hideReject}
-            onChange={(event) => handleToggleHideReject(event.target.checked)}
-          />
-          Hide Reject
-        </label>
+        {isReviewArea ? (
+          <label style={toggleOptionLabelStyle}>
+            <input
+              type="checkbox"
+              checked={reviewIncludeRejects}
+              onChange={(event) => setReviewIncludeRejects(event.target.checked)}
+            />
+            Include Rejects
+          </label>
+        ) : (
+          <label style={secondaryToggleOptionLabelStyle}>
+            <input
+              type="checkbox"
+              checked={hideReject}
+              onChange={(event) => handleToggleHideReject(event.target.checked)}
+            />
+            Hide Reject
+          </label>
+        )}
+        {(isReviewArea || isLibraryArea) ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={filterLabelStyle}>View:</span>
+            <button
+              type="button"
+              style={
+                viewerMode === 'Grid'
+                  ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+                  : compareButtonStyle
+              }
+              onClick={() => setViewerMode('Grid')}
+              disabled={viewerMode === 'Grid'}
+            >
+              Grid
+            </button>
+            <button
+              type="button"
+              style={
+                viewerMode === 'Loupe'
+                  ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+                  : compareButtonStyle
+              }
+              onClick={() => setViewerMode('Loupe')}
+              disabled={viewerMode === 'Loupe' || !selectedAsset}
+            >
+              Loupe
+            </button>
+          </div>
+        ) : null}
+        {(isReviewArea || isLibraryArea) ? (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => setDetailsPanelsVisible((previous) => !previous)}
+          >
+            {detailsPanelsVisible ? 'Hide Details' : 'Show Details'}
+          </button>
+        ) : null}
         {isLibraryArea ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={filterLabelStyle}>Library View:</span>
@@ -2902,7 +3239,7 @@ export default function App() {
             </button>
           </div>
         ) : null}
-        {isTimelineMode ? (
+        {isTimelineGridMode ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={filterLabelStyle}>Timeline Zoom:</span>
             {timelineZoomLevels.map((level, index) => (
@@ -3147,8 +3484,8 @@ export default function App() {
       </section>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         {isReviewArea
-          ? 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click to multi-select.'
-          : 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, Space play/pause in slideshow. Cmd/Ctrl-click to multi-select.'}
+          ? 'Keyboard: arrows navigate, Home/End jump, Enter/Space full screen, S/P/R/U review. Cmd/Ctrl-click to multi-select.'
+          : 'Keyboard: arrows navigate, Home/End jump, Enter/Space full screen, Space play/pause in slideshow. Cmd/Ctrl-click to multi-select.'}
       </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -3181,19 +3518,35 @@ export default function App() {
                 totalCount={visibleAssets.length}
               />
             ) : null}
-            <AssetDetailPanel
-              asset={selectedAsset}
-              isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
-              onOpenImmersive={openImmersive}
-              onSetPhotoState={handleSetPhotoState}
-            />
+            {showDetailsPanels && !isLoupeMode ? (
+              <AssetDetailPanel
+                asset={selectedAsset}
+                isUpdating={selectedAsset ? updatingAssetIds[selectedAsset.id] === true : false}
+                onOpenImmersive={openImmersive}
+                onSetPhotoState={handleSetPhotoState}
+              />
+            ) : null}
             <AssetFilmstrip
               assets={visibleAssets}
               activeAssetId={selectedAssetId}
               onSelectAsset={handleFilmstripSelectAsset}
             />
-            <AssetDetailsPanel asset={selectedAsset} />
-            {isTimelineMode ? (
+            {isLoupeMode && selectedAsset ? (
+              <LoupeViewer
+                asset={selectedAsset}
+                index={selectedAssetIndex}
+                total={visibleAssets.length}
+                hasPrevious={selectedAssetIndex > 0}
+                hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
+                onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
+                onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
+                onOpenFullscreen={openImmersive}
+              />
+            ) : null}
+            {showDetailsPanels ? (
+              <AssetDetailsPanel asset={selectedAsset} albumLabels={selectedAssetAlbumLabels} />
+            ) : null}
+            {!isLoupeMode && isTimelineGridMode ? (
               <div style={timelineLayoutStyle}>
                 <aside style={timelineNavPanelStyle}>
                   <strong>Timeline</strong>
@@ -3252,6 +3605,7 @@ export default function App() {
                             key={asset.id}
                             asset={asset}
                             isSelected={selectedAssetIds.includes(asset.id)}
+                            isActive={selectedAssetId === asset.id}
                             isUpdating={updatingAssetIds[asset.id] === true}
                             onCardClick={handleCardClick}
                             onSetPhotoState={handleSetPhotoState}
@@ -3262,7 +3616,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            ) : isGroupedAlbumsPresentation ? (
+            ) : !isLoupeMode && isGroupedAlbumsPresentation ? (
               <>
                 {checkedAlbumSections.map((section) => (
                   <section key={section.albumId} style={groupSectionStyle}>
@@ -3278,6 +3632,7 @@ export default function App() {
                           key={`${section.albumId}-${asset.id}`}
                           asset={asset}
                           isSelected={selectedAssetIds.includes(asset.id)}
+                          isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
                           onCardClick={handleCardClick}
                           onSetPhotoState={handleSetPhotoState}
@@ -3285,32 +3640,35 @@ export default function App() {
                       ))}
                     </div>
                   </section>
-                ))}
-              </>
-            ) : (
+                  ))}
+                </>
+            ) : !isLoupeMode ? (
               <div style={gridStyle}>
                 {visibleAssets.map((asset) => (
                   <AssetCard
                     key={asset.id}
                     asset={asset}
                     isSelected={selectedAssetIds.includes(asset.id)}
+                    isActive={selectedAssetId === asset.id}
                     isUpdating={updatingAssetIds[asset.id] === true}
                     onCardClick={handleCardClick}
                     onSetPhotoState={handleSetPhotoState}
                   />
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         ) : (
           <>
-            <AssetDetailPanel
-              asset={null}
-              isUpdating={false}
-              onOpenImmersive={openImmersive}
-              onSetPhotoState={handleSetPhotoState}
-            />
-            <AssetDetailsPanel asset={null} />
+            {showDetailsPanels ? (
+              <AssetDetailPanel
+                asset={null}
+                isUpdating={false}
+                onOpenImmersive={openImmersive}
+                onSetPhotoState={handleSetPhotoState}
+              />
+            ) : null}
+            {showDetailsPanels ? <AssetDetailsPanel asset={null} albumLabels={[]} /> : null}
             {isLibraryAlbumsMode && !hasCheckedAlbums ? (
               <p>Check one or more albums to browse their photos.</p>
             ) : isLibraryAlbumsMode && !hasAssetsInCheckedAlbumsInAreaScope ? (
@@ -3331,7 +3689,7 @@ export default function App() {
                 <button type="button" style={compareButtonStyle} onClick={clearFilters}>
                   Clear Filters
                 </button>
-                {hideReject ? (
+                {!isReviewArea && hideReject ? (
                   <button
                     type="button"
                     style={compareButtonStyle}
@@ -3340,6 +3698,17 @@ export default function App() {
                     Show Rejects
                   </button>
                 ) : null}
+              </div>
+            ) : null}
+            {isReviewArea && !reviewIncludeRejects ? (
+              <div style={actionsStyle}>
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  onClick={() => setReviewIncludeRejects(true)}
+                >
+                  Include Rejects
+                </button>
               </div>
             ) : null}
             {isSearchArea && hasActiveSearchFilters ? (
@@ -3392,7 +3761,7 @@ export default function App() {
           total={visibleAssets.length}
           hasPrevious={selectedAssetIndex > 0}
           hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
-          onClose={() => setImmersiveOpen(false)}
+          onClose={closeImmersive}
           onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
           onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}

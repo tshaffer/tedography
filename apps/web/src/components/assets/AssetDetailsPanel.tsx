@@ -3,6 +3,7 @@ import { type MediaAsset } from '@tedography/domain';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
+  albumLabels?: string[];
 }
 
 const panelStyle: CSSProperties = {
@@ -75,7 +76,31 @@ function renderRow(label: string, value: string) {
   );
 }
 
-export function AssetDetailsPanel({ asset }: AssetDetailsPanelProps) {
+function formatAlbumLabels(albumLabels: string[]): string {
+  if (albumLabels.length === 0) {
+    return '—';
+  }
+
+  return albumLabels.join(', ');
+}
+
+function formatLocation(
+  locationLabel?: string | null,
+  locationLatitude?: number | null,
+  locationLongitude?: number | null
+): string {
+  if (typeof locationLabel === 'string' && locationLabel.trim().length > 0) {
+    return locationLabel;
+  }
+
+  if (typeof locationLatitude === 'number' && typeof locationLongitude === 'number') {
+    return `${locationLatitude.toFixed(5)}, ${locationLongitude.toFixed(5)}`;
+  }
+
+  return '—';
+}
+
+export function AssetDetailsPanel({ asset, albumLabels = [] }: AssetDetailsPanelProps) {
   if (!asset) {
     return (
       <section style={panelStyle}>
@@ -91,6 +116,11 @@ export function AssetDetailsPanel({ asset }: AssetDetailsPanelProps) {
     { label: 'Media Type', value: formatValue(asset.mediaType) },
     { label: 'Captured', value: formatDateTime(asset.captureDateTime) },
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
+    { label: 'Albums', value: formatAlbumLabels(albumLabels) },
+    {
+      label: 'Location',
+      value: formatLocation(asset.locationLabel, asset.locationLatitude, asset.locationLongitude)
+    },
     { label: 'Original Format', value: formatValue(asset.originalFileFormat) },
     { label: 'Original Root', value: formatValue(asset.originalStorageRootId) },
     { label: 'Original Path', value: formatValue(asset.originalArchivePath) },
