@@ -379,6 +379,16 @@ const immersiveBottomHintStyle: CSSProperties = {
   marginTop: '8px'
 };
 
+const slideshowOverlayStyle: CSSProperties = {
+  ...immersiveOverlayStyle,
+  backgroundColor: 'rgba(0, 0, 0, 0.96)'
+};
+
+const slideshowTopBarStyle: CSSProperties = {
+  ...immersiveTopBarStyle,
+  paddingBottom: '12px'
+};
+
 const surveyOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
@@ -929,6 +939,78 @@ function ImmersiveViewer({
   );
 }
 
+type SlideshowViewerProps = {
+  asset: MediaAsset;
+  index: number;
+  total: number;
+  isPlaying: boolean;
+  onExit: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onTogglePlayPause: () => void;
+  onActiveImageLoad: (assetId: string) => void;
+};
+
+function SlideshowViewer({
+  asset,
+  index,
+  total,
+  isPlaying,
+  onExit,
+  onNext,
+  onPrevious,
+  onTogglePlayPause,
+  onActiveImageLoad
+}: SlideshowViewerProps) {
+  const imageUrl = getAssetDisplayImageUrl(asset);
+
+  return (
+    <div style={slideshowOverlayStyle}>
+      <section style={{ width: '100%', height: '100%' }}>
+        <div style={slideshowTopBarStyle}>
+          <div style={immersiveInfoStyle}>
+            <strong>{asset.filename}</strong>
+            <span>
+              {index + 1} / {total}
+            </span>
+            <span>{formatCaptureDate(asset.captureDateTime)}</span>
+          </div>
+          <div style={immersiveControlsStyle}>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onTogglePlayPause}>
+              {isPlaying ? 'Pause' : 'Play'}
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onPrevious}>
+              Previous
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onNext}>
+              Next
+            </button>
+            <button type="button" style={immersiveControlButtonStyle} onClick={onExit}>
+              Exit
+            </button>
+          </div>
+        </div>
+        <div style={immersiveImageWrapStyle}>
+          {imageUrl ? (
+            <img
+              key={asset.id}
+              src={imageUrl}
+              alt={asset.filename}
+              style={immersiveImageStyle}
+              onLoad={() => onActiveImageLoad(asset.id)}
+            />
+          ) : (
+            <div style={immersiveImageStyle} />
+          )}
+        </div>
+        <p style={immersiveBottomHintStyle}>
+          Keyboard: Space play/pause, Left/Right navigate, Escape exit slideshow.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 type SurveyModeProps = {
   assets: MediaAsset[];
   focusedAsset: MediaAsset;
@@ -1109,6 +1191,9 @@ export default function App() {
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [immersiveOpen, setImmersiveOpen] = useState(false);
   const [surveyOpen, setSurveyOpen] = useState(false);
+  const [slideshowActive, setSlideshowActive] = useState(false);
+  const [slideshowPlaying, setSlideshowPlaying] = useState(false);
+  const [slideshowIntervalMs] = useState(5000);
   const [advanceAfterRating, setAdvanceAfterRating] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -1590,9 +1675,19 @@ export default function App() {
     [visibleAssets, selectedAssetIds]
   );
 
+  const slideshowAssets = useMemo(
+    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    [compareAssets, visibleAssets]
+  );
+
   const selectedAssetIndex = useMemo(
     () => visibleAssets.findIndex((asset) => asset.id === selectedAssetId),
     [visibleAssets, selectedAssetId]
+  );
+
+  const slideshowSelectedAssetIndex = useMemo(
+    () => slideshowAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [slideshowAssets, selectedAssetId]
   );
 
   const surveyFocusedAsset = useMemo(
@@ -1691,6 +1786,38 @@ export default function App() {
       setSelectedAssetId(surveyFocusedAsset.id);
     }
   }, [selectedAssetId, surveyFocusedAsset, surveyOpen]);
+
+  useEffect(() => {
+    if (slideshowActive && slideshowAssets.length === 0) {
+      setSlideshowActive(false);
+      setSlideshowPlaying(false);
+    }
+  }, [slideshowActive, slideshowAssets]);
+
+  useEffect(() => {
+    if (!slideshowActive || !slideshowPlaying || slideshowAssets.length < 2) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setSelectedAssetId((previous) => {
+        const currentIndex = previous
+          ? slideshowAssets.findIndex((asset) => asset.id === previous)
+          : -1;
+
+        if (currentIndex < 0) {
+          return slideshowAssets[0]?.id ?? previous;
+        }
+
+        const nextIndex = (currentIndex + 1) % slideshowAssets.length;
+        return slideshowAssets[nextIndex]?.id ?? previous;
+      });
+    }, slideshowIntervalMs);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [slideshowActive, slideshowAssets, slideshowIntervalMs, slideshowPlaying]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
@@ -1811,6 +1938,8 @@ export default function App() {
       return;
     }
 
+    setSlideshowActive(false);
+    setSlideshowPlaying(false);
     setSurveyOpen(false);
     setImmersiveOpen(true);
   }
@@ -1820,8 +1949,50 @@ export default function App() {
       return;
     }
 
+    setSlideshowActive(false);
+    setSlideshowPlaying(false);
     setImmersiveOpen(false);
     setSurveyOpen(true);
+  }
+
+  function startSlideshow(): void {
+    if (slideshowAssets.length === 0) {
+      return;
+    }
+
+    setSurveyOpen(false);
+    setImmersiveOpen(false);
+    setSlideshowActive(true);
+    setSlideshowPlaying(true);
+
+    if (!selectedAssetId || !slideshowAssets.some((asset) => asset.id === selectedAssetId)) {
+      setSelectedAssetId(slideshowAssets[0]?.id ?? null);
+    }
+  }
+
+  function stopSlideshow(): void {
+    setSlideshowActive(false);
+    setSlideshowPlaying(false);
+  }
+
+  function toggleSlideshowPlayPause(): void {
+    setSlideshowPlaying((previous) => !previous);
+  }
+
+  function handleSlideshowRelative(offset: number): void {
+    if (slideshowAssets.length === 0) {
+      return;
+    }
+
+    setSelectedAssetId((previous) => {
+      const currentIndex = previous ? slideshowAssets.findIndex((asset) => asset.id === previous) : -1;
+      if (currentIndex < 0) {
+        return slideshowAssets[0]?.id ?? previous;
+      }
+
+      const nextIndex = (currentIndex + offset + slideshowAssets.length) % slideshowAssets.length;
+      return slideshowAssets[nextIndex]?.id ?? previous;
+    });
   }
 
   function togglePhotoStateFilter(photoState: PhotoState): void {
@@ -2096,7 +2267,7 @@ export default function App() {
   }
 
   function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
-    if (!immersiveOpen) {
+    if (!immersiveOpen && !slideshowActive) {
       return;
     }
 
@@ -2215,6 +2386,12 @@ export default function App() {
         return;
       }
 
+      if (event.key === 'Escape' && slideshowActive) {
+        event.preventDefault();
+        stopSlideshow();
+        return;
+      }
+
       if (event.key === 'Escape' && immersiveOpen) {
         setImmersiveOpen(false);
         return;
@@ -2266,6 +2443,28 @@ export default function App() {
         }
 
         void handleKeyboardReview(event.key);
+        return;
+      }
+
+      if (slideshowActive) {
+        if (event.key === ' ') {
+          event.preventDefault();
+          toggleSlideshowPlayPause();
+          return;
+        }
+
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          handleSlideshowRelative(1);
+          return;
+        }
+
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          handleSlideshowRelative(-1);
+          return;
+        }
+
         return;
       }
 
@@ -2322,6 +2521,7 @@ export default function App() {
     immersiveOpen,
     selectedAsset,
     selectedAssetId,
+    slideshowActive,
     surveyOpen,
     updatingAssetIds
   ]);
@@ -2554,6 +2754,17 @@ export default function App() {
             Import
           </button>
         )}
+        {isLibraryArea || isSearchArea ? (
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={startSlideshow}
+            disabled={slideshowAssets.length === 0}
+            title="Uses selected visible photos when available; otherwise uses all visible photos."
+          >
+            {compareAssets.length > 0 ? 'Slideshow Selected' : 'Slideshow Visible'}
+          </button>
+        ) : null}
       </div>
       {!isSearchArea ? (
         <section style={albumTreeSectionStyle}>
@@ -2722,7 +2933,7 @@ export default function App() {
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         {isReviewArea
           ? 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, S/P/R/U review. Cmd/Ctrl-click to multi-select.'
-          : 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive. Cmd/Ctrl-click to multi-select.'}
+          : 'Keyboard: arrows navigate, Home/End jump, Enter/Space immersive, Space play/pause in slideshow. Cmd/Ctrl-click to multi-select.'}
       </p>
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -2939,6 +3150,20 @@ export default function App() {
             ) : null}
           </>
         )
+      ) : null}
+
+      {slideshowActive && selectedAsset ? (
+        <SlideshowViewer
+          asset={selectedAsset}
+          index={slideshowSelectedAssetIndex}
+          total={slideshowAssets.length}
+          isPlaying={slideshowPlaying}
+          onExit={stopSlideshow}
+          onPrevious={() => handleSlideshowRelative(-1)}
+          onNext={() => handleSlideshowRelative(1)}
+          onTogglePlayPause={toggleSlideshowPlayPause}
+          onActiveImageLoad={handleImmersiveActiveImageLoad}
+        />
       ) : null}
 
       {immersiveOpen && selectedAsset ? (

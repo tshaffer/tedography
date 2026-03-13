@@ -236,3 +236,19 @@ pnpm --filter @tedography/api assets:verify --json
 8. Apply filters that produce no matches and verify message appears: `No photos match the current search filters.`
 9. In no-match state, click `Clear Filters` and verify results return.
 10. Reload the app and verify Search filters restore from local storage.
+
+## Testing Slideshow Mode
+
+1. Switch to `Library` and click `Slideshow`.
+2. Select a visible subset of assets, start slideshow, and verify only selected visible assets are included.
+3. Select assets where some are no longer visible due to filters/scope; start slideshow and verify only selected visible assets are included.
+4. With no selected visible assets, start slideshow and verify it uses the full visible asset set.
+5. Make the active asset fall outside the slideshow set, start slideshow, and verify it starts from the first asset in the slideshow set.
+6. Verify auto-advance runs every ~5 seconds while playing.
+7. Click `Pause` and verify auto-advance stops.
+8. Click `Play` and verify auto-advance resumes.
+9. Click `Next` and `Previous` and verify manual navigation works while paused and while playing.
+10. Verify slideshow wraps from last asset to first asset during playback.
+11. Press `Space` and verify play/pause toggles.
+12. Press `Right` and `Left` arrows and verify next/previous navigation.
+13. Press `Escape` and verify slideshow exits cleanly back to normal viewer state on the current asset.
