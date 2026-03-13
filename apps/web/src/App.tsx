@@ -44,6 +44,10 @@ const primaryAreaStorageKey = 'tedography.primaryArea';
 const libraryBrowseModeStorageKey = 'tedography.libraryBrowseMode';
 const timelineNavExpandedYearKeysStorageKey = 'tedography.timelineNavExpandedYears';
 const albumResultsPresentationStorageKey = 'tedography.albumResultsPresentation';
+const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
+const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
+const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
+const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
@@ -466,8 +470,25 @@ function formatCaptureDate(dateString?: string | null): string {
   return parsed.toLocaleString();
 }
 
+function parseStringArrayFromStorage(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((entry): entry is string => typeof entry === 'string');
+  } catch {
+    return [];
+  }
+}
+
 function parsePrimaryAreaFromStorage(value: string | null): TedographyPrimaryArea {
-  if (value === 'Review' || value === 'Library') {
+  if (value === 'Review' || value === 'Library' || value === 'Search') {
     return value;
   }
 
@@ -490,12 +511,64 @@ function parseAlbumResultsPresentationFromStorage(value: string | null): AlbumRe
   return 'Merged';
 }
 
-function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] {
+function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] | null {
   if (area === 'Library') {
     return [PhotoState.Select];
   }
 
+  if (area === 'Search') {
+    return null;
+  }
+
   return [PhotoState.Unreviewed, PhotoState.Pending];
+}
+
+function parseLocalDate(value: string): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function doesAssetMatchSearchCaptureDateRange(
+  asset: MediaAsset,
+  captureDateFrom: string,
+  captureDateTo: string
+): boolean {
+  if (!captureDateFrom && !captureDateTo) {
+    return true;
+  }
+
+  if (!asset.captureDateTime) {
+    return false;
+  }
+
+  const captureDate = new Date(asset.captureDateTime);
+  if (Number.isNaN(captureDate.getTime())) {
+    return false;
+  }
+
+  const fromDate = parseLocalDate(captureDateFrom);
+  if (fromDate && captureDate < fromDate) {
+    return false;
+  }
+
+  const toDate = parseLocalDate(captureDateTo);
+  if (toDate) {
+    const inclusiveEnd = new Date(toDate);
+    inclusiveEnd.setHours(23, 59, 59, 999);
+    if (captureDate > inclusiveEnd) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -998,6 +1071,40 @@ export default function App() {
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [photoStateFilters, setPhotoStateFilters] = useState<PhotoState[]>([]);
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
+  const [searchPhotoStates, setSearchPhotoStates] = useState<PhotoState[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const parsed = parseStringArrayFromStorage(
+      window.localStorage.getItem(searchPhotoStatesStorageKey)
+    );
+
+    return parsed.filter((entry): entry is PhotoState =>
+      photoStateFilterOptions.includes(entry as PhotoState)
+    );
+  });
+  const [searchAlbumIds, setSearchAlbumIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    return parseStringArrayFromStorage(window.localStorage.getItem(searchAlbumIdsStorageKey));
+  });
+  const [searchCaptureDateFrom, setSearchCaptureDateFrom] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return window.localStorage.getItem(searchCaptureDateFromStorageKey) ?? '';
+  });
+  const [searchCaptureDateTo, setSearchCaptureDateTo] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return window.localStorage.getItem(searchCaptureDateToStorageKey) ?? '';
+  });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [immersiveOpen, setImmersiveOpen] = useState(false);
@@ -1156,6 +1263,22 @@ export default function App() {
     window.localStorage.setItem(expandedAlbumTreeGroupIdsStorageKey, JSON.stringify(expandedGroupIds));
   }, [expandedGroupIds]);
 
+  useEffect(() => {
+    window.localStorage.setItem(searchPhotoStatesStorageKey, JSON.stringify(searchPhotoStates));
+  }, [searchPhotoStates]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchAlbumIdsStorageKey, JSON.stringify(searchAlbumIds));
+  }, [searchAlbumIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchCaptureDateFromStorageKey, searchCaptureDateFrom);
+  }, [searchCaptureDateFrom]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchCaptureDateToStorageKey, searchCaptureDateTo);
+  }, [searchCaptureDateTo]);
+
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
       setAssetsLoading(true);
@@ -1222,6 +1345,11 @@ export default function App() {
       setCheckedAlbumIds(nextCheckedIds);
     }
 
+    const nextSearchAlbumIds = searchAlbumIds.filter((id) => albumNodeIds.has(id));
+    if (!arraysEqual(nextSearchAlbumIds, searchAlbumIds)) {
+      setSearchAlbumIds(nextSearchAlbumIds);
+    }
+
     const groupNodeIds = new Set(
       albumTreeNodes.filter((node) => node.nodeType === 'Group').map((node) => node.id)
     );
@@ -1236,7 +1364,14 @@ export default function App() {
         setSelectedTreeNodeId(null);
       }
     }
-  }, [albumTreeLoading, albumTreeNodes, checkedAlbumIds, expandedGroupIds, selectedTreeNodeId]);
+  }, [
+    albumTreeLoading,
+    albumTreeNodes,
+    checkedAlbumIds,
+    expandedGroupIds,
+    searchAlbumIds,
+    selectedTreeNodeId
+  ]);
 
   const selectedAssetIdsForAlbumAction = useMemo(() => {
     if (selectedAssetIds.length > 0) {
@@ -1277,9 +1412,39 @@ export default function App() {
   );
 
   const areaScopedAssets = useMemo(
-    () => assets.filter((asset) => areaDefaultPhotoStates.includes(asset.photoState)),
+    () =>
+      areaDefaultPhotoStates === null
+        ? assets
+        : assets.filter((asset) => areaDefaultPhotoStates.includes(asset.photoState)),
     [assets, areaDefaultPhotoStates]
   );
+
+  const searchResults = useMemo(() => {
+    const searchAlbumIdsSet = new Set(searchAlbumIds);
+
+    const filtered = areaScopedAssets.filter((asset) => {
+      const matchesPhotoState =
+        searchPhotoStates.length === 0 || searchPhotoStates.includes(asset.photoState);
+      const matchesAlbum =
+        searchAlbumIds.length === 0 ||
+        (asset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
+      const matchesCaptureDateRange = doesAssetMatchSearchCaptureDateRange(
+        asset,
+        searchCaptureDateFrom,
+        searchCaptureDateTo
+      );
+
+      return matchesPhotoState && matchesAlbum && matchesCaptureDateRange;
+    });
+
+    return sortVisibleAssetsForTimeline(filtered);
+  }, [
+    areaScopedAssets,
+    searchAlbumIds,
+    searchCaptureDateFrom,
+    searchCaptureDateTo,
+    searchPhotoStates
+  ]);
 
   const assetsAfterAdditionalFilters = useMemo(() => {
     return areaScopedAssets.filter((asset) => {
@@ -1375,6 +1540,10 @@ export default function App() {
   }, [checkedAlbumSections]);
 
   const visibleAssets = useMemo(() => {
+    if (primaryArea === 'Search') {
+      return searchResults;
+    }
+
     const isLibraryAlbumsMode = primaryArea === 'Library' && libraryBrowseMode === 'Albums';
     if (!isLibraryAlbumsMode) {
       return sortVisibleAssetsForTimeline(assetsAfterAdditionalFilters);
@@ -1396,7 +1565,8 @@ export default function App() {
     groupedAlbumNavigationAssets,
     libraryBrowseMode,
     mergedAlbumAssets,
-    primaryArea
+    primaryArea,
+    searchResults
   ]);
 
   const timelineMonthGroups = useMemo(
@@ -1442,10 +1612,16 @@ export default function App() {
   const hasAreaScopedAssets = areaScopedAssets.length > 0;
   const hasFilteredAssets = visibleAssets.length > 0;
   const hasActiveFilters = photoStateFilters.length > 0 || mediaTypeFilters.length > 0 || hideReject;
+  const hasActiveSearchFilters =
+    searchPhotoStates.length > 0 ||
+    searchAlbumIds.length > 0 ||
+    searchCaptureDateFrom.length > 0 ||
+    searchCaptureDateTo.length > 0;
   const hasCheckedAlbums = checkedAlbumIds.length > 0;
   const hasAssetsInCheckedAlbumsAfterFilters = checkedAlbumSections.length > 0;
   const isReviewArea = primaryArea === 'Review';
   const isLibraryArea = primaryArea === 'Library';
+  const isSearchArea = primaryArea === 'Search';
   const isTimelineMode = isLibraryArea && libraryBrowseMode === 'Timeline';
   const isLibraryAlbumsMode = isLibraryArea && libraryBrowseMode === 'Albums';
   const isGroupedAlbumsPresentation =
@@ -1453,6 +1629,10 @@ export default function App() {
   const treeDisplayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
     [albumTreeNodes, expandedGroupIds]
+  );
+  const searchAlbumFilterOptions = useMemo(
+    () => [...albumNodes].sort((left, right) => left.label.localeCompare(right.label)),
+    [albumNodes]
   );
 
   useEffect(() => {
@@ -1542,16 +1722,35 @@ export default function App() {
         previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
       );
 
-      const matchesPhotoStateAfterUpdate =
-        photoStateFilters.length === 0 || photoStateFilters.includes(updatedAsset.photoState);
-      const matchesMediaTypeAfterUpdate =
-        mediaTypeFilters.length === 0 || mediaTypeFilters.includes(updatedAsset.mediaType);
-      const matchesHideRejectAfterUpdate =
-        !hideReject || updatedAsset.photoState !== PhotoState.Reject;
-      const remainsVisibleAfterUpdate =
-        matchesPhotoStateAfterUpdate &&
-        matchesMediaTypeAfterUpdate &&
-        matchesHideRejectAfterUpdate;
+      const remainsVisibleAfterUpdate = (() => {
+        if (primaryArea === 'Search') {
+          const searchAlbumIdsSet = new Set(searchAlbumIds);
+          const matchesSearchPhotoState =
+            searchPhotoStates.length === 0 || searchPhotoStates.includes(updatedAsset.photoState);
+          const matchesSearchAlbum =
+            searchAlbumIds.length === 0 ||
+            (updatedAsset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
+          const matchesSearchDate = doesAssetMatchSearchCaptureDateRange(
+            updatedAsset,
+            searchCaptureDateFrom,
+            searchCaptureDateTo
+          );
+
+          return matchesSearchPhotoState && matchesSearchAlbum && matchesSearchDate;
+        }
+
+        const matchesPhotoStateAfterUpdate =
+          photoStateFilters.length === 0 || photoStateFilters.includes(updatedAsset.photoState);
+        const matchesMediaTypeAfterUpdate =
+          mediaTypeFilters.length === 0 || mediaTypeFilters.includes(updatedAsset.mediaType);
+        const matchesHideRejectAfterUpdate =
+          !hideReject || updatedAsset.photoState !== PhotoState.Reject;
+        return (
+          matchesPhotoStateAfterUpdate &&
+          matchesMediaTypeAfterUpdate &&
+          matchesHideRejectAfterUpdate
+        );
+      })();
 
       if (isActiveAssetUpdate) {
         if (!remainsVisibleAfterUpdate) {
@@ -1641,10 +1840,33 @@ export default function App() {
     );
   }
 
+  function toggleSearchPhotoState(photoState: PhotoState): void {
+    setSearchPhotoStates((previous) =>
+      previous.includes(photoState)
+        ? previous.filter((state) => state !== photoState)
+        : [...previous, photoState]
+    );
+  }
+
+  function toggleSearchAlbum(albumId: string): void {
+    setSearchAlbumIds((previous) =>
+      previous.includes(albumId)
+        ? previous.filter((id) => id !== albumId)
+        : [...previous, albumId]
+    );
+  }
+
   function clearFilters(): void {
     setPhotoStateFilters([]);
     setMediaTypeFilters([]);
     setHideReject(false);
+  }
+
+  function clearSearchFilters(): void {
+    setSearchPhotoStates([]);
+    setSearchAlbumIds([]);
+    setSearchCaptureDateFrom('');
+    setSearchCaptureDateTo('');
   }
 
   function handleToggleHideReject(nextValue: boolean): void {
@@ -2134,11 +2356,25 @@ export default function App() {
         >
           Library
         </button>
+        <button
+          type="button"
+          style={
+            primaryArea === 'Search'
+              ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+              : compareButtonStyle
+          }
+          onClick={() => setPrimaryArea('Search')}
+          disabled={primaryArea === 'Search'}
+        >
+          Search
+        </button>
       </div>
       <p style={{ color: '#666', fontSize: '13px', margin: '-4px 0 10px 0' }}>
         {isReviewArea
           ? 'Review — curate unreviewed and pending photos quickly.'
-          : 'Library — browse selected keeper photos.'}
+          : isLibraryArea
+            ? 'Library — browse selected keeper photos.'
+            : 'Search — find photos by state, album, and capture date.'}
       </p>
       {isLibraryArea && isTimelineMode ? (
         <p style={{ color: '#666', fontSize: '12px', margin: '-2px 0 10px 0' }}>
@@ -2300,7 +2536,7 @@ export default function App() {
             </button>
           </div>
         ) : null}
-        {isLibraryArea ? (
+        {!isReviewArea ? (
           <button
             type="button"
             style={compareButtonStyle}
@@ -2319,105 +2555,169 @@ export default function App() {
           </button>
         )}
       </div>
-      <section style={albumTreeSectionStyle}>
-        <strong>Albums</strong>
-        <div style={albumTreeRowStyle}>
-          <button type="button" style={compareButtonStyle} onClick={() => setLibraryBrowseMode('Flat')}>
-            All Photos ({assets.length})
-          </button>
-          <span style={{ color: '#666', fontSize: '12px' }}>
-            Checked Albums ({checkedAlbumIds.length})
-          </span>
-        </div>
-        {albumTreeLoading ? <p>Loading album tree...</p> : null}
-        {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
-        {!albumTreeLoading ? (
-          <div style={albumTreeListStyle}>
-            {treeDisplayNodes.length === 0 ? (
-              <p>No tree nodes yet. Create a Group or Album.</p>
-            ) : (
-              treeDisplayNodes.map((node) => {
-                const isGroup = node.nodeType === 'Group';
-                const isExpanded = expandedGroupIds.includes(node.id);
-                const isChecked = checkedAlbumIds.includes(node.id);
-                const isSelected = selectedTreeNodeId === node.id;
-                const childPrefix = ' '.repeat(node.depth * 2);
+      {!isSearchArea ? (
+        <section style={albumTreeSectionStyle}>
+          <strong>Albums</strong>
+          <div style={albumTreeRowStyle}>
+            <button type="button" style={compareButtonStyle} onClick={() => setLibraryBrowseMode('Flat')}>
+              All Photos ({assets.length})
+            </button>
+            <span style={{ color: '#666', fontSize: '12px' }}>
+              Checked Albums ({checkedAlbumIds.length})
+            </span>
+          </div>
+          {albumTreeLoading ? <p>Loading album tree...</p> : null}
+          {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
+          {!albumTreeLoading ? (
+            <div style={albumTreeListStyle}>
+              {treeDisplayNodes.length === 0 ? (
+                <p>No tree nodes yet. Create a Group or Album.</p>
+              ) : (
+                treeDisplayNodes.map((node) => {
+                  const isGroup = node.nodeType === 'Group';
+                  const isExpanded = expandedGroupIds.includes(node.id);
+                  const isChecked = checkedAlbumIds.includes(node.id);
+                  const isSelected = selectedTreeNodeId === node.id;
+                  const childPrefix = ' '.repeat(node.depth * 2);
 
-                return (
-                  <div key={node.id} style={albumTreeRowStyle}>
-                    <span style={{ minWidth: `${node.depth * 18}px` }}>{childPrefix}</span>
-                    {isGroup ? (
+                  return (
+                    <div key={node.id} style={albumTreeRowStyle}>
+                      <span style={{ minWidth: `${node.depth * 18}px` }}>{childPrefix}</span>
+                      {isGroup ? (
+                        <button
+                          type="button"
+                          style={compareButtonStyle}
+                          onClick={() => toggleGroupExpanded(node.id)}
+                        >
+                          {isExpanded ? '▾' : '▸'}
+                        </button>
+                      ) : (
+                        <span style={{ width: '34px' }} />
+                      )}
+                      {!isGroup ? (
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleAlbumChecked(node.id)}
+                        />
+                      ) : null}
                       <button
                         type="button"
                         style={compareButtonStyle}
-                        onClick={() => toggleGroupExpanded(node.id)}
+                        onClick={() => setSelectedTreeNodeId(node.id)}
+                        disabled={isSelected}
                       >
-                        {isExpanded ? '▾' : '▸'}
+                        {node.label}
+                        {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
                       </button>
-                    ) : (
-                      <span style={{ width: '34px' }} />
-                    )}
-                    {!isGroup ? (
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleAlbumChecked(node.id)}
-                      />
-                    ) : null}
-                    <button
-                      type="button"
-                      style={compareButtonStyle}
-                      onClick={() => setSelectedTreeNodeId(node.id)}
-                      disabled={isSelected}
-                    >
-                      {node.label}
-                      {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : null}
-      </section>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       <section style={filterSectionStyle}>
-        <strong>Filters</strong>
-        <div style={filterRowStyle}>
-          <div style={filterGroupStyle}>
-            <span style={filterLabelStyle}>Photo State:</span>
-            {photoStateFilterOptions.map((option) => (
-              <label key={option} style={filterOptionLabelStyle}>
-                <input
-                  type="checkbox"
-                  checked={photoStateFilters.includes(option)}
-                  onChange={() => togglePhotoStateFilter(option)}
-                />
-                {option}
-              </label>
-            ))}
+        <strong>{isSearchArea ? 'Search Filters' : 'Filters'}</strong>
+        {!isSearchArea ? (
+          <div style={filterRowStyle}>
+            <div style={filterGroupStyle}>
+              <span style={filterLabelStyle}>Photo State:</span>
+              {photoStateFilterOptions.map((option) => (
+                <label key={option} style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={photoStateFilters.includes(option)}
+                    onChange={() => togglePhotoStateFilter(option)}
+                  />
+                  {option}
+                </label>
+              ))}
+            </div>
+            <div style={filterGroupStyle}>
+              <span style={filterLabelStyle}>Media Type:</span>
+              {mediaTypeFilterOptions.map((option) => (
+                <label key={option} style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={mediaTypeFilters.includes(option)}
+                    onChange={() => toggleMediaTypeFilter(option)}
+                  />
+                  {option}
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+            >
+              Clear Filters
+            </button>
           </div>
-          <div style={filterGroupStyle}>
-            <span style={filterLabelStyle}>Media Type:</span>
-            {mediaTypeFilterOptions.map((option) => (
-              <label key={option} style={filterOptionLabelStyle}>
-                <input
-                  type="checkbox"
-                  checked={mediaTypeFilters.includes(option)}
-                  onChange={() => toggleMediaTypeFilter(option)}
-                />
-                {option}
-              </label>
-            ))}
-          </div>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            onClick={clearFilters}
-            disabled={!hasActiveFilters}
-          >
-            Clear Filters
-          </button>
-        </div>
+        ) : (
+          <>
+            <div style={filterRowStyle}>
+              <div style={filterGroupStyle}>
+                <span style={filterLabelStyle}>Photo State:</span>
+                {photoStateFilterOptions.map((option) => (
+                  <label key={option} style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchPhotoStates.includes(option)}
+                      onChange={() => toggleSearchPhotoState(option)}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+              <div style={filterGroupStyle}>
+                <span style={filterLabelStyle}>Capture Date:</span>
+                <label style={filterOptionLabelStyle}>
+                  From
+                  <input
+                    type="date"
+                    value={searchCaptureDateFrom}
+                    onChange={(event) => setSearchCaptureDateFrom(event.target.value)}
+                  />
+                </label>
+                <label style={filterOptionLabelStyle}>
+                  To
+                  <input
+                    type="date"
+                    value={searchCaptureDateTo}
+                    onChange={(event) => setSearchCaptureDateTo(event.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+            <div style={filterRowStyle}>
+              <div style={filterGroupStyle}>
+                <span style={filterLabelStyle}>Albums:</span>
+                {searchAlbumFilterOptions.map((albumNode) => (
+                  <label key={albumNode.id} style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchAlbumIds.includes(albumNode.id)}
+                      onChange={() => toggleSearchAlbum(albumNode.id)}
+                    />
+                    {albumNode.label}
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                onClick={clearSearchFilters}
+                disabled={!hasActiveSearchFilters}
+              >
+                Clear Filters
+              </button>
+            </div>
+          </>
+        )}
       </section>
       <p style={{ color: '#666', fontSize: '12px', marginTop: '-8px' }}>
         {isReviewArea
@@ -2428,6 +2728,9 @@ export default function App() {
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
+      {isSearchArea && !assetsLoading && !assetsError ? (
+        <p style={{ color: '#666', fontSize: '13px' }}>{visibleAssets.length} results</p>
+      ) : null}
       {!assetsLoading && !assetsError ? (
         hasNoAssets ? (
           <section style={emptyStateStyle}>
@@ -2584,6 +2887,8 @@ export default function App() {
               <p>The checked albums contain no selected photos yet.</p>
             ) : isLibraryAlbumsMode && !hasAssetsInCheckedAlbumsAfterFilters ? (
               <p>No photos in the checked albums match the current filters.</p>
+            ) : isSearchArea ? (
+              <p>No photos match the current search filters.</p>
             ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
               <p>No photos need review right now. Switch to Library to browse selected photos.</p>
             ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
@@ -2591,7 +2896,7 @@ export default function App() {
             ) : (
               <p>No visible assets match the current filters.</p>
             )}
-            {hasActiveFilters ? (
+            {!isSearchArea && hasActiveFilters ? (
               <div style={actionsStyle}>
                 <button type="button" style={compareButtonStyle} onClick={clearFilters}>
                   Clear Filters
@@ -2605,6 +2910,13 @@ export default function App() {
                     Show Rejects
                   </button>
                 ) : null}
+              </div>
+            ) : null}
+            {isSearchArea && hasActiveSearchFilters ? (
+              <div style={actionsStyle}>
+                <button type="button" style={compareButtonStyle} onClick={clearSearchFilters}>
+                  Clear Filters
+                </button>
               </div>
             ) : null}
             {isLibraryAlbumsMode ? (

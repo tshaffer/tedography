@@ -223,3 +223,16 @@ pnpm --filter @tedography/api assets:verify --json
 10. Click assets in Albums mode and verify loupe, quick bar, filmstrip, and keyboard navigation remain coherent.
 11. Reload the app and verify `Library View` mode and `Album Results` presentation persist.
 12. Reload and verify checked album ids / expanded groups still restore correctly.
+
+## Testing Search Area
+
+1. Switch to `Search` from top navigation and verify it is a distinct primary area.
+2. With no search filters set, verify Search shows results ordered by capture date (newest first, with existing fallback ordering).
+3. In Search filters, select one or more photo states and verify only matching assets remain.
+4. Select one or more albums and verify only assets assigned to at least one selected album remain.
+5. Set capture date `From`/`To` values and verify inclusive date-range filtering.
+6. Combine photo state + album + date filters and verify AND behavior across categories.
+7. Click a search result and verify focused asset, loupe/immersive, filmstrip, and keyboard navigation operate on the Search result set.
+8. Apply filters that produce no matches and verify message appears: `No photos match the current search filters.`
+9. In no-match state, click `Clear Filters` and verify results return.
+10. Reload the app and verify Search filters restore from local storage.
