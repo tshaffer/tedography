@@ -24,6 +24,7 @@ import { prefetchImage } from './utilities/imagePrefetch';
 import {
   buildTimelineNavigationYears,
   groupAssetsByCaptureMonth,
+  type TimelineMonthGroup,
   type TimelineNavigationYear
 } from './utilities/libraryTimeline';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
@@ -48,10 +49,21 @@ const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
+const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
+
+const timelineStickyTopPx = 10;
+const timelineActiveMonthOffsetPx = timelineStickyTopPx + 16;
+const timelineZoomLevels = [
+  { label: 'XS', minWidth: 160 },
+  { label: 'S', minWidth: 200 },
+  { label: 'M', minWidth: 240 },
+  { label: 'L', minWidth: 300 },
+  { label: 'XL', minWidth: 360 }
+] as const;
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -157,6 +169,15 @@ const groupHeaderStyle: CSSProperties = {
   fontSize: '16px'
 };
 
+const timelineGroupHeaderStyle: CSSProperties = {
+  ...groupHeaderStyle,
+  backgroundColor: '#fafafa',
+  padding: '8px 0',
+  position: 'sticky',
+  top: timelineStickyTopPx,
+  zIndex: 2
+};
+
 const groupMetaStyle: CSSProperties = {
   color: '#666',
   fontSize: '12px',
@@ -176,7 +197,7 @@ const timelineNavPanelStyle: CSSProperties = {
   backgroundColor: '#fafafa',
   padding: '10px',
   position: 'sticky',
-  top: '10px'
+  top: timelineStickyTopPx
 };
 
 const timelineYearHeaderStyle: CSSProperties = {
@@ -197,6 +218,13 @@ const timelineMonthButtonStyle: CSSProperties = {
   padding: '4px 8px',
   textAlign: 'left',
   width: 'calc(100% - 24px)'
+};
+
+const activeTimelineMonthButtonStyle: CSSProperties = {
+  ...timelineMonthButtonStyle,
+  backgroundColor: '#e8f1ff',
+  borderColor: '#1f6feb',
+  fontWeight: 600
 };
 
 const cardStyle: CSSProperties = {
@@ -519,6 +547,25 @@ function parseAlbumResultsPresentationFromStorage(value: string | null): AlbumRe
   }
 
   return 'Merged';
+}
+
+function parseTimelineZoomLevelFromStorage(value: string | null): number {
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed >= 0 && parsed < timelineZoomLevels.length) {
+    return parsed;
+  }
+
+  return 2;
+}
+
+function getTimelineContentSignature(groups: TimelineMonthGroup[]): string {
+  return groups
+    .map((group) => {
+      const firstAssetId = group.assets[0]?.id ?? '';
+      const lastAssetId = group.assets[group.assets.length - 1]?.id ?? '';
+      return `${group.key}:${group.assets.length}:${firstAssetId}:${lastAssetId}`;
+    })
+    .join('|');
 }
 
 function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] | null {
@@ -1298,7 +1345,21 @@ export default function App() {
       return [];
     }
   });
+  const [timelineZoomLevel, setTimelineZoomLevel] = useState<number>(() => {
+    if (typeof window === 'undefined') {
+      return 2;
+    }
+
+    return parseTimelineZoomLevelFromStorage(
+      window.localStorage.getItem(timelineZoomLevelStorageKey)
+    );
+  });
+  const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const previousIsTimelineModeRef = useRef(false);
+  const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
+  const timelineScrollMemoryRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
+  const pendingTimelineZoomAnchorKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -1339,6 +1400,10 @@ export default function App() {
       JSON.stringify(timelineNavExpandedYearKeys)
     );
   }, [timelineNavExpandedYearKeys]);
+
+  useEffect(() => {
+    window.localStorage.setItem(timelineZoomLevelStorageKey, String(timelineZoomLevel));
+  }, [timelineZoomLevel]);
 
   useEffect(() => {
     window.localStorage.setItem(checkedAlbumIdsStorageKey, JSON.stringify(checkedAlbumIds));
@@ -1663,6 +1728,20 @@ export default function App() {
     () => buildTimelineNavigationYears(timelineMonthGroups),
     [timelineMonthGroups]
   );
+  const timelineContentSignature = useMemo(
+    () => getTimelineContentSignature(timelineMonthGroups),
+    [timelineMonthGroups]
+  );
+  const timelineGridStyle = useMemo<CSSProperties>(
+    () => {
+      const activeTimelineZoomLevel = timelineZoomLevels[timelineZoomLevel] ?? timelineZoomLevels[2];
+      return {
+        ...gridStyle,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${activeTimelineZoomLevel.minWidth}px, 1fr))`
+      };
+    },
+    [timelineZoomLevel]
+  );
 
 
   const selectedAsset = useMemo(
@@ -1730,6 +1809,30 @@ export default function App() {
     [albumNodes]
   );
 
+  function getTopVisibleTimelineMonthKey(): string | null {
+    if (timelineMonthGroups.length === 0) {
+      return null;
+    }
+
+    let currentKey = timelineMonthGroups[0]?.key ?? null;
+    for (const group of timelineMonthGroups) {
+      const sectionElement = timelineSectionRefs.current[group.key];
+      if (!sectionElement) {
+        continue;
+      }
+
+      const rect = sectionElement.getBoundingClientRect();
+      if (rect.top <= timelineActiveMonthOffsetPx) {
+        currentKey = group.key;
+        continue;
+      }
+
+      break;
+    }
+
+    return currentKey;
+  }
+
   useEffect(() => {
     const validYearKeys = new Set(timelineNavigationYears.map((year) => year.key));
     const pruned = timelineNavExpandedYearKeys.filter((key) => validYearKeys.has(key));
@@ -1745,6 +1848,88 @@ export default function App() {
 
     setTimelineNavExpandedYearKeys(timelineNavigationYears.map((year) => year.key));
   }, [timelineNavExpandedYearKeys.length, timelineNavigationYears]);
+
+  useEffect(() => {
+    if (!isTimelineMode) {
+      setActiveTimelineMonthKey(null);
+      return;
+    }
+
+    let animationFrameId = 0;
+
+    const updateActiveMonth = () => {
+      animationFrameId = 0;
+      setActiveTimelineMonthKey(getTopVisibleTimelineMonthKey());
+    };
+
+    const handleScrollOrResize = () => {
+      if (animationFrameId !== 0) {
+        return;
+      }
+
+      animationFrameId = window.requestAnimationFrame(updateActiveMonth);
+    };
+
+    updateActiveMonth();
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true });
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      if (animationFrameId !== 0) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isTimelineMode, timelineContentSignature, timelineMonthGroups]);
+
+  useEffect(() => {
+    const wasTimelineMode = previousIsTimelineModeRef.current;
+
+    if (wasTimelineMode && !isTimelineMode) {
+      timelineScrollMemoryRef.current = {
+        scrollY: window.scrollY,
+        contentSignature: timelineContentSignature
+      };
+    }
+
+    if (!wasTimelineMode && isTimelineMode) {
+      const stored = timelineScrollMemoryRef.current;
+      if (stored && stored.contentSignature === timelineContentSignature) {
+        pendingTimelineRestoreRef.current = stored;
+      }
+    }
+
+    previousIsTimelineModeRef.current = isTimelineMode;
+  }, [isTimelineMode, timelineContentSignature]);
+
+  useEffect(() => {
+    if (!isTimelineMode) {
+      return;
+    }
+
+    const anchorKey = pendingTimelineZoomAnchorKeyRef.current;
+    if (anchorKey) {
+      pendingTimelineZoomAnchorKeyRef.current = null;
+      window.requestAnimationFrame(() => {
+        const sectionElement = timelineSectionRefs.current[anchorKey];
+        if (sectionElement) {
+          sectionElement.scrollIntoView({ block: 'start' });
+        }
+      });
+      return;
+    }
+
+    const pendingRestore = pendingTimelineRestoreRef.current;
+    if (!pendingRestore || pendingRestore.contentSignature !== timelineContentSignature) {
+      return;
+    }
+
+    pendingTimelineRestoreRef.current = null;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: pendingRestore.scrollY });
+    });
+  }, [isTimelineMode, timelineContentSignature, timelineZoomLevel]);
 
   useEffect(() => {
     const visibleIds = new Set(visibleAssets.map((asset) => asset.id));
@@ -2056,6 +2241,15 @@ export default function App() {
     setLibraryBrowseMode(mode);
   }
 
+  function handleSetTimelineZoomLevel(nextLevel: number): void {
+    if (nextLevel === timelineZoomLevel) {
+      return;
+    }
+
+    pendingTimelineZoomAnchorKeyRef.current = getTopVisibleTimelineMonthKey();
+    setTimelineZoomLevel(nextLevel);
+  }
+
   function handleSetAlbumResultsPresentation(mode: AlbumResultsPresentation): void {
     setAlbumResultsPresentation(mode);
   }
@@ -2069,6 +2263,7 @@ export default function App() {
   }
 
   function handleJumpToTimelineMonth(groupKey: string): void {
+    setActiveTimelineMonthKey(groupKey);
     const sectionElement = timelineSectionRefs.current[groupKey];
     if (sectionElement) {
       sectionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2707,6 +2902,26 @@ export default function App() {
             </button>
           </div>
         ) : null}
+        {isTimelineMode ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={filterLabelStyle}>Timeline Zoom:</span>
+            {timelineZoomLevels.map((level, index) => (
+              <button
+                key={level.label}
+                type="button"
+                style={
+                  timelineZoomLevel === index
+                    ? { ...compareButtonStyle, backgroundColor: '#e8f1ff', borderColor: '#1f6feb' }
+                    : compareButtonStyle
+                }
+                onClick={() => handleSetTimelineZoomLevel(index)}
+                disabled={timelineZoomLevel === index}
+              >
+                {level.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {isLibraryAlbumsMode ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={filterLabelStyle}>Album Results:</span>
@@ -3001,7 +3216,11 @@ export default function App() {
                               <button
                                 key={month.key}
                                 type="button"
-                                style={timelineMonthButtonStyle}
+                                style={
+                                  activeTimelineMonthKey === month.key
+                                    ? activeTimelineMonthButtonStyle
+                                    : timelineMonthButtonStyle
+                                }
                                 onClick={() => handleJumpToTimelineMonth(month.key)}
                               >
                                 {month.label} ({month.assetCount})
@@ -3021,13 +3240,13 @@ export default function App() {
                         timelineSectionRefs.current[group.key] = element;
                       }}
                     >
-                      <h3 style={groupHeaderStyle}>
+                      <h3 style={timelineGroupHeaderStyle}>
                         {group.label}
                         <span style={groupMetaStyle}>
                           · {group.assets.length} {group.assets.length === 1 ? 'asset' : 'assets'}
                         </span>
                       </h3>
-                      <div style={gridStyle}>
+                      <div style={timelineGridStyle}>
                         {group.assets.map((asset) => (
                           <AssetCard
                             key={asset.id}

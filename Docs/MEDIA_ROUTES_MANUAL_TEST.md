@@ -204,10 +204,15 @@ pnpm --filter @tedography/api assets:verify --json
 3. In `Timeline`, verify month sections render (for example `March 2026`) with per-section asset counts.
 4. Verify month sections are ordered newest-first and assets within each month remain in descending chronological order.
 5. In the timeline left panel, expand/collapse year groups and click a month; verify main content scrolls to that month section.
-6. Apply PhotoState/MediaType/Hide Reject filters and verify timeline sections and counts reflect only filtered visible assets.
-7. Click an asset in Timeline mode and verify focused asset, loupe, quick bar, and filmstrip continue to work normally.
-8. Reload the app and verify `Library View` mode persists.
-9. Verify assets without capture date appear under `Unknown Date`.
+6. Scroll through `Timeline` and verify month headers remain sticky and legible above the thumbnail grid.
+7. Verify the currently visible month is highlighted in the timeline left panel while scrolling.
+8. Change `Timeline Zoom` and verify thumbnail density updates.
+9. While scrolled partway through the timeline, change `Timeline Zoom` and verify the top visible month remains in view after rerender.
+10. Switch from `Timeline` to another Library view and back; verify window scroll position restores when the timeline content has not materially changed.
+11. Apply PhotoState/MediaType/Hide Reject filters and verify timeline sections and counts reflect only filtered visible assets.
+12. Click an asset in Timeline mode and verify focused asset, loupe, quick bar, and filmstrip continue to work normally.
+13. Reload the app and verify `Library View` and `Timeline Zoom` persist.
+14. Verify assets without capture date appear under `Unknown Date`.
 
 ## Testing Library Albums Mode
 
