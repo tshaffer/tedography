@@ -491,11 +491,13 @@ const loupeMainColumnStyle: CSSProperties = {
   gap: '8px'
 };
 
-const loupePinnedChromeStyle: CSSProperties = {
+const stickyAssetChromeStyle: CSSProperties = {
   flex: '0 0 auto',
   backgroundColor: '#f3f4f6',
-  position: 'relative',
-  zIndex: 3
+  position: 'sticky',
+  top: 0,
+  zIndex: 4,
+  paddingBottom: '4px'
 };
 
 const actionButtonStyle: CSSProperties = {
@@ -4130,37 +4132,20 @@ export default function App() {
           </section>
         ) : hasFilteredAssets ? (
           <>
-            {isLoupeMode ? (
-              <div style={loupePinnedChromeStyle}>
-                {!immersiveOpen ? (
-                  <AssetQuickBar
-                    asset={selectedAsset}
-                    currentIndex={selectedAssetIndex}
-                    totalCount={visibleAssets.length}
-                  />
-                ) : null}
-                <AssetFilmstrip
-                  assets={visibleAssets}
-                  activeAssetId={selectedAssetId}
-                  onSelectAsset={handleFilmstripSelectAsset}
+            <div style={stickyAssetChromeStyle}>
+              {!immersiveOpen ? (
+                <AssetQuickBar
+                  asset={selectedAsset}
+                  currentIndex={selectedAssetIndex}
+                  totalCount={visibleAssets.length}
                 />
-              </div>
-            ) : (
-              <>
-                {!immersiveOpen ? (
-                  <AssetQuickBar
-                    asset={selectedAsset}
-                    currentIndex={selectedAssetIndex}
-                    totalCount={visibleAssets.length}
-                  />
-                ) : null}
-                <AssetFilmstrip
-                  assets={visibleAssets}
-                  activeAssetId={selectedAssetId}
-                  onSelectAsset={handleFilmstripSelectAsset}
-                />
-              </>
-            )}
+              ) : null}
+              <AssetFilmstrip
+                assets={visibleAssets}
+                activeAssetId={selectedAssetId}
+                onSelectAsset={handleFilmstripSelectAsset}
+              />
+            </div>
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
