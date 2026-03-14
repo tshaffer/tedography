@@ -2,7 +2,6 @@ import path from 'node:path';
 import { MediaType } from '@tedography/domain';
 
 const photoExtensions = new Set(['.jpg', '.jpeg', '.png', '.heic', '.nef', '.dng', '.tif', '.tiff']);
-const videoExtensions = new Set(['.mov', '.mp4', '.m4v']);
 
 export function getMediaSupport(filename: string): {
   extension: string | null;
@@ -17,14 +16,6 @@ export function getMediaSupport(filename: string): {
       extension: normalizedExtension,
       isSupportedMedia: true,
       mediaType: MediaType.Photo
-    };
-  }
-
-  if (normalizedExtension && videoExtensions.has(normalizedExtension)) {
-    return {
-      extension: normalizedExtension,
-      isSupportedMedia: true,
-      mediaType: MediaType.Video
     };
   }
 
