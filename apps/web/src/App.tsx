@@ -57,6 +57,8 @@ const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 const leftPanelVisibleStorageKey = 'tedography.leftPanelVisible';
 const reviewVisiblePhotoStatesStorageKey = 'tedography.reviewVisiblePhotoStates';
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
+const showFilmstripStorageKey = 'tedography.showFilmstrip';
+const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
@@ -203,6 +205,25 @@ const selectionChipStyle: CSSProperties = {
 
 const topBarSpacerStyle: CSSProperties = {
   flex: '1 1 auto'
+};
+
+const menuAnchorStyle: CSSProperties = {
+  position: 'relative'
+};
+
+const optionsMenuStyle: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% + 6px)',
+  right: 0,
+  minWidth: '180px',
+  border: '1px solid #d6d6d6',
+  borderRadius: '8px',
+  backgroundColor: '#fff',
+  boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)',
+  padding: '8px',
+  zIndex: 30,
+  display: 'grid',
+  gap: '6px'
 };
 
 const albumTreeListStyle: CSSProperties = {
@@ -1092,6 +1113,7 @@ type AssetCardProps = {
   isSelected: boolean;
   isActive: boolean;
   isUpdating: boolean;
+  showPhotoStateBadge: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
 };
 
@@ -1100,6 +1122,7 @@ function AssetCard({
   isSelected,
   isActive,
   isUpdating,
+  showPhotoStateBadge,
   onCardClick
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -1133,9 +1156,11 @@ function AssetCard({
       title={asset.filename}
     >
       <div style={thumbnailFrameStyle}>
-        <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
-          {photoStateLabel}
-        </span>
+        {showPhotoStateBadge ? (
+          <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
+            {photoStateLabel}
+          </span>
+        ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
         {imageUrl && !imageFailed ? (
@@ -1751,6 +1776,23 @@ export default function App() {
     const stored = window.localStorage.getItem(leftPanelVisibleStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showFilmstrip, setShowFilmstrip] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(showFilmstripStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
+  const [showThumbnailPhotoStateBadges, setShowThumbnailPhotoStateBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(showThumbnailPhotoStateBadgesStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
+  const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
       return 'Review';
@@ -1880,6 +1922,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!viewOptionsOpen) {
+      return;
+    }
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setViewOptionsOpen(false);
+        return;
+      }
+
+      const optionsRoot = document.getElementById('tdg-view-options-root');
+      if (optionsRoot?.contains(event.target)) {
+        return;
+      }
+
+      setViewOptionsOpen(false);
+    }
+
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [viewOptionsOpen]);
+
+  useEffect(() => {
     window.localStorage.setItem(advanceAfterRatingStorageKey, advanceAfterRating ? 'true' : 'false');
   }, [advanceAfterRating]);
 
@@ -1904,6 +1971,17 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(leftPanelVisibleStorageKey, leftPanelVisible ? 'true' : 'false');
   }, [leftPanelVisible]);
+
+  useEffect(() => {
+    window.localStorage.setItem(showFilmstripStorageKey, showFilmstrip ? 'true' : 'false');
+  }, [showFilmstrip]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailPhotoStateBadgesStorageKey,
+      showThumbnailPhotoStateBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailPhotoStateBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
@@ -3985,8 +4063,50 @@ export default function App() {
 	              >
 	                Full Screen
 	              </button>
+              {compareAssets.length >= 2 ? (
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  data-selected={surveyOpen ? 'true' : undefined}
+                  onClick={openSurveyMode}
+                  title="Survey compare"
+                >
+                  Survey
+                </button>
+              ) : null}
 	            </>
 	          ) : null}
+          <div style={menuAnchorStyle} id="tdg-view-options-root">
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={viewOptionsOpen ? 'true' : undefined}
+              onClick={() => setViewOptionsOpen((previous) => !previous)}
+              title="Display preferences"
+            >
+              View Options
+            </button>
+            {viewOptionsOpen ? (
+              <div style={optionsMenuStyle}>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showFilmstrip}
+                    onChange={(event) => setShowFilmstrip(event.target.checked)}
+                  />
+                  Show filmstrip
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailPhotoStateBadges}
+                    onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
+                  />
+                  Show thumbnail state
+                </label>
+              </div>
+            ) : null}
+          </div>
         </div>
 
           {hasSelectedAssets ? (
@@ -4055,11 +4175,6 @@ export default function App() {
               }
             >
               -Album
-            </button>
-          ) : null}
-          {compareAssets.length >= 2 ? (
-            <button type="button" style={compareButtonStyle} onClick={openSurveyMode} title="Survey compare">
-              Survey
             </button>
           ) : null}
           {isLibraryArea || isSearchArea ? (
@@ -4140,11 +4255,13 @@ export default function App() {
                   totalCount={visibleAssets.length}
                 />
               ) : null}
-              <AssetFilmstrip
-                assets={visibleAssets}
-                activeAssetId={selectedAssetId}
-                onSelectAsset={handleFilmstripSelectAsset}
-              />
+              {showFilmstrip ? (
+                <AssetFilmstrip
+                  assets={visibleAssets}
+                  activeAssetId={selectedAssetId}
+                  onSelectAsset={handleFilmstripSelectAsset}
+                />
+              ) : null}
             </div>
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
@@ -4182,6 +4299,7 @@ export default function App() {
                           isSelected={selectedAssetIds.includes(asset.id)}
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
+                          showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           onCardClick={handleCardClick}
                         />
                       ))}
@@ -4207,6 +4325,7 @@ export default function App() {
                           isSelected={selectedAssetIds.includes(asset.id)}
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
+                          showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           onCardClick={handleCardClick}
                         />
                       ))}
@@ -4223,6 +4342,7 @@ export default function App() {
                     isSelected={selectedAssetIds.includes(asset.id)}
                     isActive={selectedAssetId === asset.id}
                     isUpdating={updatingAssetIds[asset.id] === true}
+                    showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     onCardClick={handleCardClick}
                   />
                 ))}
