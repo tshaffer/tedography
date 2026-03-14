@@ -41,6 +41,10 @@ export async function getNextSortOrderForParent(parentId: string | null): Promis
 export async function createAlbumTreeNode(
   input: CreateAlbumTreeNodeInput
 ): Promise<AlbumTreeNode> {
+  if (input.nodeType === 'Album' && input.parentId === null) {
+    throw new Error('Album nodes must have a parent Group');
+  }
+
   const now = new Date().toISOString();
   const node: AlbumTreeNode = {
     id: randomUUID(),

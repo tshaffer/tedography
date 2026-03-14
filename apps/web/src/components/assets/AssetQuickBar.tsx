@@ -11,11 +11,11 @@ const quickBarStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '8px',
   backgroundColor: '#f7f7f7',
-  padding: '8px 10px',
-  marginBottom: '10px',
+  padding: '6px 8px',
+  marginBottom: '8px',
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '8px 14px',
+  gap: '6px 10px',
   alignItems: 'center',
   fontSize: '12px'
 };

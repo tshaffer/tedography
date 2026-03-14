@@ -9,22 +9,23 @@ interface AssetDetailsPanelProps {
 const panelStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
-  padding: '14px',
-  marginBottom: '16px',
+  padding: '10px',
+  marginBottom: '8px',
   backgroundColor: '#fff'
 };
 
 const titleStyle: CSSProperties = {
   marginTop: 0,
-  marginBottom: '10px'
+  marginBottom: '8px',
+  fontSize: '14px'
 };
 
 const rowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '170px 1fr',
+  gridTemplateColumns: '118px 1fr',
   gap: '8px',
-  fontSize: '13px',
-  padding: '4px 0',
+  fontSize: '12px',
+  padding: '3px 0',
   borderBottom: '1px solid #efefef'
 };
 

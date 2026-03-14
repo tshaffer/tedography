@@ -10,20 +10,20 @@ type AssetFilmstripProps = {
 
 const stripStyle: CSSProperties = {
   display: 'flex',
-  gap: '8px',
+  gap: '6px',
   overflowX: 'auto',
-  padding: '8px',
+  padding: '6px',
   border: '1px solid #d6d6d6',
   borderRadius: '8px',
   backgroundColor: '#f7f7f7',
-  marginBottom: '10px'
+  marginBottom: '8px'
 };
 
 const itemButtonStyle: CSSProperties = {
   position: 'relative',
-  width: '88px',
-  height: '88px',
-  minWidth: '88px',
+  width: '76px',
+  height: '76px',
+  minWidth: '76px',
   padding: 0,
   border: '1px solid #bababa',
   borderRadius: '6px',
@@ -87,17 +87,15 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
       return;
     }
 
-    const itemCenter = element.offsetLeft + element.clientWidth / 2;
-    const containerCenter = container.clientWidth / 2;
-    const targetScrollLeft = itemCenter - containerCenter;
-    const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0);
-    const clampedScrollLeft = Math.min(Math.max(targetScrollLeft, 0), maxScrollLeft);
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const isFullyVisible =
+      elementRect.left >= containerRect.left && elementRect.right <= containerRect.right;
 
-    if (Math.abs(container.scrollLeft - clampedScrollLeft) < 1) {
+    if (isFullyVisible) {
       return;
     }
-
-    container.scrollTo({ left: clampedScrollLeft, behavior: 'smooth' });
+    element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, [activeAssetId]);
 
   if (assets.length === 0) {
@@ -112,6 +110,7 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
           type="button"
           style={asset.id === activeAssetId ? { ...itemButtonStyle, ...activeItemButtonStyle } : itemButtonStyle}
           onClick={() => onSelectAsset(asset.id)}
+          onMouseDown={(event) => event.preventDefault()}
           ref={(node) => {
             if (node) {
               thumbnailRefs.current.set(asset.id, node);

@@ -269,3 +269,29 @@ pnpm --filter @tedography/api assets:verify --json
 7. Toggle `Hide Details` / `Show Details`; verify focused-asset/details panels collapse and return cleanly without breaking navigation.
 8. Open `Asset Details` for an asset with album memberships and verify album labels are listed.
 9. If any asset includes location metadata, verify it appears in `Asset Details`; if no location metadata exists, verify no broken placeholder/UI regression appears.
+
+## Testing RL-UX Phase A + B
+
+1. In `Review`, verify the left panel shows album scoping prominently and checked albums immediately scope the review set.
+2. In `Library`, verify the left panel changes with browse mode: timeline navigation in `Timeline`, album tree in `Albums`, compact visibility controls in both.
+3. Toggle photo-state visibility in `Review`, switch to `Library`, change Library visibility, then switch back; verify each area restores its own photo-state visibility state.
+4. Select assets and verify a compact selected-count chip appears in the top toolbar; click `Clear` and verify selection clears while the focused asset remains.
+5. Press `Escape` with a non-empty selection and no overlay open; verify it deselects all.
+6. Open `Survey`, zoom with mouse wheel or the `+` / `-` controls on a tile, pan by dragging while zoomed, and verify `Reset` returns that tile to default framing.
+7. Enter `Full Screen` and verify only the photo and minimal fullscreen controls remain visible; verify `Escape` exits cleanly.
+8. Toggle the left panel and inspector from the top toolbar and verify photo area width increases noticeably when they are hidden.
+9. In `Loupe`, `Timeline`, and `Albums`, verify the denser shell still preserves filmstrip sync, active asset navigation, and bulk review actions.
+10. Verify the right inspector is optional by default and can be reopened without losing active asset context.
+
+## Testing RL-UX Corrective Pass
+
+1. In any grid view, verify tiles no longer show persistent filename/state/type/captured text under each image.
+2. Hover a grid item and verify the filename appears as a compact hover treatment only while hovered.
+3. Verify grid cards no longer show per-card photo-state action buttons.
+4. Select one asset and verify toolbar-level photo-state actions apply to that selection cleanly.
+5. Select multiple assets and verify the same toolbar action group applies state changes to the full selected set.
+6. In `Review`, switch among `Flat`, `Timeline`, and `Albums` browse modes and verify each presentation works over the current reviewable set.
+7. In `Review -> Albums`, verify checked albums remain the primary scoping mechanism and grouped album sections render.
+8. In `Review -> Timeline`, verify the existing timeline grouping/navigation still works over the review set.
+9. Verify the right-side inspector is visible by default, shows active-asset metadata, and can be toggled off/on without breaking focus or selection.
+10. Verify album membership and location remain available in the right-side inspector and are no longer needed on individual grid tiles.

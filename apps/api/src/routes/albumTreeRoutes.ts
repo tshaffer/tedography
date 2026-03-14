@@ -101,6 +101,14 @@ albumTreeRoutes.post('/', async (req, res) => {
     return;
   }
 
+  if (nodeType === 'Album' && parentId === null) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'Album nodes must be created inside a Group'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
   if (parentId !== null) {
     const parentNode = await findAlbumTreeNodeById(parentId);
     if (!parentNode) {
