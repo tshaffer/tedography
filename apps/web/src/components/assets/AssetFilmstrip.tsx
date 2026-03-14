@@ -89,13 +89,32 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
 
     const containerRect = container.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
+    const computedStyles = window.getComputedStyle(container);
+    const paddingLeft = Number.parseFloat(computedStyles.paddingLeft || '0') || 0;
+    const paddingRight = Number.parseFloat(computedStyles.paddingRight || '0') || 0;
+    const visibleLeft = containerRect.left + paddingLeft;
+    const visibleRight = containerRect.right - paddingRight;
     const isFullyVisible =
-      elementRect.left >= containerRect.left && elementRect.right <= containerRect.right;
+      elementRect.left >= visibleLeft && elementRect.right <= visibleRight;
 
     if (isFullyVisible) {
       return;
     }
-    element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+    let nextScrollLeft = container.scrollLeft;
+    if (elementRect.left < visibleLeft) {
+      nextScrollLeft -= visibleLeft - elementRect.left;
+    } else if (elementRect.right > visibleRight) {
+      nextScrollLeft += elementRect.right - visibleRight;
+    }
+
+    const maxScrollLeft = Math.max(container.scrollWidth - container.clientWidth, 0);
+    const clampedScrollLeft = Math.min(Math.max(nextScrollLeft, 0), maxScrollLeft);
+    if (Math.abs(clampedScrollLeft - container.scrollLeft) < 1) {
+      return;
+    }
+
+    container.scrollTo({ left: clampedScrollLeft, behavior: 'smooth' });
   }, [activeAssetId]);
 
   if (assets.length === 0) {
