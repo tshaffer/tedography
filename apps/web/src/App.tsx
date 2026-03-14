@@ -78,7 +78,13 @@ const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
   margin: '0 auto',
   maxWidth: 'none',
-  padding: '10px 12px 14px'
+  padding: '10px 12px 14px',
+  boxSizing: 'border-box',
+  height: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  backgroundColor: '#f3f4f6'
 };
 
 const topBarStyle: CSSProperties = {
@@ -86,14 +92,13 @@ const topBarStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: '8px',
-  marginBottom: '10px',
   padding: '8px 10px',
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
   backgroundColor: '#fbfbfb',
-  position: 'sticky',
-  top: 8,
-  zIndex: 5
+  position: 'relative',
+  zIndex: 20,
+  flex: '0 0 auto'
 };
 
 const topBarSectionStyle: CSSProperties = {
@@ -113,7 +118,9 @@ const shellLayoutStyle: CSSProperties = {
   display: 'grid',
   gap: '10px',
   gridTemplateColumns: '280px minmax(0, 1fr) 320px',
-  alignItems: 'start'
+  alignItems: 'stretch',
+  height: '100%',
+  minHeight: 0
 };
 
 const shellLayoutNoLeftStyle: CSSProperties = {
@@ -136,8 +143,10 @@ const sidePanelStyle: CSSProperties = {
   borderRadius: '10px',
   backgroundColor: '#fafafa',
   padding: '8px',
-  position: 'sticky',
-  top: '58px'
+  minHeight: 0,
+  height: '100%',
+  overflow: 'auto',
+  overscrollBehavior: 'contain'
 };
 
 const sidePanelSectionStyle: CSSProperties = {
@@ -161,12 +170,23 @@ const sidePanelTitleStyle: CSSProperties = {
 };
 
 const mainColumnStyle: CSSProperties = {
-  minWidth: 0
+  minWidth: 0,
+  minHeight: 0,
+  height: '100%',
+  overflow: 'auto',
+  overscrollBehavior: 'contain'
 };
 
 const rightPanelStyle: CSSProperties = {
   ...sidePanelStyle,
   backgroundColor: '#fff'
+};
+
+const shellViewportStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflow: 'hidden',
+  paddingTop: '10px'
 };
 
 const selectionChipStyle: CSSProperties = {
@@ -420,25 +440,62 @@ const loupeViewerStyle: CSSProperties = {
   borderRadius: '10px',
   backgroundColor: '#fff',
   padding: '10px',
-  marginBottom: '10px'
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: 0,
+  flex: 1
 };
 
 const loupeImageWrapStyle: CSSProperties = {
-  aspectRatio: '4 / 3',
+  flex: 1,
+  minHeight: 0,
   backgroundColor: '#1f1f1f',
   borderRadius: '8px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  marginBottom: '10px'
+  marginBottom: '10px',
+  padding: '12px'
+};
+
+const loupeImageScrollerStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  width: '100%',
+  overflow: 'auto',
+  overscrollBehavior: 'contain'
+};
+
+const loupeImageStageStyle: CSSProperties = {
+  minHeight: '100%',
+  minWidth: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
 };
 
 const loupeImageStyle: CSSProperties = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'contain',
+  maxWidth: '100%',
+  maxHeight: 'calc(100vh - 260px)',
+  width: 'auto',
+  height: 'auto',
   display: 'block'
+};
+
+const loupeMainColumnStyle: CSSProperties = {
+  ...mainColumnStyle,
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px'
+};
+
+const loupePinnedChromeStyle: CSSProperties = {
+  flex: '0 0 auto',
+  backgroundColor: '#f3f4f6',
+  position: 'relative',
+  zIndex: 3
 };
 
 const actionButtonStyle: CSSProperties = {
@@ -1175,7 +1232,11 @@ function LoupeViewer({
     <section style={loupeViewerStyle}>
       <h2 style={{ marginTop: 0 }}>Loupe</h2>
       <div style={loupeImageWrapStyle}>
-        {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
+        <div style={loupeImageScrollerStyle}>
+          <div style={loupeImageStageStyle}>
+            {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
+          </div>
+        </div>
       </div>
       <div style={actionsStyle}>
         <button type="button" style={compareButtonStyle} onClick={onPrevious} disabled={!hasPrevious}>
@@ -4027,20 +4088,21 @@ export default function App() {
         </div>
       </div>
 
-      <div
-        style={
-          leftPanelVisible
-            ? showDetailsPanels && !immersiveOpen && !slideshowActive && !surveyOpen
-              ? shellLayoutStyle
-              : shellLayoutNoRightStyle
-            : showDetailsPanels && !immersiveOpen && !slideshowActive && !surveyOpen
-              ? shellLayoutNoLeftStyle
-              : shellLayoutMainOnlyStyle
-        }
-      >
-        {renderLeftPanel()}
+      <div style={shellViewportStyle}>
+        <div
+          style={
+            leftPanelVisible
+              ? showDetailsPanels && !immersiveOpen && !slideshowActive && !surveyOpen
+                ? shellLayoutStyle
+                : shellLayoutNoRightStyle
+              : showDetailsPanels && !immersiveOpen && !slideshowActive && !surveyOpen
+                ? shellLayoutNoLeftStyle
+                : shellLayoutMainOnlyStyle
+          }
+        >
+          {renderLeftPanel()}
 
-        <main style={mainColumnStyle}>
+        <main style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}>
           <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
             {mainPaneDescription}
           </p>
@@ -4068,18 +4130,37 @@ export default function App() {
           </section>
         ) : hasFilteredAssets ? (
           <>
-            {!immersiveOpen ? (
-              <AssetQuickBar
-                asset={selectedAsset}
-                currentIndex={selectedAssetIndex}
-                totalCount={visibleAssets.length}
-              />
-            ) : null}
-            <AssetFilmstrip
-              assets={visibleAssets}
-              activeAssetId={selectedAssetId}
-              onSelectAsset={handleFilmstripSelectAsset}
-            />
+            {isLoupeMode ? (
+              <div style={loupePinnedChromeStyle}>
+                {!immersiveOpen ? (
+                  <AssetQuickBar
+                    asset={selectedAsset}
+                    currentIndex={selectedAssetIndex}
+                    totalCount={visibleAssets.length}
+                  />
+                ) : null}
+                <AssetFilmstrip
+                  assets={visibleAssets}
+                  activeAssetId={selectedAssetId}
+                  onSelectAsset={handleFilmstripSelectAsset}
+                />
+              </div>
+            ) : (
+              <>
+                {!immersiveOpen ? (
+                  <AssetQuickBar
+                    asset={selectedAsset}
+                    currentIndex={selectedAssetIndex}
+                    totalCount={visibleAssets.length}
+                  />
+                ) : null}
+                <AssetFilmstrip
+                  assets={visibleAssets}
+                  activeAssetId={selectedAssetId}
+                  onSelectAsset={handleFilmstripSelectAsset}
+                />
+              </>
+            )}
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
@@ -4223,6 +4304,7 @@ export default function App() {
       ) : null}
         </main>
         {renderRightPanel()}
+        </div>
       </div>
 
       {slideshowActive && selectedAsset ? (
