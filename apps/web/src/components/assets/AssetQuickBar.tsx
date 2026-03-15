@@ -5,6 +5,7 @@ type AssetQuickBarProps = {
   asset: MediaAsset | null;
   currentIndex?: number | null;
   totalCount?: number | null;
+  compact?: boolean;
 };
 
 const quickBarStyle: CSSProperties = {
@@ -75,7 +76,7 @@ function formatPosition(currentIndex?: number | null, totalCount?: number | null
   return `${currentIndex + 1} / ${totalCount}`;
 }
 
-export function AssetQuickBar({ asset, currentIndex, totalCount }: AssetQuickBarProps) {
+export function AssetQuickBar({ asset, currentIndex, totalCount, compact = false }: AssetQuickBarProps) {
   if (!asset) {
     return null;
   }
@@ -89,7 +90,19 @@ export function AssetQuickBar({ asset, currentIndex, totalCount }: AssetQuickBar
       : '—';
 
   return (
-    <section style={quickBarStyle}>
+    <section
+      style={
+        compact
+          ? {
+              ...quickBarStyle,
+              padding: '4px 6px',
+              marginBottom: '4px',
+              gap: '4px 8px',
+              fontSize: '11px'
+            }
+          : quickBarStyle
+      }
+    >
       <span style={metaItemStyle}>
         <span style={labelStyle}>File:</span>
         <strong>{asset.filename}</strong>
@@ -103,25 +116,29 @@ export function AssetQuickBar({ asset, currentIndex, totalCount }: AssetQuickBar
         {asset.photoState}
       </span>
       <span style={metaItemStyle}>
-        <span style={labelStyle}>Type:</span>
-        {asset.mediaType}
-      </span>
-      <span style={metaItemStyle}>
-        <span style={labelStyle}>Size:</span>
-        {formatDimensions(asset.width, asset.height)}
-      </span>
-      <span style={metaItemStyle}>
         <span style={labelStyle}>Captured:</span>
         {formatDateTime(asset.captureDateTime)}
       </span>
-      <span style={metaItemStyle}>
-        <span style={labelStyle}>Original:</span>
-        {formatMissing(asset.originalFileFormat)}
-      </span>
-      <span style={metaItemStyle}>
-        <span style={labelStyle}>Display:</span>
-        {formatHint}
-      </span>
+      {!compact ? (
+        <>
+          <span style={metaItemStyle}>
+            <span style={labelStyle}>Type:</span>
+            {asset.mediaType}
+          </span>
+          <span style={metaItemStyle}>
+            <span style={labelStyle}>Size:</span>
+            {formatDimensions(asset.width, asset.height)}
+          </span>
+          <span style={metaItemStyle}>
+            <span style={labelStyle}>Original:</span>
+            {formatMissing(asset.originalFileFormat)}
+          </span>
+          <span style={metaItemStyle}>
+            <span style={labelStyle}>Display:</span>
+            {formatHint}
+          </span>
+        </>
+      ) : null}
     </section>
   );
 }

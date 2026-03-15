@@ -553,7 +553,13 @@ const stickyAssetChromeStyle: CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: 4,
-  paddingBottom: '4px'
+  paddingBottom: '2px'
+};
+
+const compactPaneMetaTextStyle: CSSProperties = {
+  color: '#6b7280',
+  fontSize: '11px',
+  margin: '0 0 4px 0'
 };
 
 const actionButtonStyle: CSSProperties = {
@@ -729,6 +735,7 @@ const immersiveControlButtonStyle: CSSProperties = {
 const immersiveImageWrapStyle: CSSProperties = {
   flex: 1,
   width: '100%',
+  height: '100%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -738,10 +745,10 @@ const immersiveImageWrapStyle: CSSProperties = {
 };
 
 const immersiveImageStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
   maxWidth: '100%',
   maxHeight: '100%',
-  width: 'auto',
-  height: 'auto',
   objectFit: 'contain',
   display: 'block'
 };
@@ -1338,7 +1345,10 @@ function ImmersiveViewer({
 
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
-      <section style={{ width: '100%', height: '100%' }} onClick={(event) => event.stopPropagation()}>
+      <section
+        style={{ width: '100%', height: '100%', display: 'flex', minHeight: 0 }}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
             <img
@@ -4483,15 +4493,25 @@ export default function App() {
           ref={mainColumnRef}
           style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}
         >
-          <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
-            {mainPaneDescription}
-          </p>
+          {!isLoupeMode ? (
+            <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
+              {mainPaneDescription}
+            </p>
+          ) : null}
 
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
       {isSearchArea && !assetsLoading && !assetsError ? (
-        <p style={{ color: '#666', fontSize: '13px' }}>{visibleAssets.length} results</p>
+        <p
+          style={
+            isLoupeMode
+              ? compactPaneMetaTextStyle
+              : { color: '#666', fontSize: '13px', margin: '0 0 8px 0' }
+          }
+        >
+          {visibleAssets.length} results
+        </p>
       ) : null}
       {!assetsLoading && !assetsError ? (
         hasNoAssets ? (
@@ -4516,6 +4536,7 @@ export default function App() {
                   asset={selectedAsset}
                   currentIndex={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
                   totalCount={isLoupeMode ? loupeAssets.length : visibleAssets.length}
+                  compact={isLoupeMode}
                 />
               ) : null}
               {showFilmstrip ? (
