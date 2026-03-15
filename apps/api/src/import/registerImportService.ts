@@ -267,7 +267,7 @@ export async function registerImportedFiles(input: {
       const createdAsset = await createMediaAsset({
         filename: normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
         mediaType: mediaSupport.mediaType === 'Unknown' ? MediaType.Photo : mediaSupport.mediaType,
-        photoState: PhotoState.Unreviewed,
+        photoState: PhotoState.New,
         captureDateTime: metadata.captureDateTime,
         width: metadata.width,
         height: metadata.height,

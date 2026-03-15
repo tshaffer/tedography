@@ -53,7 +53,7 @@ const imageStyle: CSSProperties = {
 };
 
 function getPhotoStateMarkerColor(photoState: PhotoState): string | null {
-  if (photoState === PhotoState.Select) {
+  if (photoState === PhotoState.Keep) {
     return '#1f8f4d';
   }
 
@@ -61,7 +61,7 @@ function getPhotoStateMarkerColor(photoState: PhotoState): string | null {
     return '#b58813';
   }
 
-  if (photoState === PhotoState.Reject) {
+  if (photoState === PhotoState.Discard) {
     return '#b4232f';
   }
 

@@ -1,6 +1,7 @@
 import {
   MediaType,
   PhotoState,
+  normalizePhotoState,
   type DisplayStorageType,
   type MediaAsset
 } from '@tedography/domain';
@@ -35,12 +36,25 @@ export async function seedMediaAssetsIfEmpty(): Promise<void> {
   log.info('Seed check complete; no mediaAssets inserts required');
 }
 
+function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
+  return {
+    ...asset,
+    photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New
+  };
+}
+
+function normalizeMediaAssets(assets: MediaAsset[]): MediaAsset[] {
+  return assets.map(normalizeMediaAsset);
+}
+
 export async function getAllAssets(): Promise<MediaAsset[]> {
-  return MediaAssetModel.find({}, { _id: 0 }).sort({ id: 1 }).lean<MediaAsset[]>();
+  const assets = await MediaAssetModel.find({}, { _id: 0 }).sort({ id: 1 }).lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
 }
 
 export async function findById(id: string): Promise<MediaAsset | null> {
-  return MediaAssetModel.findOne({ id }, { _id: 0 }).lean<MediaAsset | null>();
+  const asset = await MediaAssetModel.findOne({ id }, { _id: 0 }).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
 }
 
 export async function findByOriginalStorageRootAndArchivePaths(
@@ -51,10 +65,11 @@ export async function findByOriginalStorageRootAndArchivePaths(
     return [];
   }
 
-  return MediaAssetModel.find(
+  const assets = await MediaAssetModel.find(
     { originalStorageRootId, originalArchivePath: { $in: originalArchivePaths } },
     { _id: 0 }
   ).lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
 }
 
 export async function findByOriginalContentHashes(
@@ -64,16 +79,18 @@ export async function findByOriginalContentHashes(
     return [];
   }
 
-  return MediaAssetModel.find(
+  const assets = await MediaAssetModel.find(
     { originalContentHash: { $in: originalContentHashes } },
     { _id: 0 }
   ).lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
 }
 
 export async function findPhotoAssets(): Promise<MediaAsset[]> {
-  return MediaAssetModel.find({ mediaType: MediaType.Photo }, { _id: 0 })
+  const assets = await MediaAssetModel.find({ mediaType: MediaType.Photo }, { _id: 0 })
     .sort({ id: 1 })
     .lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
 }
 
 export interface CreateMediaAssetInput {
@@ -158,15 +175,16 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     throw new Error(`Failed to load newly created MediaAsset: ${id}`);
   }
 
-  return createdAsset;
+  return normalizeMediaAsset(createdAsset);
 }
 
 export async function updatePhotoState(id: string, photoState: PhotoState): Promise<MediaAsset | null> {
-  return MediaAssetModel.findOneAndUpdate(
+  const asset = await MediaAssetModel.findOneAndUpdate(
     { id },
     { $set: { photoState } },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
 }
 
 export async function updateThumbnailReferenceFields(input: {
@@ -175,7 +193,7 @@ export async function updateThumbnailReferenceFields(input: {
   thumbnailDerivedPath: string;
   thumbnailFileFormat: string;
 }): Promise<MediaAsset | null> {
-  return MediaAssetModel.findOneAndUpdate(
+  const asset = await MediaAssetModel.findOneAndUpdate(
     { id: input.id },
     {
       $set: {
@@ -186,6 +204,7 @@ export async function updateThumbnailReferenceFields(input: {
     },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
 }
 
 export async function addAssetToAlbum(assetId: string, albumId: string): Promise<void> {

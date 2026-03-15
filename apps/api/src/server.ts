@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PhotoState } from '@tedography/domain';
+import { PhotoState, normalizePhotoState } from '@tedography/domain';
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
@@ -14,16 +14,7 @@ const __dirname = path.dirname(__filename);
 const mockMediaDir = path.resolve(__dirname, '../mock-media');
 
 function parsePhotoState(value: unknown): PhotoState | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const validStates = Object.values(PhotoState);
-  if (!validStates.includes(value as PhotoState)) {
-    return null;
-  }
-
-  return value as PhotoState;
+  return normalizePhotoState(value);
 }
 
 export function createServer(): Express {
@@ -56,7 +47,7 @@ export function createServer(): Express {
   app.patch('/api/assets/:id/photoState', async (req, res) => {
     const photoState = parsePhotoState((req.body as { photoState?: unknown }).photoState);
     if (!photoState) {
-      res.status(400).json({ error: 'photoState must be one of Unreviewed, Pending, Select, Reject' });
+      res.status(400).json({ error: 'photoState must be one of New, Pending, Keep, Discard' });
       return;
     }
 

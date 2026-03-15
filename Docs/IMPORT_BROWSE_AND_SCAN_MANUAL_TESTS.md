@@ -317,7 +317,7 @@ db.mediaAssets.find(
 Verify:
 - `originalStorageRootId` and `originalArchivePath` are set
 - `originalContentHash` exists for supported files
-- `photoState` defaults to `Unreviewed`
+- `photoState` defaults to `New`
 - `width`/`height`/`captureDateTime` are populated when available
 - HEIC originals have `displayStorageType: "derived-root"` and `displayDerivedPath` set
 - JPG/JPEG/PNG originals have `displayStorageType: "archive-root"` with `displayArchivePath`
