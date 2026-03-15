@@ -93,7 +93,7 @@ const topBarStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '8px',
+  gap: '12px',
   padding: '8px 10px',
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
@@ -114,6 +114,18 @@ const primaryAreaControlsStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   gap: '6px'
+};
+
+const toolbarGroupStyle: CSSProperties = {
+  ...topBarSectionStyle,
+  paddingRight: '12px',
+  marginRight: '2px',
+  borderRight: '1px solid #e3e6ea'
+};
+
+const toolbarTrailingGroupStyle: CSSProperties = {
+  ...topBarSectionStyle,
+  marginLeft: 'auto'
 };
 
 const shellLayoutStyle: CSSProperties = {
@@ -2443,7 +2455,7 @@ export default function App() {
     viewerMode === 'Grid' && (isFlatBrowseMode || isTimelineMode || isAlbumsMode);
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
-  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea);
+  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea || isSearchArea);
   const showDetailsPanels = isSearchArea || detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
@@ -3840,6 +3852,12 @@ export default function App() {
     );
   }
 
+  const toolbarBrowseMode = isReviewArea
+    ? reviewBrowseMode
+    : isLibraryArea
+      ? libraryBrowseMode
+      : null;
+
   function renderLeftPanel(): ReactElement | null {
     if (!leftPanelVisible) {
       return null;
@@ -3852,35 +3870,6 @@ export default function App() {
             <section style={sidePanelSectionStyle}>
               <div style={sidePanelHeaderStyle}>
                 <h2 style={sidePanelTitleStyle}>Review</h2>
-                <div style={topBarSectionStyle}>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Flat' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Flat')}
-	                    title="Flat review"
-	                  >
-                    Flat
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Timeline' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Timeline')}
-	                    title="Timeline review"
-	                  >
-                    Time
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Albums' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Albums')}
-	                    title="Album review"
-	                  >
-                    Albums
-                  </button>
-                </div>
               </div>
             </section>
             {renderThumbnailSizePanel()}
@@ -3894,35 +3883,6 @@ export default function App() {
             <section style={sidePanelSectionStyle}>
               <div style={sidePanelHeaderStyle}>
                 <h2 style={sidePanelTitleStyle}>Library</h2>
-                <div style={topBarSectionStyle}>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Flat' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Flat')}
-	                    title="Flat view"
-	                  >
-                    Flat
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Timeline' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Timeline')}
-	                    title="Timeline view"
-	                  >
-                    Time
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Albums' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Albums')}
-	                    title="Albums view"
-	                  >
-                    Albums
-                  </button>
-                </div>
               </div>
               {isLibraryAlbumsMode ? (
                 <div style={topBarSectionStyle}>
@@ -3991,89 +3951,96 @@ export default function App() {
     <div style={pageStyle} className="tdg-app">
       <style>{controlStateStyles}</style>
       <div style={topBarStyle}>
-        <div style={primaryAreaControlsStyle}>
+        <div style={toolbarGroupStyle}>
           <strong style={{ fontSize: '20px', marginRight: '4px' }}>Tedography</strong>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Review' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Review')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Review' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Review')}
+          >
             Review
           </button>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Library' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Library')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Library' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Library')}
+          >
             Library
           </button>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Search' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Search')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Search' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Search')}
+          >
             Search
           </button>
         </div>
 
-        <div style={topBarSectionStyle}>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={leftPanelVisible ? 'true' : undefined}
-	            onClick={() => setLeftPanelVisible((previous) => !previous)}
-	            title={leftPanelVisible ? 'Hide left panel' : 'Show left panel'}
-          >
-            {leftPanelVisible ? '◧' : '☰'}
-          </button>
-          {(isReviewArea || isLibraryArea) ? (
-	            <button
-	              type="button"
-	              style={compareButtonStyle}
-	              data-selected={detailsPanelsVisible ? 'true' : undefined}
-	              onClick={() => setDetailsPanelsVisible((previous) => !previous)}
-	              title={detailsPanelsVisible ? 'Hide inspector' : 'Show inspector'}
+        {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
+          <div style={toolbarGroupStyle}>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea ? handleSetReviewBrowseMode('Flat') : handleSetLibraryBrowseMode('Flat')
+              }
+              title="Flat presentation"
             >
-              {detailsPanelsVisible ? 'ⓘ' : '⌁'}
+              Flat
             </button>
-          ) : null}
-	          {(isReviewArea || isLibraryArea) ? (
-	            <>
-	              <button
-	                type="button"
-	                style={compareButtonStyle}
-	                data-selected={viewerMode === 'Grid' ? 'true' : undefined}
-	                onClick={() => setViewerMode('Grid')}
-	                title="Grid view"
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea
+                  ? handleSetReviewBrowseMode('Timeline')
+                  : handleSetLibraryBrowseMode('Timeline')
+              }
+              title="Timeline presentation"
+            >
+              Time
+            </button>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea ? handleSetReviewBrowseMode('Albums') : handleSetLibraryBrowseMode('Albums')
+              }
+              title="Albums presentation"
+            >
+              Albums
+            </button>
+          </div>
+        ) : null}
+
+        <div style={toolbarGroupStyle}>
+          {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            <>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                data-selected={viewerMode === 'Grid' ? 'true' : undefined}
+                onClick={() => setViewerMode('Grid')}
+                title="Grid view"
               >
                 Grid
               </button>
-		              <button
-		                type="button"
-		                style={compareButtonStyle}
-		                data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
-		                onClick={() => setViewerMode('Loupe')}
-		                disabled={!selectedAsset}
-		                title="Loupe view"
-	              >
-	                Loupe
-	              </button>
-	              <button
-	                type="button"
-	                style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
-	                onClick={openImmersive}
-	                disabled={!selectedAsset}
-	                title={
-	                  selectedAsset
-	                    ? 'Open the active photo in full screen'
-	                    : 'Select a photo to open full screen'
-	                }
-	              >
-	                Full Screen
-	              </button>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
+                onClick={() => setViewerMode('Loupe')}
+                disabled={!selectedAsset}
+                title="Loupe view"
+              >
+                Loupe
+              </button>
               {compareAssets.length >= 2 ? (
                 <button
                   type="button"
@@ -4085,8 +4052,44 @@ export default function App() {
                   Survey
                 </button>
               ) : null}
-	            </>
-	          ) : null}
+              <button
+                type="button"
+                style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={openImmersive}
+                disabled={!selectedAsset}
+                title={
+                  selectedAsset
+                    ? 'Open the active photo in full screen'
+                    : 'Select a photo to open full screen'
+                }
+              >
+                Full Screen
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        <div style={toolbarGroupStyle}>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={leftPanelVisible ? 'true' : undefined}
+            onClick={() => setLeftPanelVisible((previous) => !previous)}
+            title={leftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+          >
+            {leftPanelVisible ? '◧' : '☰'}
+          </button>
+          {(isReviewArea || isLibraryArea) ? (
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={detailsPanelsVisible ? 'true' : undefined}
+              onClick={() => setDetailsPanelsVisible((previous) => !previous)}
+              title={detailsPanelsVisible ? 'Hide inspector' : 'Show inspector'}
+            >
+              {detailsPanelsVisible ? 'ⓘ' : '⌁'}
+            </button>
+          ) : null}
           <div style={menuAnchorStyle} id="tdg-view-options-root">
             <button
               type="button"
@@ -4118,20 +4121,6 @@ export default function App() {
               </div>
             ) : null}
           </div>
-        </div>
-
-          {hasSelectedAssets ? (
-            <div style={selectionChipStyle}>
-              <span>{selectionCount} selected</span>
-              <button type="button" style={compareButtonStyle} onClick={clearSelection} title="Deselect all (Esc)">
-                Clear
-              </button>
-          </div>
-        ) : null}
-
-        <div style={topBarSpacerStyle} />
-
-        <div style={topBarSectionStyle}>
           {isReviewArea ? (
             <label style={toggleOptionLabelStyle} title="Advance to the next asset after a rating change">
               <input
@@ -4142,6 +4131,20 @@ export default function App() {
               Auto-advance
             </label>
           ) : null}
+        </div>
+
+        {hasSelectedAssets ? (
+          <div style={toolbarGroupStyle}>
+            <div style={selectionChipStyle}>
+              <span>{selectionCount} selected</span>
+            </div>
+            <button type="button" style={compareButtonStyle} onClick={clearSelection} title="Deselect all (Esc)">
+              Clear
+            </button>
+          </div>
+        ) : null}
+
+        <div style={toolbarGroupStyle}>
           {(isReviewArea || isLibraryArea) ? (
             reviewActions.map((state) => (
               <button
@@ -4203,7 +4206,12 @@ export default function App() {
               Slide
             </button>
           ) : null}
-          {!isReviewArea ? (
+        </div>
+
+        <div style={topBarSpacerStyle} />
+
+        {!isReviewArea ? (
+          <div style={toolbarTrailingGroupStyle}>
             <button
               type="button"
               style={compareButtonStyle}
@@ -4212,8 +4220,8 @@ export default function App() {
             >
               Import
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <div style={shellViewportStyle}>
