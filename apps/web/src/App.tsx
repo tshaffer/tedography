@@ -314,7 +314,7 @@ const toggleOptionLabelStyle: CSSProperties = {
 
 const gridStyle: CSSProperties = {
   display: 'grid',
-  gap: '10px',
+  gap: '2px',
   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))'
 };
 
