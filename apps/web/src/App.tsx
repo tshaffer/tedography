@@ -460,7 +460,7 @@ const loupeViewerStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
   backgroundColor: '#fff',
-  padding: '10px',
+  padding: '6px',
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
@@ -476,21 +476,22 @@ const loupeImageWrapStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  marginBottom: '10px',
-  padding: '12px'
+  marginBottom: '8px',
+  padding: '4px'
 };
 
 const loupeImageScrollerStyle: CSSProperties = {
   flex: 1,
   minHeight: 0,
   width: '100%',
+  height: '100%',
   overflow: 'auto',
   overscrollBehavior: 'contain'
 };
 
 const loupeImageStageStyle: CSSProperties = {
-  minHeight: '100%',
-  minWidth: '100%',
+  width: '100%',
+  height: '100%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center'
@@ -498,9 +499,10 @@ const loupeImageStageStyle: CSSProperties = {
 
 const loupeImageStyle: CSSProperties = {
   maxWidth: '100%',
-  maxHeight: 'calc(100vh - 260px)',
+  maxHeight: '100%',
   width: 'auto',
   height: 'auto',
+  objectFit: 'contain',
   display: 'block'
 };
 
@@ -531,6 +533,16 @@ const actionButtonStyle: CSSProperties = {
 };
 
 const controlStateStyles = `
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: #f3f4f6;
+}
+
 .tdg-app button {
   transition:
     background-color 120ms ease,
@@ -646,7 +658,7 @@ const immersiveOverlayStyle: CSSProperties = {
   backgroundColor: 'rgba(0, 0, 0, 0.92)',
   display: 'flex',
   flexDirection: 'column',
-  padding: '12px',
+  padding: 0,
   zIndex: 1000
 };
 
@@ -657,7 +669,7 @@ const immersiveTopBarStyle: CSSProperties = {
   justifyContent: 'flex-end',
   alignItems: 'center',
   gap: '10px',
-  paddingBottom: '10px'
+  paddingBottom: '6px'
 };
 
 const immersiveInfoStyle: CSSProperties = {
@@ -686,17 +698,19 @@ const immersiveImageWrapStyle: CSSProperties = {
   width: '100%',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center'
+  justifyContent: 'center',
+  minHeight: 0,
+  overflow: 'hidden',
+  padding: 0
 };
 
 const immersiveImageStyle: CSSProperties = {
-  width: '100%',
-  maxWidth: '96vw',
-  maxHeight: '78vh',
+  maxWidth: '100%',
+  maxHeight: '100%',
+  width: 'auto',
+  height: 'auto',
   objectFit: 'contain',
-  backgroundColor: '#111',
-  borderRadius: '8px',
-  border: '1px solid #2b2b2b'
+  display: 'block'
 };
 
 const immersiveBottomHintStyle: CSSProperties = {
@@ -1257,7 +1271,6 @@ function LoupeViewer({
 
   return (
     <section style={loupeViewerStyle}>
-      <h2 style={{ marginTop: 0 }}>Loupe</h2>
       <div style={loupeImageWrapStyle}>
         <div style={loupeImageScrollerStyle}>
           <div style={loupeImageStageStyle}>
@@ -1297,13 +1310,7 @@ type ImmersiveViewerProps = {
 
 function ImmersiveViewer({
   asset,
-  index,
-  total,
-  hasPrevious,
-  hasNext,
   onClose,
-  onPrevious,
-  onNext,
   onActiveImageLoad
 }: ImmersiveViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
@@ -1311,29 +1318,6 @@ function ImmersiveViewer({
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
       <section style={{ width: '100%', height: '100%' }} onClick={(event) => event.stopPropagation()}>
-        <div style={immersiveTopBarStyle}>
-          <div style={immersiveControlsStyle}>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onClose}>
-              Exit
-            </button>
-            <button
-              type="button"
-              style={immersiveControlButtonStyle}
-              onClick={onPrevious}
-              disabled={!hasPrevious}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              style={immersiveControlButtonStyle}
-              onClick={onNext}
-              disabled={!hasNext}
-            >
-              Next
-            </button>
-          </div>
-        </div>
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
             <img
@@ -1347,9 +1331,6 @@ function ImmersiveViewer({
             <div style={immersiveImageStyle} />
           )}
         </div>
-        <p style={immersiveBottomHintStyle}>
-          {asset.filename} · {index + 1} / {total} · Esc exit · ←/→ navigate
-        </p>
       </section>
     </div>
   );
@@ -2399,9 +2380,19 @@ export default function App() {
     [compareAssets, visibleAssets]
   );
 
+  const loupeAssets = useMemo(
+    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    [compareAssets, visibleAssets]
+  );
+
   const selectedAssetIndex = useMemo(
     () => visibleAssets.findIndex((asset) => asset.id === selectedAssetId),
     [visibleAssets, selectedAssetId]
+  );
+
+  const loupeSelectedAssetIndex = useMemo(
+    () => loupeAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [loupeAssets, selectedAssetId]
   );
 
   const slideshowSelectedAssetIndex = useMemo(
@@ -2661,6 +2652,18 @@ export default function App() {
       setViewerMode('Grid');
     }
   }, [selectedAsset, viewerMode]);
+
+  useEffect(() => {
+    if (!isLoupeMode || loupeAssets.length === 0) {
+      return;
+    }
+
+    if (selectedAssetId && loupeAssets.some((asset) => asset.id === selectedAssetId)) {
+      return;
+    }
+
+    setSelectedAssetId(loupeAssets[0]?.id ?? null);
+  }, [isLoupeMode, loupeAssets, selectedAssetId]);
 
   useEffect(() => {
     if (!slideshowActive || !slideshowPlaying || slideshowAssets.length < 2) {
@@ -3246,13 +3249,16 @@ export default function App() {
       return;
     }
 
+    const navigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
+    const navigationIndex = isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex;
+
     // Guard against stale load events when fast navigation changes the active asset.
-    if (!selectedAssetId || loadedAssetId !== selectedAssetId || selectedAssetIndex < 0) {
+    if (!selectedAssetId || loadedAssetId !== selectedAssetId || navigationIndex < 0) {
       return;
     }
 
-    const nextAsset = visibleAssets[selectedAssetIndex + 1];
-    const previousAsset = visibleAssets[selectedAssetIndex - 1];
+    const nextAsset = navigationAssets[navigationIndex + 1];
+    const previousAsset = navigationAssets[navigationIndex - 1];
 
     // Prefetch forward first because next-image navigation is the primary review flow.
     if (nextAsset) {
@@ -3468,28 +3474,31 @@ export default function App() {
       }
 
       if (immersiveOpen) {
+        const immersiveNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
         if (event.key === 'ArrowRight') {
           event.preventDefault();
-          handleSelectRelativeInList(visibleAssets, 1);
+          handleSelectRelativeInList(immersiveNavigationAssets, 1);
         }
 
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          handleSelectRelativeInList(visibleAssets, -1);
+          handleSelectRelativeInList(immersiveNavigationAssets, -1);
         }
 
         void handleKeyboardReview(event.key);
         return;
       }
 
+      const primaryNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
+
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
         event.preventDefault();
-        handleSelectRelativeInList(visibleAssets, 1);
+        handleSelectRelativeInList(primaryNavigationAssets, 1);
       }
 
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
         event.preventDefault();
-        handleSelectRelativeInList(visibleAssets, -1);
+        handleSelectRelativeInList(primaryNavigationAssets, -1);
       }
 
       if (event.key === 'Home') {
@@ -3516,7 +3525,9 @@ export default function App() {
     };
   }, [
     compareAssets,
+    loupeAssets,
     visibleAssets,
+    isLoupeMode,
     immersiveOpen,
     selectedAsset,
     selectedAssetId,
@@ -4251,13 +4262,13 @@ export default function App() {
               {!immersiveOpen ? (
                 <AssetQuickBar
                   asset={selectedAsset}
-                  currentIndex={selectedAssetIndex}
-                  totalCount={visibleAssets.length}
+                  currentIndex={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
+                  totalCount={isLoupeMode ? loupeAssets.length : visibleAssets.length}
                 />
               ) : null}
               {showFilmstrip ? (
                 <AssetFilmstrip
-                  assets={visibleAssets}
+                  assets={isLoupeMode ? loupeAssets : visibleAssets}
                   activeAssetId={selectedAssetId}
                   onSelectAsset={handleFilmstripSelectAsset}
                 />
@@ -4266,12 +4277,12 @@ export default function App() {
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
-                index={selectedAssetIndex}
-                total={visibleAssets.length}
-                hasPrevious={selectedAssetIndex > 0}
-                hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
-                onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
-                onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
+                index={loupeSelectedAssetIndex}
+                total={loupeAssets.length}
+                hasPrevious={loupeSelectedAssetIndex > 0}
+                hasNext={loupeSelectedAssetIndex >= 0 && loupeSelectedAssetIndex < loupeAssets.length - 1}
+                onPrevious={() => handleSelectRelativeInList(loupeAssets, -1)}
+                onNext={() => handleSelectRelativeInList(loupeAssets, 1)}
                 onOpenFullscreen={openImmersive}
               />
             ) : null}
@@ -4429,13 +4440,17 @@ export default function App() {
       {immersiveOpen && selectedAsset ? (
         <ImmersiveViewer
           asset={selectedAsset}
-          index={selectedAssetIndex}
-          total={visibleAssets.length}
-          hasPrevious={selectedAssetIndex > 0}
-          hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
+          index={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
+          total={isLoupeMode ? loupeAssets.length : visibleAssets.length}
+          hasPrevious={(isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) > 0}
+          hasNext={
+            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) >= 0 &&
+            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) <
+              (isLoupeMode ? loupeAssets.length : visibleAssets.length) - 1
+          }
           onClose={closeImmersive}
-          onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
-          onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
+          onPrevious={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, -1)}
+          onNext={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
