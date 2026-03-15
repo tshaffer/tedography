@@ -3881,9 +3881,9 @@ export default function App() {
               </div>
             </section>
             {renderThumbnailSizePanel()}
+            {renderVisibilityPanel()}
             {renderAlbumTreePanel()}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
-            {renderVisibilityPanel()}
           </>
         ) : null}
         {isLibraryArea ? (
@@ -3914,9 +3914,9 @@ export default function App() {
               ) : null}
             </section>
             {renderThumbnailSizePanel()}
+            {renderVisibilityPanel()}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
             {isLibraryAlbumsMode ? renderAlbumTreePanel() : null}
-            {renderVisibilityPanel()}
           </>
         ) : null}
         {isSearchArea ? renderSearchFiltersPanel() : null}
