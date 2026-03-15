@@ -71,6 +71,7 @@ type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type ReviewBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type ViewerMode = 'Grid' | 'Loupe';
+type SurveyLayoutMode = 'landscape' | 'portrait';
 
 const timelineStickyTopPx = 10;
 const timelineActiveMonthOffsetPx = timelineStickyTopPx + 16;
@@ -772,72 +773,334 @@ const slideshowTopBarStyle: CSSProperties = {
 const surveyOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.88)',
+  backgroundColor: '#080808',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'stretch',
   padding: '16px',
   zIndex: 1100,
-  overflow: 'auto'
+  overflow: 'hidden'
 };
 
 const surveyContainerStyle: CSSProperties = {
+  width: '100%',
   maxWidth: '1200px',
   margin: '0 auto',
-  color: '#f3f3f3'
+  height: 'calc(100vh - 32px)',
+  maxHeight: 'calc(100vh - 32px)',
+  display: 'flex',
+  flexDirection: 'column',
+  color: '#f3f3f3',
+  backgroundColor: '#101010',
+  border: '1px solid #232323',
+  borderRadius: '14px',
+  boxShadow: '0 24px 80px rgba(0, 0, 0, 0.6)',
+  padding: '18px',
+  boxSizing: 'border-box',
+  position: 'relative',
+  zIndex: 1,
+  overflow: 'hidden'
+};
+
+const surveyHeaderStyle: CSSProperties = {
+  flex: '0 0 auto',
+  position: 'sticky',
+  top: 0,
+  zIndex: 2,
+  display: 'grid',
+  gap: '10px',
+  paddingBottom: '10px',
+  marginBottom: '8px',
+  backgroundColor: '#101010'
+};
+
+const surveyHeaderTopRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '12px',
+  flexWrap: 'wrap'
+};
+
+const surveyHeaderIdentityStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexWrap: 'wrap',
+  minWidth: 0
+};
+
+const surveyTitleBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  height: '28px',
+  borderRadius: '999px',
+  padding: '0 10px',
+  backgroundColor: '#171717',
+  border: '1px solid #2a2a2a',
+  color: '#f5f5f5',
+  fontSize: '12px',
+  fontWeight: 700,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase'
+};
+
+const surveyFocusedFilenameStyle: CSSProperties = {
+  minWidth: 0,
+  maxWidth: '420px',
+  color: '#f1f1f1',
+  fontSize: '14px',
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+};
+
+const surveyCountBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  height: '28px',
+  borderRadius: '999px',
+  padding: '0 10px',
+  backgroundColor: '#131313',
+  border: '1px solid #2d2d2d',
+  color: '#d8d8d8',
+  fontSize: '12px'
+};
+
+const surveyHeaderControlsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end'
+};
+
+const surveySegmentedControlStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '4px',
+  borderRadius: '999px',
+  backgroundColor: '#141414',
+  border: '1px solid #292929'
+};
+
+const surveySegmentButtonStyle: CSSProperties = {
+  border: '1px solid transparent',
+  borderRadius: '999px',
+  backgroundColor: 'transparent',
+  color: '#b7b7b7',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 600,
+  padding: '7px 12px'
+};
+
+const surveySegmentButtonActiveStyle: CSSProperties = {
+  backgroundColor: '#262626',
+  borderColor: '#3a3a3a',
+  color: '#f2f2f2'
+};
+
+const surveyActionStripStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexWrap: 'wrap'
+};
+
+const surveyActionButtonStyle: CSSProperties = {
+  ...immersiveControlButtonStyle,
+  backgroundColor: '#161616',
+  border: '1px solid #303030',
+  padding: '6px 9px',
+  fontSize: '12px'
+};
+
+const surveyWorkspaceStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+  overflowY: 'auto',
+  overflowX: 'hidden'
 };
 
 const surveyGridStyle: CSSProperties = {
   display: 'grid',
+  width: '100%',
   gap: '12px',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))'
+  alignContent: 'start',
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0
+};
+
+const surveyGridLandscapeStyle: CSSProperties = {
+  height: '100%'
+};
+
+const surveyGridPortraitStyle: CSSProperties = {
+  height: '100%'
 };
 
 const surveyTileStyle: CSSProperties = {
-  border: '1px solid #444',
-  borderRadius: '8px',
-  backgroundColor: '#171717',
-  padding: '8px',
+  position: 'relative',
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100%',
+  minWidth: 0,
+  minHeight: 0,
   cursor: 'pointer'
 };
 
+const surveyLandscapeTileStyle: CSSProperties = {
+  maxWidth: '100%'
+};
+
+const surveyPortraitTileStyle: CSSProperties = {
+  minWidth: 0
+};
+
 const surveyFocusedTileStyle: CSSProperties = {
-  border: '2px solid #4da3ff',
-  boxShadow: '0 0 0 2px rgba(77, 163, 255, 0.2)'
+  boxShadow: '0 0 0 1px rgba(77, 163, 255, 0.8), 0 0 0 4px rgba(77, 163, 255, 0.14)'
 };
 
 const surveyWinnerTileStyle: CSSProperties = {
-  borderColor: '#1f8f4d',
-  backgroundColor: '#132217'
+  boxShadow: 'inset 0 0 0 1px rgba(31, 143, 77, 0.5)'
 };
 
 const surveyAlternateTileStyle: CSSProperties = {
-  borderColor: '#8f7530',
-  backgroundColor: '#242013'
+  boxShadow: 'inset 0 0 0 1px rgba(181, 136, 19, 0.5)'
 };
 
 const surveyRejectTileStyle: CSSProperties = {
-  opacity: 0.45,
-  filter: 'grayscale(35%)'
+  boxShadow: 'inset 0 0 0 1px rgba(180, 35, 47, 0.45)'
+};
+
+const surveyPaneViewportStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: '12px',
+  background:
+    'radial-gradient(circle at top, rgba(255, 255, 255, 0.04), transparent 42%), #050505',
+  border: '1px solid #1d1d1d',
+  minHeight: 0
+};
+
+const surveyPaneViewportLandscapeStyle: CSSProperties = {};
+
+const surveyPaneViewportPortraitStyle: CSSProperties = {};
+
+const surveyPaneStageStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden'
+};
+
+const surveyImageTransformStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  height: '100%',
+  transformOrigin: 'center center'
 };
 
 const surveyImageStyle: CSSProperties = {
-  width: '100%',
-  aspectRatio: '3 / 2',
-  objectFit: 'cover',
-  borderRadius: '6px',
-  marginBottom: '6px',
-  backgroundColor: '#2a2a2a'
+  width: 'auto',
+  height: 'auto',
+  maxWidth: '100%',
+  maxHeight: '100%',
+  display: 'block',
+  backgroundColor: '#050505',
+  opacity: 1,
+  filter: 'none'
 };
 
-const surveyDetailStyle: CSSProperties = {
-  border: '1px solid #444',
-  borderRadius: '8px',
-  backgroundColor: '#1a1a1a',
-  padding: '10px',
-  marginBottom: '12px'
+const surveyPaneOverlayTopStyle: CSSProperties = {
+  position: 'absolute',
+  top: '10px',
+  left: '10px',
+  right: '10px',
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: '8px',
+  pointerEvents: 'none'
 };
 
-const surveyRoleStyle: CSSProperties = {
+const surveyPaneBadgeGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  flexWrap: 'wrap',
+  minWidth: 0
+};
+
+const surveyPaneBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  maxWidth: '100%',
+  padding: '4px 8px',
+  borderRadius: '999px',
+  fontSize: '11px',
+  lineHeight: 1.2,
+  color: '#f3f3f3',
+  backgroundColor: 'rgba(10, 10, 10, 0.78)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  backdropFilter: 'blur(8px)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+};
+
+const surveyPaneFocusedBadgeStyle: CSSProperties = {
+  ...surveyPaneBadgeStyle,
+  color: '#d7ecff',
+  borderColor: 'rgba(77, 163, 255, 0.45)',
+  backgroundColor: 'rgba(17, 29, 41, 0.88)'
+};
+
+const surveyPaneZoomControlsStyle: CSSProperties = {
+  position: 'absolute',
+  right: '10px',
+  bottom: '10px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '4px',
+  borderRadius: '999px',
+  backgroundColor: 'rgba(10, 10, 10, 0.82)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  backdropFilter: 'blur(8px)'
+};
+
+const surveyPaneZoomButtonStyle: CSSProperties = {
+  width: '30px',
+  height: '30px',
+  borderRadius: '999px',
+  border: '1px solid #3a3a3a',
+  backgroundColor: '#151515',
+  color: '#f2f2f2',
+  cursor: 'pointer',
+  fontSize: '13px',
+  padding: 0
+};
+
+const surveyPaneResetButtonStyle: CSSProperties = {
+  ...surveyPaneZoomButtonStyle,
+  width: 'auto',
+  padding: '0 10px',
   fontSize: '12px',
-  margin: '4px 0 0 0'
+  whiteSpace: 'nowrap'
 };
 
 const reviewActions: PhotoState[] = [
@@ -1456,25 +1719,54 @@ type SurveyModeProps = {
 
 function SurveyZoomableTile({
   asset,
+  layoutMode,
   onFocus
 }: {
   asset: MediaAsset;
+  layoutMode: SurveyLayoutMode;
   onFocus: () => void;
 }) {
   const imageUrl = getAssetDisplayImageUrl(asset);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(
+    asset.width && asset.height ? { width: asset.width, height: asset.height } : null
+  );
   const dragStartRef = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   function clampOffset(nextScale: number, nextOffset: { x: number; y: number }) {
     if (nextScale <= 1) {
       return { x: 0, y: 0 };
     }
 
-    const maxOffset = ((nextScale - 1) * 100) / 2;
+    const viewport = viewportRef.current;
+    const naturalWidth = imageDimensions?.width ?? asset.width ?? 0;
+    const naturalHeight = imageDimensions?.height ?? asset.height ?? 0;
+
+    if (!viewport || naturalWidth <= 0 || naturalHeight <= 0) {
+      return nextOffset;
+    }
+
+    const viewportWidth = viewport.clientWidth;
+    const viewportHeight = viewport.clientHeight;
+
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+      return nextOffset;
+    }
+
+    const containScale = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
+    const fittedWidth = naturalWidth * containScale;
+    const fittedHeight = naturalHeight * containScale;
+    const scaledWidth = fittedWidth * nextScale;
+    const scaledHeight = fittedHeight * nextScale;
+    const maxOffsetX = Math.max(0, (scaledWidth - viewportWidth) / 2);
+    const maxOffsetY = Math.max(0, (scaledHeight - viewportHeight) / 2);
+
     return {
-      x: Math.max(-maxOffset, Math.min(maxOffset, nextOffset.x)),
-      y: Math.max(-maxOffset, Math.min(maxOffset, nextOffset.y))
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, nextOffset.x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, nextOffset.y))
     };
   }
 
@@ -1497,6 +1789,7 @@ function SurveyZoomableTile({
       originX: offset.x,
       originY: offset.y
     };
+    setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -1508,8 +1801,8 @@ function SurveyZoomableTile({
     const deltaX = event.clientX - dragStartRef.current.x;
     const deltaY = event.clientY - dragStartRef.current.y;
     const nextOffset = {
-      x: dragStartRef.current.originX + deltaX / 3,
-      y: dragStartRef.current.originY + deltaY / 3
+      x: dragStartRef.current.originX + deltaX,
+      y: dragStartRef.current.originY + deltaY
     };
 
     setOffset(clampOffset(scale, nextOffset));
@@ -1520,62 +1813,89 @@ function SurveyZoomableTile({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     dragStartRef.current = null;
+    setIsDragging(false);
   }
 
   function resetZoom(): void {
     setScale(1);
     setOffset({ x: 0, y: 0 });
+    setIsDragging(false);
   }
 
   return (
-    <>
-      <div
-        style={{
-          ...surveyImageStyle,
-          overflow: 'hidden',
-          cursor: scale > 1 ? 'grab' : 'zoom-in'
-        }}
-        onWheel={handleWheel}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onDoubleClick={resetZoom}
-      >
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={asset.filename}
-            style={{
-              ...surveyImageStyle,
-              marginBottom: 0,
-              transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-              transformOrigin: 'center center',
-              cursor: scale > 1 ? 'grab' : 'zoom-in'
-            }}
-            draggable={false}
-          />
-        ) : (
-          <div style={{ ...surveyImageStyle, marginBottom: 0 }} />
-        )}
+    <div
+      ref={viewportRef}
+      style={{
+        ...surveyPaneViewportStyle,
+        ...(layoutMode === 'portrait' ? surveyPaneViewportPortraitStyle : surveyPaneViewportLandscapeStyle),
+        cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
+      }}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={resetZoom}
+    >
+      <div style={surveyPaneStageStyle}>
+        <div
+          style={{
+            ...surveyImageTransformStyle,
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`
+          }}
+        >
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={asset.filename}
+              style={{
+                ...surveyImageStyle,
+                cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
+              }}
+              draggable={false}
+              onLoad={(event) =>
+                setImageDimensions({
+                  width: event.currentTarget.naturalWidth,
+                  height: event.currentTarget.naturalHeight
+                })
+              }
+            />
+          ) : (
+            <div style={{ ...surveyImageStyle, width: '100%', height: '100%' }} />
+          )}
+        </div>
       </div>
-      <div style={{ ...actionsStyle, marginTop: '6px' }}>
-        <button type="button" style={immersiveControlButtonStyle} onClick={() => setScale((previous) => Math.min(4, previous + 0.25))}>
+      <div
+        style={surveyPaneZoomControlsStyle}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          style={surveyPaneZoomButtonStyle}
+          onClick={() => setScale((previous) => Math.min(4, Number((previous + 0.25).toFixed(2))))}
+          aria-label={`Zoom in ${asset.filename}`}
+        >
           +
         </button>
-        <button type="button" style={immersiveControlButtonStyle} onClick={() => setScale((previous) => Math.max(1, previous - 0.25))}>
+        <button
+          type="button"
+          style={surveyPaneZoomButtonStyle}
+          onClick={() => setScale((previous) => Math.max(1, Number((previous - 0.25).toFixed(2))))}
+          aria-label={`Zoom out ${asset.filename}`}
+        >
           -
         </button>
         <button
           type="button"
-          style={immersiveControlButtonStyle}
+          style={surveyPaneResetButtonStyle}
           onClick={resetZoom}
           disabled={scale === 1 && offset.x === 0 && offset.y === 0}
         >
           Reset
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1593,97 +1913,149 @@ function SurveyMode({
   onKeepFocusedRejectOthers,
   onSetPhotoState
 }: SurveyModeProps) {
+  const [layoutMode, setLayoutMode] = useState<SurveyLayoutMode>('landscape');
+  const surveyGridLayoutStyle =
+    layoutMode === 'landscape'
+      ? {
+          ...surveyGridLandscapeStyle,
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          gridTemplateRows: `repeat(${assets.length}, minmax(0, 1fr))`
+        }
+      : {
+          ...surveyGridPortraitStyle,
+          gridTemplateColumns: `repeat(${Math.min(assets.length, 2)}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${Math.ceil(assets.length / 2)}, minmax(0, 1fr))`
+        };
+
   return (
     <div style={surveyOverlayStyle} onClick={onClose}>
       <section style={surveyContainerStyle} onClick={(event) => event.stopPropagation()}>
-        <div style={{ ...immersiveTopBarStyle, paddingBottom: '12px' }}>
-          <div style={immersiveInfoStyle}>
-            <strong>Survey Compare</strong>
-            <span>
-              {focusedAsset.filename} | {focusedIndex + 1} / {assets.length}
-            </span>
+        <div style={surveyHeaderStyle}>
+          <div style={surveyHeaderTopRowStyle}>
+            <div style={surveyHeaderIdentityStyle}>
+              <span style={surveyTitleBadgeStyle}>Survey</span>
+              <span style={surveyFocusedFilenameStyle} title={focusedAsset.filename}>
+                {focusedAsset.filename}
+              </span>
+              <span style={surveyCountBadgeStyle}>
+                {focusedIndex + 1} / {assets.length}
+              </span>
+            </div>
+            <div style={surveyHeaderControlsStyle}>
+              <div style={surveySegmentedControlStyle} aria-label="Survey layout mode">
+                <button
+                  type="button"
+                  style={{
+                    ...surveySegmentButtonStyle,
+                    ...(layoutMode === 'landscape' ? surveySegmentButtonActiveStyle : {})
+                  }}
+                  onClick={() => setLayoutMode('landscape')}
+                >
+                  Landscape Compare
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...surveySegmentButtonStyle,
+                    ...(layoutMode === 'portrait' ? surveySegmentButtonActiveStyle : {})
+                  }}
+                  onClick={() => setLayoutMode('portrait')}
+                >
+                  Portrait Compare
+                </button>
+              </div>
+              <button type="button" style={surveyActionButtonStyle} onClick={onClose}>
+                Close
+              </button>
+            </div>
           </div>
-          <button type="button" style={immersiveControlButtonStyle} onClick={onClose}>
-            Close
-          </button>
-        </div>
-
-        <AssetQuickBar asset={focusedAsset} currentIndex={focusedIndex} totalCount={assets.length} />
-
-        <div style={surveyDetailStyle}>
-          <p>
-            <strong>Focused:</strong> {focusedAsset.filename}
-          </p>
-          <p>
-            <strong>Compare role:</strong> {compareRoleFromPhotoState(focusedAsset.photoState)} |{' '}
-            <strong>State:</strong> {focusedAsset.photoState} | <strong>Type:</strong> {focusedAsset.mediaType}
-          </p>
-          <p>
-            <strong>Captured:</strong> {formatCaptureDate(focusedAsset.captureDateTime)}
-          </p>
-          <div style={actionsStyle}>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedWinner}>
-              Winner (W)
+          <div style={surveyActionStripStyle}>
+            <button type="button" style={surveyActionButtonStyle} onClick={onSetFocusedWinner} title="Mark focused image as Winner (W)">
+              Winner
             </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedAlternate}>
-              Alternate (A)
+            <button type="button" style={surveyActionButtonStyle} onClick={onSetFocusedAlternate} title="Mark focused image as Alternate (A)">
+              Alternate
             </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedReject}>
-              Discard (R)
+            <button type="button" style={surveyActionButtonStyle} onClick={onSetFocusedReject} title="Mark focused image as Discard (R)">
+              Discard
             </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedAlternates}>
-              Winner + Alternates (K)
+            <button type="button" style={surveyActionButtonStyle} onClick={onKeepFocusedAlternates} title="Focused Winner, all others Alternate (K)">
+              Winner + Alternates
             </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedRejectOthers}>
-              Winner Only (Shift+K)
+            <button type="button" style={surveyActionButtonStyle} onClick={onKeepFocusedRejectOthers} title="Focused Winner, all others Discard (Shift+K)">
+              Winner Only
             </button>
-          </div>
-          <div style={actionsStyle}>
             {reviewActions.map((state) => (
               <button
                 key={state}
                 type="button"
-                style={immersiveControlButtonStyle}
+                style={surveyActionButtonStyle}
                 onClick={() => onSetPhotoState(focusedAsset.id, state)}
                 disabled={isUpdating || focusedAsset.photoState === state}
+                title={`Set focused image to ${state}`}
               >
                 {state}
               </button>
             ))}
           </div>
-          <p style={{ color: '#b8b8b8', fontSize: '12px', marginTop: '8px' }}>
-            Survey shortcuts: W winner, A alternate, R discard, K winner + alternates, Shift+K winner
-            only.
-          </p>
-          <p style={{ color: '#9f9f9f', fontSize: '12px', marginTop: '4px' }}>
-            Also available: S/P/R/U maps to Keep/Pending/Discard/New.
-          </p>
         </div>
 
-        <div style={surveyGridStyle}>
+        <div style={surveyWorkspaceStyle}>
+          <div
+            style={{
+              ...surveyGridStyle,
+              ...surveyGridLayoutStyle
+            }}
+          >
           {assets.map((asset) => {
+            const photoStateColor = getPhotoStateBadgeColor(asset.photoState);
+            const roleLabel = compareRoleFromPhotoState(asset.photoState);
+            const isFocused = asset.id === focusedAsset.id;
+
             return (
               <article
                 key={asset.id}
                 style={{
                   ...surveyTileStyle,
+                  ...(layoutMode === 'landscape' ? surveyLandscapeTileStyle : surveyPortraitTileStyle),
                   ...(asset.photoState === PhotoState.Keep ? surveyWinnerTileStyle : {}),
                   ...(asset.photoState === PhotoState.Pending ? surveyAlternateTileStyle : {}),
                   ...(asset.photoState === PhotoState.Discard ? surveyRejectTileStyle : {}),
-                  ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
+                  ...(isFocused ? surveyFocusedTileStyle : {})
                 }}
                 onClick={() => onFocusAsset(asset.id)}
-            >
+                title={`${asset.filename} | ${roleLabel} | ${asset.photoState} | ${formatCaptureDate(asset.captureDateTime)}`}
+              >
                 <SurveyZoomableTile
                   asset={asset}
+                  layoutMode={layoutMode}
                   onFocus={() => onFocusAsset(asset.id)}
                 />
-                <strong>{asset.filename}</strong>
-                <p>{asset.photoState}</p>
-                <p style={surveyRoleStyle}>Role: {compareRoleFromPhotoState(asset.photoState)}</p>
+                <div style={surveyPaneOverlayTopStyle}>
+                  <div style={surveyPaneBadgeGroupStyle}>
+                    <span style={surveyPaneBadgeStyle} title={asset.filename}>
+                      {asset.filename}
+                    </span>
+                    {isFocused ? <span style={surveyPaneFocusedBadgeStyle}>Focused</span> : null}
+                  </div>
+                  <div style={surveyPaneBadgeGroupStyle}>
+                    <span
+                      style={{
+                        ...surveyPaneBadgeStyle,
+                        backgroundColor: photoStateColor,
+                        borderColor: photoStateColor,
+                        color: '#fff'
+                      }}
+                    >
+                      {roleLabel}
+                    </span>
+                    <span style={surveyPaneBadgeStyle}>{asset.photoState}</span>
+                  </div>
+                </div>
               </article>
             );
           })}
+          </div>
         </div>
       </section>
     </div>
