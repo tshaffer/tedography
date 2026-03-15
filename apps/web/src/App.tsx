@@ -1048,6 +1048,18 @@ function getOverlapLength(startA: number, endA: number, startB: number, endB: nu
   return Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
 }
 
+type GridCardLayout = {
+  assetId: string;
+  node: HTMLElement;
+  rect: DOMRect;
+  centerX: number;
+  centerY: number;
+};
+
+function getGridRowTolerance(height: number): number {
+  return Math.max(height * 0.6, 24);
+}
+
 type AlbumTreeNodeWithDepth = AlbumTreeNode & {
   depth: number;
 };
@@ -1887,6 +1899,7 @@ export default function App() {
   });
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
+  const pendingGridRevealAssetIdRef = useRef<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const previousIsTimelineModeRef = useRef(false);
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
@@ -2841,51 +2854,66 @@ export default function App() {
     }
   }
 
+  function getRenderedGridCardLayouts(): GridCardLayout[] {
+    if (!mainColumnRef.current) {
+      return [];
+    }
+
+    return Array.from(
+      mainColumnRef.current.querySelectorAll<HTMLElement>('[data-grid-card="true"][data-asset-id]')
+    )
+      .map((node) => {
+        const assetId = node.dataset.assetId;
+        if (!assetId) {
+          return null;
+        }
+
+        const rect = node.getBoundingClientRect();
+        return {
+          assetId,
+          node,
+          rect,
+          centerX: (rect.left + rect.right) / 2,
+          centerY: (rect.top + rect.bottom) / 2
+        };
+      })
+      .filter((entry): entry is GridCardLayout => entry !== null);
+  }
+
   function handleSelectGridDirectional(direction: 'left' | 'right' | 'up' | 'down'): void {
     if (!selectedAssetId || !mainColumnRef.current) {
       return;
     }
 
-    const nodes = Array.from(
-      mainColumnRef.current.querySelectorAll<HTMLElement>('[data-grid-card="true"][data-asset-id]')
-    );
-    if (nodes.length === 0) {
+    const layouts = getRenderedGridCardLayouts();
+    if (layouts.length === 0) {
       return;
     }
 
-    const currentNode =
-      nodes.find(
-        (node) =>
-          node.dataset.assetId === selectedAssetId &&
-          node.dataset.active === 'true'
-      ) ?? nodes.find((node) => node.dataset.assetId === selectedAssetId);
-    if (!currentNode) {
+    const currentLayout =
+      layouts.find(
+        (layout) =>
+          layout.assetId === selectedAssetId &&
+          layout.node.dataset.active === 'true'
+      ) ?? layouts.find((layout) => layout.assetId === selectedAssetId);
+    if (!currentLayout) {
       return;
     }
 
-    const currentRect = currentNode.getBoundingClientRect();
-    const currentCenterX = (currentRect.left + currentRect.right) / 2;
-    const currentCenterY = (currentRect.top + currentRect.bottom) / 2;
-    const rowTolerance = Math.max(currentRect.height * 0.6, 24);
+    const { rect: currentRect, centerX: currentCenterX, centerY: currentCenterY } = currentLayout;
+    const rowTolerance = getGridRowTolerance(currentRect.height);
     const columnTolerance = Math.max(currentRect.width * 0.75, 24);
 
-    let bestNode: HTMLElement | null = null;
+    let bestLayout: GridCardLayout | null = null;
     let bestPrimary = Number.POSITIVE_INFINITY;
     let bestSecondary = Number.POSITIVE_INFINITY;
 
-    for (const node of nodes) {
-      if (node === currentNode) {
+    for (const layout of layouts) {
+      if (layout.node === currentLayout.node) {
         continue;
       }
 
-      const assetId = node.dataset.assetId;
-      if (!assetId) {
-        continue;
-      }
-
-      const rect = node.getBoundingClientRect();
-      const centerX = (rect.left + rect.right) / 2;
-      const centerY = (rect.top + rect.bottom) / 2;
+      const { rect, centerX, centerY } = layout;
       const horizontalOverlap = getOverlapLength(rect.left, rect.right, currentRect.left, currentRect.right);
       const verticalOverlap = getOverlapLength(rect.top, rect.bottom, currentRect.top, currentRect.bottom);
       let primaryDistance = Number.POSITIVE_INFINITY;
@@ -2953,14 +2981,61 @@ export default function App() {
         primaryDistance < bestPrimary ||
         (Math.abs(primaryDistance - bestPrimary) < 0.5 && secondaryDistance < bestSecondary)
       ) {
-        bestNode = node;
+        bestLayout = layout;
         bestPrimary = primaryDistance;
         bestSecondary = secondaryDistance;
       }
     }
 
-    const nextAssetId = bestNode?.dataset.assetId;
+    let nextAssetId = bestLayout?.assetId ?? null;
+    const currentRowLayouts = layouts
+      .filter((layout) => Math.abs(layout.centerY - currentCenterY) <= rowTolerance)
+      .sort((left, right) => left.centerX - right.centerX);
+    const currentRowIndex = currentRowLayouts.findIndex((layout) => layout.assetId === currentLayout.assetId);
+
+    if (!nextAssetId && (direction === 'right' || direction === 'left') && currentRowIndex >= 0) {
+      const sortedRows = [...layouts]
+        .sort((left, right) =>
+          Math.abs(left.centerY - right.centerY) < rowTolerance
+            ? left.centerX - right.centerX
+            : left.centerY - right.centerY
+        )
+        .reduce<GridCardLayout[][]>((rows, layout) => {
+          const lastRow = rows[rows.length - 1];
+          if (!lastRow) {
+            rows.push([layout]);
+            return rows;
+          }
+
+          const rowCenterY =
+            lastRow.reduce((sum, rowLayout) => sum + rowLayout.centerY, 0) / lastRow.length;
+          if (Math.abs(layout.centerY - rowCenterY) <= rowTolerance) {
+            lastRow.push(layout);
+            lastRow.sort((left, right) => left.centerX - right.centerX);
+          } else {
+            rows.push([layout]);
+          }
+
+          return rows;
+        }, []);
+
+      const currentVisualRowIndex = sortedRows.findIndex((row) =>
+        row.some((layout) => layout.assetId === currentLayout.assetId)
+      );
+
+      if (currentVisualRowIndex >= 0) {
+        if (direction === 'right') {
+          const nextRow = sortedRows[currentVisualRowIndex + 1];
+          nextAssetId = nextRow?.[0]?.assetId ?? null;
+        } else {
+          const previousRow = sortedRows[currentVisualRowIndex - 1];
+          nextAssetId = previousRow?.[previousRow.length - 1]?.assetId ?? null;
+        }
+      }
+    }
+
     if (nextAssetId) {
+      pendingGridRevealAssetIdRef.current = nextAssetId;
       setSelectedAssetId(nextAssetId);
     }
   }
@@ -3687,6 +3762,28 @@ export default function App() {
     updatingAssetIds,
     viewerMode
   ]);
+
+  useEffect(() => {
+    if (viewerMode !== 'Grid') {
+      pendingGridRevealAssetIdRef.current = null;
+      return;
+    }
+
+    const pendingAssetId = pendingGridRevealAssetIdRef.current;
+    if (!pendingAssetId || pendingAssetId !== selectedAssetId || !mainColumnRef.current) {
+      return;
+    }
+
+    const targetNode = mainColumnRef.current.querySelector<HTMLElement>(
+      `[data-grid-card="true"][data-asset-id="${pendingAssetId}"]`
+    );
+    pendingGridRevealAssetIdRef.current = null;
+    if (!targetNode) {
+      return;
+    }
+
+    targetNode.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [selectedAssetId, viewerMode, visibleAssets]);
 
   function renderAlbumTreeRows(
     checkedIds: string[],
