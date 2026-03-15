@@ -1278,22 +1278,10 @@ function AssetDetailPanel({
 
 type LoupeViewerProps = {
   asset: MediaAsset;
-  index: number;
-  total: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
 };
 
 function LoupeViewer({
-  asset,
-  index,
-  total,
-  hasPrevious,
-  hasNext,
-  onPrevious,
-  onNext
+  asset
 }: LoupeViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
 
@@ -1306,17 +1294,6 @@ function LoupeViewer({
           </div>
         </div>
       </div>
-      <div style={actionsStyle}>
-        <button type="button" style={compareButtonStyle} onClick={onPrevious} disabled={!hasPrevious}>
-          Previous
-        </button>
-        <button type="button" style={compareButtonStyle} onClick={onNext} disabled={!hasNext}>
-          Next
-        </button>
-      </div>
-      <p style={{ marginBottom: 0, color: '#666', fontSize: '13px' }}>
-        {asset.filename} · {index + 1} / {total} · {asset.photoState} · {asset.mediaType}
-      </p>
     </section>
   );
 }
@@ -4293,12 +4270,6 @@ export default function App() {
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
-                index={loupeSelectedAssetIndex}
-                total={loupeAssets.length}
-                hasPrevious={loupeSelectedAssetIndex > 0}
-                hasNext={loupeSelectedAssetIndex >= 0 && loupeSelectedAssetIndex < loupeAssets.length - 1}
-                onPrevious={() => handleSelectRelativeInList(loupeAssets, -1)}
-                onNext={() => handleSelectRelativeInList(loupeAssets, 1)}
               />
             ) : null}
             {!isLoupeMode && isTimelineGridMode ? (
