@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { PhotoState, type MediaAsset } from '@tedography/domain';
+import { type MediaAsset } from '@tedography/domain';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 type AssetFilmstripProps = {
@@ -37,36 +37,12 @@ const activeItemButtonStyle: CSSProperties = {
   boxShadow: '0 0 0 2px rgba(31, 111, 235, 0.15)'
 };
 
-const stateMarkerStyle: CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  height: '4px'
-};
-
 const imageStyle: CSSProperties = {
   width: '100%',
   height: '100%',
   objectFit: 'cover',
   display: 'block'
 };
-
-function getPhotoStateMarkerColor(photoState: PhotoState): string | null {
-  if (photoState === PhotoState.Keep) {
-    return '#1f8f4d';
-  }
-
-  if (photoState === PhotoState.Pending) {
-    return '#b58813';
-  }
-
-  if (photoState === PhotoState.Discard) {
-    return '#b4232f';
-  }
-
-  return null;
-}
 
 export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFilmstripProps) {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -139,14 +115,6 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
           }}
           aria-label={`Navigate to ${asset.filename}`}
         >
-          {getPhotoStateMarkerColor(asset.photoState) ? (
-            <span
-              style={{
-                ...stateMarkerStyle,
-                backgroundColor: getPhotoStateMarkerColor(asset.photoState) ?? undefined
-              }}
-            />
-          ) : null}
           <img src={getThumbnailMediaUrl(asset.id)} alt={asset.filename} style={imageStyle} loading="lazy" />
         </button>
       ))}
