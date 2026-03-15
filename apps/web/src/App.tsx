@@ -284,6 +284,21 @@ const filterOptionLabelStyle: CSSProperties = {
   fontSize: '12px'
 };
 
+const filterSubsectionStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  marginTop: '8px'
+};
+
+const filterSubsectionTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#4f5965',
+  textTransform: 'uppercase',
+  letterSpacing: '0.03em'
+};
+
 const toggleOptionLabelStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -2462,10 +2477,6 @@ export default function App() {
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
     [albumTreeNodes, expandedGroupIds]
   );
-  const searchAlbumFilterOptions = useMemo(
-    () => [...albumNodes].sort((left, right) => left.label.localeCompare(right.label)),
-    [albumNodes]
-  );
 
   function getTopVisibleTimelineMonthKey(): string | null {
     if (timelineMonthGroups.length === 0) {
@@ -3539,6 +3550,64 @@ export default function App() {
     updatingAssetIds
   ]);
 
+  function renderAlbumTreeRows(
+    checkedIds: string[],
+    onToggleChecked: (albumId: string) => void
+  ): ReactElement {
+    return (
+      <div style={albumTreeListStyle}>
+        {treeDisplayNodes.length === 0 ? (
+          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No tree nodes yet.</p>
+        ) : (
+          treeDisplayNodes.map((node) => {
+            const isGroup = node.nodeType === 'Group';
+            const isExpanded = expandedGroupIds.includes(node.id);
+            const isChecked = checkedIds.includes(node.id);
+            const isSelected = selectedTreeNodeId === node.id;
+            const depthIndent = `${node.depth * 20}px`;
+
+            return (
+              <div key={node.id} style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}>
+                {isGroup ? (
+                  <button
+                    type="button"
+                    style={compareButtonStyle}
+                    data-selected={isExpanded ? 'true' : undefined}
+                    onClick={() => toggleGroupExpanded(node.id)}
+                    title={isExpanded ? 'Collapse group' : 'Expand group'}
+                  >
+                    {isExpanded ? '▾' : '▸'}
+                  </button>
+                ) : (
+                  <span style={albumTreeSpacerStyle} />
+                )}
+                {isGroup ? <span style={{ width: '18px', height: '18px' }} /> : null}
+                {!isGroup ? (
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onToggleChecked(node.id)}
+                    title="Scope to this album"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  style={albumTreeLabelButtonStyle}
+                  data-selected={isSelected ? 'true' : undefined}
+                  onClick={() => setSelectedTreeNodeId(node.id)}
+                  title={node.label}
+                >
+                  {node.label}
+                  {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    );
+  }
+
   function renderAlbumTreePanel(): ReactElement | null {
     if (isSearchArea) {
       return null;
@@ -3610,58 +3679,7 @@ export default function App() {
         </div>
         {albumTreeLoading ? <p>Loading albums...</p> : null}
         {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
-        {!albumTreeLoading ? (
-          <div style={albumTreeListStyle}>
-            {treeDisplayNodes.length === 0 ? (
-              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No tree nodes yet.</p>
-            ) : (
-              treeDisplayNodes.map((node) => {
-                const isGroup = node.nodeType === 'Group';
-                const isExpanded = expandedGroupIds.includes(node.id);
-                const isChecked = checkedAlbumIds.includes(node.id);
-                const isSelected = selectedTreeNodeId === node.id;
-                const depthIndent = `${node.depth * 20}px`;
-
-                return (
-                  <div key={node.id} style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}>
-                    {isGroup ? (
-	                    <button
-	                      type="button"
-	                      style={compareButtonStyle}
-	                      data-selected={isExpanded ? 'true' : undefined}
-	                      onClick={() => toggleGroupExpanded(node.id)}
-	                      title={isExpanded ? 'Collapse group' : 'Expand group'}
-	                    >
-                        {isExpanded ? '▾' : '▸'}
-                      </button>
-                    ) : (
-                      <span style={albumTreeSpacerStyle} />
-                    )}
-                    {isGroup ? <span style={{ width: '18px', height: '18px' }} /> : null}
-                    {!isGroup ? (
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleAlbumChecked(node.id)}
-                        title="Scope to this album"
-                      />
-                    ) : null}
-	                    <button
-	                      type="button"
-	                      style={albumTreeLabelButtonStyle}
-	                      data-selected={isSelected ? 'true' : undefined}
-	                      onClick={() => setSelectedTreeNodeId(node.id)}
-	                      title={node.label}
-	                    >
-                      {node.label}
-                      {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : null}
+        {!albumTreeLoading ? renderAlbumTreeRows(checkedAlbumIds, toggleAlbumChecked) : null}
       </section>
     );
   }
@@ -3715,51 +3733,49 @@ export default function App() {
             Reset
           </button>
         </div>
-        <div style={filterRowStyle}>
-          <div style={filterGroupStyle}>
-            {photoStateFilterOptions.map((option) => (
-              <label key={option} style={filterOptionLabelStyle}>
-                <input
-                  type="checkbox"
-                  checked={searchPhotoStates.includes(option)}
-                  onChange={() => toggleSearchPhotoState(option)}
-                />
-                {option}
-              </label>
-            ))}
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Photo State</h3>
+          <div style={filterRowStyle}>
+            <div style={filterGroupStyle}>
+              {photoStateFilterOptions.map((option) => (
+                <label key={option} style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={searchPhotoStates.includes(option)}
+                    onChange={() => toggleSearchPhotoState(option)}
+                  />
+                  {option}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
-        <div style={filterRowStyle}>
-          <label style={filterOptionLabelStyle}>
-            From
-            <input
-              type="date"
-              value={searchCaptureDateFrom}
-              onChange={(event) => setSearchCaptureDateFrom(event.target.value)}
-            />
-          </label>
-          <label style={filterOptionLabelStyle}>
-            To
-            <input
-              type="date"
-              value={searchCaptureDateTo}
-              onChange={(event) => setSearchCaptureDateTo(event.target.value)}
-            />
-          </label>
-        </div>
-        <div style={filterRowStyle}>
-          <div style={filterGroupStyle}>
-            {searchAlbumFilterOptions.map((albumNode) => (
-              <label key={albumNode.id} style={filterOptionLabelStyle}>
-                <input
-                  type="checkbox"
-                  checked={searchAlbumIds.includes(albumNode.id)}
-                  onChange={() => toggleSearchAlbum(albumNode.id)}
-                />
-                {albumNode.label}
-              </label>
-            ))}
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Date Range</h3>
+          <div style={filterRowStyle}>
+            <label style={filterOptionLabelStyle}>
+              From
+              <input
+                type="date"
+                value={searchCaptureDateFrom}
+                onChange={(event) => setSearchCaptureDateFrom(event.target.value)}
+              />
+            </label>
+            <label style={filterOptionLabelStyle}>
+              To
+              <input
+                type="date"
+                value={searchCaptureDateTo}
+                onChange={(event) => setSearchCaptureDateTo(event.target.value)}
+              />
+            </label>
           </div>
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Albums</h3>
+          {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading albums...</p> : null}
+          {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
+          {!albumTreeLoading ? renderAlbumTreeRows(searchAlbumIds, toggleSearchAlbum) : null}
         </div>
       </section>
     );
