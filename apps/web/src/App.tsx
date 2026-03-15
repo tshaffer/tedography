@@ -1044,6 +1044,10 @@ function getAdjacentReplacementAssetId(list: MediaAsset[], currentAssetId: strin
   return null;
 }
 
+function getOverlapLength(startA: number, endA: number, startB: number, endB: number): number {
+  return Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+}
+
 type AlbumTreeNodeWithDepth = AlbumTreeNode & {
   depth: number;
 };
@@ -1188,6 +1192,9 @@ function AssetCard({
 
   return (
     <article
+      data-grid-card="true"
+      data-asset-id={asset.id}
+      data-active={isActive ? 'true' : undefined}
       style={
         isActive
           ? {
@@ -1879,6 +1886,7 @@ export default function App() {
     );
   });
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
+  const mainColumnRef = useRef<HTMLElement | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const previousIsTimelineModeRef = useRef(false);
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
@@ -2833,6 +2841,130 @@ export default function App() {
     }
   }
 
+  function handleSelectGridDirectional(direction: 'left' | 'right' | 'up' | 'down'): void {
+    if (!selectedAssetId || !mainColumnRef.current) {
+      return;
+    }
+
+    const nodes = Array.from(
+      mainColumnRef.current.querySelectorAll<HTMLElement>('[data-grid-card="true"][data-asset-id]')
+    );
+    if (nodes.length === 0) {
+      return;
+    }
+
+    const currentNode =
+      nodes.find(
+        (node) =>
+          node.dataset.assetId === selectedAssetId &&
+          node.dataset.active === 'true'
+      ) ?? nodes.find((node) => node.dataset.assetId === selectedAssetId);
+    if (!currentNode) {
+      return;
+    }
+
+    const currentRect = currentNode.getBoundingClientRect();
+    const currentCenterX = (currentRect.left + currentRect.right) / 2;
+    const currentCenterY = (currentRect.top + currentRect.bottom) / 2;
+    const rowTolerance = Math.max(currentRect.height * 0.6, 24);
+    const columnTolerance = Math.max(currentRect.width * 0.75, 24);
+
+    let bestNode: HTMLElement | null = null;
+    let bestPrimary = Number.POSITIVE_INFINITY;
+    let bestSecondary = Number.POSITIVE_INFINITY;
+
+    for (const node of nodes) {
+      if (node === currentNode) {
+        continue;
+      }
+
+      const assetId = node.dataset.assetId;
+      if (!assetId) {
+        continue;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const centerX = (rect.left + rect.right) / 2;
+      const centerY = (rect.top + rect.bottom) / 2;
+      const horizontalOverlap = getOverlapLength(rect.left, rect.right, currentRect.left, currentRect.right);
+      const verticalOverlap = getOverlapLength(rect.top, rect.bottom, currentRect.top, currentRect.bottom);
+      let primaryDistance = Number.POSITIVE_INFINITY;
+      let secondaryDistance = Number.POSITIVE_INFINITY;
+
+      if (direction === 'right') {
+        if (centerX <= currentCenterX) {
+          continue;
+        }
+
+        const rowAligned =
+          verticalOverlap > Math.min(rect.height, currentRect.height) * 0.35 ||
+          Math.abs(centerY - currentCenterY) <= rowTolerance;
+        if (!rowAligned) {
+          continue;
+        }
+
+        primaryDistance = centerX - currentCenterX;
+        secondaryDistance = Math.abs(centerY - currentCenterY);
+      } else if (direction === 'left') {
+        if (centerX >= currentCenterX) {
+          continue;
+        }
+
+        const rowAligned =
+          verticalOverlap > Math.min(rect.height, currentRect.height) * 0.35 ||
+          Math.abs(centerY - currentCenterY) <= rowTolerance;
+        if (!rowAligned) {
+          continue;
+        }
+
+        primaryDistance = currentCenterX - centerX;
+        secondaryDistance = Math.abs(centerY - currentCenterY);
+      } else if (direction === 'down') {
+        if (centerY <= currentCenterY) {
+          continue;
+        }
+
+        const columnAligned =
+          horizontalOverlap > Math.min(rect.width, currentRect.width) * 0.35 ||
+          Math.abs(centerX - currentCenterX) <= columnTolerance;
+        if (!columnAligned) {
+          continue;
+        }
+
+        primaryDistance = centerY - currentCenterY;
+        secondaryDistance = Math.abs(centerX - currentCenterX);
+      } else {
+        if (centerY >= currentCenterY) {
+          continue;
+        }
+
+        const columnAligned =
+          horizontalOverlap > Math.min(rect.width, currentRect.width) * 0.35 ||
+          Math.abs(centerX - currentCenterX) <= columnTolerance;
+        if (!columnAligned) {
+          continue;
+        }
+
+        primaryDistance = currentCenterY - centerY;
+        secondaryDistance = Math.abs(centerX - currentCenterX);
+      }
+
+      if (
+        primaryDistance < bestPrimary ||
+        (Math.abs(primaryDistance - bestPrimary) < 0.5 && secondaryDistance < bestSecondary)
+      ) {
+        bestNode = node;
+        bestPrimary = primaryDistance;
+        bestSecondary = secondaryDistance;
+      }
+    }
+
+    const nextAssetId = bestNode?.dataset.assetId;
+    if (nextAssetId) {
+      setSelectedAssetId(nextAssetId);
+    }
+  }
+
   async function requestBrowserFullscreen(): Promise<void> {
     if (document.fullscreenElement) {
       return;
@@ -3483,14 +3615,40 @@ export default function App() {
 
       const primaryNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
 
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-        event.preventDefault();
-        handleSelectRelativeInList(primaryNavigationAssets, 1);
-      }
+      if (viewerMode === 'Grid') {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          handleSelectGridDirectional('right');
+          return;
+        }
 
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        handleSelectRelativeInList(primaryNavigationAssets, -1);
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          handleSelectGridDirectional('left');
+          return;
+        }
+
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          handleSelectGridDirectional('down');
+          return;
+        }
+
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          handleSelectGridDirectional('up');
+          return;
+        }
+      } else {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          handleSelectRelativeInList(primaryNavigationAssets, 1);
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          handleSelectRelativeInList(primaryNavigationAssets, -1);
+        }
       }
 
       if (event.key === 'Home') {
@@ -3526,7 +3684,8 @@ export default function App() {
     slideshowActive,
     selectedAssetIds.length,
     surveyOpen,
-    updatingAssetIds
+    updatingAssetIds,
+    viewerMode
   ]);
 
   function renderAlbumTreeRows(
@@ -4223,7 +4382,10 @@ export default function App() {
         >
           {renderLeftPanel()}
 
-        <main style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}>
+        <main
+          ref={mainColumnRef}
+          style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}
+        >
           <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
             {mainPaneDescription}
           </p>
