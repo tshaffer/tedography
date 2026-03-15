@@ -135,6 +135,20 @@ const toolbarTrailingGroupStyle: CSSProperties = {
   marginLeft: 'auto'
 };
 
+const toolbarActionSubgroupStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px'
+};
+
+const toolbarActionDividerStyle: CSSProperties = {
+  width: '1px',
+  alignSelf: 'stretch',
+  backgroundColor: '#d9dde4',
+  margin: '0 6px'
+};
+
 const shellLayoutStyle: CSSProperties = {
   display: 'grid',
   gap: '10px',
@@ -4768,67 +4782,72 @@ export default function App() {
         ) : null}
 
         <div style={toolbarGroupStyle}>
-          {(isReviewArea || isLibraryArea) ? (
-            reviewActions.map((state) => (
+          <div style={toolbarActionSubgroupStyle}>
+            {(isReviewArea || isLibraryArea) ? (
+              reviewActions.map((state) => (
+                <button
+                  key={state}
+                  type="button"
+                  style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                  onClick={() => void handleApplyPhotoStateToSelectedAssets(state)}
+                  disabled={!hasSelectedAssets}
+                  title={
+                    hasSelectedAssets
+                      ? `Apply ${state} to the current selection`
+                      : `Select one or more photos to apply ${state}`
+                  }
+                >
+                  {state}
+                </button>
+              ))
+            ) : null}
+          </div>
+          {(isReviewArea || isLibraryArea) ? <div style={toolbarActionDividerStyle} aria-hidden="true" /> : null}
+          <div style={toolbarActionSubgroupStyle}>
+            <button
+              type="button"
+              style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              onClick={() => void handleAddSelectedToAlbum()}
+              disabled={!hasSelectedAssets}
+              title={
+                hasSelectedAssets
+                  ? 'Add current selection to album'
+                  : 'Select one or more photos to add them to an album'
+              }
+            >
+              +Album
+            </button>
+            {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
               <button
-                key={state}
                 type="button"
                 style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={() => void handleApplyPhotoStateToSelectedAssets(state)}
+                onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
                 disabled={!hasSelectedAssets}
                 title={
                   hasSelectedAssets
-                    ? `Apply ${state} to the current selection`
-                    : `Select one or more photos to apply ${state}`
+                    ? 'Remove current selection from focused album'
+                    : 'Select one or more photos to remove them from the focused album'
                 }
               >
-                {state}
+                -Album
               </button>
-            ))
-          ) : null}
-          <button
-            type="button"
-            style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-            onClick={() => void handleAddSelectedToAlbum()}
-            disabled={!hasSelectedAssets}
-            title={
-              hasSelectedAssets
-                ? 'Add current selection to album'
-                : 'Select one or more photos to add them to an album'
-            }
-          >
-            +Album
-          </button>
-          {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
-            <button
-              type="button"
-              style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-              onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
-              disabled={!hasSelectedAssets}
-              title={
-                hasSelectedAssets
-                  ? 'Remove current selection from focused album'
-                  : 'Select one or more photos to remove them from the focused album'
-              }
-            >
-              -Album
-            </button>
-          ) : null}
-          {isLibraryArea || isSearchArea ? (
-            <button
-              type="button"
-              style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-              onClick={startSlideshow}
-              disabled={!hasSelectedAssets}
-              title={
-                hasSelectedAssets
-                  ? 'Start slideshow from selected visible assets'
-                  : 'Select one or more photos to start a slideshow'
-              }
-            >
-              Slide
-            </button>
-          ) : null}
+            ) : null}
+            {isLibraryArea || isSearchArea ? (
+              <button
+                type="button"
+                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={startSlideshow}
+                disabled={!hasSelectedAssets}
+                title={
+                  hasSelectedAssets
+                    ? 'Start slideshow from selected visible assets'
+                    : 'Select one or more photos to start a slideshow'
+                }
+              >
+                Slide
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div style={topBarSpacerStyle} />
