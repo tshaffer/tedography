@@ -1216,12 +1216,10 @@ function AssetCard({
 
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
-  onOpenImmersive: () => void;
 };
 
 function AssetDetailPanel({
-  asset,
-  onOpenImmersive
+  asset
 }: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
@@ -1251,9 +1249,6 @@ function AssetDetailPanel({
         <strong>Dimensions:</strong>{' '}
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
-      <button type="button" style={immersiveButtonStyle} onClick={onOpenImmersive}>
-        Full Screen
-      </button>
     </section>
   );
 }
@@ -1266,7 +1261,6 @@ type LoupeViewerProps = {
   hasNext: boolean;
   onPrevious: () => void;
   onNext: () => void;
-  onOpenFullscreen: () => void;
 };
 
 function LoupeViewer({
@@ -1276,8 +1270,7 @@ function LoupeViewer({
   hasPrevious,
   hasNext,
   onPrevious,
-  onNext,
-  onOpenFullscreen
+  onNext
 }: LoupeViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
 
@@ -1296,9 +1289,6 @@ function LoupeViewer({
         </button>
         <button type="button" style={compareButtonStyle} onClick={onNext} disabled={!hasNext}>
           Next
-        </button>
-        <button type="button" style={compareButtonStyle} onClick={onOpenFullscreen}>
-          Full Screen
         </button>
       </div>
       <p style={{ marginBottom: 0, color: '#666', fontSize: '13px' }}>
@@ -3939,7 +3929,6 @@ export default function App() {
           </div>
           <AssetDetailPanel
             asset={selectedAsset}
-            onOpenImmersive={openImmersive}
           />
           <AssetDetailsPanel asset={selectedAsset} albumLabels={selectedAssetAlbumLabels} />
         </section>
@@ -4291,7 +4280,6 @@ export default function App() {
                 hasNext={loupeSelectedAssetIndex >= 0 && loupeSelectedAssetIndex < loupeAssets.length - 1}
                 onPrevious={() => handleSelectRelativeInList(loupeAssets, -1)}
                 onNext={() => handleSelectRelativeInList(loupeAssets, 1)}
-                onOpenFullscreen={openImmersive}
               />
             ) : null}
             {!isLoupeMode && isTimelineGridMode ? (
