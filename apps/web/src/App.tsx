@@ -2446,7 +2446,7 @@ export default function App() {
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
   const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea || isSearchArea);
-  const showDetailsPanels = isSearchArea || detailsPanelsVisible;
+  const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
   const mainPaneDescription = isReviewArea
@@ -3916,16 +3916,14 @@ export default function App() {
         <section style={sidePanelSectionStyle}>
           <div style={sidePanelHeaderStyle}>
             <h2 style={sidePanelTitleStyle}>Inspector</h2>
-            {!isSearchArea ? (
-              <button
-                type="button"
-                style={compareButtonStyle}
-                onClick={() => setDetailsPanelsVisible(false)}
-                title="Hide inspector"
-              >
-                Hide
-              </button>
-            ) : null}
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => setDetailsPanelsVisible(false)}
+              title="Hide inspector"
+            >
+              Hide
+            </button>
           </div>
           <AssetDetailPanel
             asset={selectedAsset}
@@ -4030,17 +4028,20 @@ export default function App() {
               >
                 Loupe
               </button>
-              {compareAssets.length >= 2 ? (
-                <button
-                  type="button"
-                  style={compareButtonStyle}
-                  data-selected={surveyOpen ? 'true' : undefined}
-                  onClick={openSurveyMode}
-                  title="Survey compare"
-                >
-                  Survey
-                </button>
-              ) : null}
+              <button
+                type="button"
+                style={compareAssets.length >= 2 ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                data-selected={surveyOpen ? 'true' : undefined}
+                onClick={openSurveyMode}
+                disabled={compareAssets.length < 2}
+                title={
+                  compareAssets.length >= 2
+                    ? 'Survey compare'
+                    : 'Select two or more visible photos to enter Survey'
+                }
+              >
+                Survey
+              </button>
               <button
                 type="button"
                 style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
@@ -4068,7 +4069,7 @@ export default function App() {
           >
             {leftPanelVisible ? '◧' : '☰'}
           </button>
-          {(isReviewArea || isLibraryArea) ? (
+          {(isReviewArea || isLibraryArea || isSearchArea) ? (
             <button
               type="button"
               style={compareButtonStyle}
