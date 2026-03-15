@@ -93,7 +93,7 @@ const topBarStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '8px',
+  gap: '12px',
   padding: '8px 10px',
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
@@ -114,6 +114,18 @@ const primaryAreaControlsStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   gap: '6px'
+};
+
+const toolbarGroupStyle: CSSProperties = {
+  ...topBarSectionStyle,
+  paddingRight: '12px',
+  marginRight: '2px',
+  borderRight: '1px solid #e3e6ea'
+};
+
+const toolbarTrailingGroupStyle: CSSProperties = {
+  ...topBarSectionStyle,
+  marginLeft: 'auto'
 };
 
 const shellLayoutStyle: CSSProperties = {
@@ -460,7 +472,7 @@ const loupeViewerStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
   backgroundColor: '#fff',
-  padding: '10px',
+  padding: '6px',
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
@@ -476,21 +488,22 @@ const loupeImageWrapStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  marginBottom: '10px',
-  padding: '12px'
+  marginBottom: '8px',
+  padding: '4px'
 };
 
 const loupeImageScrollerStyle: CSSProperties = {
   flex: 1,
   minHeight: 0,
   width: '100%',
+  height: '100%',
   overflow: 'auto',
   overscrollBehavior: 'contain'
 };
 
 const loupeImageStageStyle: CSSProperties = {
-  minHeight: '100%',
-  minWidth: '100%',
+  width: '100%',
+  height: '100%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center'
@@ -498,9 +511,10 @@ const loupeImageStageStyle: CSSProperties = {
 
 const loupeImageStyle: CSSProperties = {
   maxWidth: '100%',
-  maxHeight: 'calc(100vh - 260px)',
+  maxHeight: '100%',
   width: 'auto',
   height: 'auto',
+  objectFit: 'contain',
   display: 'block'
 };
 
@@ -531,6 +545,16 @@ const actionButtonStyle: CSSProperties = {
 };
 
 const controlStateStyles = `
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background-color: #f3f4f6;
+}
+
 .tdg-app button {
   transition:
     background-color 120ms ease,
@@ -646,7 +670,7 @@ const immersiveOverlayStyle: CSSProperties = {
   backgroundColor: 'rgba(0, 0, 0, 0.92)',
   display: 'flex',
   flexDirection: 'column',
-  padding: '12px',
+  padding: 0,
   zIndex: 1000
 };
 
@@ -657,7 +681,7 @@ const immersiveTopBarStyle: CSSProperties = {
   justifyContent: 'flex-end',
   alignItems: 'center',
   gap: '10px',
-  paddingBottom: '10px'
+  paddingBottom: '6px'
 };
 
 const immersiveInfoStyle: CSSProperties = {
@@ -686,17 +710,19 @@ const immersiveImageWrapStyle: CSSProperties = {
   width: '100%',
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center'
+  justifyContent: 'center',
+  minHeight: 0,
+  overflow: 'hidden',
+  padding: 0
 };
 
 const immersiveImageStyle: CSSProperties = {
-  width: '100%',
-  maxWidth: '96vw',
-  maxHeight: '78vh',
+  maxWidth: '100%',
+  maxHeight: '100%',
+  width: 'auto',
+  height: 'auto',
   objectFit: 'contain',
-  backgroundColor: '#111',
-  borderRadius: '8px',
-  border: '1px solid #2b2b2b'
+  display: 'block'
 };
 
 const immersiveBottomHintStyle: CSSProperties = {
@@ -1190,12 +1216,10 @@ function AssetCard({
 
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
-  onOpenImmersive: () => void;
 };
 
 function AssetDetailPanel({
-  asset,
-  onOpenImmersive
+  asset
 }: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
@@ -1225,9 +1249,6 @@ function AssetDetailPanel({
         <strong>Dimensions:</strong>{' '}
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
-      <button type="button" style={immersiveButtonStyle} onClick={onOpenImmersive}>
-        Full Screen
-      </button>
     </section>
   );
 }
@@ -1240,7 +1261,6 @@ type LoupeViewerProps = {
   hasNext: boolean;
   onPrevious: () => void;
   onNext: () => void;
-  onOpenFullscreen: () => void;
 };
 
 function LoupeViewer({
@@ -1250,14 +1270,12 @@ function LoupeViewer({
   hasPrevious,
   hasNext,
   onPrevious,
-  onNext,
-  onOpenFullscreen
+  onNext
 }: LoupeViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
 
   return (
     <section style={loupeViewerStyle}>
-      <h2 style={{ marginTop: 0 }}>Loupe</h2>
       <div style={loupeImageWrapStyle}>
         <div style={loupeImageScrollerStyle}>
           <div style={loupeImageStageStyle}>
@@ -1271,9 +1289,6 @@ function LoupeViewer({
         </button>
         <button type="button" style={compareButtonStyle} onClick={onNext} disabled={!hasNext}>
           Next
-        </button>
-        <button type="button" style={compareButtonStyle} onClick={onOpenFullscreen}>
-          Full Screen
         </button>
       </div>
       <p style={{ marginBottom: 0, color: '#666', fontSize: '13px' }}>
@@ -1297,13 +1312,7 @@ type ImmersiveViewerProps = {
 
 function ImmersiveViewer({
   asset,
-  index,
-  total,
-  hasPrevious,
-  hasNext,
   onClose,
-  onPrevious,
-  onNext,
   onActiveImageLoad
 }: ImmersiveViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
@@ -1311,29 +1320,6 @@ function ImmersiveViewer({
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
       <section style={{ width: '100%', height: '100%' }} onClick={(event) => event.stopPropagation()}>
-        <div style={immersiveTopBarStyle}>
-          <div style={immersiveControlsStyle}>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onClose}>
-              Exit
-            </button>
-            <button
-              type="button"
-              style={immersiveControlButtonStyle}
-              onClick={onPrevious}
-              disabled={!hasPrevious}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              style={immersiveControlButtonStyle}
-              onClick={onNext}
-              disabled={!hasNext}
-            >
-              Next
-            </button>
-          </div>
-        </div>
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
             <img
@@ -1347,9 +1333,6 @@ function ImmersiveViewer({
             <div style={immersiveImageStyle} />
           )}
         </div>
-        <p style={immersiveBottomHintStyle}>
-          {asset.filename} · {index + 1} / {total} · Esc exit · ←/→ navigate
-        </p>
       </section>
     </div>
   );
@@ -2399,9 +2382,19 @@ export default function App() {
     [compareAssets, visibleAssets]
   );
 
+  const loupeAssets = useMemo(
+    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    [compareAssets, visibleAssets]
+  );
+
   const selectedAssetIndex = useMemo(
     () => visibleAssets.findIndex((asset) => asset.id === selectedAssetId),
     [visibleAssets, selectedAssetId]
+  );
+
+  const loupeSelectedAssetIndex = useMemo(
+    () => loupeAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [loupeAssets, selectedAssetId]
   );
 
   const slideshowSelectedAssetIndex = useMemo(
@@ -2452,7 +2445,7 @@ export default function App() {
     viewerMode === 'Grid' && (isFlatBrowseMode || isTimelineMode || isAlbumsMode);
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
-  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea);
+  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea || isSearchArea);
   const showDetailsPanels = isSearchArea || detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
@@ -2661,6 +2654,18 @@ export default function App() {
       setViewerMode('Grid');
     }
   }, [selectedAsset, viewerMode]);
+
+  useEffect(() => {
+    if (!isLoupeMode || loupeAssets.length === 0) {
+      return;
+    }
+
+    if (selectedAssetId && loupeAssets.some((asset) => asset.id === selectedAssetId)) {
+      return;
+    }
+
+    setSelectedAssetId(loupeAssets[0]?.id ?? null);
+  }, [isLoupeMode, loupeAssets, selectedAssetId]);
 
   useEffect(() => {
     if (!slideshowActive || !slideshowPlaying || slideshowAssets.length < 2) {
@@ -3246,13 +3251,16 @@ export default function App() {
       return;
     }
 
+    const navigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
+    const navigationIndex = isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex;
+
     // Guard against stale load events when fast navigation changes the active asset.
-    if (!selectedAssetId || loadedAssetId !== selectedAssetId || selectedAssetIndex < 0) {
+    if (!selectedAssetId || loadedAssetId !== selectedAssetId || navigationIndex < 0) {
       return;
     }
 
-    const nextAsset = visibleAssets[selectedAssetIndex + 1];
-    const previousAsset = visibleAssets[selectedAssetIndex - 1];
+    const nextAsset = navigationAssets[navigationIndex + 1];
+    const previousAsset = navigationAssets[navigationIndex - 1];
 
     // Prefetch forward first because next-image navigation is the primary review flow.
     if (nextAsset) {
@@ -3468,28 +3476,31 @@ export default function App() {
       }
 
       if (immersiveOpen) {
+        const immersiveNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
         if (event.key === 'ArrowRight') {
           event.preventDefault();
-          handleSelectRelativeInList(visibleAssets, 1);
+          handleSelectRelativeInList(immersiveNavigationAssets, 1);
         }
 
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
-          handleSelectRelativeInList(visibleAssets, -1);
+          handleSelectRelativeInList(immersiveNavigationAssets, -1);
         }
 
         void handleKeyboardReview(event.key);
         return;
       }
 
+      const primaryNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
+
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
         event.preventDefault();
-        handleSelectRelativeInList(visibleAssets, 1);
+        handleSelectRelativeInList(primaryNavigationAssets, 1);
       }
 
       if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
         event.preventDefault();
-        handleSelectRelativeInList(visibleAssets, -1);
+        handleSelectRelativeInList(primaryNavigationAssets, -1);
       }
 
       if (event.key === 'Home') {
@@ -3516,7 +3527,9 @@ export default function App() {
     };
   }, [
     compareAssets,
+    loupeAssets,
     visibleAssets,
+    isLoupeMode,
     immersiveOpen,
     selectedAsset,
     selectedAssetId,
@@ -3829,6 +3842,12 @@ export default function App() {
     );
   }
 
+  const toolbarBrowseMode = isReviewArea
+    ? reviewBrowseMode
+    : isLibraryArea
+      ? libraryBrowseMode
+      : null;
+
   function renderLeftPanel(): ReactElement | null {
     if (!leftPanelVisible) {
       return null;
@@ -3841,35 +3860,6 @@ export default function App() {
             <section style={sidePanelSectionStyle}>
               <div style={sidePanelHeaderStyle}>
                 <h2 style={sidePanelTitleStyle}>Review</h2>
-                <div style={topBarSectionStyle}>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Flat' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Flat')}
-	                    title="Flat review"
-	                  >
-                    Flat
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Timeline' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Timeline')}
-	                    title="Timeline review"
-	                  >
-                    Time
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={reviewBrowseMode === 'Albums' ? 'true' : undefined}
-	                    onClick={() => handleSetReviewBrowseMode('Albums')}
-	                    title="Album review"
-	                  >
-                    Albums
-                  </button>
-                </div>
               </div>
             </section>
             {renderThumbnailSizePanel()}
@@ -3883,35 +3873,6 @@ export default function App() {
             <section style={sidePanelSectionStyle}>
               <div style={sidePanelHeaderStyle}>
                 <h2 style={sidePanelTitleStyle}>Library</h2>
-                <div style={topBarSectionStyle}>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Flat' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Flat')}
-	                    title="Flat view"
-	                  >
-                    Flat
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Timeline' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Timeline')}
-	                    title="Timeline view"
-	                  >
-                    Time
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={libraryBrowseMode === 'Albums' ? 'true' : undefined}
-	                    onClick={() => handleSetLibraryBrowseMode('Albums')}
-	                    title="Albums view"
-	                  >
-                    Albums
-                  </button>
-                </div>
               </div>
               {isLibraryAlbumsMode ? (
                 <div style={topBarSectionStyle}>
@@ -3968,7 +3929,6 @@ export default function App() {
           </div>
           <AssetDetailPanel
             asset={selectedAsset}
-            onOpenImmersive={openImmersive}
           />
           <AssetDetailsPanel asset={selectedAsset} albumLabels={selectedAssetAlbumLabels} />
         </section>
@@ -3980,89 +3940,96 @@ export default function App() {
     <div style={pageStyle} className="tdg-app">
       <style>{controlStateStyles}</style>
       <div style={topBarStyle}>
-        <div style={primaryAreaControlsStyle}>
+        <div style={toolbarGroupStyle}>
           <strong style={{ fontSize: '20px', marginRight: '4px' }}>Tedography</strong>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Review' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Review')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Review' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Review')}
+          >
             Review
           </button>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Library' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Library')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Library' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Library')}
+          >
             Library
           </button>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={primaryArea === 'Search' ? 'true' : undefined}
-	            onClick={() => setPrimaryArea('Search')}
-	          >
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={primaryArea === 'Search' ? 'true' : undefined}
+            onClick={() => setPrimaryArea('Search')}
+          >
             Search
           </button>
         </div>
 
-        <div style={topBarSectionStyle}>
-	          <button
-	            type="button"
-	            style={compareButtonStyle}
-	            data-selected={leftPanelVisible ? 'true' : undefined}
-	            onClick={() => setLeftPanelVisible((previous) => !previous)}
-	            title={leftPanelVisible ? 'Hide left panel' : 'Show left panel'}
-          >
-            {leftPanelVisible ? '◧' : '☰'}
-          </button>
-          {(isReviewArea || isLibraryArea) ? (
-	            <button
-	              type="button"
-	              style={compareButtonStyle}
-	              data-selected={detailsPanelsVisible ? 'true' : undefined}
-	              onClick={() => setDetailsPanelsVisible((previous) => !previous)}
-	              title={detailsPanelsVisible ? 'Hide inspector' : 'Show inspector'}
+        {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
+          <div style={toolbarGroupStyle}>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea ? handleSetReviewBrowseMode('Flat') : handleSetLibraryBrowseMode('Flat')
+              }
+              title="Flat presentation"
             >
-              {detailsPanelsVisible ? 'ⓘ' : '⌁'}
+              Flat
             </button>
-          ) : null}
-	          {(isReviewArea || isLibraryArea) ? (
-	            <>
-	              <button
-	                type="button"
-	                style={compareButtonStyle}
-	                data-selected={viewerMode === 'Grid' ? 'true' : undefined}
-	                onClick={() => setViewerMode('Grid')}
-	                title="Grid view"
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea
+                  ? handleSetReviewBrowseMode('Timeline')
+                  : handleSetLibraryBrowseMode('Timeline')
+              }
+              title="Timeline presentation"
+            >
+              Time
+            </button>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
+              onClick={() =>
+                isReviewArea ? handleSetReviewBrowseMode('Albums') : handleSetLibraryBrowseMode('Albums')
+              }
+              title="Albums presentation"
+            >
+              Albums
+            </button>
+          </div>
+        ) : null}
+
+        <div style={toolbarGroupStyle}>
+          {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            <>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                data-selected={viewerMode === 'Grid' ? 'true' : undefined}
+                onClick={() => setViewerMode('Grid')}
+                title="Grid view"
               >
                 Grid
               </button>
-		              <button
-		                type="button"
-		                style={compareButtonStyle}
-		                data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
-		                onClick={() => setViewerMode('Loupe')}
-		                disabled={!selectedAsset}
-		                title="Loupe view"
-	              >
-	                Loupe
-	              </button>
-	              <button
-	                type="button"
-	                style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
-	                onClick={openImmersive}
-	                disabled={!selectedAsset}
-	                title={
-	                  selectedAsset
-	                    ? 'Open the active photo in full screen'
-	                    : 'Select a photo to open full screen'
-	                }
-	              >
-	                Full Screen
-	              </button>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
+                onClick={() => setViewerMode('Loupe')}
+                disabled={!selectedAsset}
+                title="Loupe view"
+              >
+                Loupe
+              </button>
               {compareAssets.length >= 2 ? (
                 <button
                   type="button"
@@ -4074,8 +4041,44 @@ export default function App() {
                   Survey
                 </button>
               ) : null}
-	            </>
-	          ) : null}
+              <button
+                type="button"
+                style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={openImmersive}
+                disabled={!selectedAsset}
+                title={
+                  selectedAsset
+                    ? 'Open the active photo in full screen'
+                    : 'Select a photo to open full screen'
+                }
+              >
+                Full Screen
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        <div style={toolbarGroupStyle}>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            data-selected={leftPanelVisible ? 'true' : undefined}
+            onClick={() => setLeftPanelVisible((previous) => !previous)}
+            title={leftPanelVisible ? 'Hide left panel' : 'Show left panel'}
+          >
+            {leftPanelVisible ? '◧' : '☰'}
+          </button>
+          {(isReviewArea || isLibraryArea) ? (
+            <button
+              type="button"
+              style={compareButtonStyle}
+              data-selected={detailsPanelsVisible ? 'true' : undefined}
+              onClick={() => setDetailsPanelsVisible((previous) => !previous)}
+              title={detailsPanelsVisible ? 'Hide inspector' : 'Show inspector'}
+            >
+              {detailsPanelsVisible ? 'ⓘ' : '⌁'}
+            </button>
+          ) : null}
           <div style={menuAnchorStyle} id="tdg-view-options-root">
             <button
               type="button"
@@ -4107,20 +4110,6 @@ export default function App() {
               </div>
             ) : null}
           </div>
-        </div>
-
-          {hasSelectedAssets ? (
-            <div style={selectionChipStyle}>
-              <span>{selectionCount} selected</span>
-              <button type="button" style={compareButtonStyle} onClick={clearSelection} title="Deselect all (Esc)">
-                Clear
-              </button>
-          </div>
-        ) : null}
-
-        <div style={topBarSpacerStyle} />
-
-        <div style={topBarSectionStyle}>
           {isReviewArea ? (
             <label style={toggleOptionLabelStyle} title="Advance to the next asset after a rating change">
               <input
@@ -4131,6 +4120,20 @@ export default function App() {
               Auto-advance
             </label>
           ) : null}
+        </div>
+
+        {hasSelectedAssets ? (
+          <div style={toolbarGroupStyle}>
+            <div style={selectionChipStyle}>
+              <span>{selectionCount} selected</span>
+            </div>
+            <button type="button" style={compareButtonStyle} onClick={clearSelection} title="Deselect all (Esc)">
+              Clear
+            </button>
+          </div>
+        ) : null}
+
+        <div style={toolbarGroupStyle}>
           {(isReviewArea || isLibraryArea) ? (
             reviewActions.map((state) => (
               <button
@@ -4192,7 +4195,12 @@ export default function App() {
               Slide
             </button>
           ) : null}
-          {!isReviewArea ? (
+        </div>
+
+        <div style={topBarSpacerStyle} />
+
+        {!isReviewArea ? (
+          <div style={toolbarTrailingGroupStyle}>
             <button
               type="button"
               style={compareButtonStyle}
@@ -4201,8 +4209,8 @@ export default function App() {
             >
               Import
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <div style={shellViewportStyle}>
@@ -4251,13 +4259,13 @@ export default function App() {
               {!immersiveOpen ? (
                 <AssetQuickBar
                   asset={selectedAsset}
-                  currentIndex={selectedAssetIndex}
-                  totalCount={visibleAssets.length}
+                  currentIndex={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
+                  totalCount={isLoupeMode ? loupeAssets.length : visibleAssets.length}
                 />
               ) : null}
               {showFilmstrip ? (
                 <AssetFilmstrip
-                  assets={visibleAssets}
+                  assets={isLoupeMode ? loupeAssets : visibleAssets}
                   activeAssetId={selectedAssetId}
                   onSelectAsset={handleFilmstripSelectAsset}
                 />
@@ -4266,13 +4274,12 @@ export default function App() {
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
-                index={selectedAssetIndex}
-                total={visibleAssets.length}
-                hasPrevious={selectedAssetIndex > 0}
-                hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
-                onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
-                onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
-                onOpenFullscreen={openImmersive}
+                index={loupeSelectedAssetIndex}
+                total={loupeAssets.length}
+                hasPrevious={loupeSelectedAssetIndex > 0}
+                hasNext={loupeSelectedAssetIndex >= 0 && loupeSelectedAssetIndex < loupeAssets.length - 1}
+                onPrevious={() => handleSelectRelativeInList(loupeAssets, -1)}
+                onNext={() => handleSelectRelativeInList(loupeAssets, 1)}
               />
             ) : null}
             {!isLoupeMode && isTimelineGridMode ? (
@@ -4429,13 +4436,17 @@ export default function App() {
       {immersiveOpen && selectedAsset ? (
         <ImmersiveViewer
           asset={selectedAsset}
-          index={selectedAssetIndex}
-          total={visibleAssets.length}
-          hasPrevious={selectedAssetIndex > 0}
-          hasNext={selectedAssetIndex >= 0 && selectedAssetIndex < visibleAssets.length - 1}
+          index={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
+          total={isLoupeMode ? loupeAssets.length : visibleAssets.length}
+          hasPrevious={(isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) > 0}
+          hasNext={
+            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) >= 0 &&
+            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) <
+              (isLoupeMode ? loupeAssets.length : visibleAssets.length) - 1
+          }
           onClose={closeImmersive}
-          onPrevious={() => handleSelectRelativeInList(visibleAssets, -1)}
-          onNext={() => handleSelectRelativeInList(visibleAssets, 1)}
+          onPrevious={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, -1)}
+          onNext={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
