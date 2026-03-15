@@ -389,7 +389,7 @@ const selectedCardStyle: CSSProperties = {
 };
 
 const activeCardStyle: CSSProperties = {
-  boxShadow: '0 0 0 1px rgba(245, 158, 11, 0.35)'
+  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.18)'
 };
 
 const thumbnailFrameStyle: CSSProperties = {
@@ -456,9 +456,9 @@ const cardSelectedBadgeStyle: CSSProperties = {
 
 const cardActiveRingStyle: CSSProperties = {
   position: 'absolute',
-  inset: '8px',
+  inset: '4px',
   borderRadius: '6px',
-  boxShadow: 'inset 0 0 0 2px rgba(245, 158, 11, 0.95)',
+  boxShadow: 'inset 0 0 0 2px rgba(255, 255, 255, 0.92)',
   pointerEvents: 'none',
   zIndex: 1
 };
