@@ -9,7 +9,13 @@ import {
   type ReactElement,
   type WheelEvent as ReactWheelEvent
 } from 'react';
-import { MediaType, PhotoState, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
+import {
+  MediaType,
+  PhotoState,
+  normalizePhotoState,
+  type AlbumTreeNode,
+  type MediaAsset
+} from '@tedography/domain';
 import {
   addAssetsToAlbum,
   createAlbumTreeNode,
@@ -33,10 +39,10 @@ import {
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 
 const photoStateFilterOptions: PhotoState[] = [
-  PhotoState.Unreviewed,
+  PhotoState.New,
   PhotoState.Pending,
-  PhotoState.Select,
-  PhotoState.Reject
+  PhotoState.Keep,
+  PhotoState.Discard
 ];
 
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
@@ -828,10 +834,10 @@ const surveyRoleStyle: CSSProperties = {
 };
 
 const reviewActions: PhotoState[] = [
-  PhotoState.Select,
+  PhotoState.Keep,
   PhotoState.Pending,
-  PhotoState.Reject,
-  PhotoState.Unreviewed
+  PhotoState.Discard,
+  PhotoState.New
 ];
 
 function formatCaptureDate(dateString?: string | null): string {
@@ -909,9 +915,11 @@ function parsePhotoStatesFromStorage(
   value: string | null,
   fallback: PhotoState[]
 ): PhotoState[] {
-  const parsed = parseStringArrayFromStorage(value).filter((entry): entry is PhotoState =>
-    photoStateFilterOptions.includes(entry as PhotoState)
-  );
+  const parsed = parseStringArrayFromStorage(value)
+    .map((entry) => normalizePhotoState(entry))
+    .filter((entry): entry is PhotoState => entry !== null)
+    .filter((entry, index, array) => array.indexOf(entry) === index)
+    .filter((entry) => photoStateFilterOptions.includes(entry));
 
   return parsed.length > 0 ? parsed : fallback;
 }
@@ -928,14 +936,14 @@ function getTimelineContentSignature(groups: TimelineMonthGroup[]): string {
 
 function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): PhotoState[] | null {
   if (area === 'Library') {
-    return [PhotoState.Select];
+    return [PhotoState.Keep];
   }
 
   if (area === 'Search') {
     return null;
   }
 
-  return [PhotoState.Unreviewed, PhotoState.Pending];
+  return [PhotoState.New, PhotoState.Pending];
 }
 
 function parseLocalDate(value: string): Date | null {
@@ -1086,7 +1094,7 @@ function buildAlbumTreeDisplayList(
 }
 
 function compareRoleFromPhotoState(photoState: PhotoState): string {
-  if (photoState === PhotoState.Select) {
+  if (photoState === PhotoState.Keep) {
     return 'Winner';
   }
 
@@ -1094,31 +1102,31 @@ function compareRoleFromPhotoState(photoState: PhotoState): string {
     return 'Alternate';
   }
 
-  if (photoState === PhotoState.Reject) {
-    return 'Reject';
+  if (photoState === PhotoState.Discard) {
+    return 'Discard';
   }
 
-  return 'Unreviewed';
+  return 'New';
 }
 
 function getPhotoStateBadgeLabel(photoState: PhotoState): string {
-  if (photoState === PhotoState.Select) {
-    return 'Select';
+  if (photoState === PhotoState.Keep) {
+    return 'Keep';
   }
 
   if (photoState === PhotoState.Pending) {
     return 'Pending';
   }
 
-  if (photoState === PhotoState.Reject) {
-    return 'Reject';
+  if (photoState === PhotoState.Discard) {
+    return 'Discard';
   }
 
   return 'New';
 }
 
 function getPhotoStateBadgeColor(photoState: PhotoState): string {
-  if (photoState === PhotoState.Select) {
+  if (photoState === PhotoState.Keep) {
     return '#1f8f4d';
   }
 
@@ -1126,7 +1134,7 @@ function getPhotoStateBadgeColor(photoState: PhotoState): string {
     return '#b58813';
   }
 
-  if (photoState === PhotoState.Reject) {
+  if (photoState === PhotoState.Discard) {
     return '#b4232f';
   }
 
@@ -1615,7 +1623,7 @@ function SurveyMode({
               Alternate (A)
             </button>
             <button type="button" style={immersiveControlButtonStyle} onClick={onSetFocusedReject}>
-              Reject (R)
+              Discard (R)
             </button>
             <button type="button" style={immersiveControlButtonStyle} onClick={onKeepFocusedAlternates}>
               Winner + Alternates (K)
@@ -1638,11 +1646,11 @@ function SurveyMode({
             ))}
           </div>
           <p style={{ color: '#b8b8b8', fontSize: '12px', marginTop: '8px' }}>
-            Survey shortcuts: W winner, A alternate, R reject, K winner + alternates, Shift+K winner
+            Survey shortcuts: W winner, A alternate, R discard, K winner + alternates, Shift+K winner
             only.
           </p>
           <p style={{ color: '#9f9f9f', fontSize: '12px', marginTop: '4px' }}>
-            Also available: S/P/R/U maps to Select/Pending/Reject/Unreviewed.
+            Also available: S/P/R/U maps to Keep/Pending/Discard/New.
           </p>
         </div>
 
@@ -1653,9 +1661,9 @@ function SurveyMode({
                 key={asset.id}
                 style={{
                   ...surveyTileStyle,
-                  ...(asset.photoState === PhotoState.Select ? surveyWinnerTileStyle : {}),
+                  ...(asset.photoState === PhotoState.Keep ? surveyWinnerTileStyle : {}),
                   ...(asset.photoState === PhotoState.Pending ? surveyAlternateTileStyle : {}),
-                  ...(asset.photoState === PhotoState.Reject ? surveyRejectTileStyle : {}),
+                  ...(asset.photoState === PhotoState.Discard ? surveyRejectTileStyle : {}),
                   ...(asset.id === focusedAsset.id ? surveyFocusedTileStyle : {})
                 }}
                 onClick={() => onFocusAsset(asset.id)}
@@ -1690,22 +1698,22 @@ export default function App() {
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [reviewVisiblePhotoStates, setReviewVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
-      return [PhotoState.Unreviewed, PhotoState.Pending];
+      return [PhotoState.New, PhotoState.Pending];
     }
 
     return parsePhotoStatesFromStorage(
       window.localStorage.getItem(reviewVisiblePhotoStatesStorageKey),
-      [PhotoState.Unreviewed, PhotoState.Pending]
+      [PhotoState.New, PhotoState.Pending]
     );
   });
   const [libraryVisiblePhotoStates, setLibraryVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
-      return [PhotoState.Select];
+      return [PhotoState.Keep];
     }
 
     return parsePhotoStatesFromStorage(
       window.localStorage.getItem(libraryVisiblePhotoStatesStorageKey),
-      [PhotoState.Select]
+      [PhotoState.Keep]
     );
   });
   const [searchPhotoStates, setSearchPhotoStates] = useState<PhotoState[]>(() => {
@@ -1713,13 +1721,7 @@ export default function App() {
       return [];
     }
 
-    const parsed = parseStringArrayFromStorage(
-      window.localStorage.getItem(searchPhotoStatesStorageKey)
-    );
-
-    return parsed.filter((entry): entry is PhotoState =>
-      photoStateFilterOptions.includes(entry as PhotoState)
-    );
+    return parsePhotoStatesFromStorage(window.localStorage.getItem(searchPhotoStatesStorageKey), []);
   });
   const [searchAlbumIds, setSearchAlbumIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') {
@@ -3290,7 +3292,7 @@ export default function App() {
 
     const key = shortcutKey.toLowerCase();
     if (key === 's') {
-      await handleSetPhotoState(selectedAsset.id, PhotoState.Select);
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Keep);
       return;
     }
 
@@ -3300,12 +3302,12 @@ export default function App() {
     }
 
     if (key === 'r') {
-      await handleSetPhotoState(selectedAsset.id, PhotoState.Reject);
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
       return;
     }
 
     if (key === 'u') {
-      await handleSetPhotoState(selectedAsset.id, PhotoState.Unreviewed);
+      await handleSetPhotoState(selectedAsset.id, PhotoState.New);
     }
   }
 
@@ -3316,9 +3318,9 @@ export default function App() {
 
     for (const asset of compareAssets) {
       if (asset.id === selectedAssetId) {
-        await handleSetPhotoState(asset.id, PhotoState.Select);
+        await handleSetPhotoState(asset.id, PhotoState.Keep);
       } else {
-        await handleSetPhotoState(asset.id, PhotoState.Reject);
+        await handleSetPhotoState(asset.id, PhotoState.Discard);
       }
     }
   }
@@ -3338,7 +3340,7 @@ export default function App() {
 
     for (const asset of compareAssets) {
       if (asset.id === selectedAssetId) {
-        await handleSetPhotoState(asset.id, PhotoState.Select);
+        await handleSetPhotoState(asset.id, PhotoState.Keep);
       } else {
         await handleSetPhotoState(asset.id, PhotoState.Pending);
       }
@@ -3432,7 +3434,7 @@ export default function App() {
 
         if (event.key.toLowerCase() === 'w') {
           event.preventDefault();
-          void handleSurveySetFocusedPhotoState(PhotoState.Select);
+          void handleSurveySetFocusedPhotoState(PhotoState.Keep);
           return;
         }
 
@@ -3444,7 +3446,7 @@ export default function App() {
 
         if (event.key.toLowerCase() === 'r') {
           event.preventDefault();
-          void handleSurveySetFocusedPhotoState(PhotoState.Reject);
+          void handleSurveySetFocusedPhotoState(PhotoState.Discard);
           return;
         }
 
@@ -4392,7 +4394,7 @@ export default function App() {
             ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
               <p>No photos need review right now. Switch to Library to browse selected photos.</p>
             ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
-              <p>No selected photos in the library yet. Mark keepers as Select in Review.</p>
+              <p>No selected photos in the library yet. Mark keepers as Keep in Review.</p>
             ) : (
               <p>No visible assets match the current filters.</p>
             )}
@@ -4476,9 +4478,9 @@ export default function App() {
           isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
           onClose={() => setSurveyOpen(false)}
           onFocusAsset={setSelectedAssetId}
-          onSetFocusedWinner={() => void handleSurveySetFocusedPhotoState(PhotoState.Select)}
+          onSetFocusedWinner={() => void handleSurveySetFocusedPhotoState(PhotoState.Keep)}
           onSetFocusedAlternate={() => void handleSurveySetFocusedPhotoState(PhotoState.Pending)}
-          onSetFocusedReject={() => void handleSurveySetFocusedPhotoState(PhotoState.Reject)}
+          onSetFocusedReject={() => void handleSurveySetFocusedPhotoState(PhotoState.Discard)}
           onKeepFocusedAlternates={() => void handleSurveyKeepFocusedAlternates()}
           onKeepFocusedRejectOthers={() => void handleSurveyKeepFocusedRejectOthers()}
           onSetPhotoState={handleSetPhotoState}

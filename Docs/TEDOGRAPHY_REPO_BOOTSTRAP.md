@@ -618,10 +618,10 @@ The domain package should compile immediately, even if the types are still minim
 
 ```ts
 export enum PhotoState {
-  Unreviewed = 'Unreviewed',
+  New = 'New',
   Pending = 'Pending',
-  Select = 'Select',
-  Reject = 'Reject'
+  Keep = 'Keep',
+  Discard = 'Discard'
 }
 ```
 
@@ -966,4 +966,3 @@ After the repo is up, the next implementation order should be:
 # 16. One implementation note
 
 Your broader preference elsewhere has often been npm, but this architecture explicitly defines a **pnpm monorepo**, so this bootstrap follows that architecture as requested.
-

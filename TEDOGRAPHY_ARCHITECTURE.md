@@ -30,7 +30,7 @@ personal archive**.
 
 Tedography should make it easy to:
 
-Import → Review → Select / Pending / Reject → Organize → Enjoy viewing
+Import → Review → Keep / Pending / Discard → Organize → Enjoy viewing
 later → Optionally publish/export.
 
 ------------------------------------------------------------------------
@@ -43,7 +43,7 @@ Tedography prioritizes **deciding which photos to keep**.
 
 The primary workflow is:
 
-Import → Review → Select / Pending / Reject
+Import → Review → Keep / Pending / Discard
 
 The system should allow reviewing large sets of images **quickly and
 comfortably**.
@@ -117,26 +117,26 @@ Review is the core workflow.
 
 Imported photos begin in state:
 
-Unreviewed
+New
 
 Photos transition between:
 
--   Unreviewed
+-   New
 -   Pending
--   Select
--   Reject
+-   Keep
+-   Discard
 
 Definitions:
 
-Unreviewed --- newly imported photos not yet reviewed
+New --- newly imported photos not yet reviewed
 
 Pending --- photos requiring later decision
 
-Select --- keeper photos
+Keep --- keeper photos
 
-Reject --- photos not retained in the archive
+Discard --- photos not retained in the archive
 
-Reject photos should be **hidden by default but recoverable**.
+Discarded photos should be **hidden by default but recoverable**.
 
 ------------------------------------------------------------------------
 
@@ -202,7 +202,7 @@ The Review area is optimized for curation.
 
 Default scope:
 
-photoState in (Unreviewed, Pending)
+photoState in (New, Pending)
 
 Optional toggle allows including **Selected photos as reference** during
 review.
@@ -215,7 +215,7 @@ The Library area is optimized for browsing kept photos.
 
 Default scope:
 
-photoState = Select
+photoState = Keep
 
 ------------------------------------------------------------------------
 

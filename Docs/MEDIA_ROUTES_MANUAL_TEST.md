@@ -60,7 +60,7 @@ Cache-Control: public, max-age=86400
 ## Testing Asset Filtering
 
 1. Start with no filters selected and verify all assets are visible.
-2. Under `Filters`, select one photo state (for example `Unreviewed`) and verify only that state remains.
+2. Under `Filters`, select one photo state (for example `New`) and verify only that state remains.
 3. Select multiple photo states and verify the result is a union within photo state.
 4. Select one media type (`Photo` or `Video`) and verify only that media type remains.
 5. Combine photo state + media type selections and verify AND behavior across categories.
@@ -95,24 +95,24 @@ Cache-Control: public, max-age=86400
 ## Testing Advance-After-Rating
 
 1. Disable `Advance after rating`.
-2. Set current asset to `Select`, `Pending`, and `Reject`; verify state changes and active asset stays on the same item.
+2. Set current asset to `Keep`, `Pending`, and `Discard`; verify state changes and active asset stays on the same item.
 3. Enable `Advance after rating`.
-4. Set current asset to `Select`, `Pending`, and `Reject`; verify state changes and active asset advances to the next visible asset.
+4. Set current asset to `Keep`, `Pending`, and `Discard`; verify state changes and active asset advances to the next visible asset.
 5. On the last visible asset, rate it and verify there is no wraparound.
-6. Filter to `Unreviewed` only, enable advance-after-rating, and rate current asset so it leaves filter; verify focus advances to the next remaining visible item or clean no-match state.
+6. Filter to `New` only, enable advance-after-rating, and rate current asset so it leaves filter; verify focus advances to the next remaining visible item or clean no-match state.
 7. Verify keyboard review shortcuts (S/P/R/U) also advance when the option is enabled.
 8. Reload the page and verify `Advance after rating` persists using the previous toggle value.
 
-## Testing Hide Reject
+## Testing Hide Discard
 
-1. With `Hide Reject` OFF, verify rejected assets remain visible in grid, review context, and filmstrip.
-2. Turn `Hide Reject` ON and verify rejected assets disappear from the current visible set.
-3. If current active asset is rejected when turning ON, verify selection moves to next visible asset, otherwise previous, otherwise clears cleanly.
-4. With `Hide Reject` ON, rate current asset to `Reject` and verify it disappears immediately and focus moves to next visible asset (or previous/none if needed).
+1. With `Hide Discard` OFF, verify discarded assets remain visible in grid, review context, and filmstrip.
+2. Turn `Hide Discard` ON and verify discarded assets disappear from the current visible set.
+3. If current active asset is discarded when turning ON, verify selection moves to next visible asset, otherwise previous, otherwise clears cleanly.
+4. With `Hide Discard` ON, rate current asset to `Discard` and verify it disappears immediately and focus moves to next visible asset (or previous/none if needed).
 5. Verify loupe navigation and filmstrip stay consistent with the same post-hide visible set.
-6. Combine `Hide Reject` with existing PhotoState/MediaType filters and verify behavior remains coherent.
-7. Force a no-visible-assets state and verify message appears with recovery actions (`Clear Filters` and `Show Rejects` when applicable).
-8. Reload the app and verify `Hide Reject` preference persists.
+6. Combine `Hide Discard` with existing PhotoState/MediaType filters and verify behavior remains coherent.
+7. Force a no-visible-assets state and verify message appears with recovery actions (`Clear Filters` and `Show Discarded` when applicable).
+8. Reload the app and verify `Hide Discard` preference persists.
 
 ## Testing Timeline Grouping
 
@@ -171,13 +171,13 @@ pnpm --filter @tedography/api assets:verify --json
 ## Testing Review vs Library Areas
 
 1. Open app with no stored area preference and verify `Review` is the default.
-2. In `Review`, verify default scope shows only `Unreviewed` + `Pending` assets.
-3. In `Review`, verify `Select` assets are excluded unless additional logic explicitly includes them.
-4. Switch to `Library` and verify default scope shows `Select` assets.
-5. In `Library`, verify `Unreviewed`/`Pending` assets are excluded by default.
+2. In `Review`, verify default scope shows only `New` + `Pending` assets.
+3. In `Review`, verify `Keep` assets are excluded unless additional logic explicitly includes them.
+4. Switch to `Library` and verify default scope shows `Keep` assets.
+5. In `Library`, verify `New`/`Pending` assets are excluded by default.
 6. Switch between `Review` and `Library` and verify active asset stays if still visible, otherwise moves to a valid replacement or clears cleanly.
-7. Verify `Review` area empty message appears when no assets are in `Unreviewed`/`Pending` scope.
-8. Verify `Library` area empty message appears when no assets are in `Select` scope.
+7. Verify `Review` area empty message appears when no assets are in `New`/`Pending` scope.
+8. Verify `Library` area empty message appears when no assets are in `Keep` scope.
 9. Verify true no-assets state still shows import-focused empty state.
 10. Reload app and verify last selected area persists.
 
@@ -186,7 +186,7 @@ pnpm --filter @tedography/api assets:verify --json
 1. Switch to `Review` and verify curation controls are emphasized:
    - `Survey`
    - `Advance after rating`
-   - `Hide Reject`
+   - `Hide Discard`
 2. In `Review`, verify album tree management controls are not dominant in the top row.
 3. Switch to `Library` and verify browsing controls are emphasized:
    - `Import`
@@ -199,7 +199,7 @@ pnpm --filter @tedography/api assets:verify --json
 
 ## Testing Library Timeline Mode
 
-1. Switch to `Library` and verify default Library scope still shows only `Select` assets.
+1. Switch to `Library` and verify default Library scope still shows only `Keep` assets.
 2. In `Library View`, switch between `Flat` and `Timeline`.
 3. In `Timeline`, verify month sections render (for example `March 2026`) with per-section asset counts.
 4. Verify month sections are ordered newest-first and assets within each month remain in descending chronological order.
@@ -209,14 +209,14 @@ pnpm --filter @tedography/api assets:verify --json
 8. Change `Timeline Zoom` and verify thumbnail density updates.
 9. While scrolled partway through the timeline, change `Timeline Zoom` and verify the top visible month remains in view after rerender.
 10. Switch from `Timeline` to another Library view and back; verify window scroll position restores when the timeline content has not materially changed.
-11. Apply PhotoState/MediaType/Hide Reject filters and verify timeline sections and counts reflect only filtered visible assets.
+11. Apply PhotoState/MediaType/Hide Discard filters and verify timeline sections and counts reflect only filtered visible assets.
 12. Click an asset in Timeline mode and verify focused asset, loupe, quick bar, and filmstrip continue to work normally.
 13. Reload the app and verify `Library View` and `Timeline Zoom` persist.
 14. Verify assets without capture date appear under `Unknown Date`.
 
 ## Testing Library Albums Mode
 
-1. Switch to `Library` and verify default scope remains `Select` assets.
+1. Switch to `Library` and verify default scope remains `Keep` assets.
 2. Switch `Library View` to `Albums` and verify album tree is the primary navigator.
 3. With no albums checked, verify scoped empty state appears: `Check one or more albums to browse their photos.`
 4. Check one leaf album and verify only that album's assets are shown.
@@ -224,7 +224,7 @@ pnpm --filter @tedography/api assets:verify --json
 6. Set `Album Results` to `Merged` and verify duplicates across albums are deduplicated.
 7. Set `Album Results` to `Grouped by Album` and verify sections render per checked album.
 8. In `Grouped by Album`, verify an asset can appear in multiple sections if it belongs to multiple checked albums.
-9. Apply PhotoState/MediaType/Hide Reject filters and verify album-scoped results update correctly.
+9. Apply PhotoState/MediaType/Hide Discard filters and verify album-scoped results update correctly.
 10. Click assets in Albums mode and verify loupe, quick bar, filmstrip, and keyboard navigation remain coherent.
 11. Reload the app and verify `Library View` mode and `Album Results` presentation persist.
 12. Reload and verify checked album ids / expanded groups still restore correctly.
@@ -263,8 +263,8 @@ pnpm --filter @tedography/api assets:verify --json
 1. Switch between `Grid` and `Loupe` in both `Review` and `Library`; verify Loupe shows one large in-app image while the rest of the app UI remains visible.
 2. In `Loupe`, use left/right arrows and verify adjacent visible-asset navigation remains stable.
 3. Enter `Full Screen` from the focused asset panel or Loupe and verify the browser enters real fullscreen, app chrome is hidden by the fullscreen viewer, and `Escape` exits cleanly back to the prior context.
-4. In `Review`, select multiple assets and use `Apply to Selected`; verify `Unreviewed`, `Pending`, `Select`, and `Reject` apply to the whole selected set.
-5. In `Review`, toggle `Include Rejects`; verify Reject assets can be brought back into Review scope without conflicting with Library `Hide Reject`.
+4. In `Review`, select multiple assets and use `Apply to Selected`; verify `New`, `Pending`, `Keep`, and `Discard` apply to the whole selected set.
+5. In `Review`, toggle `Include Discarded`; verify Discard assets can be brought back into Review scope without conflicting with Library `Hide Discard`.
 6. In any grid presentation, click one asset, then Shift-click another; verify the full contiguous range is selected.
 7. Toggle `Hide Details` / `Show Details`; verify focused-asset/details panels collapse and return cleanly without breaking navigation.
 8. Open `Asset Details` for an asset with album memberships and verify album labels are listed.

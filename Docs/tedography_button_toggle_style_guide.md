@@ -8,7 +8,7 @@ Tedography has two main control families:
 
 1. **Action buttons**
    - perform an operation immediately
-   - examples: `Select`, `Pending`, `Reject`, `Unreviewed`, `+Album`, `-Album`, `Slide`, `Clear`
+   - examples: `Keep`, `Pending`, `Discard`, `New`, `+Album`, `-Album`, `Slide`, `Clear`
 
 2. **Toggle / segmented controls**
    - switch a mode or persistent state
@@ -135,10 +135,10 @@ Each toggle should support:
 
 ### 1. Top toolbar action buttons
 Examples:
-- `Select`
+- `Keep`
 - `Pending`
-- `Reject`
-- `Unreviewed`
+- `Discard`
+- `New`
 - `+Album`
 - `-Album`
 - `Slide`
@@ -317,4 +317,3 @@ Tedography button/toggle styling is in a good state when:
 - pressed state is consistent
 - action buttons and toggle buttons no longer look like the same control type
 - the UI feels compact and photo-first rather than loud and control-heavy
-

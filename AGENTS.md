@@ -19,7 +19,7 @@ Tedography is a personal photo management system designed for:
 
 Primary workflow:
 
-Import → Review → Select / Pending / Reject → Organize → Browse later
+Import → Review → Keep / Pending / Discard → Organize → Browse later
 
 Tedography assumes media lives in **locally controlled storage**. Cloud services may be used as **publication targets**, but not as canonical storage.
 
@@ -236,10 +236,10 @@ Properties include:
 
 ### PhotoState values
 
-- Unreviewed
+- New
 - Pending
-- Select
-- Reject
+- Keep
+- Discard
 
 ### Albums
 
@@ -255,7 +255,7 @@ Review is the core workflow.
 
 States:
 
-Unreviewed → Pending → Select → Reject
+New → Pending → Keep → Discard
 
 Agents should not rename these states without updating:
 
