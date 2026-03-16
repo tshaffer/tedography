@@ -51,10 +51,10 @@ http://localhost:4000
 
 Use a small test folder first (for example a folder with 3-10 files) to make responses easy to inspect.
 
-Mock-media seeding is no longer part of normal startup.
+Tedography startup should not create any runtime sample assets.
 
-- if `mediaAssets` is empty, Tedography should remain empty until you import real files
-- no startup path should auto-insert mock assets
+- if `mediaAssets` is empty, Tedography remains empty until you import real files
+- startup should not auto-insert any placeholder or seeded media records
 
 ### HEIC conversion mechanism used in v1
 

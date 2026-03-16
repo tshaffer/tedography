@@ -6,34 +6,12 @@ import {
   type MediaAsset
 } from '@tedography/domain';
 import { randomUUID } from 'node:crypto';
-import { mockAssets } from '../data/mockAssets.js';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
 
 export async function syncMediaAssetIndexes(): Promise<void> {
   await MediaAssetModel.syncIndexes();
   log.info('Synchronized mediaAssets indexes');
-}
-
-export async function seedMediaAssetsIfEmpty(): Promise<void> {
-  let insertedCount = 0;
-
-  for (const asset of mockAssets) {
-    const result = await MediaAssetModel.updateOne(
-      { id: asset.id },
-      { $setOnInsert: asset },
-      { upsert: true, runValidators: true }
-    );
-
-    insertedCount += result.upsertedCount;
-  }
-
-  if (insertedCount > 0) {
-    log.info(`Seeded ${insertedCount} mediaAssets records`);
-    return;
-  }
-
-  log.info('Seed check complete; no mediaAssets inserts required');
 }
 
 function normalizeMediaAsset(asset: MediaAsset): MediaAsset {

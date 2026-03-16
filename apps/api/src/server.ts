@@ -1,17 +1,11 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { PhotoState, normalizePhotoState } from '@tedography/domain';
 import { log } from './logger.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const mockMediaDir = path.resolve(__dirname, '../mock-media');
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -26,7 +20,6 @@ export function createServer(): Express {
   app.use('/api/media', mediaRoutes);
   app.use('/api/album-tree', albumTreeRoutes);
   app.use('/api/albums', albumMembershipRoutes);
-  app.use('/media', express.static(mockMediaDir));
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.
