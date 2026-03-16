@@ -29,6 +29,7 @@ import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
+import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
 import {
@@ -2038,6 +2039,7 @@ export default function App() {
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
   const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
@@ -4581,6 +4583,14 @@ export default function App() {
           >
             Search
           </button>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => setMaintenanceDialogOpen(true)}
+            title="Open maintenance tools"
+          >
+            Maintenance
+          </button>
         </div>
 
         {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
@@ -5103,6 +5113,14 @@ export default function App() {
         open={importDialogOpen}
         onClose={() => setImportDialogOpen(false)}
         onImportCompleted={() => {
+          void loadAssets({ showLoading: false });
+          void loadAlbumTreeNodes({ showLoading: false });
+        }}
+      />
+      <MaintenanceDialog
+        open={maintenanceDialogOpen}
+        onClose={() => setMaintenanceDialogOpen(false)}
+        onMaintenanceCompleted={() => {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });
         }}
