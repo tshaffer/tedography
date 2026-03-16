@@ -1464,6 +1464,7 @@ type AssetCardProps = {
   isUpdating: boolean;
   showPhotoStateBadge: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
+  onCardDoubleClick: (assetId: string) => void;
 };
 
 function AssetCard({
@@ -1472,7 +1473,8 @@ function AssetCard({
   isActive,
   isUpdating,
   showPhotoStateBadge,
-  onCardClick
+  onCardClick,
+  onCardDoubleClick
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -1503,6 +1505,7 @@ function AssetCard({
             : cardStyle
       }
       onClick={(event) => onCardClick(event, asset.id)}
+      onDoubleClick={() => onCardDoubleClick(asset.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={asset.filename}
@@ -1581,10 +1584,12 @@ function AssetDetailPanel({
 
 type LoupeViewerProps = {
   asset: MediaAsset;
+  onOpenImmersive: (assetId: string) => void;
 };
 
 function LoupeViewer({
-  asset
+  asset,
+  onOpenImmersive
 }: LoupeViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
 
@@ -1592,7 +1597,7 @@ function LoupeViewer({
     <section style={loupeViewerStyle}>
       <div style={loupeImageWrapStyle}>
         <div style={loupeImageScrollerStyle}>
-          <div style={loupeImageStageStyle}>
+          <div style={loupeImageStageStyle} onDoubleClick={() => onOpenImmersive(asset.id)}>
             {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
           </div>
         </div>
@@ -1723,6 +1728,7 @@ type SurveyModeProps = {
   isUpdating: boolean;
   onClose: () => void;
   onFocusAsset: (assetId: string) => void;
+  onOpenImmersiveAsset: (assetId: string) => void;
   onSetFocusedWinner: () => void;
   onSetFocusedAlternate: () => void;
   onSetFocusedReject: () => void;
@@ -1734,11 +1740,13 @@ type SurveyModeProps = {
 function SurveyZoomableTile({
   asset,
   layoutMode,
-  onFocus
+  onFocus,
+  onOpenImmersive
 }: {
   asset: MediaAsset;
   layoutMode: SurveyLayoutMode;
   onFocus: () => void;
+  onOpenImmersive: () => void;
 }) {
   const imageUrl = getAssetDisplayImageUrl(asset);
   const [scale, setScale] = useState(1);
@@ -1849,7 +1857,7 @@ function SurveyZoomableTile({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onDoubleClick={resetZoom}
+      onDoubleClick={onOpenImmersive}
     >
       <div style={surveyPaneStageStyle}>
         <div
@@ -1920,6 +1928,7 @@ function SurveyMode({
   isUpdating,
   onClose,
   onFocusAsset,
+  onOpenImmersiveAsset,
   onSetFocusedWinner,
   onSetFocusedAlternate,
   onSetFocusedReject,
@@ -2044,6 +2053,7 @@ function SurveyMode({
                   asset={asset}
                   layoutMode={layoutMode}
                   onFocus={() => onFocusAsset(asset.id)}
+                  onOpenImmersive={() => onOpenImmersiveAsset(asset.id)}
                 />
                 <div style={surveyPaneOverlayTopStyle}>
                   <div style={surveyPaneBadgeGroupStyle}>
@@ -3469,7 +3479,20 @@ export default function App() {
     if (!selectedAsset) {
       return;
     }
+    openImmersiveForAsset(selectedAsset.id);
+  }
 
+  function openImmersiveForAsset(assetId: string): void {
+    const targetAssetExists =
+      visibleAssets.some((asset) => asset.id === assetId) ||
+      loupeAssets.some((asset) => asset.id === assetId) ||
+      compareAssets.some((asset) => asset.id === assetId);
+
+    if (!targetAssetExists) {
+      return;
+    }
+
+    setSelectedAssetId(assetId);
     setSlideshowActive(false);
     setSlideshowPlaying(false);
     setSurveyOpen(false);
@@ -4941,6 +4964,7 @@ export default function App() {
             {isLoupeMode && selectedAsset ? (
               <LoupeViewer
                 asset={selectedAsset}
+                onOpenImmersive={openImmersiveForAsset}
               />
             ) : null}
             {!isLoupeMode && isTimelineGridMode ? (
@@ -4969,6 +4993,7 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           onCardClick={handleCardClick}
+                          onCardDoubleClick={openImmersiveForAsset}
                         />
                       ))}
                     </div>
@@ -4995,6 +5020,7 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           onCardClick={handleCardClick}
+                          onCardDoubleClick={openImmersiveForAsset}
                         />
                       ))}
                     </div>
@@ -5012,6 +5038,7 @@ export default function App() {
                     isUpdating={updatingAssetIds[asset.id] === true}
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     onCardClick={handleCardClick}
+                    onCardDoubleClick={openImmersiveForAsset}
                   />
                 ))}
               </div>
@@ -5120,6 +5147,7 @@ export default function App() {
           isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
           onClose={() => setSurveyOpen(false)}
           onFocusAsset={setSelectedAssetId}
+          onOpenImmersiveAsset={openImmersiveForAsset}
           onSetFocusedWinner={() => void handleSurveySetFocusedPhotoState(PhotoState.Keep)}
           onSetFocusedAlternate={() => void handleSurveySetFocusedPhotoState(PhotoState.Pending)}
           onSetFocusedReject={() => void handleSurveySetFocusedPhotoState(PhotoState.Discard)}
