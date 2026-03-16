@@ -146,6 +146,50 @@ export interface RefreshFolderRequest {
   relativePath: string;
 }
 
+export type VerifyProblemCategory =
+  | 'MissingOriginalFile'
+  | 'MissingDisplayFile'
+  | 'MissingThumbnailFile'
+  | 'InvalidOriginalReference'
+  | 'InvalidDisplayReference'
+  | 'InvalidThumbnailReference'
+  | 'MissingStorageRoot'
+  | 'FileSizeMismatch'
+  | 'Other';
+
+export interface VerifyKnownAssetsInFolderResultDto {
+  assetId: string;
+  filename: string;
+  relativePath: string;
+  status: 'Healthy' | 'ProblemsFound';
+  problemCategories: VerifyProblemCategory[];
+  message?: string;
+}
+
+export interface VerifyKnownAssetsInFolderSummaryDto {
+  totalKnownAssetsChecked: number;
+  healthyAssets: number;
+  assetsWithProblems: number;
+  missingThumbnailCount: number;
+  missingDisplayCount: number;
+  sourceMissingCount: number;
+  invalidReferenceCount: number;
+  missingStorageRootCount: number;
+  fileSizeMismatchCount: number;
+  otherProblemCount: number;
+}
+
+export interface VerifyKnownAssetsInFolderResponse {
+  operation: 'VerifyKnownAssetsInFolder';
+  root: {
+    id: string;
+    label: string;
+  };
+  scanTargetRelativePath: string;
+  summary: VerifyKnownAssetsInFolderSummaryDto;
+  results: VerifyKnownAssetsInFolderResultDto[];
+}
+
 export type RefreshOperationType =
   | 'ReimportKnownAssetsInFolder'
   | 'RebuildDerivedFilesInFolder'

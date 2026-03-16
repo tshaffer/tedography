@@ -7,7 +7,8 @@ import type {
   RegisterImportRequest,
   RegisterImportResponse,
   ScanImportRequest,
-  ScanImportResponse
+  ScanImportResponse,
+  VerifyKnownAssetsInFolderResponse
 } from '@tedography/domain';
 
 type ApiErrorPayload = {
@@ -67,6 +68,18 @@ export async function reimportKnownAssetsInFolder(
   request: RefreshFolderRequest
 ): Promise<RefreshOperationResponse> {
   return fetchJson<RefreshOperationResponse>('/api/import/reimport-known', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function verifyKnownAssetsInFolder(
+  request: RefreshFolderRequest
+): Promise<VerifyKnownAssetsInFolderResponse> {
+  return fetchJson<VerifyKnownAssetsInFolderResponse>('/api/import/verify-known', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

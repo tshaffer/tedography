@@ -2,13 +2,15 @@ import { useEffect, useState, type CSSProperties, type ReactElement } from 'reac
 import type {
   BrowseDirectoryResponse,
   RefreshOperationResponse,
-  StorageRootDto
+  StorageRootDto,
+  VerifyKnownAssetsInFolderResponse
 } from '@tedography/domain';
 import {
   browseDirectory,
   rebuildDerivedFilesInFolder,
   getStorageRoots,
-  reimportKnownAssetsInFolder
+  reimportKnownAssetsInFolder,
+  verifyKnownAssetsInFolder
 } from '../../api/importApi';
 
 type SourceSelection = {
@@ -203,6 +205,15 @@ const maintenanceGroupStyle: CSSProperties = {
   gap: '8px'
 };
 
+const verifyGroupStyle: CSSProperties = {
+  border: '1px solid #d6e3d1',
+  borderRadius: '10px',
+  backgroundColor: '#f7fbf5',
+  padding: '12px',
+  display: 'grid',
+  gap: '8px'
+};
+
 const summaryGridStyle: CSSProperties = {
   marginTop: '8px',
   fontSize: '12px',
@@ -253,6 +264,9 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
   const [browseErrors, setBrowseErrors] = useState<Record<string, string>>({});
   const [expandedSourceKeys, setExpandedSourceKeys] = useState<string[]>([]);
   const [selectedSource, setSelectedSource] = useState<SourceSelection | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyResponse, setVerifyResponse] = useState<VerifyKnownAssetsInFolderResponse | null>(null);
   const [folderOperationLoading, setFolderOperationLoading] = useState<null | 'reimport' | 'rebuild'>(null);
   const [folderOperationError, setFolderOperationError] = useState<string | null>(null);
   const [folderOperationResponse, setFolderOperationResponse] = useState<RefreshOperationResponse | null>(null);
@@ -326,6 +340,9 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
     setBrowseCache({});
     setBrowseErrors({});
     setExpandedSourceKeys([]);
+    setVerifyLoading(false);
+    setVerifyError(null);
+    setVerifyResponse(null);
     setFolderOperationLoading(null);
     setFolderOperationError(null);
     setFolderOperationResponse(null);
@@ -336,6 +353,8 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
   }
 
   function clearOperationState(): void {
+    setVerifyError(null);
+    setVerifyResponse(null);
     setFolderOperationError(null);
     setFolderOperationResponse(null);
   }
@@ -383,6 +402,28 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
     }
   }
 
+  async function handleVerifyKnownAssets(): Promise<void> {
+    if (!selectedSource) {
+      return;
+    }
+
+    setVerifyLoading(true);
+    setVerifyError(null);
+    setVerifyResponse(null);
+
+    try {
+      const response = await verifyKnownAssetsInFolder({
+        rootId: selectedSource.rootId,
+        relativePath: selectedSource.relativePath
+      });
+      setVerifyResponse(response);
+    } catch (error) {
+      setVerifyError(error instanceof Error ? error.message : 'Failed to verify known assets in folder');
+    } finally {
+      setVerifyLoading(false);
+    }
+  }
+
   function renderRefreshOperationSummary(response: RefreshOperationResponse): ReactElement {
     return (
       <>
@@ -406,6 +447,39 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
             >
               <strong>{result.relativePath}</strong> - {result.status}
               {result.message ? <span style={{ color: '#666' }}> ({result.message})</span> : null}
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+
+  function renderVerifySummary(response: VerifyKnownAssetsInFolderResponse): ReactElement {
+    return (
+      <>
+        <p style={{ margin: '0 0 8px 0' }}>
+          <strong>Operation:</strong> {response.operation}
+        </p>
+        <div style={summaryGridStyle}>
+          <span>Known assets checked: {response.summary.totalKnownAssetsChecked}</span>
+          <span>Healthy: {response.summary.healthyAssets}</span>
+          <span>With problems: {response.summary.assetsWithProblems}</span>
+          <span>Source missing: {response.summary.sourceMissingCount}</span>
+          <span>Missing display: {response.summary.missingDisplayCount}</span>
+          <span>Missing thumbnail: {response.summary.missingThumbnailCount}</span>
+          <span>Invalid references: {response.summary.invalidReferenceCount}</span>
+          <span>Missing storage roots: {response.summary.missingStorageRootCount}</span>
+          <span>File size mismatches: {response.summary.fileSizeMismatchCount}</span>
+          <span>Other problems: {response.summary.otherProblemCount}</span>
+        </div>
+        <ul style={listStyle}>
+          {response.results.map((result: VerifyKnownAssetsInFolderResponse['results'][number]) => (
+            <li key={`${result.relativePath}:${result.assetId}`} style={listRowStyle}>
+              <strong>{result.relativePath}</strong> - {result.status}
+              {result.problemCategories.length > 0 ? (
+                <span style={{ color: '#666' }}> ({result.problemCategories.join(', ')})</span>
+              ) : null}
+              {result.message ? <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>{result.message}</div> : null}
             </li>
           ))}
         </ul>
@@ -591,56 +665,97 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
               </div>
             </div>
             <div style={panelBodyStyle}>
-              <div style={maintenanceGroupStyle}>
+              <section>
+                <h3 style={sectionTitleStyle}>Selected Folder</h3>
                 <div style={controlRowStyle}>
                   <span style={badgeStyle}>
                     {selectedSource ? `${selectedSource.rootId}:${selectedSource.relativePath || '/'}` : 'No folder selected'}
                   </span>
-                  <span style={warningBadgeStyle}>Mutates known assets</span>
                 </div>
-                <p style={mutedTextStyle}>
-                  Reimport updates metadata from source files. Rebuild regenerates display and thumbnail derivatives.
+                <p style={{ ...mutedTextStyle, marginTop: '8px' }}>
+                  Maintenance only checks already-known assets in the selected folder. For new files, use Import.
                 </p>
-                <div style={controlRowStyle}>
-                  <button
-                    type="button"
-                    style={
-                      selectedSource && folderOperationLoading === null ? buttonStyle : disabledButtonStyle
-                    }
-                    disabled={!selectedSource || folderOperationLoading !== null}
-                    onClick={() => void handleFolderOperation('reimport')}
-                  >
-                    {folderOperationLoading === 'reimport'
-                      ? 'Reimporting...'
-                      : 'Reimport Known Assets in Folder'}
-                  </button>
-                  <button
-                    type="button"
-                    style={
-                      selectedSource && folderOperationLoading === null ? buttonStyle : disabledButtonStyle
-                    }
-                    disabled={!selectedSource || folderOperationLoading !== null}
-                    onClick={() => void handleFolderOperation('rebuild')}
-                  >
-                    {folderOperationLoading === 'rebuild'
-                      ? 'Rebuilding...'
-                      : 'Rebuild Derived Files in Folder'}
-                  </button>
-                </div>
-              </div>
+              </section>
 
-              {folderOperationError ? <p style={{ color: '#b00020', marginTop: '12px' }}>{folderOperationError}</p> : null}
-              {folderOperationResponse ? (
-                <section style={sectionStyle}>
-                  <h3 style={sectionTitleStyle}>Refresh / Repair Results</h3>
-                  {renderRefreshOperationSummary(folderOperationResponse)}
-                </section>
-              ) : (
-                <section style={sectionStyle}>
-                  <h3 style={sectionTitleStyle}>Results</h3>
-                  <p style={mutedTextStyle}>Choose a folder and run a maintenance action to see the outcome summary.</p>
-                </section>
-              )}
+              <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Verify</h3>
+                <div style={verifyGroupStyle}>
+                  <p style={mutedTextStyle}>
+                    Verify checks already-known assets in the selected folder for missing or broken source and derived files.
+                  </p>
+                  <div style={controlRowStyle}>
+                    <button
+                      type="button"
+                      style={selectedSource && !verifyLoading && folderOperationLoading === null ? buttonStyle : disabledButtonStyle}
+                      disabled={!selectedSource || verifyLoading || folderOperationLoading !== null}
+                      onClick={() => void handleVerifyKnownAssets()}
+                    >
+                      {verifyLoading ? 'Verifying...' : 'Verify Known Assets in Folder'}
+                    </button>
+                    <span style={badgeStyle}>Non-mutating</span>
+                  </div>
+                </div>
+                {verifyError ? <p style={{ color: '#b00020', marginTop: '12px' }}>{verifyError}</p> : null}
+                {verifyResponse ? (
+                  <section style={sectionStyle}>
+                    <h3 style={sectionTitleStyle}>Verification Results</h3>
+                    {renderVerifySummary(verifyResponse)}
+                  </section>
+                ) : (
+                  <p style={{ ...mutedTextStyle, marginTop: '12px' }}>
+                    Choose a folder and run verification to inspect known asset health in that folder.
+                  </p>
+                )}
+              </section>
+
+              <section style={sectionStyle}>
+                <h3 style={sectionTitleStyle}>Repair</h3>
+                <div style={maintenanceGroupStyle}>
+                  <div style={controlRowStyle}>
+                    <span style={warningBadgeStyle}>Mutates known assets</span>
+                  </div>
+                  <p style={mutedTextStyle}>
+                    Reimport updates metadata from source files. Rebuild regenerates display and thumbnail derivatives.
+                  </p>
+                  <div style={controlRowStyle}>
+                    <button
+                      type="button"
+                      style={
+                        selectedSource && !verifyLoading && folderOperationLoading === null ? buttonStyle : disabledButtonStyle
+                      }
+                      disabled={!selectedSource || verifyLoading || folderOperationLoading !== null}
+                      onClick={() => void handleFolderOperation('reimport')}
+                    >
+                      {folderOperationLoading === 'reimport'
+                        ? 'Reimporting...'
+                        : 'Reimport Known Assets in Folder'}
+                    </button>
+                    <button
+                      type="button"
+                      style={
+                        selectedSource && !verifyLoading && folderOperationLoading === null ? buttonStyle : disabledButtonStyle
+                      }
+                      disabled={!selectedSource || verifyLoading || folderOperationLoading !== null}
+                      onClick={() => void handleFolderOperation('rebuild')}
+                    >
+                      {folderOperationLoading === 'rebuild'
+                        ? 'Rebuilding...'
+                        : 'Rebuild Derived Files in Folder'}
+                    </button>
+                  </div>
+                </div>
+                {folderOperationError ? <p style={{ color: '#b00020', marginTop: '12px' }}>{folderOperationError}</p> : null}
+                {folderOperationResponse ? (
+                  <section style={sectionStyle}>
+                    <h3 style={sectionTitleStyle}>Repair Results</h3>
+                    {renderRefreshOperationSummary(folderOperationResponse)}
+                  </section>
+                ) : (
+                  <p style={{ ...mutedTextStyle, marginTop: '12px' }}>
+                    Run reimport or rebuild to repair already-known assets in the selected folder.
+                  </p>
+                )}
+              </section>
             </div>
           </section>
         </div>

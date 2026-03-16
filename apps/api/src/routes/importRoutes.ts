@@ -17,6 +17,10 @@ import {
   RefreshServiceError,
   reimportKnownAssetsInFolder
 } from '../import/refreshService.js';
+import {
+  verifyKnownAssetsInFolder,
+  VerifyServiceError
+} from '../import/verifyService.js';
 import { registerImportedFiles, RegisterImportServiceError } from '../import/registerImportService.js';
 import { scanImportTarget, ScanServiceError } from '../import/scanService.js';
 import { resolveSafeAbsolutePath } from '../import/storagePathUtils.js';
@@ -232,6 +236,29 @@ importRoutes.post('/reimport-known', async (req, res) => {
 
     log.error('Failed to reimport known assets in folder', error);
     res.status(500).json({ error: 'Failed to reimport known assets in folder' });
+  }
+});
+
+importRoutes.post('/verify-known', async (req, res) => {
+  const request = readRefreshFolderRequest(req.body as Partial<RefreshFolderRequest> | undefined);
+  if (!request) {
+    const errorResponse: ImportApiErrorResponse = { error: 'rootId and relativePath are required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response = await verifyKnownAssetsInFolder(request);
+    res.json(response);
+  } catch (error) {
+    if (error instanceof VerifyServiceError) {
+      const errorResponse: ImportApiErrorResponse = { error: error.message };
+      res.status(error.code === 'INVALID_INPUT' ? 400 : error.code === 'NOT_FOUND' ? 404 : 409).json(errorResponse);
+      return;
+    }
+
+    log.error('Failed to verify known assets in folder', error);
+    res.status(500).json({ error: 'Failed to verify known assets in folder' });
   }
 });
 
