@@ -24,6 +24,7 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
+import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -2038,6 +2039,9 @@ export default function App() {
   const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
+  const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
+  const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [reviewVisiblePhotoStates, setReviewVisiblePhotoStates] = useState<PhotoState[]>(() => {
@@ -2977,6 +2981,11 @@ export default function App() {
   }, [immersiveOpen, selectedAsset]);
 
   useEffect(() => {
+    setAssetMaintenanceMessage(null);
+    setAssetMaintenanceError(false);
+  }, [selectedAssetId]);
+
+  useEffect(() => {
     const handleFullscreenChange = (): void => {
       if (!document.fullscreenElement) {
         setImmersiveOpen(false);
@@ -3804,6 +3813,60 @@ export default function App() {
     setSelectedAssetId(assetId);
   }
 
+  async function handleReimportSelectedAsset(): Promise<void> {
+    if (!selectedAsset) {
+      return;
+    }
+
+    setAssetMaintenanceBusy('reimport');
+    setAssetMaintenanceMessage(null);
+    setAssetMaintenanceError(false);
+
+    try {
+      const response = await reimportAsset(selectedAsset.id);
+      const result = response.results[0];
+      if (!result || result.status === 'Error' || result.status === 'SourceMissing') {
+        throw new Error(result?.message ?? 'Asset reimport failed');
+      }
+
+      setAssetMaintenanceMessage(`Reimported ${selectedAsset.filename}.`);
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      setAssetMaintenanceError(true);
+      setAssetMaintenanceMessage(error instanceof Error ? error.message : 'Failed to reimport asset');
+    } finally {
+      setAssetMaintenanceBusy(null);
+    }
+  }
+
+  async function handleRebuildDerivedFilesForSelectedAsset(): Promise<void> {
+    if (!selectedAsset) {
+      return;
+    }
+
+    setAssetMaintenanceBusy('rebuild');
+    setAssetMaintenanceMessage(null);
+    setAssetMaintenanceError(false);
+
+    try {
+      const response = await rebuildAssetDerivedFiles(selectedAsset.id);
+      const result = response.results[0];
+      if (!result || result.status === 'Error' || result.status === 'SourceMissing') {
+        throw new Error(result?.message ?? 'Derived rebuild failed');
+      }
+
+      setAssetMaintenanceMessage(`Rebuilt derived files for ${selectedAsset.filename}.`);
+      await loadAssets({ showLoading: false });
+    } catch (error: unknown) {
+      setAssetMaintenanceError(true);
+      setAssetMaintenanceMessage(
+        error instanceof Error ? error.message : 'Failed to rebuild derived files for asset'
+      );
+    } finally {
+      setAssetMaintenanceBusy(null);
+    }
+  }
+
   function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
     if (!immersiveOpen && !slideshowActive) {
       return;
@@ -4474,7 +4537,15 @@ export default function App() {
           <AssetDetailPanel
             asset={selectedAsset}
           />
-          <AssetDetailsPanel asset={selectedAsset} albumLabels={selectedAssetAlbumLabels} />
+          <AssetDetailsPanel
+            asset={selectedAsset}
+            albumLabels={selectedAssetAlbumLabels}
+            onReimportAsset={() => void handleReimportSelectedAsset()}
+            onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
+            assetOperationBusy={assetMaintenanceBusy !== null}
+            assetOperationMessage={assetMaintenanceMessage}
+            assetOperationError={assetMaintenanceError}
+          />
         </section>
       </aside>
     );

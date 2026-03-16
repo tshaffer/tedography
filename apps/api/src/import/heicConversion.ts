@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 export interface ConvertHeicToJpegInput {
   sourceAbsolutePath: string;
   targetAbsolutePath: string;
+  forceRegenerate?: boolean;
 }
 
 function runSipsConvert(sourceAbsolutePath: string, targetAbsolutePath: string): Promise<void> {
@@ -41,7 +42,7 @@ async function hasReusableTarget(targetAbsolutePath: string): Promise<boolean> {
 }
 
 export async function convertHeicToJpeg(input: ConvertHeicToJpegInput): Promise<void> {
-  if (await hasReusableTarget(input.targetAbsolutePath)) {
+  if (!input.forceRegenerate && (await hasReusableTarget(input.targetAbsolutePath))) {
     return;
   }
 

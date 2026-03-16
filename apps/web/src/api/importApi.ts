@@ -2,6 +2,8 @@ import type {
   BrowseDirectoryRequest,
   BrowseDirectoryResponse,
   GetStorageRootsResponse,
+  RefreshFolderRequest,
+  RefreshOperationResponse,
   RegisterImportRequest,
   RegisterImportResponse,
   ScanImportRequest,
@@ -53,6 +55,30 @@ export async function registerImportedFiles(
   request: RegisterImportRequest
 ): Promise<RegisterImportResponse> {
   return fetchJson<RegisterImportResponse>('/api/import/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function reimportKnownAssetsInFolder(
+  request: RefreshFolderRequest
+): Promise<RefreshOperationResponse> {
+  return fetchJson<RefreshOperationResponse>('/api/import/reimport-known', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function rebuildDerivedFilesInFolder(
+  request: RefreshFolderRequest
+): Promise<RefreshOperationResponse> {
+  return fetchJson<RefreshOperationResponse>('/api/import/rebuild-derived', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

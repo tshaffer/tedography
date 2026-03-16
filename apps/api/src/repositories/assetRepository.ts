@@ -50,6 +50,16 @@ export async function findByOriginalStorageRootAndArchivePaths(
   return normalizeMediaAssets(assets);
 }
 
+export async function findByOriginalStorageRootId(
+  originalStorageRootId: string
+): Promise<MediaAsset[]> {
+  const assets = await MediaAssetModel.find(
+    { originalStorageRootId },
+    { _id: 0 }
+  ).lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
+}
+
 export async function findByOriginalContentHashes(
   originalContentHashes: string[]
 ): Promise<MediaAsset[]> {
@@ -180,6 +190,64 @@ export async function updateThumbnailReferenceFields(input: {
         thumbnailFileFormat: input.thumbnailFileFormat
       }
     },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
+}
+
+export interface UpdateMediaAssetSourceDataInput {
+  id: string;
+  filename: string;
+  mediaType: MediaType;
+  captureDateTime: Date | null;
+  width: number | null;
+  height: number | null;
+  locationLabel: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
+  originalFileSizeBytes: number;
+  originalContentHash: string;
+  originalFileFormat: string;
+  displayStorageType: DisplayStorageType;
+  displayStorageRootId: string | null;
+  displayArchivePath: string | null;
+  displayDerivedPath: string | null;
+  displayFileFormat: string;
+  thumbnailStorageType: 'derived-root' | null;
+  thumbnailDerivedPath: string | null;
+  thumbnailFileFormat: string | null;
+  thumbnailUrl: string | null;
+}
+
+export async function updateMediaAssetSourceData(
+  input: UpdateMediaAssetSourceDataInput
+): Promise<MediaAsset | null> {
+  const updatePayload: Record<string, string | number | null | MediaType> = {
+    filename: input.filename,
+    mediaType: input.mediaType,
+    captureDateTime: input.captureDateTime?.toISOString() ?? null,
+    width: input.width,
+    height: input.height,
+    locationLabel: input.locationLabel,
+    locationLatitude: input.locationLatitude,
+    locationLongitude: input.locationLongitude,
+    originalFileSizeBytes: input.originalFileSizeBytes,
+    originalContentHash: input.originalContentHash,
+    originalFileFormat: input.originalFileFormat,
+    displayStorageType: input.displayStorageType,
+    displayStorageRootId: input.displayStorageRootId,
+    displayArchivePath: input.displayArchivePath,
+    displayDerivedPath: input.displayDerivedPath,
+    displayFileFormat: input.displayFileFormat,
+    thumbnailStorageType: input.thumbnailStorageType,
+    thumbnailDerivedPath: input.thumbnailDerivedPath,
+    thumbnailFileFormat: input.thumbnailFileFormat,
+    thumbnailUrl: input.thumbnailUrl
+  };
+
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id: input.id },
+    { $set: updatePayload },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
   return asset ? normalizeMediaAsset(asset) : null;

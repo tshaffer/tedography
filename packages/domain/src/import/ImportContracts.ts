@@ -140,3 +140,50 @@ export interface RegisterImportResponse {
   errorCount: number;
   results: RegisterImportFileResultDto[];
 }
+
+export interface RefreshFolderRequest {
+  rootId: string;
+  relativePath: string;
+}
+
+export type RefreshOperationType =
+  | 'ReimportKnownAssetsInFolder'
+  | 'RebuildDerivedFilesInFolder'
+  | 'ReimportAsset'
+  | 'RebuildDerivedFiles';
+
+export type RefreshResultStatus =
+  | 'Reimported'
+  | 'RebuiltDerivedFiles'
+  | 'SourceMissing'
+  | 'Skipped'
+  | 'Error';
+
+export interface RefreshResultDto {
+  assetId?: string;
+  filename: string;
+  relativePath: string;
+  status: RefreshResultStatus;
+  message?: string;
+}
+
+export interface RefreshSummaryDto {
+  totalCandidates: number;
+  succeededCount: number;
+  skippedCount: number;
+  failedCount: number;
+  sourceMissingCount: number;
+  reimportedCount: number;
+  rebuiltCount: number;
+}
+
+export interface RefreshOperationResponse {
+  operation: RefreshOperationType;
+  root?: {
+    id: string;
+    label: string;
+  };
+  scanTargetRelativePath?: string;
+  summary: RefreshSummaryDto;
+  results: RefreshResultDto[];
+}

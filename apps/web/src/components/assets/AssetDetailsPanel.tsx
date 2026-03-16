@@ -4,6 +4,11 @@ import { type MediaAsset } from '@tedography/domain';
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
+  onReimportAsset?: () => void;
+  onRebuildDerivedFiles?: () => void;
+  assetOperationBusy?: boolean;
+  assetOperationMessage?: string | null;
+  assetOperationError?: boolean;
 }
 
 const panelStyle: CSSProperties = {
@@ -37,6 +42,28 @@ const labelStyle: CSSProperties = {
 const valueStyle: CSSProperties = {
   color: '#111',
   wordBreak: 'break-word'
+};
+
+const actionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
+  marginBottom: '10px'
+};
+
+const buttonStyle: CSSProperties = {
+  border: '1px solid #c8c8c8',
+  borderRadius: '6px',
+  backgroundColor: '#f4f4f4',
+  cursor: 'pointer',
+  fontSize: '12px',
+  padding: '6px 10px'
+};
+
+const disabledButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  opacity: 0.55,
+  cursor: 'not-allowed'
 };
 
 function formatValue(value: string | null | undefined): string {
@@ -101,7 +128,15 @@ function formatLocation(
   return '—';
 }
 
-export function AssetDetailsPanel({ asset, albumLabels = [] }: AssetDetailsPanelProps) {
+export function AssetDetailsPanel({
+  asset,
+  albumLabels = [],
+  onReimportAsset,
+  onRebuildDerivedFiles,
+  assetOperationBusy = false,
+  assetOperationMessage = null,
+  assetOperationError = false
+}: AssetDetailsPanelProps) {
   if (!asset) {
     return (
       <section style={panelStyle}>
@@ -142,6 +177,29 @@ export function AssetDetailsPanel({ asset, albumLabels = [] }: AssetDetailsPanel
   return (
     <section style={panelStyle}>
       <h3 style={titleStyle}>Asset Details</h3>
+      <div style={actionsStyle}>
+        <button
+          type="button"
+          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          onClick={onReimportAsset}
+          disabled={assetOperationBusy || !onReimportAsset}
+        >
+          {assetOperationBusy ? 'Working...' : 'Reimport Asset'}
+        </button>
+        <button
+          type="button"
+          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          onClick={onRebuildDerivedFiles}
+          disabled={assetOperationBusy || !onRebuildDerivedFiles}
+        >
+          {assetOperationBusy ? 'Working...' : 'Rebuild Derived Files'}
+        </button>
+      </div>
+      {assetOperationMessage ? (
+        <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>
+          {assetOperationMessage}
+        </p>
+      ) : null}
       {rows.map((row) => renderRow(row.label, row.value))}
     </section>
   );

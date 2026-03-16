@@ -25,8 +25,8 @@ node ./copy-importable-media.js
 const fs = require('fs/promises');
 const path = require('path');
 
-const SOURCE_ROOT = '/Volumes/ShMedia/Shafferography/ShafferographyMedia/Jorgan Wedding Photos';
-const DEST_ROOT = '/Volumes/ShMedia/Shafferography/ShafferographyMediaNew/Jorgan Wedding Photos';
+const SOURCE_ROOT = '/Volumes/ShMedia/Shafferography/ShafferographyMedia';
+const DEST_ROOT = '/Volumes/ShMedia/Shafferography/ShafferographyMediaNew';
 
 /**
  * Adjust this set to match Tedography's actual importable extensions.

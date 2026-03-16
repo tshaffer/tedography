@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import type {
   AlbumTreeNode,
   BrowseDirectoryResponse,
+  RefreshOperationResponse,
   RegisterImportResponse,
   ScanImportResponse,
   StorageRootDto
@@ -9,7 +10,9 @@ import type {
 import { addAssetsToAlbum, createAlbumTreeNode, listAlbumTreeNodes } from '../../api/albumTreeApi';
 import {
   browseDirectory,
+  rebuildDerivedFilesInFolder,
   getStorageRoots,
+  reimportKnownAssetsInFolder,
   registerImportedFiles,
   scanImportTarget
 } from '../../api/importApi';
@@ -211,6 +214,50 @@ const summaryGridStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'
 };
 
+const actionGroupsStyle: CSSProperties = {
+  display: 'grid',
+  gap: '10px'
+};
+
+const actionGroupStyle: CSSProperties = {
+  border: '1px solid #e7e7e7',
+  borderRadius: '10px',
+  padding: '12px',
+  display: 'grid',
+  gap: '8px'
+};
+
+const scanPreviewGroupStyle: CSSProperties = {
+  ...actionGroupStyle,
+  backgroundColor: '#fbfcff'
+};
+
+const updateRepairGroupStyle: CSSProperties = {
+  ...actionGroupStyle,
+  backgroundColor: '#fffaf4',
+  borderColor: '#ead8bf'
+};
+
+const actionGroupHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  flexWrap: 'wrap'
+};
+
+const actionGroupTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '13px'
+};
+
+const warningBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  borderColor: '#e1c699',
+  backgroundColor: '#fff1da',
+  color: '#7a4d00'
+};
+
 const listStyle: CSSProperties = {
   listStyle: 'none',
   margin: '10px 0 0 0',
@@ -347,6 +394,9 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanResponse, setScanResponse] = useState<ScanImportResponse | null>(null);
+  const [folderOperationLoading, setFolderOperationLoading] = useState<null | 'reimport' | 'rebuild'>(null);
+  const [folderOperationError, setFolderOperationError] = useState<string | null>(null);
+  const [folderOperationResponse, setFolderOperationResponse] = useState<RefreshOperationResponse | null>(null);
 
   const [selectedImportablePaths, setSelectedImportablePaths] = useState<string[]>([]);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -494,6 +544,8 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     setBrowseCache({});
     setBrowseErrors({});
     setScanResponse(null);
+    setFolderOperationResponse(null);
+    setFolderOperationError(null);
     setSelectedImportablePaths([]);
     setRegisterResponse(null);
     setRegisterError(null);
@@ -511,8 +563,10 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
 
   function clearScanState(): void {
     setScanResponse(null);
+    setFolderOperationResponse(null);
     setSelectedImportablePaths([]);
     setScanError(null);
+    setFolderOperationError(null);
     setRegisterResponse(null);
     setRegisterError(null);
     setAlbumAssignmentMessage(null);
@@ -561,6 +615,74 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     } finally {
       setScanLoading(false);
     }
+  }
+
+  async function handleFolderOperation(mode: 'reimport' | 'rebuild'): Promise<void> {
+    if (!selectedSource) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      mode === 'reimport'
+        ? 'Reimport known assets in this folder? Tedography will update existing assets from their source files and may regenerate derived files.'
+        : 'Rebuild derived files for known assets in this folder? Tedography will regenerate display and thumbnail files for existing assets.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setFolderOperationLoading(mode);
+    setFolderOperationError(null);
+    setFolderOperationResponse(null);
+
+    try {
+      const request = {
+        rootId: selectedSource.rootId,
+        relativePath: selectedSource.relativePath
+      };
+      const response =
+        mode === 'reimport'
+          ? await reimportKnownAssetsInFolder(request)
+          : await rebuildDerivedFilesInFolder(request);
+      setFolderOperationResponse(response);
+      onImportCompleted?.();
+    } catch (error) {
+      setFolderOperationError(
+        error instanceof Error ? error.message : 'Failed to run folder operation'
+      );
+    } finally {
+      setFolderOperationLoading(null);
+    }
+  }
+
+  function renderRefreshOperationSummary(response: RefreshOperationResponse): ReactElement {
+    return (
+      <>
+        <p style={{ margin: '0 0 8px 0' }}>
+          <strong>Operation:</strong> {response.operation}
+        </p>
+        <div style={summaryGridStyle}>
+          <span>Total candidates: {response.summary.totalCandidates}</span>
+          <span>Succeeded: {response.summary.succeededCount}</span>
+          <span>Reimported: {response.summary.reimportedCount}</span>
+          <span>Rebuilt: {response.summary.rebuiltCount}</span>
+          <span>Skipped: {response.summary.skippedCount}</span>
+          <span>Source missing: {response.summary.sourceMissingCount}</span>
+          <span>Failed: {response.summary.failedCount}</span>
+        </div>
+        <ul style={listStyle}>
+          {response.results.map((result) => (
+            <li
+              key={`${result.relativePath}:${result.assetId ?? 'no-asset'}:${result.status}`}
+              style={listRowStyle}
+            >
+              <strong>{result.relativePath}</strong> - {result.status}
+              {result.message ? <span style={{ color: '#666' }}> ({result.message})</span> : null}
+            </li>
+          ))}
+        </ul>
+      </>
+    );
   }
 
   async function handleImportSelected(): Promise<void> {
@@ -889,20 +1011,74 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
               </div>
             </div>
             <div style={panelBodyStyle}>
-              <div style={controlRowStyle}>
+              <div style={actionGroupsStyle}>
                 <span style={badgeStyle}>
                   {selectedSource ? `${selectedSource.rootId}:${selectedSource.relativePath || '/'}` : 'No folder selected'}
                 </span>
-                <button
-                  type="button"
-                  style={
-                    selectedSource && !scanLoading && !registerLoading ? primaryButtonStyle : disabledButtonStyle
-                  }
-                  disabled={!selectedSource || scanLoading || registerLoading}
-                  onClick={() => void handleScan()}
-                >
-                  {scanLoading ? 'Scanning...' : 'Scan Selected Folder'}
-                </button>
+
+                <section style={scanPreviewGroupStyle}>
+                  <div style={actionGroupHeaderStyle}>
+                    <h3 style={actionGroupTitleStyle}>Scan / Preview</h3>
+                    <span style={badgeStyle}>Non-mutating</span>
+                  </div>
+                  <p style={mutedTextStyle}>
+                    Scan the selected folder for importable files. This does not import or modify assets yet.
+                  </p>
+                  <div style={controlRowStyle}>
+                    <button
+                      type="button"
+                      style={
+                        selectedSource && !scanLoading && !registerLoading && !folderOperationLoading
+                          ? primaryButtonStyle
+                          : disabledButtonStyle
+                      }
+                      disabled={!selectedSource || scanLoading || registerLoading || folderOperationLoading !== null}
+                      onClick={() => void handleScan()}
+                    >
+                      {scanLoading ? 'Scanning...' : 'Scan for New Assets in Folder'}
+                    </button>
+                  </div>
+                </section>
+
+                <section style={updateRepairGroupStyle}>
+                  <div style={actionGroupHeaderStyle}>
+                    <h3 style={actionGroupTitleStyle}>Update / Repair</h3>
+                    <span style={warningBadgeStyle}>Mutates known assets</span>
+                  </div>
+                  <p style={mutedTextStyle}>
+                    Applies to already-known assets in this folder and may update metadata or rebuild derived files.
+                  </p>
+                  <div style={controlRowStyle}>
+                    <button
+                      type="button"
+                      style={
+                        selectedSource && !scanLoading && !registerLoading && !folderOperationLoading
+                          ? buttonStyle
+                          : disabledButtonStyle
+                      }
+                      disabled={!selectedSource || scanLoading || registerLoading || folderOperationLoading !== null}
+                      onClick={() => void handleFolderOperation('reimport')}
+                    >
+                      {folderOperationLoading === 'reimport'
+                        ? 'Reimporting...'
+                        : 'Reimport Known Assets in Folder'}
+                    </button>
+                    <button
+                      type="button"
+                      style={
+                        selectedSource && !scanLoading && !registerLoading && !folderOperationLoading
+                          ? buttonStyle
+                          : disabledButtonStyle
+                      }
+                      disabled={!selectedSource || scanLoading || registerLoading || folderOperationLoading !== null}
+                      onClick={() => void handleFolderOperation('rebuild')}
+                    >
+                      {folderOperationLoading === 'rebuild'
+                        ? 'Rebuilding...'
+                        : 'Rebuild Derived Files in Folder'}
+                    </button>
+                  </div>
+                </section>
               </div>
 
               <div style={sectionStyle}>
@@ -1050,6 +1226,13 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
 
               {registerError ? <p style={{ color: '#b00020' }}>{registerError}</p> : null}
               {albumAssignmentMessage ? <p style={{ color: '#136f2d' }}>{albumAssignmentMessage}</p> : null}
+              {folderOperationError ? <p style={{ color: '#b00020' }}>{folderOperationError}</p> : null}
+              {folderOperationResponse ? (
+                <section style={sectionStyle}>
+                  <h3 style={sectionTitleStyle}>Folder Refresh Results</h3>
+                  {renderRefreshOperationSummary(folderOperationResponse)}
+                </section>
+              ) : null}
               {registerResponse ? (
                 <section style={sectionStyle}>
                   <h3 style={sectionTitleStyle}>Import Results</h3>

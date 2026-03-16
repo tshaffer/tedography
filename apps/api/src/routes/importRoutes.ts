@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import { Router } from 'express';
 import type {
   BrowseDirectoryResponse,
+  RefreshFolderRequest,
+  RefreshOperationResponse,
   GetStorageRootsResponse,
   ImportApiErrorResponse,
   RegisterImportRequest,
@@ -10,6 +12,11 @@ import type {
   ScanImportResponse
 } from '@tedography/domain';
 import { browseDirectory, BrowseServiceError } from '../import/browseService.js';
+import {
+  rebuildDerivedFilesInFolder,
+  RefreshServiceError,
+  reimportKnownAssetsInFolder
+} from '../import/refreshService.js';
 import { registerImportedFiles, RegisterImportServiceError } from '../import/registerImportService.js';
 import { scanImportTarget, ScanServiceError } from '../import/scanService.js';
 import { resolveSafeAbsolutePath } from '../import/storagePathUtils.js';
@@ -188,6 +195,66 @@ importRoutes.post('/register', async (req, res) => {
     log.error('Failed to register import files', error);
     const errorResponse: ImportApiErrorResponse = { error: 'Failed to register files' };
     res.status(500).json(errorResponse);
+  }
+});
+
+function readRefreshFolderRequest(body: Partial<RefreshFolderRequest> | undefined): {
+  rootId: string;
+  relativePath: string;
+} | null {
+  if (typeof body?.rootId !== 'string' || typeof body?.relativePath !== 'string') {
+    return null;
+  }
+
+  return {
+    rootId: body.rootId,
+    relativePath: body.relativePath
+  };
+}
+
+importRoutes.post('/reimport-known', async (req, res) => {
+  const request = readRefreshFolderRequest(req.body as Partial<RefreshFolderRequest> | undefined);
+  if (!request) {
+    const errorResponse: ImportApiErrorResponse = { error: 'rootId and relativePath are required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response: RefreshOperationResponse = await reimportKnownAssetsInFolder(request);
+    res.json(response);
+  } catch (error) {
+    if (error instanceof RefreshServiceError) {
+      const errorResponse: ImportApiErrorResponse = { error: error.message };
+      res.status(error.code === 'INVALID_INPUT' ? 400 : error.code === 'NOT_FOUND' ? 404 : 409).json(errorResponse);
+      return;
+    }
+
+    log.error('Failed to reimport known assets in folder', error);
+    res.status(500).json({ error: 'Failed to reimport known assets in folder' });
+  }
+});
+
+importRoutes.post('/rebuild-derived', async (req, res) => {
+  const request = readRefreshFolderRequest(req.body as Partial<RefreshFolderRequest> | undefined);
+  if (!request) {
+    const errorResponse: ImportApiErrorResponse = { error: 'rootId and relativePath are required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response: RefreshOperationResponse = await rebuildDerivedFilesInFolder(request);
+    res.json(response);
+  } catch (error) {
+    if (error instanceof RefreshServiceError) {
+      const errorResponse: ImportApiErrorResponse = { error: error.message };
+      res.status(error.code === 'INVALID_INPUT' ? 400 : error.code === 'NOT_FOUND' ? 404 : 409).json(errorResponse);
+      return;
+    }
+
+    log.error('Failed to rebuild derived files in folder', error);
+    res.status(500).json({ error: 'Failed to rebuild derived files in folder' });
   }
 });
 

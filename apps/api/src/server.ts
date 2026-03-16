@@ -1,7 +1,13 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { PhotoState, normalizePhotoState } from '@tedography/domain';
+import type { RefreshOperationResponse } from '@tedography/domain';
 import { log } from './logger.js';
+import {
+  rebuildDerivedFilesForAsset,
+  RefreshServiceError,
+  reimportAssetById
+} from './import/refreshService.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
@@ -56,6 +62,40 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to update asset photoState', error);
       res.status(500).json({ error: 'Failed to update asset' });
+    }
+  });
+
+  app.post('/api/assets/:id/reimport', async (req, res) => {
+    try {
+      const response: RefreshOperationResponse = await reimportAssetById(req.params.id);
+      res.json(response);
+    } catch (error) {
+      if (error instanceof RefreshServiceError) {
+        res.status(error.code === 'NOT_FOUND' ? 404 : error.code === 'INVALID_INPUT' ? 400 : 409).json({
+          error: error.message
+        });
+        return;
+      }
+
+      log.error('Failed to reimport asset', error);
+      res.status(500).json({ error: 'Failed to reimport asset' });
+    }
+  });
+
+  app.post('/api/assets/:id/rebuild-derived', async (req, res) => {
+    try {
+      const response: RefreshOperationResponse = await rebuildDerivedFilesForAsset(req.params.id);
+      res.json(response);
+    } catch (error) {
+      if (error instanceof RefreshServiceError) {
+        res.status(error.code === 'NOT_FOUND' ? 404 : error.code === 'INVALID_INPUT' ? 400 : 409).json({
+          error: error.message
+        });
+        return;
+      }
+
+      log.error('Failed to rebuild asset derived files', error);
+      res.status(500).json({ error: 'Failed to rebuild asset derived files' });
     }
   });
 
