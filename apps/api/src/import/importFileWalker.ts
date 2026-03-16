@@ -26,7 +26,6 @@ function joinRelativePath(baseRelativePath: string, entryName: string): string {
 async function walkDirectory(
   absoluteDirectoryPath: string,
   baseRelativePath: string,
-  recursive: boolean,
   accumulator: WalkImportFilesResult
 ): Promise<void> {
   const entries = await fs.readdir(absoluteDirectoryPath, { withFileTypes: true });
@@ -42,9 +41,6 @@ async function walkDirectory(
     const entryRelativePath = joinRelativePath(baseRelativePath, entry.name);
 
     if (entry.isDirectory()) {
-      if (recursive) {
-        await walkDirectory(entryAbsolutePath, entryRelativePath, recursive, accumulator);
-      }
       continue;
     }
 
@@ -66,7 +62,6 @@ async function walkDirectory(
 export async function walkImportFiles(input: {
   absoluteBasePath: string;
   relativeBasePath: string;
-  recursive: boolean;
 }): Promise<WalkImportFilesResult> {
   const result: WalkImportFilesResult = {
     files: [],
@@ -76,7 +71,6 @@ export async function walkImportFiles(input: {
   await walkDirectory(
     input.absoluteBasePath,
     input.relativeBasePath,
-    input.recursive,
     result
   );
 

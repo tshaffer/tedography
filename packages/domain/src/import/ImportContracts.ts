@@ -49,7 +49,6 @@ export interface ImportApiErrorResponse {
 export interface ScanImportRequest {
   rootId: string;
   relativePath: string;
-  recursive?: boolean;
 }
 
 export type ScanFileStatus =
@@ -98,7 +97,6 @@ export interface ScanImportResponse {
     label: string;
   };
   scanTargetRelativePath: string;
-  recursive: boolean;
   summary: ScanSummaryDto;
   files: ScannedCandidateFileDto[];
 }

@@ -66,7 +66,6 @@ function getOriginalFileFormat(extension: string | null): string {
 export async function scanImportTarget(input: {
   rootId: string;
   relativePath: string;
-  recursive: boolean;
 }): Promise<ScanImportResponse> {
   const rootId = input.rootId.trim();
   if (rootId.length === 0) {
@@ -112,8 +111,7 @@ export async function scanImportTarget(input: {
 
   const walkResult = await walkImportFiles({
     absoluteBasePath: absoluteTargetPath,
-    relativeBasePath: scanTargetRelativePath,
-    recursive: input.recursive
+    relativeBasePath: scanTargetRelativePath
   });
 
   const supportedFileMap = new Map<string, SupportedScannedFile>();
@@ -236,7 +234,6 @@ export async function scanImportTarget(input: {
       label: root.label
     },
     scanTargetRelativePath,
-    recursive: input.recursive,
     summary: {
       totalFilesystemEntriesSeen: walkResult.totalFilesystemEntriesSeen,
       totalFilesSeen: files.length,

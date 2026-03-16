@@ -82,7 +82,6 @@ importRoutes.post('/scan', async (req, res) => {
   const body = req.body as Partial<ScanImportRequest> | undefined;
   const rootId = body?.rootId;
   const relativePath = body?.relativePath;
-  const recursive = body?.recursive ?? false;
 
   if (typeof rootId !== 'string' || rootId.trim().length === 0) {
     const errorResponse: ImportApiErrorResponse = { error: 'rootId is required' };
@@ -96,17 +95,10 @@ importRoutes.post('/scan', async (req, res) => {
     return;
   }
 
-  if (typeof recursive !== 'boolean') {
-    const errorResponse: ImportApiErrorResponse = { error: 'recursive must be a boolean when provided' };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
   try {
     const response: ScanImportResponse = await scanImportTarget({
       rootId,
-      relativePath,
-      recursive
+      relativePath
     });
     res.json(response);
   } catch (error) {
