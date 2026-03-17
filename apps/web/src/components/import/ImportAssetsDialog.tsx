@@ -353,6 +353,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registerResponse, setRegisterResponse] = useState<RegisterImportResponse | null>(null);
   const [albumAssignmentMessage, setAlbumAssignmentMessage] = useState<string | null>(null);
+  const [importCompletionMessage, setImportCompletionMessage] = useState<string | null>(null);
 
   const [albumTreeNodes, setAlbumTreeNodes] = useState<AlbumTreeNode[]>([]);
   const [albumTreeLoading, setAlbumTreeLoading] = useState(false);
@@ -372,6 +373,12 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
         .map((file) => file.relativePath) ?? [],
     [scanResponse]
   );
+  const selectedImportableScanPaths = useMemo(
+    () => selectedImportablePaths.filter((relativePath) => importableScanPaths.includes(relativePath)),
+    [importableScanPaths, selectedImportablePaths]
+  );
+  const allImportableSelected =
+    importableScanPaths.length > 0 && selectedImportableScanPaths.length === importableScanPaths.length;
 
   const suggestedAlbumName = useMemo(
     () => (selectedSource ? getFolderName(selectedSource.relativePath) : ''),
@@ -499,6 +506,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     setRegisterError(null);
     setScanError(null);
     setAlbumAssignmentMessage(null);
+    setImportCompletionMessage(null);
     setAlbumDestinationMode('none');
     setSelectedExistingAlbumId('');
     setSelectedNewAlbumParentId('');
@@ -516,6 +524,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     setRegisterResponse(null);
     setRegisterError(null);
     setAlbumAssignmentMessage(null);
+    setImportCompletionMessage(null);
   }
 
   function selectSource(selection: SourceSelection): void {
@@ -541,6 +550,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     setRegisterResponse(null);
     setRegisterError(null);
     setAlbumAssignmentMessage(null);
+    setImportCompletionMessage(null);
 
     try {
       const response = await scanImportTarget({
@@ -563,8 +573,23 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     }
   }
 
+  async function refreshScanStateAfterImport(source: SourceSelection): Promise<void> {
+    const response = await scanImportTarget({
+      rootId: source.rootId,
+      relativePath: source.relativePath
+    });
+
+    setScanResponse(response);
+    setSelectedImportablePaths(
+      response.files
+        .filter((file) => file.status === 'Importable')
+        .map((file) => file.relativePath)
+    );
+    setScanError(null);
+  }
+
   async function handleImportSelected(): Promise<void> {
-    if (!selectedSource || selectedImportablePaths.length === 0) {
+    if (!selectedSource || selectedImportableScanPaths.length === 0) {
       return;
     }
 
@@ -614,7 +639,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
 
       const response = await registerImportedFiles({
         rootId: selectedSource.rootId,
-        files: selectedImportablePaths.map((relativePath) => ({ relativePath }))
+        files: selectedImportableScanPaths.map((relativePath) => ({ relativePath }))
       });
 
       if (destinationAlbumId) {
@@ -637,6 +662,19 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
       }
 
       setRegisterResponse(response);
+      const nonImportedCount =
+        response.skippedAlreadyImportedByPathCount +
+        response.skippedDuplicateContentCount +
+        response.unsupportedCount +
+        response.missingCount +
+        response.errorCount;
+      setImportCompletionMessage(
+        `Import complete: ${response.importedCount} imported` +
+          (nonImportedCount > 0 ? `, ${nonImportedCount} not imported` : '') +
+          (destinationAlbumLabel ? ` into "${destinationAlbumLabel}"` : '') +
+          '.'
+      );
+      await refreshScanStateAfterImport(selectedSource);
       if (response.importedCount > 0 || destinationAlbumId) {
         onImportCompleted?.();
       }
@@ -903,7 +941,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
                   disabled={!selectedSource || scanLoading || registerLoading}
                   onClick={() => void handleScan()}
                 >
-                  {scanLoading ? 'Scanning...' : 'Scan for New Assets in Folder'}
+                  {scanLoading ? 'Scanning...' : 'Scan for Assets in Folder'}
                 </button>
               </div>
 
@@ -927,17 +965,17 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
                     <div style={{ ...controlRowStyle, marginTop: '10px' }}>
                       <button
                         type="button"
-                        style={buttonStyle}
+                        style={!allImportableSelected ? buttonStyle : disabledButtonStyle}
                         onClick={() => setSelectedImportablePaths(importableScanPaths)}
-                        disabled={importableScanPaths.length === 0}
+                        disabled={importableScanPaths.length === 0 || allImportableSelected}
                       >
                         Select All Importable
                       </button>
                       <button
                         type="button"
-                        style={buttonStyle}
+                        style={selectedImportableScanPaths.length > 0 ? buttonStyle : disabledButtonStyle}
                         onClick={() => setSelectedImportablePaths([])}
-                        disabled={selectedImportablePaths.length === 0}
+                        disabled={selectedImportableScanPaths.length === 0}
                       >
                         Clear Selection
                       </button>
@@ -1051,6 +1089,7 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
               </div>
 
               {registerError ? <p style={{ color: '#b00020' }}>{registerError}</p> : null}
+              {importCompletionMessage ? <p style={{ color: '#136f2d' }}>{importCompletionMessage}</p> : null}
               {albumAssignmentMessage ? <p style={{ color: '#136f2d' }}>{albumAssignmentMessage}</p> : null}
               {registerResponse ? (
                 <section style={sectionStyle}>
@@ -1088,12 +1127,12 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
             <button
               type="button"
               style={
-                selectedImportablePaths.length > 0 && !registerLoading ? primaryButtonStyle : disabledButtonStyle
+                selectedImportableScanPaths.length > 0 && !registerLoading ? primaryButtonStyle : disabledButtonStyle
               }
-              disabled={selectedImportablePaths.length === 0 || registerLoading}
+              disabled={selectedImportableScanPaths.length === 0 || registerLoading}
               onClick={() => void handleImportSelected()}
             >
-              {registerLoading ? 'Importing...' : `Import Selected (${selectedImportablePaths.length})`}
+              {registerLoading ? 'Importing...' : `Import Selected (${selectedImportableScanPaths.length})`}
             </button>
             <button type="button" style={buttonStyle} onClick={onClose}>
               Close
