@@ -16,6 +16,11 @@ import {
 
 type AlbumDestinationMode = 'none' | 'existing' | 'new';
 
+export interface ImportAssetsDialogInitialAlbumDestination {
+  mode: 'new';
+  parentGroupId: string;
+}
+
 type SourceSelection = {
   rootId: string;
   relativePath: string;
@@ -331,9 +336,15 @@ interface ImportAssetsDialogProps {
   open: boolean;
   onClose: () => void;
   onImportCompleted?: () => void;
+  initialAlbumDestination?: ImportAssetsDialogInitialAlbumDestination | null;
 }
 
-export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportAssetsDialogProps) {
+export function ImportAssetsDialog({
+  open,
+  onClose,
+  onImportCompleted,
+  initialAlbumDestination
+}: ImportAssetsDialogProps) {
   const [roots, setRoots] = useState<StorageRootDto[]>([]);
   const [rootsLoading, setRootsLoading] = useState(false);
   const [rootsError, setRootsError] = useState<string | null>(null);
@@ -507,11 +518,11 @@ export function ImportAssetsDialog({ open, onClose, onImportCompleted }: ImportA
     setScanError(null);
     setAlbumAssignmentMessage(null);
     setImportCompletionMessage(null);
-    setAlbumDestinationMode('none');
+    setAlbumDestinationMode(initialAlbumDestination?.mode ?? 'none');
     setSelectedExistingAlbumId('');
-    setSelectedNewAlbumParentId('');
+    setSelectedNewAlbumParentId(initialAlbumDestination?.parentGroupId ?? '');
     setNewAlbumName('');
-  }, [open]);
+  }, [initialAlbumDestination, open]);
 
   if (!open) {
     return null;

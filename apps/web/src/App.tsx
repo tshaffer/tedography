@@ -28,7 +28,10 @@ import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
-import { ImportAssetsDialog } from './components/import/ImportAssetsDialog';
+import {
+  ImportAssetsDialog,
+  type ImportAssetsDialogInitialAlbumDestination
+} from './components/import/ImportAssetsDialog';
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
@@ -75,6 +78,14 @@ type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 
+type AlbumTreeContextMenuState = {
+  nodeId: string;
+  x: number;
+  y: number;
+};
+
+const albumTreeContextMenuViewportPaddingPx = 8;
+
 const timelineStickyTopPx = 10;
 const timelineActiveMonthOffsetPx = timelineStickyTopPx + 16;
 const timelineZoomLevels = [
@@ -117,6 +128,36 @@ const topBarSectionStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: '6px'
+};
+
+const contextMenuStyle: CSSProperties = {
+  position: 'fixed',
+  minWidth: '180px',
+  padding: '6px',
+  borderRadius: '10px',
+  border: '1px solid #d6d6d6',
+  backgroundColor: '#fff',
+  boxShadow: '0 12px 28px rgba(15, 23, 42, 0.18)',
+  zIndex: 1400,
+  display: 'grid',
+  gap: '4px'
+};
+
+const contextMenuItemStyle: CSSProperties = {
+  width: '100%',
+  border: '1px solid transparent',
+  borderRadius: '8px',
+  backgroundColor: 'transparent',
+  textAlign: 'left',
+  padding: '8px 10px',
+  fontSize: '13px',
+  cursor: 'pointer'
+};
+
+const disabledContextMenuItemStyle: CSSProperties = {
+  ...contextMenuItemStyle,
+  color: '#999',
+  cursor: 'not-allowed'
 };
 
 const primaryAreaControlsStyle: CSSProperties = {
@@ -2070,7 +2111,11 @@ export default function App() {
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importDialogInitialAlbumDestination, setImportDialogInitialAlbumDestination] =
+    useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
+  const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [albumMembershipNotice, setAlbumMembershipNotice] = useState<{
     kind: 'success' | 'error';
@@ -2817,6 +2862,15 @@ export default function App() {
       selectedAssetsForAlbumMembershipAction.length - selectedAssetsInFocusedAlbum.length
     );
   }, [selectedAssetsForAlbumMembershipAction.length, selectedAssetsInFocusedAlbum.length]);
+
+  const selectedAlbumTreeGroupNode = useMemo(() => {
+    if (!selectedTreeNodeId) {
+      return null;
+    }
+
+    const node = albumNodesById.get(selectedTreeNodeId);
+    return node?.nodeType === 'Group' ? node : null;
+  }, [albumNodesById, selectedTreeNodeId]);
 
   const slideshowAssets = useMemo(
     () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
@@ -3776,6 +3830,49 @@ export default function App() {
     await handleCreateAlbumTreeNode('Album', null);
   }
 
+  function handleOpenImportDialog(
+    initialAlbumDestination: ImportAssetsDialogInitialAlbumDestination | null = null
+  ): void {
+    setImportDialogInitialAlbumDestination(initialAlbumDestination);
+    setImportDialogOpen(true);
+  }
+
+  function closeAlbumTreeContextMenu(): void {
+    setAlbumTreeContextMenu(null);
+  }
+
+  function handleAlbumTreeGroupContextMenu(
+    event: ReactMouseEvent<HTMLDivElement>,
+    node: AlbumTreeNode
+  ): void {
+    if (node.nodeType !== 'Group' || selectedTreeNodeId !== node.id) {
+      return;
+    }
+
+    event.preventDefault();
+    setAlbumTreeContextMenu({
+      nodeId: node.id,
+      x: event.clientX,
+      y: event.clientY
+    });
+  }
+
+  function handleImportAlbumFromSelectedGroup(): void {
+    if (!selectedAlbumTreeGroupNode) {
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+    handleOpenImportDialog({
+      mode: 'new',
+      parentGroupId: selectedAlbumTreeGroupNode.id
+    });
+  }
+
+  function handleAlbumTreeMoveToPlaceholder(): void {
+    closeAlbumTreeContextMenu();
+  }
+
   async function handleRenameSelectedTreeNode(): Promise<void> {
     if (!selectedTreeNodeId) {
       return;
@@ -4096,6 +4193,12 @@ export default function App() {
         return;
       }
 
+      if (event.key === 'Escape' && albumTreeContextMenu) {
+        event.preventDefault();
+        closeAlbumTreeContextMenu();
+        return;
+      }
+
       if (event.key === 'Escape' && surveyOpen) {
         setSurveyOpen(false);
         return;
@@ -4236,6 +4339,7 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [
+    albumTreeContextMenu,
     compareAssets,
     loupeAssets,
     visibleAssets,
@@ -4249,6 +4353,69 @@ export default function App() {
     updatingAssetIds,
     viewerMode
   ]);
+
+  useEffect(() => {
+    if (!albumTreeContextMenu) {
+      return;
+    }
+
+    const handlePointerDown = (): void => {
+      setAlbumTreeContextMenu(null);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [albumTreeContextMenu]);
+
+  useEffect(() => {
+    if (albumTreeContextMenu && albumTreeContextMenu.nodeId !== selectedTreeNodeId) {
+      setAlbumTreeContextMenu(null);
+    }
+  }, [albumTreeContextMenu, selectedTreeNodeId]);
+
+  useEffect(() => {
+    if (!albumTreeContextMenu || !albumTreeContextMenuRef.current) {
+      return;
+    }
+
+    const repositionMenu = (): void => {
+      const menuBounds = albumTreeContextMenuRef.current?.getBoundingClientRect();
+      if (!menuBounds) {
+        return;
+      }
+
+      const maxX = Math.max(
+        albumTreeContextMenuViewportPaddingPx,
+        window.innerWidth - menuBounds.width - albumTreeContextMenuViewportPaddingPx
+      );
+      const maxY = Math.max(
+        albumTreeContextMenuViewportPaddingPx,
+        window.innerHeight - menuBounds.height - albumTreeContextMenuViewportPaddingPx
+      );
+      const nextX = Math.min(Math.max(albumTreeContextMenu.x, albumTreeContextMenuViewportPaddingPx), maxX);
+      const nextY = Math.min(Math.max(albumTreeContextMenu.y, albumTreeContextMenuViewportPaddingPx), maxY);
+
+      if (nextX !== albumTreeContextMenu.x || nextY !== albumTreeContextMenu.y) {
+        setAlbumTreeContextMenu((previous) =>
+          previous
+            ? {
+                ...previous,
+                x: nextX,
+                y: nextY
+              }
+            : previous
+        );
+      }
+    };
+
+    repositionMenu();
+    window.addEventListener('resize', repositionMenu);
+    return () => {
+      window.removeEventListener('resize', repositionMenu);
+    };
+  }, [albumTreeContextMenu]);
 
   useEffect(() => {
     if (viewerMode !== 'Grid') {
@@ -4289,7 +4456,11 @@ export default function App() {
             const depthIndent = `${node.depth * 20}px`;
 
             return (
-              <div key={node.id} style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}>
+              <div
+                key={node.id}
+                style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}
+                onContextMenu={(event) => handleAlbumTreeGroupContextMenu(event, node)}
+              >
                 {isGroup ? (
                   <button
                     type="button"
@@ -4326,6 +4497,61 @@ export default function App() {
             );
           })
         )}
+      </div>
+    );
+  }
+
+  function renderAlbumTreeContextMenu(): ReactElement | null {
+    if (!albumTreeContextMenu || selectedAlbumTreeGroupNode?.id !== albumTreeContextMenu.nodeId) {
+      return null;
+    }
+
+    return (
+      <div
+        ref={albumTreeContextMenuRef}
+        style={{
+          ...contextMenuStyle,
+          left: `${albumTreeContextMenu.x}px`,
+          top: `${albumTreeContextMenu.y}px`
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
+          Import Album
+        </button>
+        <button
+          type="button"
+          style={contextMenuItemStyle}
+          onClick={() => {
+            closeAlbumTreeContextMenu();
+            void handleCreateGroup();
+          }}
+        >
+          Add Group
+        </button>
+        <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
+          Move To...
+        </button>
+        <button
+          type="button"
+          style={contextMenuItemStyle}
+          onClick={() => {
+            closeAlbumTreeContextMenu();
+            void handleRenameSelectedTreeNode();
+          }}
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          style={contextMenuItemStyle}
+          onClick={() => {
+            closeAlbumTreeContextMenu();
+            void handleDeleteSelectedTreeNode();
+          }}
+        >
+          Delete
+        </button>
       </div>
     );
   }
@@ -4988,7 +5214,7 @@ export default function App() {
             <button
               type="button"
               style={compareButtonStyle}
-              onClick={() => setImportDialogOpen(true)}
+              onClick={() => handleOpenImportDialog()}
               title="Import assets"
             >
               Import
@@ -5056,7 +5282,7 @@ export default function App() {
             <button
               type="button"
               style={compareButtonStyle}
-              onClick={() => setImportDialogOpen(true)}
+              onClick={() => handleOpenImportDialog()}
             >
               Import Assets
             </button>
@@ -5271,9 +5497,15 @@ export default function App() {
         />
       ) : null}
 
+      {renderAlbumTreeContextMenu()}
+
       <ImportAssetsDialog
         open={importDialogOpen}
-        onClose={() => setImportDialogOpen(false)}
+        initialAlbumDestination={importDialogInitialAlbumDestination}
+        onClose={() => {
+          setImportDialogOpen(false);
+          setImportDialogInitialAlbumDestination(null);
+        }}
         onImportCompleted={() => {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });
