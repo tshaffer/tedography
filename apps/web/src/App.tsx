@@ -21,10 +21,12 @@ import {
   createAlbumTreeNode,
   deleteAlbumTreeNode,
   listAlbumTreeNodes,
+  moveAlbumTreeNode,
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
+import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -1452,6 +1454,29 @@ function getAncestorGroupIdsForAlbumIds(
   return Array.from(ancestorGroupIds);
 }
 
+function getAncestorGroupIdsForParentId(
+  parentId: string | null,
+  albumNodesById: Map<string, AlbumTreeNode>
+): string[] {
+  const ancestorGroupIds = new Set<string>();
+  let currentParentId = parentId;
+
+  while (currentParentId) {
+    const currentNode = albumNodesById.get(currentParentId);
+    if (!currentNode) {
+      break;
+    }
+
+    if (currentNode.nodeType === 'Group') {
+      ancestorGroupIds.add(currentNode.id);
+    }
+
+    currentParentId = currentNode.parentId;
+  }
+
+  return Array.from(ancestorGroupIds);
+}
+
 function resolveAlbumTreeCreationParentId(selectedNode: AlbumTreeNode | null): string | null {
   if (!selectedNode) {
     return null;
@@ -2140,6 +2165,7 @@ export default function App() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importDialogInitialAlbumDestination, setImportDialogInitialAlbumDestination] =
     useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
+  const [moveDialogNodeId, setMoveDialogNodeId] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
@@ -2906,6 +2932,10 @@ export default function App() {
     const node = albumNodesById.get(selectedTreeNodeId);
     return node?.nodeType === 'Album' ? node : null;
   }, [albumNodesById, selectedTreeNodeId]);
+  const moveDialogNode = useMemo(
+    () => (moveDialogNodeId ? albumNodesById.get(moveDialogNodeId) ?? null : null),
+    [albumNodesById, moveDialogNodeId]
+  );
 
   const slideshowAssets = useMemo(
     () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
@@ -3935,6 +3965,15 @@ export default function App() {
     closeAlbumTreeContextMenu();
   }
 
+  function openMoveDialogForSelectedTreeNode(): void {
+    if (!selectedTreeNodeId) {
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+    setMoveDialogNodeId(selectedTreeNodeId);
+  }
+
   function handleImportPhotosIntoSelectedAlbum(): void {
     if (!selectedAlbumTreeAlbumNode) {
       return;
@@ -3945,6 +3984,29 @@ export default function App() {
       mode: 'existing',
       albumId: selectedAlbumTreeAlbumNode.id
     });
+  }
+
+  async function handleMoveTreeNode(destinationParentId: string | null): Promise<void> {
+    if (!moveDialogNode) {
+      return;
+    }
+
+    const moved = await moveAlbumTreeNode(moveDialogNode.id, { parentId: destinationParentId });
+    const ancestorGroupIds = getAncestorGroupIdsForParentId(destinationParentId, albumNodesById);
+
+    if (ancestorGroupIds.length > 0) {
+      setExpandedGroupIds((previous) => {
+        const merged = new Set(previous);
+        for (const groupId of ancestorGroupIds) {
+          merged.add(groupId);
+        }
+        return Array.from(merged);
+      });
+    }
+
+    setSelectedTreeNodeId(moved.id);
+    setMoveDialogNodeId(null);
+    await loadAlbumTreeNodes({ showLoading: false });
   }
 
   async function handleRenameSelectedTreeNode(): Promise<void> {
@@ -4611,7 +4673,7 @@ export default function App() {
             >
               Add Group
             </button>
-            <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
+            <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
             </button>
             <button
@@ -4641,7 +4703,7 @@ export default function App() {
             <button type="button" style={contextMenuItemStyle} onClick={handleImportPhotosIntoSelectedAlbum}>
               Import Photos
             </button>
-            <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
+            <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
             </button>
             <button
@@ -5640,6 +5702,14 @@ export default function App() {
       ) : null}
 
       {renderAlbumTreeContextMenu()}
+
+      <MoveAlbumTreeNodeDialog
+        open={moveDialogNode !== null}
+        nodes={albumTreeNodes}
+        nodeToMove={moveDialogNode}
+        onClose={() => setMoveDialogNodeId(null)}
+        onMove={handleMoveTreeNode}
+      />
 
       <ImportAssetsDialog
         open={importDialogOpen}

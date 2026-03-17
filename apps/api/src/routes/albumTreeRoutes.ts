@@ -11,6 +11,7 @@ import {
   deleteAlbumTreeNode,
   findAlbumTreeNodeById,
   listAlbumTreeNodes,
+  moveAlbumTreeNode,
   renameAlbumTreeNode
 } from '../repositories/albumTreeRepository.js';
 
@@ -76,6 +77,31 @@ async function loadAlbumNode(nodeId: string): Promise<AlbumTreeNode | null> {
   }
 
   return node;
+}
+
+function getDescendantNodeIds(nodes: AlbumTreeNode[], groupId: string): Set<string> {
+  const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
+
+  for (const node of nodes) {
+    const siblings = childrenByParent.get(node.parentId) ?? [];
+    siblings.push(node);
+    childrenByParent.set(node.parentId, siblings);
+  }
+
+  const descendantIds = new Set<string>();
+  const stack = [...(childrenByParent.get(groupId) ?? [])];
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node) {
+      continue;
+    }
+
+    descendantIds.add(node.id);
+    stack.push(...(childrenByParent.get(node.id) ?? []));
+  }
+
+  return descendantIds;
 }
 
 export const albumTreeRoutes: Router = Router();
@@ -146,6 +172,67 @@ albumTreeRoutes.patch('/:id', async (req, res) => {
     res.json(updated);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to rename node' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.post('/:id/move', async (req, res) => {
+  const parentId = parseParentId((req.body as { parentId?: unknown }).parentId);
+  const node = await findAlbumTreeNodeById(req.params.id);
+  if (!node) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  if (parentId === node.parentId) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Choose a different destination' };
+    res.status(409).json(errorResponse);
+    return;
+  }
+
+  if (parentId !== null) {
+    const parentNode = await findAlbumTreeNodeById(parentId);
+    if (!parentNode) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Destination node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    if (parentNode.nodeType !== 'Group') {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Only Group nodes may contain child nodes' };
+      res.status(400).json(errorResponse);
+      return;
+    }
+
+    if (node.nodeType === 'Group') {
+      if (parentNode.id === node.id) {
+        const errorResponse: AlbumTreeErrorResponse = { error: 'A group cannot be moved into itself' };
+        res.status(400).json(errorResponse);
+        return;
+      }
+
+      const allNodes = await listAlbumTreeNodes();
+      const descendantIds = getDescendantNodeIds(allNodes, node.id);
+      if (descendantIds.has(parentNode.id)) {
+        const errorResponse: AlbumTreeErrorResponse = { error: 'A group cannot be moved into its descendant' };
+        res.status(400).json(errorResponse);
+        return;
+      }
+    }
+  }
+
+  try {
+    const moved = await moveAlbumTreeNode(node.id, parentId);
+    if (!moved) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(moved);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to move node' };
     res.status(500).json(errorResponse);
   }
 });

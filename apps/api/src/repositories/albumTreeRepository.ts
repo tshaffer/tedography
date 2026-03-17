@@ -72,6 +72,23 @@ export async function renameAlbumTreeNode(
   ).lean<AlbumTreeNode | null>();
 }
 
+export async function moveAlbumTreeNode(
+  nodeId: string,
+  parentId: string | null
+): Promise<AlbumTreeNode | null> {
+  return AlbumTreeNodeModel.findOneAndUpdate(
+    { id: nodeId },
+    {
+      $set: {
+        parentId,
+        sortOrder: await getNextSortOrderForParent(parentId),
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<AlbumTreeNode | null>();
+}
+
 export async function deleteAlbumTreeNode(nodeId: string): Promise<boolean> {
   const result = await AlbumTreeNodeModel.deleteOne({ id: nodeId });
   return result.deletedCount > 0;
