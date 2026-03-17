@@ -2041,6 +2041,10 @@ export default function App() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [albumMembershipNotice, setAlbumMembershipNotice] = useState<{
+    kind: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
   const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
   const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
@@ -2491,9 +2495,20 @@ export default function App() {
       ),
     [albumTreeNodes]
   );
+  const assetsById = useMemo(
+    () =>
+      new Map<string, MediaAsset>(
+        assets.map((asset) => [asset.id, asset])
+      ),
+    [assets]
+  );
   const selectedTreeNode = useMemo(
     () => (selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) ?? null : null),
     [albumNodesById, selectedTreeNodeId]
+  );
+  const focusedAlbumForMembershipAction = useMemo(
+    () => (selectedTreeNode?.nodeType === 'Album' ? selectedTreeNode : null),
+    [selectedTreeNode]
   );
   const canCreateGroupNode = selectedTreeNode?.nodeType === 'Group';
   const canCreateAlbumNode = selectedTreeNode?.nodeType === 'Group';
@@ -2745,6 +2760,28 @@ export default function App() {
     () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
     [visibleAssets, selectedAssetIds]
   );
+  const selectedAssetsForAlbumMembershipAction = useMemo(
+    () =>
+      selectedAssetIdsForAlbumAction
+        .map((assetId) => assetsById.get(assetId) ?? null)
+        .filter((asset): asset is MediaAsset => asset !== null),
+    [assetsById, selectedAssetIdsForAlbumAction]
+  );
+  const selectedAssetsInFocusedAlbum = useMemo(() => {
+    if (!focusedAlbumForMembershipAction) {
+      return [];
+    }
+
+    return selectedAssetsForAlbumMembershipAction.filter((asset) =>
+      (asset.albumIds ?? []).includes(focusedAlbumForMembershipAction.id)
+    );
+  }, [focusedAlbumForMembershipAction, selectedAssetsForAlbumMembershipAction]);
+  const selectedAssetsAlreadyOutsideFocusedAlbumCount = useMemo(() => {
+    return Math.max(
+      0,
+      selectedAssetsForAlbumMembershipAction.length - selectedAssetsInFocusedAlbum.length
+    );
+  }, [selectedAssetsForAlbumMembershipAction.length, selectedAssetsInFocusedAlbum.length]);
 
   const slideshowAssets = useMemo(
     () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
@@ -2986,6 +3023,10 @@ export default function App() {
     setAssetMaintenanceMessage(null);
     setAssetMaintenanceError(false);
   }, [selectedAssetId]);
+
+  useEffect(() => {
+    setAlbumMembershipNotice(null);
+  }, [selectedTreeNodeId]);
 
   useEffect(() => {
     const handleFullscreenChange = (): void => {
@@ -3788,25 +3829,72 @@ export default function App() {
   }
 
   async function handleRemoveSelectedFromFocusedAlbum(): Promise<void> {
-    if (!selectedTreeNodeId) {
+    if (!focusedAlbumForMembershipAction) {
       return;
     }
 
-    const focusedNode = albumNodesById.get(selectedTreeNodeId);
-    if (!focusedNode || focusedNode.nodeType !== 'Album') {
+    if (selectedAssetsForAlbumMembershipAction.length === 0) {
+      setAlbumMembershipNotice({
+        kind: 'error',
+        message: `Select one or more assets to remove from "${focusedAlbumForMembershipAction.label}".`
+      });
       return;
     }
 
-    if (selectedAssetIdsForAlbumAction.length === 0) {
+    if (selectedAssetsInFocusedAlbum.length === 0) {
+      setAlbumMembershipNotice({
+        kind: 'error',
+        message: `Nothing removed. None of the selected assets are in "${focusedAlbumForMembershipAction.label}".`
+      });
       return;
     }
+
+    const removalCount = selectedAssetsInFocusedAlbum.length;
+    const alreadyOutsideCount = selectedAssetsAlreadyOutsideFocusedAlbumCount;
+    const confirmed = window.confirm(
+      `Remove ${removalCount} selected ${removalCount === 1 ? 'asset' : 'assets'} from "${focusedAlbumForMembershipAction.label}"?` +
+        (alreadyOutsideCount > 0
+          ? ` ${alreadyOutsideCount} selected ${alreadyOutsideCount === 1 ? 'asset is' : 'assets are'} already outside this album.`
+          : '') +
+        ' The assets will remain in Tedography.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setAlbumMembershipNotice(null);
+    setUpdateError(null);
 
     try {
-      await removeAssetsFromAlbum(focusedNode.id, {
+      await removeAssetsFromAlbum(focusedAlbumForMembershipAction.id, {
         assetIds: selectedAssetIdsForAlbumAction
+      });
+      const removedAssetIds = new Set(selectedAssetsInFocusedAlbum.map((asset) => asset.id));
+      setAssets((previous) =>
+        previous.map((asset) =>
+          removedAssetIds.has(asset.id)
+            ? {
+                ...asset,
+                albumIds: (asset.albumIds ?? []).filter((albumId) => albumId !== focusedAlbumForMembershipAction.id)
+              }
+            : asset
+        )
+      );
+      setAlbumMembershipNotice({
+        kind: 'success',
+        message:
+          `Removed ${removalCount} ${removalCount === 1 ? 'asset' : 'assets'} from "${focusedAlbumForMembershipAction.label}".` +
+          (alreadyOutsideCount > 0
+            ? ` ${alreadyOutsideCount} selected ${alreadyOutsideCount === 1 ? 'asset was' : 'assets were'} already outside that album.`
+            : '')
       });
       await loadAssets({ showLoading: false });
     } catch (error: unknown) {
+      setAlbumMembershipNotice({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : `Failed to remove assets from "${focusedAlbumForMembershipAction.label}".`
+      });
       setUpdateError(error instanceof Error ? error.message : 'Failed to remove assets from album');
     }
   }
@@ -4800,16 +4888,22 @@ export default function App() {
             {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
               <button
                 type="button"
-                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                style={
+                  selectedAssetsInFocusedAlbum.length > 0
+                    ? compareButtonStyle
+                    : disabledToolbarActionButtonStyle
+                }
                 onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
-                disabled={!hasSelectedAssets}
+                disabled={selectedAssetsInFocusedAlbum.length === 0}
                 title={
-                  hasSelectedAssets
-                    ? 'Remove current selection from focused album'
-                    : 'Select one or more photos to remove them from the focused album'
+                  selectedAssetIdsForAlbumAction.length === 0
+                    ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                    : selectedAssetsInFocusedAlbum.length > 0
+                      ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                      : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
                 }
               >
-                -Album
+                {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
               </button>
             ) : null}
             {isLibraryArea || isSearchArea ? (
@@ -4873,6 +4967,17 @@ export default function App() {
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
+      {albumMembershipNotice ? (
+        <p
+          style={{
+            color: albumMembershipNotice.kind === 'error' ? '#b00020' : '#136f2d',
+            fontSize: '12px',
+            margin: '0 0 8px 0'
+          }}
+        >
+          {albumMembershipNotice.message}
+        </p>
+      ) : null}
       {isSearchArea && !assetsLoading && !assetsError ? (
         <p
           style={
