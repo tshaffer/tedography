@@ -1425,6 +1425,33 @@ function buildAlbumTreeDisplayList(
   return ordered;
 }
 
+function getAncestorGroupIdsForAlbumIds(
+  albumIds: string[],
+  albumNodesById: Map<string, AlbumTreeNode>
+): string[] {
+  const ancestorGroupIds = new Set<string>();
+
+  for (const albumId of albumIds) {
+    let currentNode = albumNodesById.get(albumId) ?? null;
+    let parentId = currentNode?.parentId ?? null;
+
+    while (parentId) {
+      currentNode = albumNodesById.get(parentId) ?? null;
+      if (!currentNode) {
+        break;
+      }
+
+      if (currentNode.nodeType === 'Group') {
+        ancestorGroupIds.add(currentNode.id);
+      }
+
+      parentId = currentNode.parentId;
+    }
+  }
+
+  return Array.from(ancestorGroupIds);
+}
+
 function resolveAlbumTreeCreationParentId(selectedNode: AlbumTreeNode | null): string | null {
   if (!selectedNode) {
     return null;
@@ -3775,6 +3802,25 @@ export default function App() {
     setCheckedAlbumIds([]);
   }
 
+  function revealCheckedAlbums(): void {
+    if (checkedAlbumIds.length === 0) {
+      return;
+    }
+
+    const ancestorGroupIds = getAncestorGroupIdsForAlbumIds(checkedAlbumIds, albumNodesById);
+    if (ancestorGroupIds.length === 0) {
+      return;
+    }
+
+    setExpandedGroupIds((previous) => {
+      const merged = new Set(previous);
+      for (const groupId of ancestorGroupIds) {
+        merged.add(groupId);
+      }
+      return Array.from(merged);
+    });
+  }
+
   async function handleCreateAlbumTreeNode(
     nodeType: 'Group' | 'Album',
     parentId: string | null
@@ -4645,6 +4691,19 @@ export default function App() {
         <div style={sidePanelHeaderStyle}>
           <div style={topBarSectionStyle}>
             <h2 style={sidePanelTitleStyle}>{title}</h2>
+            <button
+              type="button"
+              style={checkedAlbumIds.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              onClick={revealCheckedAlbums}
+              disabled={checkedAlbumIds.length === 0}
+              title={
+                checkedAlbumIds.length > 0
+                  ? 'Expand the tree so all checked albums are visible'
+                  : 'No checked albums to reveal'
+              }
+            >
+              Reveal Checked
+            </button>
             <button
               type="button"
               style={checkedAlbumIds.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
