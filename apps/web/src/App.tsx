@@ -824,9 +824,9 @@ const surveyHeaderStyle: CSSProperties = {
   top: 0,
   zIndex: 2,
   display: 'grid',
-  gap: '10px',
-  paddingBottom: '10px',
-  marginBottom: '8px',
+  gap: '6px',
+  paddingBottom: '6px',
+  marginBottom: '4px',
   backgroundColor: '#101010'
 };
 
@@ -863,9 +863,9 @@ const surveyTitleBadgeStyle: CSSProperties = {
 
 const surveyFocusedFilenameStyle: CSSProperties = {
   minWidth: 0,
-  maxWidth: '420px',
+  maxWidth: '360px',
   color: '#f1f1f1',
-  fontSize: '14px',
+  fontSize: '13px',
   fontWeight: 600,
   whiteSpace: 'nowrap',
   overflow: 'hidden',
@@ -887,7 +887,7 @@ const surveyCountBadgeStyle: CSSProperties = {
 const surveyHeaderControlsStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '8px',
+  gap: '6px',
   flexWrap: 'wrap',
   justifyContent: 'flex-end'
 };
@@ -895,8 +895,8 @@ const surveyHeaderControlsStyle: CSSProperties = {
 const surveySegmentedControlStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: '6px',
-  padding: '4px',
+  gap: '4px',
+  padding: '3px',
   borderRadius: '999px',
   backgroundColor: '#141414',
   border: '1px solid #292929'
@@ -908,9 +908,9 @@ const surveySegmentButtonStyle: CSSProperties = {
   backgroundColor: 'transparent',
   color: '#b7b7b7',
   cursor: 'pointer',
-  fontSize: '12px',
+  fontSize: '11px',
   fontWeight: 600,
-  padding: '7px 12px'
+  padding: '6px 10px'
 };
 
 const surveySegmentButtonActiveStyle: CSSProperties = {
@@ -922,7 +922,7 @@ const surveySegmentButtonActiveStyle: CSSProperties = {
 const surveyActionStripStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '8px',
+  gap: '6px',
   flexWrap: 'wrap'
 };
 
@@ -930,8 +930,8 @@ const surveyActionButtonStyle: CSSProperties = {
   ...immersiveControlButtonStyle,
   backgroundColor: '#161616',
   border: '1px solid #303030',
-  padding: '6px 9px',
-  fontSize: '12px'
+  padding: '5px 8px',
+  fontSize: '11px'
 };
 
 const surveyWorkspaceStyle: CSSProperties = {
@@ -940,15 +940,14 @@ const surveyWorkspaceStyle: CSSProperties = {
   flex: 1,
   minHeight: 0,
   minWidth: 0,
-  overflowY: 'auto',
-  overflowX: 'hidden'
+  overflow: 'hidden'
 };
 
 const surveyGridStyle: CSSProperties = {
   display: 'grid',
   width: '100%',
-  gap: '12px',
-  alignContent: 'start',
+  gap: '10px',
+  alignContent: 'stretch',
   flex: 1,
   minHeight: 0,
   minWidth: 0
@@ -959,7 +958,9 @@ const surveyGridLandscapeStyle: CSSProperties = {
 };
 
 const surveyGridPortraitStyle: CSSProperties = {
-  height: '100%'
+  height: '100%',
+  gridAutoFlow: 'column',
+  gridAutoColumns: 'minmax(0, 1fr)'
 };
 
 const surveyTileStyle: CSSProperties = {
@@ -981,7 +982,7 @@ const surveyPortraitTileStyle: CSSProperties = {
 };
 
 const surveyFocusedTileStyle: CSSProperties = {
-  boxShadow: '0 0 0 1px rgba(77, 163, 255, 0.8), 0 0 0 4px rgba(77, 163, 255, 0.14)'
+  boxShadow: '0 0 0 1px rgba(77, 163, 255, 0.65), 0 0 0 2px rgba(77, 163, 255, 0.12)'
 };
 
 const surveyPaneViewportStyle: CSSProperties = {
@@ -1031,20 +1032,20 @@ const surveyImageStyle: CSSProperties = {
 
 const surveyPaneOverlayTopStyle: CSSProperties = {
   position: 'absolute',
-  top: '10px',
-  left: '10px',
-  right: '10px',
+  top: '8px',
+  left: '8px',
+  right: '8px',
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
-  gap: '8px',
+  gap: '6px',
   pointerEvents: 'none'
 };
 
 const surveyPaneBadgeGroupStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '6px',
+  gap: '4px',
   flexWrap: 'wrap',
   minWidth: 0
 };
@@ -1053,14 +1054,14 @@ const surveyPaneBadgeStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   maxWidth: '100%',
-  padding: '4px 8px',
+  padding: '3px 7px',
   borderRadius: '999px',
-  fontSize: '11px',
+  fontSize: '10px',
   lineHeight: 1.2,
   color: '#f3f3f3',
-  backgroundColor: 'rgba(10, 10, 10, 0.78)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  backdropFilter: 'blur(8px)',
+  backgroundColor: 'rgba(10, 10, 10, 0.62)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  backdropFilter: 'blur(6px)',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis'
@@ -1069,41 +1070,41 @@ const surveyPaneBadgeStyle: CSSProperties = {
 const surveyPaneFocusedBadgeStyle: CSSProperties = {
   ...surveyPaneBadgeStyle,
   color: '#d7ecff',
-  borderColor: 'rgba(77, 163, 255, 0.45)',
-  backgroundColor: 'rgba(17, 29, 41, 0.88)'
+  borderColor: 'rgba(77, 163, 255, 0.35)',
+  backgroundColor: 'rgba(17, 29, 41, 0.74)'
 };
 
 const surveyPaneZoomControlsStyle: CSSProperties = {
   position: 'absolute',
-  right: '10px',
-  bottom: '10px',
+  right: '8px',
+  bottom: '8px',
   display: 'flex',
   alignItems: 'center',
-  gap: '6px',
-  padding: '4px',
+  gap: '4px',
+  padding: '3px',
   borderRadius: '999px',
-  backgroundColor: 'rgba(10, 10, 10, 0.82)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  backdropFilter: 'blur(8px)'
+  backgroundColor: 'rgba(10, 10, 10, 0.72)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  backdropFilter: 'blur(6px)'
 };
 
 const surveyPaneZoomButtonStyle: CSSProperties = {
-  width: '30px',
-  height: '30px',
+  width: '28px',
+  height: '28px',
   borderRadius: '999px',
   border: '1px solid #3a3a3a',
   backgroundColor: '#151515',
   color: '#f2f2f2',
   cursor: 'pointer',
-  fontSize: '13px',
+  fontSize: '12px',
   padding: 0
 };
 
 const surveyPaneResetButtonStyle: CSSProperties = {
   ...surveyPaneZoomButtonStyle,
   width: 'auto',
-  padding: '0 10px',
-  fontSize: '12px',
+  padding: '0 9px',
+  fontSize: '11px',
   whiteSpace: 'nowrap'
 };
 
@@ -1764,8 +1765,26 @@ function SurveyZoomableTile({
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>): void {
     event.preventDefault();
     const nextScale = Math.max(1, Math.min(4, Number((scale + (event.deltaY < 0 ? 0.25 : -0.25)).toFixed(2))));
-    setScale(nextScale);
-    setOffset((previous) => clampOffset(nextScale, previous));
+    setScale((previous) => {
+      if (previous === nextScale) {
+        return previous;
+      }
+
+      setOffset((currentOffset) => clampOffset(nextScale, currentOffset));
+      return nextScale;
+    });
+  }
+
+  function handleSetScale(nextScale: number): void {
+    const clampedScale = Math.max(1, Math.min(4, Number(nextScale.toFixed(2))));
+    setScale((previous) => {
+      if (previous === clampedScale) {
+        return previous;
+      }
+
+      setOffset((currentOffset) => clampOffset(clampedScale, currentOffset));
+      return clampedScale;
+    });
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
@@ -1864,7 +1883,7 @@ function SurveyZoomableTile({
         <button
           type="button"
           style={surveyPaneZoomButtonStyle}
-          onClick={() => setScale((previous) => Math.min(4, Number((previous + 0.25).toFixed(2))))}
+          onClick={() => handleSetScale(scale + 0.25)}
           aria-label={`Zoom in ${asset.filename}`}
         >
           +
@@ -1872,7 +1891,7 @@ function SurveyZoomableTile({
         <button
           type="button"
           style={surveyPaneZoomButtonStyle}
-          onClick={() => setScale((previous) => Math.max(1, Number((previous - 0.25).toFixed(2))))}
+          onClick={() => handleSetScale(scale - 0.25)}
           aria-label={`Zoom out ${asset.filename}`}
         >
           -
@@ -1910,8 +1929,8 @@ function SurveyMode({
         }
       : {
           ...surveyGridPortraitStyle,
-          gridTemplateColumns: `repeat(${Math.min(assets.length, 2)}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${Math.ceil(assets.length / 2)}, minmax(0, 1fr))`
+          gridTemplateColumns: `repeat(${assets.length}, minmax(0, 1fr))`,
+          gridTemplateRows: 'minmax(0, 1fr)'
         };
 
   return (
