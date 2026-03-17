@@ -1384,6 +1384,18 @@ function buildAlbumTreeDisplayList(
   return ordered;
 }
 
+function resolveAlbumTreeCreationParentId(selectedNode: AlbumTreeNode | null): string | null {
+  if (!selectedNode) {
+    return null;
+  }
+
+  if (selectedNode.nodeType === 'Group') {
+    return selectedNode.id;
+  }
+
+  return selectedNode.parentId ?? null;
+}
+
 function getPhotoStateBadgeLabel(photoState: PhotoState): string {
   if (photoState === PhotoState.Keep) {
     return 'Keep';
@@ -2529,8 +2541,12 @@ export default function App() {
     () => (selectedTreeNode?.nodeType === 'Album' ? selectedTreeNode : null),
     [selectedTreeNode]
   );
-  const canCreateGroupNode = selectedTreeNode?.nodeType === 'Group';
-  const canCreateAlbumNode = selectedTreeNode?.nodeType === 'Group';
+  const albumTreeCreationParentId = useMemo(
+    () => resolveAlbumTreeCreationParentId(selectedTreeNode),
+    [selectedTreeNode]
+  );
+  const canCreateGroupNode = !albumTreeLoading;
+  const canCreateAlbumNode = !albumTreeLoading;
 
   const albumNodes = useMemo(
     () => albumTreeNodes.filter((node) => node.nodeType === 'Album'),
@@ -3695,7 +3711,7 @@ export default function App() {
 
   async function handleCreateGroup(): Promise<void> {
     if (!canCreateGroupNode) {
-      setUpdateError('Select a Group before creating a Group.');
+      setUpdateError('Album tree is still loading.');
       return;
     }
 
@@ -3709,12 +3725,20 @@ export default function App() {
       return;
     }
 
-    const selectedNode = selectedTreeNode;
-    const parentId =
-      selectedNode && selectedNode.nodeType === 'Group' ? selectedNode.id : selectedNode?.parentId ?? null;
-
     try {
-      await createAlbumTreeNode({ label, nodeType: 'Group', parentId });
+      const created = await createAlbumTreeNode({
+        label,
+        nodeType: 'Group',
+        parentId: albumTreeCreationParentId
+      });
+      if (albumTreeCreationParentId && !expandedGroupIds.includes(albumTreeCreationParentId)) {
+        setExpandedGroupIds((previous) =>
+          previous.includes(albumTreeCreationParentId)
+            ? previous
+            : [...previous, albumTreeCreationParentId]
+        );
+      }
+      setSelectedTreeNodeId(created.id);
       await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to create group');
@@ -3722,6 +3746,11 @@ export default function App() {
   }
 
   async function handleCreateAlbum(): Promise<void> {
+    if (!canCreateAlbumNode) {
+      setUpdateError('Album tree is still loading.');
+      return;
+    }
+
     const input = window.prompt('Album label');
     if (!input) {
       return;
@@ -3732,23 +3761,21 @@ export default function App() {
       return;
     }
 
-    const selectedNode = selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) : null;
-    const parentId =
-      selectedNode && selectedNode.nodeType === 'Group' ? selectedNode.id : selectedNode?.parentId ?? null;
-
-    if (parentId === null) {
-      setUpdateError('Select a Group before creating an Album. Root-level albums are not allowed.');
-      return;
-    }
-
     try {
-      const created = await createAlbumTreeNode({ label, nodeType: 'Album', parentId });
+      const created = await createAlbumTreeNode({
+        label,
+        nodeType: 'Album',
+        parentId: albumTreeCreationParentId
+      });
       if (primaryArea === 'Library') {
         setLibraryBrowseMode('Albums');
       }
+      setSelectedTreeNodeId(created.id);
       setCheckedAlbumIds((previous) => (previous.includes(created.id) ? previous : [...previous, created.id]));
       setExpandedGroupIds((previous) =>
-        parentId && !previous.includes(parentId) ? [...previous, parentId] : previous
+        albumTreeCreationParentId && !previous.includes(albumTreeCreationParentId)
+          ? [...previous, albumTreeCreationParentId]
+          : previous
       );
       await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
@@ -4339,8 +4366,8 @@ export default function App() {
 	                disabled={!canCreateGroupNode}
 	                title={
 	                  canCreateGroupNode
-	                    ? 'Add group'
-	                    : 'Select a group to add a group'
+	                    ? 'Add group under the current group or at the top level'
+	                    : 'Album tree is loading'
 	                }
 	              >
 	                Add Group
@@ -4352,8 +4379,8 @@ export default function App() {
 	                disabled={!canCreateAlbumNode}
 	                title={
 	                  canCreateAlbumNode
-	                    ? 'Add album in selected group'
-	                    : 'Select a group to add an album'
+	                    ? 'Add album under the current group or at the top level'
+	                    : 'Album tree is loading'
 	                }
 	              >
 	                Add Album

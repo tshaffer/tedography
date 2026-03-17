@@ -19,10 +19,6 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
   }
 );
 
-albumTreeNodeSchema.path('parentId').validate(function validateAlbumParentId(value: string | null) {
-  return !(this.nodeType === 'Album' && value === null);
-}, 'Album nodes must have a parent Group');
-
 albumTreeNodeSchema.index({ parentId: 1, sortOrder: 1 });
 
 export const AlbumTreeNodeModel: Model<AlbumTreeNode> =
