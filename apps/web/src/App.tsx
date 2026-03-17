@@ -3771,6 +3771,10 @@ export default function App() {
     );
   }
 
+  function clearCheckedAlbums(): void {
+    setCheckedAlbumIds([]);
+  }
+
   async function handleCreateAlbumTreeNode(
     nodeType: 'Group' | 'Album',
     parentId: string | null
@@ -4639,7 +4643,22 @@ export default function App() {
     return (
       <section style={sidePanelSectionStyle}>
         <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>{title}</h2>
+          <div style={topBarSectionStyle}>
+            <h2 style={sidePanelTitleStyle}>{title}</h2>
+            <button
+              type="button"
+              style={checkedAlbumIds.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              onClick={clearCheckedAlbums}
+              disabled={checkedAlbumIds.length === 0}
+              title={
+                checkedAlbumIds.length > 0
+                  ? 'Clear all checked album scopes'
+                  : 'No checked albums to clear'
+              }
+            >
+              Clear Checked
+            </button>
+          </div>
           {isLibraryArea ? (
             <div style={topBarSectionStyle}>
                 <button
