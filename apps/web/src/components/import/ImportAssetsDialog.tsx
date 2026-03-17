@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement
+} from 'react';
 import type {
   AlbumTreeNode,
   BrowseDirectoryResponse,
@@ -17,8 +24,9 @@ import {
 type AlbumDestinationMode = 'none' | 'existing' | 'new';
 
 export interface ImportAssetsDialogInitialAlbumDestination {
-  mode: 'new';
-  parentGroupId: string;
+  mode: 'new' | 'existing';
+  parentGroupId?: string;
+  albumId?: string;
 }
 
 type SourceSelection = {
@@ -144,15 +152,18 @@ const treeSpacerStyle: CSSProperties = {
 };
 
 const treeLabelButtonStyle: CSSProperties = {
+  appearance: 'none',
   flex: 1,
   minWidth: 0,
   display: 'flex',
   alignItems: 'center',
   gap: '8px',
-  border: '1px solid transparent',
+  border: 'none',
   borderRadius: '8px',
+  boxShadow: 'none',
   backgroundColor: 'transparent',
   cursor: 'pointer',
+  outline: 'none',
   padding: '6px 8px',
   textAlign: 'left',
   fontSize: '13px'
@@ -160,7 +171,7 @@ const treeLabelButtonStyle: CSSProperties = {
 
 const treeLabelSelectedStyle: CSSProperties = {
   backgroundColor: '#eef4ff',
-  borderColor: '#c7dafd'
+  boxShadow: 'inset 0 0 0 1px #c7dafd'
 };
 
 const treeLabelDisabledStyle: CSSProperties = {
@@ -332,6 +343,51 @@ function buildAlbumTreeDisplayList(
   return ordered;
 }
 
+function buildExpandedAlbumGroupIdsForInitialDestination(
+  nodes: AlbumTreeNode[],
+  initialAlbumDestination: ImportAssetsDialogInitialAlbumDestination | null | undefined
+): string[] {
+  const expandedGroupIds = new Set<string>(
+    nodes.filter((node) => node.nodeType === 'Group' && node.parentId === null).map((node) => node.id)
+  );
+
+  if (!initialAlbumDestination) {
+    return Array.from(expandedGroupIds);
+  }
+
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
+  function addAncestorGroups(nodeId: string | null | undefined): void {
+    let currentNodeId = nodeId ?? null;
+
+    while (currentNodeId) {
+      const currentNode = nodesById.get(currentNodeId);
+      if (!currentNode) {
+        break;
+      }
+
+      if (currentNode.nodeType === 'Group') {
+        expandedGroupIds.add(currentNode.id);
+      }
+
+      currentNodeId = currentNode.parentId;
+    }
+  }
+
+  if (initialAlbumDestination.mode === 'new') {
+    addAncestorGroups(initialAlbumDestination.parentGroupId);
+  }
+
+  if (initialAlbumDestination.mode === 'existing') {
+    const albumNode = initialAlbumDestination.albumId
+      ? nodesById.get(initialAlbumDestination.albumId)
+      : null;
+    addAncestorGroups(albumNode?.parentId);
+  }
+
+  return Array.from(expandedGroupIds);
+}
+
 interface ImportAssetsDialogProps {
   open: boolean;
   onClose: () => void;
@@ -491,9 +547,7 @@ export function ImportAssetsDialog({
     try {
       const nodes = await listAlbumTreeNodes();
       setAlbumTreeNodes(nodes);
-      setExpandedAlbumGroupIds(
-        nodes.filter((node) => node.nodeType === 'Group' && node.parentId === null).map((node) => node.id)
-      );
+      setExpandedAlbumGroupIds(buildExpandedAlbumGroupIdsForInitialDestination(nodes, initialAlbumDestination));
     } catch (error) {
       setAlbumTreeError(error instanceof Error ? error.message : 'Failed to load album tree');
       setAlbumTreeNodes([]);
@@ -519,8 +573,8 @@ export function ImportAssetsDialog({
     setAlbumAssignmentMessage(null);
     setImportCompletionMessage(null);
     setAlbumDestinationMode(initialAlbumDestination?.mode ?? 'none');
-    setSelectedExistingAlbumId('');
-    setSelectedNewAlbumParentId(initialAlbumDestination?.parentGroupId ?? '');
+    setSelectedExistingAlbumId(initialAlbumDestination?.mode === 'existing' ? initialAlbumDestination.albumId ?? '' : '');
+    setSelectedNewAlbumParentId(initialAlbumDestination?.mode === 'new' ? initialAlbumDestination.parentGroupId ?? '' : '');
     setNewAlbumName('');
   }, [initialAlbumDestination, open]);
 
@@ -880,22 +934,25 @@ export function ImportAssetsDialog({
                 ) : (
                   <span style={treeSpacerStyle} />
                 )}
-                <button
-                  type="button"
-                  disabled={!isSelectable}
+                <div
                   style={{
                     ...treeLabelButtonStyle,
+                    userSelect: 'none',
                     ...(isSelected ? treeLabelSelectedStyle : {}),
                     ...(!isSelectable ? treeLabelDisabledStyle : {})
                   }}
-                  onClick={() => onSelectNode(node.id)}
+                  onClick={() => {
+                    if (isSelectable) {
+                      onSelectNode(node.id);
+                    }
+                  }}
                   title={node.label}
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {node.label}
                   </span>
                   <span style={badgeStyle}>{node.nodeType}</span>
-                </button>
+                </div>
               </div>
             );
           })

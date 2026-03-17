@@ -2871,6 +2871,14 @@ export default function App() {
     const node = albumNodesById.get(selectedTreeNodeId);
     return node?.nodeType === 'Group' ? node : null;
   }, [albumNodesById, selectedTreeNodeId]);
+  const selectedAlbumTreeAlbumNode = useMemo(() => {
+    if (!selectedTreeNodeId) {
+      return null;
+    }
+
+    const node = albumNodesById.get(selectedTreeNodeId);
+    return node?.nodeType === 'Album' ? node : null;
+  }, [albumNodesById, selectedTreeNodeId]);
 
   const slideshowAssets = useMemo(
     () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
@@ -3841,11 +3849,15 @@ export default function App() {
     setAlbumTreeContextMenu(null);
   }
 
-  function handleAlbumTreeGroupContextMenu(
+  function handleAlbumTreeNodeContextMenu(
     event: ReactMouseEvent<HTMLDivElement>,
     node: AlbumTreeNode
   ): void {
-    if (node.nodeType !== 'Group' || selectedTreeNodeId !== node.id) {
+    if (selectedTreeNodeId !== node.id) {
+      return;
+    }
+
+    if (node.nodeType !== 'Group' && node.nodeType !== 'Album') {
       return;
     }
 
@@ -3871,6 +3883,18 @@ export default function App() {
 
   function handleAlbumTreeMoveToPlaceholder(): void {
     closeAlbumTreeContextMenu();
+  }
+
+  function handleImportPhotosIntoSelectedAlbum(): void {
+    if (!selectedAlbumTreeAlbumNode) {
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+    handleOpenImportDialog({
+      mode: 'existing',
+      albumId: selectedAlbumTreeAlbumNode.id
+    });
   }
 
   async function handleRenameSelectedTreeNode(): Promise<void> {
@@ -4459,7 +4483,7 @@ export default function App() {
               <div
                 key={node.id}
                 style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}
-                onContextMenu={(event) => handleAlbumTreeGroupContextMenu(event, node)}
+                onContextMenu={(event) => handleAlbumTreeNodeContextMenu(event, node)}
               >
                 {isGroup ? (
                   <button
@@ -4502,7 +4526,13 @@ export default function App() {
   }
 
   function renderAlbumTreeContextMenu(): ReactElement | null {
-    if (!albumTreeContextMenu || selectedAlbumTreeGroupNode?.id !== albumTreeContextMenu.nodeId) {
+    if (!albumTreeContextMenu) {
+      return null;
+    }
+
+    const isSelectedGroupMenu = selectedAlbumTreeGroupNode?.id === albumTreeContextMenu.nodeId;
+    const isSelectedAlbumMenu = selectedAlbumTreeAlbumNode?.id === albumTreeContextMenu.nodeId;
+    if (!isSelectedGroupMenu && !isSelectedAlbumMenu) {
       return null;
     }
 
@@ -4516,42 +4546,76 @@ export default function App() {
         }}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
-          Import Album
-        </button>
-        <button
-          type="button"
-          style={contextMenuItemStyle}
-          onClick={() => {
-            closeAlbumTreeContextMenu();
-            void handleCreateGroup();
-          }}
-        >
-          Add Group
-        </button>
-        <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
-          Move To...
-        </button>
-        <button
-          type="button"
-          style={contextMenuItemStyle}
-          onClick={() => {
-            closeAlbumTreeContextMenu();
-            void handleRenameSelectedTreeNode();
-          }}
-        >
-          Rename
-        </button>
-        <button
-          type="button"
-          style={contextMenuItemStyle}
-          onClick={() => {
-            closeAlbumTreeContextMenu();
-            void handleDeleteSelectedTreeNode();
-          }}
-        >
-          Delete
-        </button>
+        {isSelectedGroupMenu ? (
+          <>
+            <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
+              Import Album
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleCreateGroup();
+              }}
+            >
+              Add Group
+            </button>
+            <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
+              Move To...
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleRenameSelectedTreeNode();
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleDeleteSelectedTreeNode();
+              }}
+            >
+              Delete
+            </button>
+          </>
+        ) : null}
+        {isSelectedAlbumMenu ? (
+          <>
+            <button type="button" style={contextMenuItemStyle} onClick={handleImportPhotosIntoSelectedAlbum}>
+              Import Photos
+            </button>
+            <button type="button" style={disabledContextMenuItemStyle} disabled onClick={handleAlbumTreeMoveToPlaceholder}>
+              Move To...
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleRenameSelectedTreeNode();
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleDeleteSelectedTreeNode();
+              }}
+            >
+              Delete
+            </button>
+          </>
+        ) : null}
       </div>
     );
   }
