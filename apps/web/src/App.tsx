@@ -3709,13 +3709,17 @@ export default function App() {
     );
   }
 
-  async function handleCreateGroup(): Promise<void> {
-    if (!canCreateGroupNode) {
+  async function handleCreateAlbumTreeNode(
+    nodeType: 'Group' | 'Album',
+    parentId: string | null
+  ): Promise<void> {
+    const canCreateNode = nodeType === 'Group' ? canCreateGroupNode : canCreateAlbumNode;
+    if (!canCreateNode) {
       setUpdateError('Album tree is still loading.');
       return;
     }
 
-    const input = window.prompt('Group label');
+    const input = window.prompt(nodeType === 'Group' ? 'Group label' : 'Album label');
     if (!input) {
       return;
     }
@@ -3728,59 +3732,48 @@ export default function App() {
     try {
       const created = await createAlbumTreeNode({
         label,
-        nodeType: 'Group',
-        parentId: albumTreeCreationParentId
+        nodeType,
+        parentId
       });
-      if (albumTreeCreationParentId && !expandedGroupIds.includes(albumTreeCreationParentId)) {
-        setExpandedGroupIds((previous) =>
-          previous.includes(albumTreeCreationParentId)
-            ? previous
-            : [...previous, albumTreeCreationParentId]
-        );
+
+      if (nodeType === 'Album') {
+        if (primaryArea === 'Library') {
+          setLibraryBrowseMode('Albums');
+        }
+        setCheckedAlbumIds((previous) => (previous.includes(created.id) ? previous : [...previous, created.id]));
       }
+
+      if (parentId && !expandedGroupIds.includes(parentId)) {
+        setExpandedGroupIds((previous) => (previous.includes(parentId) ? previous : [...previous, parentId]));
+      }
+
       setSelectedTreeNodeId(created.id);
       await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to create group');
+      setUpdateError(
+        error instanceof Error
+          ? error.message
+          : nodeType === 'Group'
+            ? 'Failed to create group'
+            : 'Failed to create album'
+      );
     }
   }
 
+  async function handleCreateGroup(): Promise<void> {
+    await handleCreateAlbumTreeNode('Group', albumTreeCreationParentId);
+  }
+
+  async function handleCreateTopLevelGroup(): Promise<void> {
+    await handleCreateAlbumTreeNode('Group', null);
+  }
+
   async function handleCreateAlbum(): Promise<void> {
-    if (!canCreateAlbumNode) {
-      setUpdateError('Album tree is still loading.');
-      return;
-    }
+    await handleCreateAlbumTreeNode('Album', albumTreeCreationParentId);
+  }
 
-    const input = window.prompt('Album label');
-    if (!input) {
-      return;
-    }
-
-    const label = input.trim();
-    if (label.length === 0) {
-      return;
-    }
-
-    try {
-      const created = await createAlbumTreeNode({
-        label,
-        nodeType: 'Album',
-        parentId: albumTreeCreationParentId
-      });
-      if (primaryArea === 'Library') {
-        setLibraryBrowseMode('Albums');
-      }
-      setSelectedTreeNodeId(created.id);
-      setCheckedAlbumIds((previous) => (previous.includes(created.id) ? previous : [...previous, created.id]));
-      setExpandedGroupIds((previous) =>
-        albumTreeCreationParentId && !previous.includes(albumTreeCreationParentId)
-          ? [...previous, albumTreeCreationParentId]
-          : previous
-      );
-      await loadAlbumTreeNodes({ showLoading: false });
-    } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to create album');
-    }
+  async function handleCreateTopLevelAlbum(): Promise<void> {
+    await handleCreateAlbumTreeNode('Album', null);
   }
 
   async function handleRenameSelectedTreeNode(): Promise<void> {
@@ -4359,6 +4352,24 @@ export default function App() {
           <h2 style={sidePanelTitleStyle}>{title}</h2>
           {isLibraryArea ? (
             <div style={topBarSectionStyle}>
+                <button
+                  type="button"
+                  style={canCreateGroupNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                  onClick={() => void handleCreateTopLevelGroup()}
+                  disabled={!canCreateGroupNode}
+                  title={canCreateGroupNode ? 'Add a group at the top level of the album tree' : 'Album tree is loading'}
+                >
+                  Add Top Group
+                </button>
+                <button
+                  type="button"
+                  style={canCreateAlbumNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                  onClick={() => void handleCreateTopLevelAlbum()}
+                  disabled={!canCreateAlbumNode}
+                  title={canCreateAlbumNode ? 'Add an album at the top level of the album tree' : 'Album tree is loading'}
+                >
+                  Add Top Album
+                </button>
 	              <button
 	                type="button"
 	                style={canCreateGroupNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
