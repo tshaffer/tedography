@@ -25,3 +25,5 @@ dist/
 mock-media
 
 apps/api/.env
+
+apps/api/scripts/output

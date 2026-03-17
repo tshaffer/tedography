@@ -10,6 +10,7 @@
     "thumbnails:verify": "pnpm --filter @tedography/api thumbnails:verify",
     "thumbnails:repair": "pnpm --filter @tedography/api thumbnails:repair",
     "thumbnails:rebuild": "pnpm --filter @tedography/api thumbnails:rebuild",
+    "photo-state-poc": "pnpm --filter @tedography/api exec tsx ../../scripts/photo-state-poc.ts",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },
