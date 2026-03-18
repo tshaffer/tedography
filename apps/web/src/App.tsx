@@ -372,6 +372,55 @@ const toggleOptionLabelStyle: CSSProperties = {
   fontSize: '12px'
 };
 
+const compactSelectStyle: CSSProperties = {
+  height: '30px',
+  borderRadius: '8px',
+  border: '1px solid #c8c8c8',
+  backgroundColor: '#fff',
+  padding: '0 8px',
+  fontSize: '12px'
+};
+
+const photoStateSummaryListStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  marginTop: '6px'
+};
+
+const photoStateSummaryRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  fontSize: '13px'
+};
+
+const photoStateCountBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '28px',
+  borderRadius: '999px',
+  padding: '2px 8px',
+  fontSize: '11px',
+  border: '1px solid #d7d7d7',
+  backgroundColor: '#fafafa',
+  color: '#555'
+};
+
+const albumPanelHeaderStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  marginBottom: '6px'
+};
+
+const albumPanelUtilityRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  flexWrap: 'nowrap'
+};
+
 const gridStyle: CSSProperties = {
   display: 'grid',
   gap: '2px',
@@ -717,6 +766,17 @@ const compareButtonStyle: CSSProperties = {
   ...actionButtonStyle,
   fontSize: '12px',
   padding: '5px 8px'
+};
+
+const compactSecondaryButtonStyle: CSSProperties = {
+  ...compareButtonStyle,
+  padding: '4px 7px',
+  whiteSpace: 'nowrap',
+  flex: '0 0 auto'
+};
+
+const compactDisabledSecondaryButtonStyle: CSSProperties = {
+  ...compactSecondaryButtonStyle
 };
 
 const disabledToolbarActionButtonStyle: CSSProperties = {
@@ -3003,6 +3063,40 @@ export default function App() {
     (isReviewArea && reviewBrowseMode === 'Flat') || (isLibraryArea && libraryBrowseMode === 'Flat');
   const showsThumbnailSizeControl =
     viewerMode === 'Grid' && (isFlatBrowseMode || isTimelineMode || isAlbumsMode);
+  const photoStateSummaryScopeAssets = useMemo(() => {
+    if (primaryArea === 'Search') {
+      return [];
+    }
+
+    if (!isAlbumsMode) {
+      return assets;
+    }
+
+    if (checkedAlbumIds.length === 0) {
+      return [];
+    }
+
+    const deduped = new Map<string, MediaAsset>();
+    for (const asset of assets) {
+      if ((asset.albumIds ?? []).some((albumId) => checkedAlbumIdsSet.has(albumId))) {
+        deduped.set(asset.id, asset);
+      }
+    }
+
+    return [...deduped.values()];
+  }, [assets, checkedAlbumIds.length, checkedAlbumIdsSet, isAlbumsMode, primaryArea]);
+  const photoStateSummaryCounts = useMemo(() => {
+    const counts = new Map<PhotoState, number>();
+    for (const state of photoStateFilterOptions) {
+      counts.set(state, 0);
+    }
+
+    for (const asset of photoStateSummaryScopeAssets) {
+      counts.set(asset.photoState, (counts.get(asset.photoState) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [photoStateSummaryScopeAssets]);
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
   const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea || isSearchArea);
@@ -4673,6 +4767,16 @@ export default function App() {
             >
               Add Group
             </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                closeAlbumTreeContextMenu();
+                void handleCreateAlbum();
+              }}
+            >
+              Add Album
+            </button>
             <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
             </button>
@@ -4750,102 +4854,47 @@ export default function App() {
 
     return (
       <section style={sidePanelSectionStyle}>
-        <div style={sidePanelHeaderStyle}>
-          <div style={topBarSectionStyle}>
-            <h2 style={sidePanelTitleStyle}>{title}</h2>
+        <div style={albumPanelHeaderStyle}>
+          <h2 style={sidePanelTitleStyle}>{title}</h2>
+          <div style={albumPanelUtilityRowStyle}>
             <button
               type="button"
-              style={checkedAlbumIds.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              style={
+                checkedAlbumIds.length > 0
+                  ? compactSecondaryButtonStyle
+                  : compactDisabledSecondaryButtonStyle
+              }
               onClick={revealCheckedAlbums}
               disabled={checkedAlbumIds.length === 0}
-              title={
-                checkedAlbumIds.length > 0
-                  ? 'Expand the tree so all checked albums are visible'
-                  : 'No checked albums to reveal'
-              }
+              title="Reveal checked albums"
             >
-              Reveal Checked
+              Reveal
             </button>
             <button
               type="button"
-              style={checkedAlbumIds.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              style={
+                checkedAlbumIds.length > 0
+                  ? compactSecondaryButtonStyle
+                  : compactDisabledSecondaryButtonStyle
+              }
               onClick={clearCheckedAlbums}
               disabled={checkedAlbumIds.length === 0}
-              title={
-                checkedAlbumIds.length > 0
-                  ? 'Clear all checked album scopes'
-                  : 'No checked albums to clear'
-              }
+              title="Clear checked albums"
             >
-              Clear Checked
+              Clear
             </button>
+            {isLibraryArea ? (
+              <button
+                type="button"
+                style={canCreateGroupNode ? compactSecondaryButtonStyle : compactDisabledSecondaryButtonStyle}
+                onClick={() => void handleCreateTopLevelGroup()}
+                disabled={!canCreateGroupNode}
+                title="Add top-level group"
+              >
+                + Group
+              </button>
+            ) : null}
           </div>
-          {isLibraryArea ? (
-            <div style={topBarSectionStyle}>
-                <button
-                  type="button"
-                  style={canCreateGroupNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                  onClick={() => void handleCreateTopLevelGroup()}
-                  disabled={!canCreateGroupNode}
-                  title={canCreateGroupNode ? 'Add a group at the top level of the album tree' : 'Album tree is loading'}
-                >
-                  Add Top Group
-                </button>
-                <button
-                  type="button"
-                  style={canCreateAlbumNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                  onClick={() => void handleCreateTopLevelAlbum()}
-                  disabled={!canCreateAlbumNode}
-                  title={canCreateAlbumNode ? 'Add an album at the top level of the album tree' : 'Album tree is loading'}
-                >
-                  Add Top Album
-                </button>
-	              <button
-	                type="button"
-	                style={canCreateGroupNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
-	                onClick={() => void handleCreateGroup()}
-	                disabled={!canCreateGroupNode}
-	                title={
-	                  canCreateGroupNode
-	                    ? 'Add group under the current group or at the top level'
-	                    : 'Album tree is loading'
-	                }
-	              >
-	                Add Group
-	              </button>
-	              <button
-	                type="button"
-	                style={canCreateAlbumNode ? compareButtonStyle : disabledToolbarActionButtonStyle}
-	                onClick={() => void handleCreateAlbum()}
-	                disabled={!canCreateAlbumNode}
-	                title={
-	                  canCreateAlbumNode
-	                    ? 'Add album under the current group or at the top level'
-	                    : 'Album tree is loading'
-	                }
-	              >
-	                Add Album
-	              </button>
-              <button
-                type="button"
-                style={compareButtonStyle}
-                onClick={() => void handleRenameSelectedTreeNode()}
-                disabled={!selectedTreeNodeId}
-                title="Rename selected node"
-	              >
-	                Rename
-	              </button>
-              <button
-                type="button"
-                style={compareButtonStyle}
-                onClick={() => void handleDeleteSelectedTreeNode()}
-                disabled={!selectedTreeNodeId}
-                title="Delete selected node"
-	              >
-	                Delete
-	              </button>
-            </div>
-          ) : null}
         </div>
         {albumTreeLoading ? <p>Loading albums...</p> : null}
         {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
@@ -4867,19 +4916,20 @@ export default function App() {
             Reset
           </button>
         </div>
-        <div style={filterRowStyle}>
-          <div style={filterGroupStyle}>
-            {photoStateFilterOptions.map((option) => (
-              <label key={option} style={filterOptionLabelStyle} title={`Show ${option}`}>
+        <div style={photoStateSummaryListStyle}>
+          {photoStateFilterOptions.map((option) => (
+            <label key={option} style={photoStateSummaryRowStyle} title={`Show ${option}`}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="checkbox"
                   checked={currentAreaPhotoStates.includes(option)}
                   onChange={() => toggleCurrentAreaPhotoState(option)}
                 />
-                {option}
-              </label>
-            ))}
-          </div>
+                <span>{option}</span>
+              </span>
+              <span style={photoStateCountBadgeStyle}>{photoStateSummaryCounts.get(option) ?? 0}</span>
+            </label>
+          ))}
         </div>
       </section>
     );
@@ -5000,34 +5050,6 @@ export default function App() {
     );
   }
 
-  function renderThumbnailSizePanel(): ReactElement | null {
-    if (!showsThumbnailSizeControl) {
-      return null;
-    }
-
-    return (
-      <section style={sidePanelSectionStyle}>
-        <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>Thumbnails</h2>
-        </div>
-        <div style={topBarSectionStyle}>
-          {timelineZoomLevels.map((level, index) => (
-            <button
-              key={level.label}
-              type="button"
-              style={compareButtonStyle}
-              data-selected={timelineZoomLevel === index ? 'true' : undefined}
-              onClick={() => handleSetTimelineZoomLevel(index)}
-              title={`Thumbnail size ${level.label}`}
-            >
-              {level.label}
-            </button>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
   const toolbarBrowseMode = isReviewArea
     ? reviewBrowseMode
     : isLibraryArea
@@ -5048,7 +5070,6 @@ export default function App() {
                 <h2 style={sidePanelTitleStyle}>Review</h2>
               </div>
             </section>
-            {renderThumbnailSizePanel()}
             {renderVisibilityPanel()}
             {renderAlbumTreePanel()}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
@@ -5060,28 +5081,7 @@ export default function App() {
               <div style={sidePanelHeaderStyle}>
                 <h2 style={sidePanelTitleStyle}>Library</h2>
               </div>
-              {isLibraryAlbumsMode ? (
-                <div style={topBarSectionStyle}>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={albumResultsPresentation === 'Merged' ? 'true' : undefined}
-	                    onClick={() => handleSetAlbumResultsPresentation('Merged')}
-	                  >
-                    Merged
-                  </button>
-	                  <button
-	                    type="button"
-	                    style={compareButtonStyle}
-	                    data-selected={albumResultsPresentation === 'GroupedByAlbum' ? 'true' : undefined}
-	                    onClick={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
-	                  >
-                    Grouped
-                  </button>
-                </div>
-              ) : null}
             </section>
-            {renderThumbnailSizePanel()}
             {renderVisibilityPanel()}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
             {isLibraryAlbumsMode ? renderAlbumTreePanel() : null}
@@ -5259,6 +5259,23 @@ export default function App() {
               </button>
             </>
           ) : null}
+          {showsThumbnailSizeControl ? <div style={toolbarActionDividerStyle} aria-hidden="true" /> : null}
+          {showsThumbnailSizeControl ? (
+            <div style={topBarSectionStyle} title="Thumbnail size">
+              {timelineZoomLevels.map((level, index) => (
+                <button
+                  key={level.label}
+                  type="button"
+                  style={compareButtonStyle}
+                  data-selected={timelineZoomLevel === index ? 'true' : undefined}
+                  onClick={() => handleSetTimelineZoomLevel(index)}
+                  title={`Thumbnail size ${level.label}`}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div style={toolbarGroupStyle}>
@@ -5309,6 +5326,25 @@ export default function App() {
                     onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
                   />
                   Show thumbnail state
+                </label>
+                <span style={filterSubsectionTitleStyle}>Album Layout</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-results-presentation"
+                    checked={albumResultsPresentation === 'Merged'}
+                    onChange={() => handleSetAlbumResultsPresentation('Merged')}
+                  />
+                  Merged
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-results-presentation"
+                    checked={albumResultsPresentation === 'GroupedByAlbum'}
+                    onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
+                  />
+                  Grouped
                 </label>
               </div>
             ) : null}
