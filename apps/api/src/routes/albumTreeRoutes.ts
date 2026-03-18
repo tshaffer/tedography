@@ -12,6 +12,7 @@ import {
   findAlbumTreeNodeById,
   listAlbumTreeNodes,
   moveAlbumTreeNode,
+  reorderAlbumTreeNodeWithinSiblings,
   renameAlbumTreeNode
 } from '../repositories/albumTreeRepository.js';
 
@@ -68,6 +69,14 @@ function parseAssetIds(value: unknown): string[] | null {
   }
 
   return Array.from(new Set(parsed));
+}
+
+function parseReorderDirection(value: unknown): 'up' | 'down' | null {
+  if (value === 'up' || value === 'down') {
+    return value;
+  }
+
+  return null;
 }
 
 async function loadAlbumNode(nodeId: string): Promise<AlbumTreeNode | null> {
@@ -233,6 +242,71 @@ albumTreeRoutes.post('/:id/move', async (req, res) => {
     res.json(moved);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to move node' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.post('/:id/reorder', async (req, res) => {
+  const direction = parseReorderDirection((req.body as { direction?: unknown }).direction);
+  if (!direction) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'direction must be "up" or "down"' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const node = await findAlbumTreeNodeById(req.params.id);
+  if (!node) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const siblings = (await listAlbumTreeNodes())
+    .filter(
+      (candidate) => candidate.parentId === node.parentId && candidate.nodeType === node.nodeType
+    )
+    .sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+
+      const labelComparison = left.label.localeCompare(right.label, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      });
+      if (labelComparison !== 0) {
+        return labelComparison;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+  const currentIndex = siblings.findIndex((candidate) => candidate.id === node.id);
+  if (currentIndex < 0) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found in its sibling set' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+  if (targetIndex < 0 || targetIndex >= siblings.length) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: direction === 'up' ? 'Node is already the first sibling' : 'Node is already the last sibling'
+    };
+    res.status(409).json(errorResponse);
+    return;
+  }
+
+  try {
+    const reordered = await reorderAlbumTreeNodeWithinSiblings(node.id, direction);
+    if (!reordered) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(reordered);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to reorder node' };
     res.status(500).json(errorResponse);
   }
 });

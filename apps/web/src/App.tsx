@@ -22,6 +22,7 @@ import {
   deleteAlbumTreeNode,
   listAlbumTreeNodes,
   moveAlbumTreeNode,
+  reorderAlbumTreeNode,
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
@@ -61,6 +62,7 @@ const libraryBrowseModeStorageKey = 'tedography.libraryBrowseMode';
 const reviewBrowseModeStorageKey = 'tedography.reviewBrowseMode';
 const timelineNavExpandedYearKeysStorageKey = 'tedography.timelineNavExpandedYears';
 const albumResultsPresentationStorageKey = 'tedography.albumResultsPresentation';
+const albumTreeSortModeStorageKey = 'tedography.albumTreeSortMode';
 const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
@@ -77,6 +79,7 @@ type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maint
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type ReviewBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
+type AlbumTreeSortMode = 'Custom' | 'Name' | 'Month/Name';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 
@@ -114,7 +117,7 @@ const pageStyle: CSSProperties = {
 const topBarStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
   gap: '12px',
   padding: '8px 10px',
   border: '1px solid #d6d6d6',
@@ -122,13 +125,15 @@ const topBarStyle: CSSProperties = {
   backgroundColor: '#fbfbfb',
   position: 'relative',
   zIndex: 20,
-  flex: '0 0 auto'
+  flex: '0 0 auto',
+  overflowX: 'auto',
+  overflowY: 'hidden'
 };
 
 const topBarSectionStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
   gap: '6px'
 };
 
@@ -183,7 +188,7 @@ const toolbarTrailingGroupStyle: CSSProperties = {
 const toolbarActionSubgroupStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
   gap: '6px'
 };
 
@@ -1280,6 +1285,14 @@ function parseAlbumResultsPresentationFromStorage(value: string | null): AlbumRe
   return 'Merged';
 }
 
+function parseAlbumTreeSortModeFromStorage(value: string | null): AlbumTreeSortMode {
+  if (value === 'Custom' || value === 'Name' || value === 'Month/Name') {
+    return value;
+  }
+
+  return 'Custom';
+}
+
 function parseTimelineZoomLevelFromStorage(value: string | null): number {
   const parsed = Number(value);
   if (Number.isInteger(parsed) && parsed >= 0 && parsed < timelineZoomLevels.length) {
@@ -1448,9 +1461,149 @@ type AlbumAssetSection = {
   assets: MediaAsset[];
 };
 
+const albumTreeNameCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base'
+});
+
+const monthTokenToNumber = new Map<string, number>([
+  ['jan', 1],
+  ['january', 1],
+  ['feb', 2],
+  ['february', 2],
+  ['mar', 3],
+  ['march', 3],
+  ['apr', 4],
+  ['april', 4],
+  ['may', 5],
+  ['jun', 6],
+  ['june', 6],
+  ['jul', 7],
+  ['july', 7],
+  ['aug', 8],
+  ['august', 8],
+  ['sep', 9],
+  ['sept', 9],
+  ['september', 9],
+  ['oct', 10],
+  ['october', 10],
+  ['nov', 11],
+  ['november', 11],
+  ['dec', 12],
+  ['december', 12]
+]);
+
+type ParsedAlbumTreeLabelMonth = {
+  month: number | null;
+  year: number | null;
+};
+
+function compareAlbumTreeNodeNames(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  const labelComparison = albumTreeNameCollator.compare(left.label, right.label);
+  if (labelComparison !== 0) {
+    return labelComparison;
+  }
+
+  if (left.sortOrder !== right.sortOrder) {
+    return left.sortOrder - right.sortOrder;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function compareAlbumTreeNodeTypes(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  if (left.nodeType === right.nodeType) {
+    return 0;
+  }
+
+  return left.nodeType === 'Group' ? -1 : 1;
+}
+
+function parseAlbumTreeLabelMonth(label: string): ParsedAlbumTreeLabelMonth {
+  const tokens = label.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  let month: number | null = null;
+  let year: number | null = null;
+
+  for (const token of tokens) {
+    if (month === null) {
+      month = monthTokenToNumber.get(token) ?? null;
+    }
+
+    if (year === null && /^(19|20)\d{2}$/.test(token)) {
+      year = Number(token);
+    }
+
+    if (month !== null && year !== null) {
+      break;
+    }
+  }
+
+  return { month, year };
+}
+
+function compareAlbumTreeNodes(
+  left: AlbumTreeNode,
+  right: AlbumTreeNode,
+  sortMode: AlbumTreeSortMode
+): number {
+  if (sortMode === 'Custom') {
+    const nodeTypeComparison = compareAlbumTreeNodeTypes(left, right);
+    if (nodeTypeComparison !== 0) {
+      return nodeTypeComparison;
+    }
+
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+
+    return compareAlbumTreeNodeNames(left, right);
+  }
+
+  const nodeTypeComparison = compareAlbumTreeNodeTypes(left, right);
+  if (nodeTypeComparison !== 0) {
+    return nodeTypeComparison;
+  }
+
+  if (sortMode === 'Month/Name') {
+    const leftMonth = parseAlbumTreeLabelMonth(left.label);
+    const rightMonth = parseAlbumTreeLabelMonth(right.label);
+
+    if (
+      leftMonth.month !== null &&
+      rightMonth.month !== null &&
+      leftMonth.year !== null &&
+      rightMonth.year !== null
+    ) {
+      if (leftMonth.year !== rightMonth.year) {
+        return leftMonth.year - rightMonth.year;
+      }
+
+      if (leftMonth.month !== rightMonth.month) {
+        return leftMonth.month - rightMonth.month;
+      }
+    } else if (leftMonth.month !== null && rightMonth.month !== null && leftMonth.month !== rightMonth.month) {
+      return leftMonth.month - rightMonth.month;
+    }
+  }
+
+  return compareAlbumTreeNodeNames(left, right);
+}
+
+function getOrderedAlbumTreeSiblingsForCustomSort(
+  nodes: AlbumTreeNode[],
+  node: AlbumTreeNode
+): AlbumTreeNode[] {
+  return nodes
+    .filter(
+      (candidate) => candidate.parentId === node.parentId && candidate.nodeType === node.nodeType
+    )
+    .sort((left, right) => compareAlbumTreeNodes(left, right, 'Custom'));
+}
+
 function buildAlbumTreeDisplayList(
   nodes: AlbumTreeNode[],
-  expandedGroupIds: string[]
+  expandedGroupIds: string[],
+  sortMode: AlbumTreeSortMode
 ): AlbumTreeNodeWithDepth[] {
   const expandedSet = new Set(expandedGroupIds);
   const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
@@ -1462,13 +1615,7 @@ function buildAlbumTreeDisplayList(
   }
 
   for (const siblings of childrenByParent.values()) {
-    siblings.sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder;
-      }
-
-      return left.label.localeCompare(right.label);
-    });
+    siblings.sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
   }
 
   const ordered: AlbumTreeNodeWithDepth[] = [];
@@ -2414,6 +2561,15 @@ export default function App() {
         window.localStorage.getItem(albumResultsPresentationStorageKey)
       );
     });
+  const [albumTreeSortMode, setAlbumTreeSortMode] = useState<AlbumTreeSortMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'Custom';
+    }
+
+    return parseAlbumTreeSortModeFromStorage(
+      window.localStorage.getItem(albumTreeSortModeStorageKey)
+    );
+  });
   const [timelineNavExpandedYearKeys, setTimelineNavExpandedYearKeys] = useState<string[]>(() => {
     if (typeof window === 'undefined') {
       return [];
@@ -2543,6 +2699,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(albumResultsPresentationStorageKey, albumResultsPresentation);
   }, [albumResultsPresentation]);
+
+  useEffect(() => {
+    window.localStorage.setItem(albumTreeSortModeStorageKey, albumTreeSortMode);
+  }, [albumTreeSortMode]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -2992,6 +3152,27 @@ export default function App() {
     const node = albumNodesById.get(selectedTreeNodeId);
     return node?.nodeType === 'Album' ? node : null;
   }, [albumNodesById, selectedTreeNodeId]);
+  const selectedAlbumTreeNodeCustomSiblings = useMemo(() => {
+    if (!selectedTreeNode) {
+      return [];
+    }
+
+    return getOrderedAlbumTreeSiblingsForCustomSort(albumTreeNodes, selectedTreeNode);
+  }, [albumTreeNodes, selectedTreeNode]);
+  const selectedAlbumTreeNodeCustomSiblingIndex = useMemo(() => {
+    if (!selectedTreeNode) {
+      return -1;
+    }
+
+    return selectedAlbumTreeNodeCustomSiblings.findIndex((node) => node.id === selectedTreeNode.id);
+  }, [selectedAlbumTreeNodeCustomSiblings, selectedTreeNode]);
+  const canUseCustomReorderCommands = albumTreeSortMode === 'Custom';
+  const canMoveSelectedTreeNodeUp =
+    canUseCustomReorderCommands && selectedAlbumTreeNodeCustomSiblingIndex > 0;
+  const canMoveSelectedTreeNodeDown =
+    canUseCustomReorderCommands &&
+    selectedAlbumTreeNodeCustomSiblingIndex >= 0 &&
+    selectedAlbumTreeNodeCustomSiblingIndex < selectedAlbumTreeNodeCustomSiblings.length - 1;
   const moveDialogNode = useMemo(
     () => (moveDialogNodeId ? albumNodesById.get(moveDialogNodeId) ?? null : null),
     [albumNodesById, moveDialogNodeId]
@@ -3113,8 +3294,8 @@ export default function App() {
       ? 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
       : 'Search: structured photo finding by state, album, and date.';
   const treeDisplayNodes = useMemo(
-    () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds),
-    [albumTreeNodes, expandedGroupIds]
+    () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode),
+    [albumTreeNodes, expandedGroupIds, albumTreeSortMode]
   );
 
   function getTopVisibleTimelineMonthKey(): string | null {
@@ -4068,6 +4249,37 @@ export default function App() {
     setMoveDialogNodeId(selectedTreeNodeId);
   }
 
+  async function handleReorderSelectedTreeNode(direction: 'up' | 'down'): Promise<void> {
+    if (!selectedTreeNodeId) {
+      return;
+    }
+
+    if (!canUseCustomReorderCommands) {
+      closeAlbumTreeContextMenu();
+      return;
+    }
+
+    if (direction === 'up' && !canMoveSelectedTreeNodeUp) {
+      closeAlbumTreeContextMenu();
+      return;
+    }
+
+    if (direction === 'down' && !canMoveSelectedTreeNodeDown) {
+      closeAlbumTreeContextMenu();
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+
+    try {
+      await reorderAlbumTreeNode(selectedTreeNodeId, { direction });
+      await loadAlbumTreeNodes({ showLoading: false });
+      setSelectedTreeNodeId(selectedTreeNodeId);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to reorder album tree node.');
+    }
+  }
+
   function handleImportPhotosIntoSelectedAlbum(): void {
     if (!selectedAlbumTreeAlbumNode) {
       return;
@@ -4782,6 +4994,40 @@ export default function App() {
             </button>
             <button
               type="button"
+              style={canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              onClick={() => {
+                void handleReorderSelectedTreeNode('up');
+              }}
+              disabled={!canMoveSelectedTreeNodeUp}
+              title={
+                !canUseCustomReorderCommands
+                  ? 'Available only in Custom sort'
+                  : canMoveSelectedTreeNodeUp
+                    ? 'Move earlier among same-type siblings'
+                    : 'Already first in custom order'
+              }
+            >
+              Move Up
+            </button>
+            <button
+              type="button"
+              style={canMoveSelectedTreeNodeDown ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              onClick={() => {
+                void handleReorderSelectedTreeNode('down');
+              }}
+              disabled={!canMoveSelectedTreeNodeDown}
+              title={
+                !canUseCustomReorderCommands
+                  ? 'Available only in Custom sort'
+                  : canMoveSelectedTreeNodeDown
+                    ? 'Move later among same-type siblings'
+                    : 'Already last in custom order'
+              }
+            >
+              Move Down
+            </button>
+            <button
+              type="button"
               style={contextMenuItemStyle}
               onClick={() => {
                 closeAlbumTreeContextMenu();
@@ -4809,6 +5055,40 @@ export default function App() {
             </button>
             <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
+            </button>
+            <button
+              type="button"
+              style={canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              onClick={() => {
+                void handleReorderSelectedTreeNode('up');
+              }}
+              disabled={!canMoveSelectedTreeNodeUp}
+              title={
+                !canUseCustomReorderCommands
+                  ? 'Available only in Custom sort'
+                  : canMoveSelectedTreeNodeUp
+                    ? 'Move earlier among same-type siblings'
+                    : 'Already first in custom order'
+              }
+            >
+              Move Up
+            </button>
+            <button
+              type="button"
+              style={canMoveSelectedTreeNodeDown ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              onClick={() => {
+                void handleReorderSelectedTreeNode('down');
+              }}
+              disabled={!canMoveSelectedTreeNodeDown}
+              title={
+                !canUseCustomReorderCommands
+                  ? 'Available only in Custom sort'
+                  : canMoveSelectedTreeNodeDown
+                    ? 'Move later among same-type siblings'
+                    : 'Already last in custom order'
+              }
+            >
+              Move Down
             </button>
             <button
               type="button"
@@ -5345,6 +5625,34 @@ export default function App() {
                     onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
                   />
                   Grouped
+                </label>
+                <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Custom'}
+                    onChange={() => setAlbumTreeSortMode('Custom')}
+                  />
+                  Custom
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Name'}
+                    onChange={() => setAlbumTreeSortMode('Name')}
+                  />
+                  Name
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Month/Name'}
+                    onChange={() => setAlbumTreeSortMode('Month/Name')}
+                  />
+                  Month/Name
                 </label>
               </div>
             ) : null}

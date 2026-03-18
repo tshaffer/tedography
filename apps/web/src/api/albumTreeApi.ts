@@ -14,6 +14,10 @@ export interface MoveAlbumTreeNodeRequest {
   parentId: string | null;
 }
 
+export interface ReorderAlbumTreeNodeRequest {
+  direction: 'up' | 'down';
+}
+
 function buildErrorMessage(status: number, payload: unknown): string {
   if (
     typeof payload === 'object' &&
@@ -84,6 +88,24 @@ export async function moveAlbumTreeNode(
   request: MoveAlbumTreeNodeRequest
 ): Promise<AlbumTreeNode> {
   const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+export async function reorderAlbumTreeNode(
+  nodeId: string,
+  request: ReorderAlbumTreeNodeRequest
+): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/reorder`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
