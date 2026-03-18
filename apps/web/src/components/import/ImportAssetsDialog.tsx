@@ -35,6 +35,19 @@ type SourceSelection = {
   label: string;
 };
 
+type PersistedImportSourceState = {
+  rootId: string;
+  relativePath: string;
+  expandedRelativePaths: string[];
+};
+
+type LastImportDestinationSummary = {
+  mode: AlbumDestinationMode;
+  albumLabel: string | null;
+};
+
+type ImportResultsPanelState = 'idle' | 'running' | 'success' | 'error';
+
 type AlbumTreeNodeWithDepth = AlbumTreeNode & {
   depth: number;
 };
@@ -63,7 +76,7 @@ const dialogStyle: CSSProperties = {
 
 const bodyStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '320px minmax(0, 1fr)',
+  gridTemplateColumns: '320px minmax(0, 1fr) 320px',
   gap: '14px',
   flex: 1,
   minHeight: 0,
@@ -85,6 +98,13 @@ const sourcePanelStyle: CSSProperties = {
 };
 
 const contentPanelStyle: CSSProperties = {
+  ...panelStyle,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+};
+
+const resultsPanelStyle: CSSProperties = {
   ...panelStyle,
   display: 'flex',
   flexDirection: 'column',
@@ -274,6 +294,8 @@ const footerStyle: CSSProperties = {
   alignItems: 'center'
 };
 
+const importSourceStateStorageKey = 'tedography.import.lastSource';
+
 function formatDate(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -299,9 +321,59 @@ function getBrowseCacheKey(rootId: string, relativePath: string): string {
   return `${rootId}::${relativePath}`;
 }
 
+function getRelativePathFromBrowseCacheKey(cacheKey: string, rootId: string): string | null {
+  const prefix = `${rootId}::`;
+  return cacheKey.startsWith(prefix) ? cacheKey.slice(prefix.length) : null;
+}
+
 function getFolderName(relativePath: string): string {
   const parts = relativePath.split('/').filter(Boolean);
   return parts.at(-1) ?? '';
+}
+
+function getAncestorRelativePaths(relativePath: string): string[] {
+  const segments = relativePath.split('/').filter(Boolean);
+  const ancestorPaths: string[] = [''];
+
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    ancestorPaths.push(segments.slice(0, index + 1).join('/'));
+  }
+
+  return ancestorPaths;
+}
+
+function parsePersistedImportSourceState(): PersistedImportSourceState | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const stored = window.localStorage.getItem(importSourceStateStorageKey);
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as unknown;
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as { rootId?: unknown }).rootId !== 'string' ||
+      typeof (parsed as { relativePath?: unknown }).relativePath !== 'string' ||
+      !Array.isArray((parsed as { expandedRelativePaths?: unknown }).expandedRelativePaths)
+    ) {
+      return null;
+    }
+
+    return {
+      rootId: (parsed as { rootId: string }).rootId,
+      relativePath: (parsed as { relativePath: string }).relativePath,
+      expandedRelativePaths: (parsed as { expandedRelativePaths: unknown[] }).expandedRelativePaths.filter(
+        (entry): entry is string => typeof entry === 'string'
+      )
+    };
+  } catch {
+    return null;
+  }
 }
 
 function buildAlbumTreeDisplayList(
@@ -347,9 +419,7 @@ function buildExpandedAlbumGroupIdsForInitialDestination(
   nodes: AlbumTreeNode[],
   initialAlbumDestination: ImportAssetsDialogInitialAlbumDestination | null | undefined
 ): string[] {
-  const expandedGroupIds = new Set<string>(
-    nodes.filter((node) => node.nodeType === 'Group' && node.parentId === null).map((node) => node.id)
-  );
+  const expandedGroupIds = new Set<string>();
 
   if (!initialAlbumDestination) {
     return Array.from(expandedGroupIds);
@@ -406,6 +476,7 @@ export function ImportAssetsDialog({
   const [rootsError, setRootsError] = useState<string | null>(null);
 
   const [browseCache, setBrowseCache] = useState<Record<string, BrowseDirectoryResponse>>({});
+  const browseCacheRef = useRef<Record<string, BrowseDirectoryResponse>>({});
   const [browseLoadingKeys, setBrowseLoadingKeys] = useState<string[]>([]);
   const [browseErrors, setBrowseErrors] = useState<Record<string, string>>({});
   const [expandedSourceKeys, setExpandedSourceKeys] = useState<string[]>([]);
@@ -414,6 +485,7 @@ export function ImportAssetsDialog({
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanResponse, setScanResponse] = useState<ScanImportResponse | null>(null);
+  const [scanFilesVisible, setScanFilesVisible] = useState(false);
 
   const [selectedImportablePaths, setSelectedImportablePaths] = useState<string[]>([]);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -421,6 +493,9 @@ export function ImportAssetsDialog({
   const [registerResponse, setRegisterResponse] = useState<RegisterImportResponse | null>(null);
   const [albumAssignmentMessage, setAlbumAssignmentMessage] = useState<string | null>(null);
   const [importCompletionMessage, setImportCompletionMessage] = useState<string | null>(null);
+  const [lastImportDestinationSummary, setLastImportDestinationSummary] =
+    useState<LastImportDestinationSummary | null>(null);
+  const [importResultsPanelState, setImportResultsPanelState] = useState<ImportResultsPanelState>('idle');
 
   const [albumTreeNodes, setAlbumTreeNodes] = useState<AlbumTreeNode[]>([]);
   const [albumTreeLoading, setAlbumTreeLoading] = useState(false);
@@ -480,42 +555,61 @@ export function ImportAssetsDialog({
     }
   }, [selectableGroupNodes, selectedNewAlbumParentId]);
 
-  async function loadRoots(): Promise<void> {
+  useEffect(() => {
+    if (
+      !initialAlbumDestination &&
+      albumTreeNodes.length > 0 &&
+      (albumDestinationMode === 'existing' || albumDestinationMode === 'new')
+    ) {
+      setExpandedAlbumGroupIds([]);
+    }
+  }, [albumDestinationMode, albumTreeNodes, initialAlbumDestination]);
+
+  useEffect(() => {
+    browseCacheRef.current = browseCache;
+  }, [browseCache]);
+
+  useEffect(() => {
+    if (!open || !selectedSource || typeof window === 'undefined') {
+      return;
+    }
+
+    const expandedRelativePaths = expandedSourceKeys
+      .map((cacheKey) => getRelativePathFromBrowseCacheKey(cacheKey, selectedSource.rootId))
+      .filter((value): value is string => value !== null);
+
+    const nextState: PersistedImportSourceState = {
+      rootId: selectedSource.rootId,
+      relativePath: selectedSource.relativePath,
+      expandedRelativePaths: Array.from(new Set(expandedRelativePaths))
+    };
+
+    window.localStorage.setItem(importSourceStateStorageKey, JSON.stringify(nextState));
+  }, [expandedSourceKeys, open, selectedSource]);
+
+  async function loadRoots(): Promise<StorageRootDto[]> {
     setRootsLoading(true);
     setRootsError(null);
 
     try {
       const response = await getStorageRoots();
       setRoots(response.storageRoots);
-
-      const defaultRoot = response.storageRoots.find((root) => root.isAvailable) ?? response.storageRoots[0];
-      if (defaultRoot) {
-        const rootSelection: SourceSelection = {
-          rootId: defaultRoot.id,
-          relativePath: '',
-          label: defaultRoot.label
-        };
-        setSelectedSource(rootSelection);
-        setExpandedSourceKeys(defaultRoot.isAvailable ? [getBrowseCacheKey(defaultRoot.id, '')] : []);
-        if (defaultRoot.isAvailable) {
-          await loadBrowse(defaultRoot.id, '');
-        }
-      } else {
-        setSelectedSource(null);
-      }
+      return response.storageRoots;
     } catch (error) {
       setRootsError(error instanceof Error ? error.message : 'Failed to load storage roots');
       setRoots([]);
       setSelectedSource(null);
+      return [];
     } finally {
       setRootsLoading(false);
     }
   }
 
-  async function loadBrowse(rootId: string, relativePath: string): Promise<void> {
+  async function loadBrowse(rootId: string, relativePath: string): Promise<BrowseDirectoryResponse | null> {
     const cacheKey = getBrowseCacheKey(rootId, relativePath);
-    if (browseCache[cacheKey]) {
-      return;
+    const cached = browseCacheRef.current[cacheKey];
+    if (cached) {
+      return cached;
     }
 
     setBrowseLoadingKeys((previous) =>
@@ -529,15 +623,85 @@ export function ImportAssetsDialog({
 
     try {
       const response = await browseDirectory({ rootId, relativePath });
-      setBrowseCache((previous) => ({ ...previous, [cacheKey]: response }));
+      setBrowseCache((previous) => {
+        const next = { ...previous, [cacheKey]: response };
+        browseCacheRef.current = next;
+        return next;
+      });
+      return response;
     } catch (error) {
       setBrowseErrors((previous) => ({
         ...previous,
         [cacheKey]: error instanceof Error ? error.message : 'Failed to browse directory'
       }));
+      return null;
     } finally {
       setBrowseLoadingKeys((previous) => previous.filter((key) => key !== cacheKey));
     }
+  }
+
+  async function restoreLastSelectedSource(nextRoots: StorageRootDto[]): Promise<void> {
+    const persisted = parsePersistedImportSourceState();
+    const defaultRoot = nextRoots.find((root) => root.isAvailable) ?? nextRoots[0];
+    if (!defaultRoot) {
+      setSelectedSource(null);
+      setExpandedSourceKeys([]);
+      return;
+    }
+
+    const restoredRoot =
+      (persisted
+        ? nextRoots.find((root) => root.id === persisted.rootId && root.isAvailable) ?? null
+        : null) ?? defaultRoot;
+
+    const desiredRelativePath = persisted && restoredRoot.id === persisted.rootId ? persisted.relativePath : '';
+    const desiredExpandedRelativePaths =
+      persisted && restoredRoot.id === persisted.rootId ? persisted.expandedRelativePaths : [''];
+
+    const rootResponse = restoredRoot.isAvailable ? await loadBrowse(restoredRoot.id, '') : null;
+    const rootSelection: SourceSelection = {
+      rootId: restoredRoot.id,
+      relativePath: '',
+      label: restoredRoot.label
+    };
+
+    if (!restoredRoot.isAvailable || !rootResponse) {
+      setSelectedSource(rootSelection);
+      setExpandedSourceKeys([]);
+      return;
+    }
+
+    const segments = desiredRelativePath.split('/').filter(Boolean);
+    const expandedRelativePaths = new Set<string>(['', ...desiredExpandedRelativePaths, ...getAncestorRelativePaths(desiredRelativePath)]);
+    let resolvedRelativePath = '';
+
+    for (const segment of segments) {
+      const parentPath = resolvedRelativePath;
+      const browseResponse = await loadBrowse(restoredRoot.id, parentPath);
+      const matchingDirectory = browseResponse?.directories.find((directory) => directory.name === segment);
+      if (!matchingDirectory) {
+        break;
+      }
+
+      resolvedRelativePath = matchingDirectory.relativePath;
+      expandedRelativePaths.add(parentPath);
+    }
+
+    if (resolvedRelativePath) {
+      await loadBrowse(restoredRoot.id, resolvedRelativePath);
+    }
+
+    const selectedLabel =
+      resolvedRelativePath.length === 0
+        ? restoredRoot.label
+        : resolvedRelativePath.split('/').filter(Boolean).at(-1) ?? restoredRoot.label;
+
+    setExpandedSourceKeys(Array.from(expandedRelativePaths).map((relativePath) => getBrowseCacheKey(restoredRoot.id, relativePath)));
+    setSelectedSource({
+      rootId: restoredRoot.id,
+      relativePath: resolvedRelativePath,
+      label: selectedLabel
+    });
   }
 
   async function loadAlbumTree(): Promise<void> {
@@ -561,21 +725,30 @@ export function ImportAssetsDialog({
       return;
     }
 
-    void loadRoots();
-    void loadAlbumTree();
+    browseCacheRef.current = {};
     setBrowseCache({});
     setBrowseErrors({});
+    setBrowseLoadingKeys([]);
+    setExpandedSourceKeys([]);
+    setSelectedSource(null);
     setScanResponse(null);
+    setScanFilesVisible(false);
     setSelectedImportablePaths([]);
     setRegisterResponse(null);
     setRegisterError(null);
     setScanError(null);
     setAlbumAssignmentMessage(null);
     setImportCompletionMessage(null);
+    setLastImportDestinationSummary(null);
+    setImportResultsPanelState('idle');
     setAlbumDestinationMode(initialAlbumDestination?.mode ?? 'none');
     setSelectedExistingAlbumId(initialAlbumDestination?.mode === 'existing' ? initialAlbumDestination.albumId ?? '' : '');
     setSelectedNewAlbumParentId(initialAlbumDestination?.mode === 'new' ? initialAlbumDestination.parentGroupId ?? '' : '');
     setNewAlbumName('');
+    void loadRoots().then(async (loadedRoots) => {
+      await restoreLastSelectedSource(loadedRoots);
+    });
+    void loadAlbumTree();
   }, [initialAlbumDestination, open]);
 
   if (!open) {
@@ -584,6 +757,7 @@ export function ImportAssetsDialog({
 
   function clearScanState(): void {
     setScanResponse(null);
+    setScanFilesVisible(false);
     setSelectedImportablePaths([]);
     setScanError(null);
     setRegisterResponse(null);
@@ -624,6 +798,7 @@ export function ImportAssetsDialog({
       });
 
       setScanResponse(response);
+      setScanFilesVisible(false);
       setSelectedImportablePaths(
         response.files
           .filter((file) => file.status === 'Importable')
@@ -645,6 +820,7 @@ export function ImportAssetsDialog({
     });
 
     setScanResponse(response);
+    setScanFilesVisible(false);
     setSelectedImportablePaths(
       response.files
         .filter((file) => file.status === 'Importable')
@@ -660,11 +836,19 @@ export function ImportAssetsDialog({
 
     setRegisterLoading(true);
     setRegisterError(null);
+    setRegisterResponse(null);
     setAlbumAssignmentMessage(null);
+    setImportCompletionMessage(null);
+    setLastImportDestinationSummary(null);
+    setImportResultsPanelState('running');
 
     try {
       let destinationAlbumId: string | null = null;
       let destinationAlbumLabel = '';
+      let destinationSummary: LastImportDestinationSummary = {
+        mode: albumDestinationMode,
+        albumLabel: null
+      };
 
       if (albumDestinationMode === 'existing') {
         if (!selectedExistingAlbumId) {
@@ -676,6 +860,10 @@ export function ImportAssetsDialog({
         }
         destinationAlbumId = existingAlbum.id;
         destinationAlbumLabel = existingAlbum.label;
+        destinationSummary = {
+          mode: 'existing',
+          albumLabel: existingAlbum.label
+        };
       }
 
       if (albumDestinationMode === 'new') {
@@ -699,6 +887,10 @@ export function ImportAssetsDialog({
         });
         destinationAlbumId = createdAlbum.id;
         destinationAlbumLabel = createdAlbum.label;
+        destinationSummary = {
+          mode: 'new',
+          albumLabel: createdAlbum.label
+        };
         await loadAlbumTree();
       }
 
@@ -727,6 +919,8 @@ export function ImportAssetsDialog({
       }
 
       setRegisterResponse(response);
+      setLastImportDestinationSummary(destinationSummary);
+      setImportResultsPanelState('success');
       const nonImportedCount =
         response.skippedAlreadyImportedByPathCount +
         response.skippedDuplicateContentCount +
@@ -744,6 +938,7 @@ export function ImportAssetsDialog({
         onImportCompleted?.();
       }
     } catch (error) {
+      setImportResultsPanelState('error');
       setRegisterError(error instanceof Error ? error.message : 'Failed to import files');
     } finally {
       setRegisterLoading(false);
@@ -1033,6 +1228,13 @@ export function ImportAssetsDialog({
                     <div style={{ ...controlRowStyle, marginTop: '10px' }}>
                       <button
                         type="button"
+                        style={buttonStyle}
+                        onClick={() => setScanFilesVisible((previous) => !previous)}
+                      >
+                        {scanFilesVisible ? 'Hide Files' : 'Show Files'}
+                      </button>
+                      <button
+                        type="button"
                         style={!allImportableSelected ? buttonStyle : disabledButtonStyle}
                         onClick={() => setSelectedImportablePaths(importableScanPaths)}
                         disabled={importableScanPaths.length === 0 || allImportableSelected}
@@ -1049,39 +1251,41 @@ export function ImportAssetsDialog({
                       </button>
                     </div>
 
-                    <ul style={listStyle}>
-                      {scanResponse.files.map((file) => {
-                        const importable = file.status === 'Importable';
-                        const selected = selectedImportablePaths.includes(file.relativePath);
+                    {scanFilesVisible ? (
+                      <ul style={listStyle}>
+                        {scanResponse.files.map((file) => {
+                          const importable = file.status === 'Importable';
+                          const selected = selectedImportablePaths.includes(file.relativePath);
 
-                        return (
-                          <li key={file.relativePath} style={listRowStyle}>
-                            <label style={{ display: 'grid', gap: '2px' }}>
-                              <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  disabled={!importable}
-                                  onChange={() => toggleSelectedPath(file.relativePath)}
-                                />
-                                <strong>{file.filename}</strong>
-                                <span style={{ fontSize: '12px', color: importable ? '#136f2d' : '#666' }}>
-                                  {file.status}
+                          return (
+                            <li key={file.relativePath} style={listRowStyle}>
+                              <label style={{ display: 'grid', gap: '2px' }}>
+                                <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={!importable}
+                                    onChange={() => toggleSelectedPath(file.relativePath)}
+                                  />
+                                  <strong>{file.filename}</strong>
+                                  <span style={{ fontSize: '12px', color: importable ? '#136f2d' : '#666' }}>
+                                    {file.status}
+                                  </span>
                                 </span>
-                              </span>
-                              <span style={{ fontSize: '12px', color: '#555' }}>{file.relativePath}</span>
-                              <span style={{ fontSize: '12px', color: '#666' }}>
-                                {formatBytes(file.sizeBytes)}
-                                {typeof file.width === 'number' && typeof file.height === 'number'
-                                  ? ` | ${file.width} x ${file.height}`
-                                  : ''}
-                                {file.captureDateTime ? ` | ${formatDate(file.captureDateTime)}` : ''}
-                              </span>
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                                <span style={{ fontSize: '12px', color: '#555' }}>{file.relativePath}</span>
+                                <span style={{ fontSize: '12px', color: '#666' }}>
+                                  {formatBytes(file.sizeBytes)}
+                                  {typeof file.width === 'number' && typeof file.height === 'number'
+                                    ? ` | ${file.width} x ${file.height}`
+                                    : ''}
+                                  {file.captureDateTime ? ` | ${formatDate(file.captureDateTime)}` : ''}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
                   </>
                 ) : (
                   <p style={mutedTextStyle}>Browse first, then scan the selected folder to inspect importable files.</p>
@@ -1155,24 +1359,48 @@ export function ImportAssetsDialog({
                   ) : null}
                 </div>
               </div>
+            </div>
+          </section>
 
-              {registerError ? <p style={{ color: '#b00020' }}>{registerError}</p> : null}
-              {importCompletionMessage ? <p style={{ color: '#136f2d' }}>{importCompletionMessage}</p> : null}
-              {albumAssignmentMessage ? <p style={{ color: '#136f2d' }}>{albumAssignmentMessage}</p> : null}
-              {registerResponse ? (
-                <section style={sectionStyle}>
-                  <h3 style={sectionTitleStyle}>Import Results</h3>
-                  <p style={{ margin: '0 0 4px 0' }}>Imported: {registerResponse.importedCount}</p>
-                  <p style={{ margin: '0 0 4px 0' }}>
-                    Already imported by path: {registerResponse.skippedAlreadyImportedByPathCount}
-                  </p>
-                  <p style={{ margin: '0 0 4px 0' }}>
-                    Duplicate by content hash: {registerResponse.skippedDuplicateContentCount}
-                  </p>
-                  <p style={{ margin: '0 0 4px 0' }}>Unsupported: {registerResponse.unsupportedCount}</p>
-                  <p style={{ margin: '0 0 4px 0' }}>Missing: {registerResponse.missingCount}</p>
-                  <p style={{ margin: '0 0 8px 0' }}>Errors: {registerResponse.errorCount}</p>
-                  <ul style={listStyle}>
+          <section style={resultsPanelStyle}>
+            <div style={panelHeaderStyle}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '15px' }}>Import Results</h3>
+                <p style={{ ...mutedTextStyle, marginTop: '4px' }}>
+                  Results from the most recent import in this dialog session.
+                </p>
+              </div>
+              {registerLoading ? <span style={badgeStyle}>Importing</span> : null}
+            </div>
+            <div style={panelBodyStyle}>
+              {registerError ? <p style={{ color: '#b00020', marginTop: 0 }}>{registerError}</p> : null}
+              {importCompletionMessage ? <p style={{ color: '#136f2d', marginTop: 0 }}>{importCompletionMessage}</p> : null}
+              {albumAssignmentMessage ? <p style={{ color: '#136f2d', marginTop: 0 }}>{albumAssignmentMessage}</p> : null}
+              {importResultsPanelState === 'running' ? (
+                <p style={mutedTextStyle}>Import in progress</p>
+              ) : registerResponse ? (
+                <>
+                  <div style={summaryGridStyle}>
+                    <span>Imported: {registerResponse.importedCount}</span>
+                    <span>
+                      Skipped:{' '}
+                      {registerResponse.skippedAlreadyImportedByPathCount +
+                        registerResponse.skippedDuplicateContentCount +
+                        registerResponse.unsupportedCount +
+                        registerResponse.missingCount}
+                    </span>
+                    <span>Already imported: {registerResponse.skippedAlreadyImportedByPathCount}</span>
+                    <span>Errors/problems: {registerResponse.errorCount}</span>
+                    <span>
+                      Destination:{' '}
+                      {lastImportDestinationSummary?.mode === 'existing'
+                        ? `Existing album${lastImportDestinationSummary.albumLabel ? `: ${lastImportDestinationSummary.albumLabel}` : ''}`
+                        : lastImportDestinationSummary?.mode === 'new'
+                          ? `New album${lastImportDestinationSummary.albumLabel ? `: ${lastImportDestinationSummary.albumLabel}` : ''}`
+                          : 'None'}
+                    </span>
+                  </div>
+                  <ul style={{ ...listStyle, maxHeight: '100%', marginTop: '12px' }}>
                     {registerResponse.results.map((result) => (
                       <li key={`${result.relativePath}:${result.status}`} style={listRowStyle}>
                         <strong>{result.relativePath}</strong> - {result.status}
@@ -1180,8 +1408,12 @@ export function ImportAssetsDialog({
                       </li>
                     ))}
                   </ul>
-                </section>
-              ) : null}
+                </>
+              ) : importResultsPanelState === 'error' ? (
+                <p style={mutedTextStyle}>Import failed.</p>
+              ) : (
+                <p style={mutedTextStyle}>No import has been run yet.</p>
+              )}
             </div>
           </section>
         </div>
