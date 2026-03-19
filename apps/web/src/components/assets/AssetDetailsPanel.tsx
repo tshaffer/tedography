@@ -1,11 +1,17 @@
 import { type CSSProperties } from 'react';
 import { type MediaAsset } from '@tedography/domain';
+import type { DuplicateReconciliationListItem } from '@tedography/shared';
+import { type DuplicateResolutionVisibilitySummary } from '../duplicates/duplicateResolutionVisibility';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
+  duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
+  duplicateReconciliation?: DuplicateReconciliationListItem | null;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
+  onOpenDuplicateGroup?: () => void;
+  onOpenDuplicateReconciliation?: () => void;
   assetOperationBusy?: boolean;
   assetOperationMessage?: string | null;
   assetOperationError?: boolean;
@@ -131,8 +137,12 @@ function formatLocation(
 export function AssetDetailsPanel({
   asset,
   albumLabels = [],
+  duplicateResolutionSummary = null,
+  duplicateReconciliation = null,
   onReimportAsset,
   onRebuildDerivedFiles,
+  onOpenDuplicateGroup,
+  onOpenDuplicateReconciliation,
   assetOperationBusy = false,
   assetOperationMessage = null,
   assetOperationError = false
@@ -174,6 +184,28 @@ export function AssetDetailsPanel({
     { label: 'Imported', value: formatDateTime(asset.importedAt) }
   ];
 
+  if (duplicateResolutionSummary) {
+    rows.push(
+      {
+        label: 'Duplicate Role',
+        value: duplicateResolutionSummary.role === 'canonical' ? 'Canonical keeper' : 'Suppressed duplicate'
+      },
+      { label: 'Duplicate Group', value: duplicateResolutionSummary.groupKey }
+    );
+  }
+
+  if (duplicateReconciliation) {
+    rows.push(
+      { label: 'Reconciliation', value: duplicateReconciliation.status },
+      {
+        label: 'Added Albums',
+        value: String(
+          duplicateReconciliation.entries.reduce((sum, entry) => sum + entry.addedValues.length, 0)
+        )
+      }
+    );
+  }
+
   return (
     <section style={panelStyle}>
       <h3 style={titleStyle}>Asset Details</h3>
@@ -194,6 +226,26 @@ export function AssetDetailsPanel({
         >
           {assetOperationBusy ? 'Working...' : 'Rebuild Derived Files'}
         </button>
+        {duplicateResolutionSummary ? (
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={onOpenDuplicateGroup}
+            disabled={!onOpenDuplicateGroup}
+          >
+            Open Duplicate Group
+          </button>
+        ) : null}
+        {duplicateReconciliation ? (
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={onOpenDuplicateReconciliation}
+            disabled={!onOpenDuplicateReconciliation}
+          >
+            Open Reconciliation
+          </button>
+        ) : null}
       </div>
       {assetOperationMessage ? (
         <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>

@@ -12,6 +12,7 @@
     "thumbnails:rebuild": "pnpm --filter @tedography/api thumbnails:rebuild",
     "photo-state-poc": "pnpm --filter @tedography/api exec tsx ../../scripts/photo-state-poc.ts",
     "canon-import-plan": "pnpm --filter @tedography/api exec tsx ../../scripts/canon-to-tedography-plan.ts",
+    "duplicate-cli": "pnpm --filter @tedography/duplicate-cli exec tsx src/index.ts",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },

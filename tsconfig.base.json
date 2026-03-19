@@ -2,6 +2,15 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
+    "baseUrl": ".",
+    "paths": {
+      "@tedography/domain": ["packages/domain/src/index.ts"],
+      "@tedography/shared": ["packages/shared/src/index.ts"],
+      "@tedography/media-metadata": ["packages/media-metadata/src/index.ts"],
+      "@tedography/import-pipeline": ["packages/import-pipeline/src/index.ts"],
+      "@tedography/duplicate-domain": ["packages/duplicate-domain/src/index.ts"],
+      "@tedography/image-analysis": ["packages/image-analysis/src/index.ts"]
+    },
     "strict": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,

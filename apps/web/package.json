@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "webpack serve --config webpack.config.js",
     "build": "webpack --config webpack.config.js",
+    "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rimraf dist",
     "lint": "echo \"lint not configured yet\""
@@ -26,6 +27,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "html-webpack-plugin": "5.6.6",
+    "tsx": "4.21.0",
     "ts-loader": "9.5.4",
     "typescript": "5.9.3",
     "webpack": "5.105.4",

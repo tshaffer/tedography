@@ -12,11 +12,13 @@
     "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rimraf dist"
   },
   "dependencies": {
     "@tedography/domain": "workspace:*",
+    "@tedography/duplicate-domain": "workspace:*",
     "@tedography/import-pipeline": "workspace:*",
     "@tedography/media-metadata": "workspace:*",
     "@tedography/shared": "workspace:*",

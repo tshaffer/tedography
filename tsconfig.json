@@ -2,10 +2,15 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/duplicate-domain" },
     { "path": "./packages/shared" },
+    { "path": "./packages/image-analysis" },
     { "path": "./packages/media-metadata" },
     { "path": "./packages/import-pipeline" },
     { "path": "./apps/api" },
-    { "path": "./apps/web" }
+    { "path": "./apps/web" },
+    { "path": "./apps/duplicate-cli" },
+    { "path": "./apps/duplicate-worker" },
+    { "path": "./apps/duplicate-review-web" }
   ]
 }

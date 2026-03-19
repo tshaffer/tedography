@@ -35,6 +35,17 @@ export async function findById(id: string): Promise<MediaAsset | null> {
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function findByIds(ids: string[]): Promise<MediaAsset[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const assets = await MediaAssetModel.find({ id: { $in: ids } }, { _id: 0 })
+    .sort({ id: 1 })
+    .lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
+}
+
 export async function findByOriginalStorageRootAndArchivePaths(
   originalStorageRootId: string,
   originalArchivePaths: string[]
@@ -250,6 +261,45 @@ export async function updateMediaAssetSourceData(
     { $set: updatePayload },
     { new: true, projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
+}
+
+export async function updateMediaAssetOriginalArchivePath(input: {
+  id: string;
+  originalArchivePath: string;
+  displayArchivePath?: string | null;
+}): Promise<MediaAsset | null> {
+  const updatePayload: Record<string, string | null> = {
+    originalArchivePath: input.originalArchivePath
+  };
+
+  if (input.displayArchivePath !== undefined) {
+    updatePayload.displayArchivePath = input.displayArchivePath;
+  }
+
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id: input.id },
+    { $set: updatePayload },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+
+  return asset ? normalizeMediaAsset(asset) : null;
+}
+
+export async function updateMediaAssetAlbumIds(
+  id: string,
+  albumIds: string[]
+): Promise<MediaAsset | null> {
+  const normalizedAlbumIds = [...new Set(albumIds.map((albumId) => albumId.trim()).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right)
+  );
+
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id },
+    { $set: { albumIds: normalizedAlbumIds } },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+
   return asset ? normalizeMediaAsset(asset) : null;
 }
 

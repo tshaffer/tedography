@@ -88,6 +88,9 @@ export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
   derivedRoot: requireAbsolutePathEnv('TEDOGRAPHY_DERIVED_ROOT'),
+  duplicateQuarantineSubdir:
+    (process.env.TEDOGRAPHY_DUPLICATE_QUARANTINE_SUBDIR ?? '.tedography-quarantine/duplicates').trim() ||
+    '.tedography-quarantine/duplicates',
 
   port: Number(process.env.PORT ?? 4000),
 };

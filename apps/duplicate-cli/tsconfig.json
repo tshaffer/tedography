@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "rootDir": "../..",
+    "outDir": "dist",
+    "types": ["node"],
+    "baseUrl": "../..",
+    "paths": {
+      "@tedography/domain": ["packages/domain/src/index.ts"],
+      "@tedography/duplicate-domain": ["packages/duplicate-domain/src/index.ts"],
+      "@tedography/image-analysis": ["packages/image-analysis/src/index.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "../../packages/domain/src",
+    "../../packages/duplicate-domain/src",
+    "../../packages/image-analysis/src"
+  ]
+}

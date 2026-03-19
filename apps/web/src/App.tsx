@@ -9,6 +9,7 @@ import {
   type ReactElement,
   type WheelEvent as ReactWheelEvent
 } from 'react';
+import { Link } from 'react-router-dom';
 import {
   MediaType,
   PhotoState,
@@ -16,6 +17,7 @@ import {
   type AlbumTreeNode,
   type MediaAsset
 } from '@tedography/domain';
+import type { DuplicateReconciliationListItem } from '@tedography/shared';
 import {
   addAssetsToAlbum,
   createAlbumTreeNode,
@@ -27,10 +29,18 @@ import {
   renameAlbumTreeNode
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
+import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
+import { listDuplicateReconciliations } from './api/duplicateReconciliationApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
+import {
+  buildDuplicateResolutionVisibilityMap,
+  filterAssetsByDuplicateSuppression,
+  getDuplicateVisibilityBadgeLabel,
+  type DuplicateResolutionVisibilitySummary
+} from './components/duplicates/duplicateResolutionVisibility';
 import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
@@ -74,6 +84,7 @@ const reviewVisiblePhotoStatesStorageKey = 'tedography.reviewVisiblePhotoStates'
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
+const showSuppressedDuplicatesStorageKey = 'tedography.showSuppressedDuplicates';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
@@ -295,16 +306,13 @@ const menuAnchorStyle: CSSProperties = {
 };
 
 const optionsMenuStyle: CSSProperties = {
-  position: 'absolute',
-  top: 'calc(100% + 6px)',
-  right: 0,
   minWidth: '180px',
   border: '1px solid #d6d6d6',
   borderRadius: '8px',
   backgroundColor: '#fff',
   boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)',
   padding: '8px',
-  zIndex: 30,
+  zIndex: 1200,
   display: 'grid',
   gap: '6px'
 };
@@ -1746,6 +1754,7 @@ function getAssetThumbnailImageUrl(asset: MediaAsset): string | null {
 
 type AssetCardProps = {
   asset: MediaAsset;
+  duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
   isSelected: boolean;
   isActive: boolean;
   isUpdating: boolean;
@@ -1756,6 +1765,7 @@ type AssetCardProps = {
 
 function AssetCard({
   asset,
+  duplicateResolutionSummary = null,
   isSelected,
   isActive,
   isUpdating,
@@ -1770,6 +1780,17 @@ function AssetCard({
   const imageUrl = imageFailed ? displayImageUrl : thumbnailImageUrl;
   const photoStateBadgeColor = getPhotoStateBadgeColor(asset.photoState);
   const photoStateLabel = getPhotoStateBadgeLabel(asset.photoState);
+  const duplicateBadgeLabel = getDuplicateVisibilityBadgeLabel(
+    duplicateResolutionSummary ?? undefined
+  );
+  const duplicateBadgeStyle: CSSProperties | null = duplicateBadgeLabel
+    ? {
+        ...cardPhotoStateBadgeStyle,
+        top: showPhotoStateBadge ? '38px' : '8px',
+        backgroundColor:
+          duplicateResolutionSummary?.role === 'canonical' ? '#0f4c5c' : '#7c3aed'
+      }
+    : null;
 
   useEffect(() => {
     setImageFailed(false);
@@ -1803,6 +1824,9 @@ function AssetCard({
             {photoStateLabel}
           </span>
         ) : null}
+        {duplicateBadgeLabel && duplicateBadgeStyle ? (
+          <span style={duplicateBadgeStyle}>{duplicateBadgeLabel}</span>
+        ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
         {imageUrl && !imageFailed ? (
@@ -1832,10 +1856,14 @@ function AssetCard({
 
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
+  duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
+  duplicateReconciliation?: DuplicateReconciliationListItem | null;
 };
 
 function AssetDetailPanel({
-  asset
+  asset,
+  duplicateResolutionSummary = null,
+  duplicateReconciliation = null
 }: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
@@ -1861,6 +1889,38 @@ function AssetDetailPanel({
       <p>
         <strong>Captured:</strong> {formatCaptureDate(asset.captureDateTime)}
       </p>
+      {duplicateResolutionSummary ? (
+        <>
+          <p>
+            <strong>Duplicate Role:</strong>{' '}
+            {duplicateResolutionSummary.role === 'canonical' ? 'Canonical keeper' : 'Suppressed duplicate'}
+          </p>
+          <p>
+            <strong>Duplicate Group:</strong> {duplicateResolutionSummary.groupKey}
+          </p>
+          <p>
+            <Link to={`/duplicates/groups?groupKey=${encodeURIComponent(duplicateResolutionSummary.groupKey)}`}>
+              Open duplicate group
+            </Link>
+          </p>
+        </>
+      ) : null}
+      {duplicateReconciliation ? (
+        <>
+          <p>
+            <strong>Reconciliation:</strong> {duplicateReconciliation.status}
+          </p>
+          <p>
+            <Link
+              to={`/duplicates/reconciliations?groupKey=${encodeURIComponent(
+                duplicateReconciliation.groupKey
+              )}`}
+            >
+              Open reconciliation detail
+            </Link>
+          </p>
+        </>
+      ) : null}
       <p>
         <strong>Dimensions:</strong>{' '}
         {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
@@ -2482,6 +2542,17 @@ export default function App() {
     const stored = window.localStorage.getItem(showThumbnailPhotoStateBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showSuppressedDuplicates, setShowSuppressedDuplicates] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showSuppressedDuplicatesStorageKey) === 'true';
+  });
+  const [duplicateResolutionVisibilityByAssetId, setDuplicateResolutionVisibilityByAssetId] =
+    useState<Map<string, DuplicateResolutionVisibilitySummary>>(() => new Map());
+  const [selectedAssetReconciliation, setSelectedAssetReconciliation] =
+    useState<DuplicateReconciliationListItem | null>(null);
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
@@ -2602,12 +2673,17 @@ export default function App() {
   });
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
+  const viewOptionsRootRef = useRef<HTMLDivElement | null>(null);
   const pendingGridRevealAssetIdRef = useRef<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const previousIsTimelineModeRef = useRef(false);
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const timelineScrollMemoryRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const pendingTimelineZoomAnchorKeyRef = useRef<string | null>(null);
+  const [viewOptionsMenuPosition, setViewOptionsMenuPosition] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -2627,6 +2703,20 @@ export default function App() {
       return;
     }
 
+    function updateViewOptionsMenuPosition(): void {
+      const rect = viewOptionsRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      setViewOptionsMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8)
+      });
+    }
+
+    updateViewOptionsMenuPosition();
+
     function handleWindowPointerDown(event: MouseEvent): void {
       if (!(event.target instanceof Node)) {
         setViewOptionsOpen(false);
@@ -2641,8 +2731,12 @@ export default function App() {
       setViewOptionsOpen(false);
     }
 
+    window.addEventListener('resize', updateViewOptionsMenuPosition);
+    window.addEventListener('scroll', updateViewOptionsMenuPosition, true);
     window.addEventListener('mousedown', handleWindowPointerDown);
     return () => {
+      window.removeEventListener('resize', updateViewOptionsMenuPosition);
+      window.removeEventListener('scroll', updateViewOptionsMenuPosition, true);
       window.removeEventListener('mousedown', handleWindowPointerDown);
     };
   }, [viewOptionsOpen]);
@@ -2683,6 +2777,13 @@ export default function App() {
       showThumbnailPhotoStateBadges ? 'true' : 'false'
     );
   }, [showThumbnailPhotoStateBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showSuppressedDuplicatesStorageKey,
+      showSuppressedDuplicates ? 'true' : 'false'
+    );
+  }, [showSuppressedDuplicates]);
 
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
@@ -2765,6 +2866,15 @@ export default function App() {
     }
   }
 
+  async function loadDuplicateResolutionVisibility(): Promise<void> {
+    try {
+      const response = await listDuplicateGroups();
+      setDuplicateResolutionVisibilityByAssetId(buildDuplicateResolutionVisibilityMap(response.groups));
+    } catch {
+      setDuplicateResolutionVisibilityByAssetId(new Map());
+    }
+  }
+
   async function loadAlbumTreeNodes(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
       setAlbumTreeLoading(true);
@@ -2789,7 +2899,26 @@ export default function App() {
   useEffect(() => {
     void loadAssets({ showLoading: true });
     void loadAlbumTreeNodes({ showLoading: true });
+    void loadDuplicateResolutionVisibility();
   }, []);
+
+  useEffect(() => {
+    async function loadSelectedAssetReconciliation(): Promise<void> {
+      if (!selectedAssetId) {
+        setSelectedAssetReconciliation(null);
+        return;
+      }
+
+      try {
+        const response = await listDuplicateReconciliations({ assetId: selectedAssetId });
+        setSelectedAssetReconciliation(response.items[0] ?? null);
+      } catch {
+        setSelectedAssetReconciliation(null);
+      }
+    }
+
+    void loadSelectedAssetReconciliation();
+  }, [selectedAssetId]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -2913,10 +3042,20 @@ export default function App() {
     [assets, currentAreaPhotoStates, primaryArea]
   );
 
+  const duplicateVisibilityScopedAssets = useMemo(
+    () =>
+      filterAssetsByDuplicateSuppression(
+        areaPhotoStateVisibleAssets,
+        duplicateResolutionVisibilityByAssetId,
+        showSuppressedDuplicates
+      ),
+    [areaPhotoStateVisibleAssets, duplicateResolutionVisibilityByAssetId, showSuppressedDuplicates]
+  );
+
   const searchResults = useMemo(() => {
     const searchAlbumIdsSet = new Set(searchAlbumIds);
 
-    const filtered = areaPhotoStateVisibleAssets.filter((asset) => {
+    const filtered = duplicateVisibilityScopedAssets.filter((asset) => {
       const matchesPhotoState =
         searchPhotoStates.length === 0 || searchPhotoStates.includes(asset.photoState);
       const matchesAlbum =
@@ -2933,7 +3072,7 @@ export default function App() {
 
     return sortVisibleAssetsForTimeline(filtered);
   }, [
-    areaPhotoStateVisibleAssets,
+    duplicateVisibilityScopedAssets,
     searchAlbumIds,
     searchCaptureDateFrom,
     searchCaptureDateTo,
@@ -2941,8 +3080,8 @@ export default function App() {
   ]);
 
   const assetsAfterAdditionalFilters = useMemo(() => {
-    return areaPhotoStateVisibleAssets;
-  }, [areaPhotoStateVisibleAssets]);
+    return duplicateVisibilityScopedAssets;
+  }, [duplicateVisibilityScopedAssets]);
 
   const checkedAlbumIdsSet = useMemo(() => new Set(checkedAlbumIds), [checkedAlbumIds]);
 
@@ -2951,10 +3090,10 @@ export default function App() {
       return false;
     }
 
-    return areaPhotoStateVisibleAssets.some((asset) =>
+    return duplicateVisibilityScopedAssets.some((asset) =>
       (asset.albumIds ?? []).some((albumId) => checkedAlbumIdsSet.has(albumId))
     );
-  }, [areaPhotoStateVisibleAssets, checkedAlbumIds.length, checkedAlbumIdsSet]);
+  }, [checkedAlbumIds.length, checkedAlbumIdsSet, duplicateVisibilityScopedAssets]);
 
   const checkedAlbumsAssetsById = useMemo(() => {
     const byAlbum = new Map<string, MediaAsset[]>();
@@ -3097,6 +3236,13 @@ export default function App() {
   const selectedAsset = useMemo(
     () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [visibleAssets, selectedAssetId]
+  );
+  const selectedAssetDuplicateResolution = useMemo(
+    () =>
+      selectedAsset
+        ? duplicateResolutionVisibilityByAssetId.get(selectedAsset.id) ?? null
+        : null,
+    [duplicateResolutionVisibilityByAssetId, selectedAsset]
   );
   const selectedAssetAlbumLabels = useMemo(() => {
     if (!selectedAsset) {
@@ -5393,10 +5539,32 @@ export default function App() {
           </div>
           <AssetDetailPanel
             asset={selectedAsset}
+            duplicateResolutionSummary={selectedAssetDuplicateResolution}
+            duplicateReconciliation={selectedAssetReconciliation}
           />
           <AssetDetailsPanel
             asset={selectedAsset}
             albumLabels={selectedAssetAlbumLabels}
+            duplicateResolutionSummary={selectedAssetDuplicateResolution}
+            duplicateReconciliation={selectedAssetReconciliation}
+            onOpenDuplicateGroup={() => {
+              if (!selectedAssetDuplicateResolution) {
+                return;
+              }
+
+              window.location.href = `/duplicates/groups?groupKey=${encodeURIComponent(
+                selectedAssetDuplicateResolution.groupKey
+              )}`;
+            }}
+            onOpenDuplicateReconciliation={() => {
+              if (!selectedAssetReconciliation) {
+                return;
+              }
+
+              window.location.href = `/duplicates/reconciliations?groupKey=${encodeURIComponent(
+                selectedAssetReconciliation.groupKey
+              )}`;
+            }}
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
             assetOperationBusy={assetMaintenanceBusy !== null}
@@ -5438,6 +5606,9 @@ export default function App() {
           >
             Search
           </button>
+          <Link to="/duplicates" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+            Duplicates
+          </Link>
           <button
             type="button"
             style={compareButtonStyle}
@@ -5579,7 +5750,7 @@ export default function App() {
               {detailsPanelsVisible ? 'ⓘ' : '⌁'}
             </button>
           ) : null}
-          <div style={menuAnchorStyle} id="tdg-view-options-root">
+          <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
             <button
               type="button"
               style={compareButtonStyle}
@@ -5590,7 +5761,14 @@ export default function App() {
               View Options
             </button>
             {viewOptionsOpen ? (
-              <div style={optionsMenuStyle}>
+              <div
+                style={{
+                  ...optionsMenuStyle,
+                  position: 'fixed',
+                  top: `${viewOptionsMenuPosition.top}px`,
+                  right: `${viewOptionsMenuPosition.right}px`
+                }}
+              >
                 <label style={toggleOptionLabelStyle}>
                   <input
                     type="checkbox"
@@ -5606,6 +5784,14 @@ export default function App() {
                     onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
                   />
                   Show thumbnail state
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showSuppressedDuplicates}
+                    onChange={(event) => setShowSuppressedDuplicates(event.target.checked)}
+                  />
+                  Show suppressed duplicates
                 </label>
                 <span style={filterSubsectionTitleStyle}>Album Layout</span>
                 <label style={toggleOptionLabelStyle}>
@@ -5881,6 +6067,9 @@ export default function App() {
                         <AssetCard
                           key={asset.id}
                           asset={asset}
+                          duplicateResolutionSummary={
+                            duplicateResolutionVisibilityByAssetId.get(asset.id) ?? null
+                          }
                           isSelected={selectedAssetIds.includes(asset.id)}
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
@@ -5908,6 +6097,9 @@ export default function App() {
                         <AssetCard
                           key={`${section.albumId}-${asset.id}`}
                           asset={asset}
+                          duplicateResolutionSummary={
+                            duplicateResolutionVisibilityByAssetId.get(asset.id) ?? null
+                          }
                           isSelected={selectedAssetIds.includes(asset.id)}
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
@@ -5926,6 +6118,9 @@ export default function App() {
                   <AssetCard
                     key={asset.id}
                     asset={asset}
+                    duplicateResolutionSummary={
+                      duplicateResolutionVisibilityByAssetId.get(asset.id) ?? null
+                    }
                     isSelected={selectedAssetIds.includes(asset.id)}
                     isActive={selectedAssetId === asset.id}
                     isUpdating={updatingAssetIds[asset.id] === true}
