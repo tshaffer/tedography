@@ -27,7 +27,6 @@ fi
 
 EXPORT_COLLECTIONS=(
   albumTreeNodes
-  mediaAssetsImportSessions
 )
 
 echo "Backing up Tedography to: $OUTPUT_DIR"
