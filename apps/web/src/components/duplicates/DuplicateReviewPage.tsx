@@ -2,16 +2,12 @@ import { useEffect, useState, type CSSProperties, type KeyboardEvent as ReactKey
 import { Link } from 'react-router-dom';
 import type {
   DuplicateCandidatePairAssetSummary,
-  DuplicateCandidatePairListItem,
   DuplicateCandidatePairSummaryResponse,
-  DuplicateCandidateReviewDecision,
-  ListDuplicateGroupsResponse
 } from '@tedography/shared';
 import {
-  bulkReviewDuplicateCandidatePairs,
+  type DuplicateReviewActionDecision,
   getDuplicateCandidatePairSummary,
   listDuplicateCandidatePairs,
-  listDuplicateGroups,
   updateDuplicateCandidatePairReview
 } from '../../api/duplicateCandidatePairApi';
 import { getDisplayMediaUrl } from '../../utilities/mediaUrls';
@@ -22,11 +18,8 @@ import {
   replaceDuplicateReviewQueue,
   type DuplicateReviewQueueState
 } from './reviewQueue';
-import { DuplicateWorkspaceNav } from './DuplicateWorkspaceNav';
 import {
   getDefaultDuplicateReviewFocusSide,
-  toggleDuplicateReviewFocusSide,
-  type DuplicateReviewComparisonMode,
   type DuplicateReviewFocusSide
 } from './focusMode';
 import {
@@ -53,6 +46,13 @@ const pageStyle: CSSProperties = {
   boxSizing: 'border-box',
   background: '#f4f1ea',
   color: '#1e293b',
+  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
+};
+
+const fullModePageStyle: CSSProperties = {
+  minHeight: '100vh',
+  background: '#020617',
+  color: '#f8fafc',
   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
 };
 
@@ -117,11 +117,8 @@ const inputStyle: CSSProperties = {
   backgroundColor: '#fff'
 };
 
-const checkboxRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  fontSize: '14px'
+const sliderStyle: CSSProperties = {
+  width: '100%'
 };
 
 const filterActionBarStyle: CSSProperties = {
@@ -155,11 +152,16 @@ const comparisonGridStyle: CSSProperties = {
   gap: '16px'
 };
 
-const focusComparisonLayoutStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 240px',
-  gap: '16px',
-  alignItems: 'start'
+const pairHeroSectionStyle: CSSProperties = {
+  minHeight: '100vh',
+  display: 'flex',
+  alignItems: 'stretch',
+  marginBottom: '20px'
+};
+
+const pairHeroGridStyle: CSSProperties = {
+  ...comparisonGridStyle,
+  width: '100%'
 };
 
 const assetPanelStyle: CSSProperties = {
@@ -167,17 +169,6 @@ const assetPanelStyle: CSSProperties = {
   borderRadius: '12px',
   backgroundColor: '#ffffff',
   overflow: 'hidden'
-};
-
-const focusedAssetPanelStyle: CSSProperties = {
-  ...assetPanelStyle,
-  borderColor: '#0f4c5c',
-  boxShadow: '0 0 0 3px rgba(15, 76, 92, 0.12)'
-};
-
-const secondaryAssetPanelStyle: CSSProperties = {
-  ...assetPanelStyle,
-  opacity: 0.78
 };
 
 const imageWrapStyle: CSSProperties = {
@@ -193,16 +184,6 @@ const imageStyle: CSSProperties = {
   maxHeight: '100%',
   objectFit: 'contain',
   display: 'block'
-};
-
-const focusedImageWrapStyle: CSSProperties = {
-  ...imageWrapStyle,
-  height: '620px'
-};
-
-const secondaryImageWrapStyle: CSSProperties = {
-  ...imageWrapStyle,
-  height: '220px'
 };
 
 const assetMetaStyle: CSSProperties = {
@@ -250,13 +231,6 @@ const primaryButtonStyle: CSSProperties = {
   color: '#ffffff'
 };
 
-const warningButtonStyle: CSSProperties = {
-  ...buttonStyle,
-  backgroundColor: '#9a3412',
-  borderColor: '#9a3412',
-  color: '#ffffff'
-};
-
 const mutedButtonStyle: CSSProperties = {
   ...buttonStyle,
   backgroundColor: '#f8fafc'
@@ -276,10 +250,7 @@ const focusToggleBarStyle: CSSProperties = {
 };
 
 const immersiveOverlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 1600,
-  backgroundColor: 'rgba(2, 6, 23, 0.96)',
+  minHeight: '100vh',
   color: '#f8fafc',
   display: 'flex',
   flexDirection: 'column',
@@ -287,13 +258,12 @@ const immersiveOverlayStyle: CSSProperties = {
   boxSizing: 'border-box'
 };
 
-const immersiveHeaderStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: '12px',
-  flexWrap: 'wrap',
-  marginBottom: '16px'
+const immersiveBodyStyle: CSSProperties = {
+  display: 'grid',
+  gap: '16px',
+  flex: '1 1 auto',
+  minHeight: 0,
+  overflowY: 'auto'
 };
 
 const immersiveMetaStyle: CSSProperties = {
@@ -304,9 +274,10 @@ const immersiveMetaStyle: CSSProperties = {
 };
 
 const immersiveImageWrapStyle: CSSProperties = {
-  flex: '1 1 auto',
-  minHeight: 0,
+  minHeight: 'calc(100vh - 40px)',
+  maxHeight: 'calc(100vh - 40px)',
   display: 'flex',
+  position: 'relative',
   alignItems: 'center',
   justifyContent: 'center',
   border: '1px solid rgba(148, 163, 184, 0.35)',
@@ -328,18 +299,30 @@ const immersiveHintStyle: CSSProperties = {
   fontSize: '13px'
 };
 
+const immersiveBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  top: '16px',
+  right: '16px',
+  padding: '8px 10px',
+  borderRadius: '999px',
+  backgroundColor: 'rgba(15, 23, 42, 0.78)',
+  color: '#f8fafc',
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  boxShadow: '0 10px 24px rgba(0, 0, 0, 0.28)',
+  fontSize: '13px',
+  fontWeight: 600,
+  display: 'grid',
+  gap: '2px',
+  justifyItems: 'end',
+  textAlign: 'right',
+  backdropFilter: 'blur(10px)'
+};
+
 const immersiveControlsStyle: CSSProperties = {
   display: 'flex',
   gap: '10px',
   flexWrap: 'wrap',
-  alignItems: 'center',
-  marginBottom: '16px'
-};
-
-const groupListStyle: CSSProperties = {
-  display: 'grid',
-  gap: '10px',
-  marginTop: '12px'
+  alignItems: 'center'
 };
 
 function formatOptionalDate(value: string | null | undefined): string {
@@ -359,6 +342,70 @@ function formatOptionalNumber(value: number | null | undefined, digits = 0): str
   return digits > 0 ? value.toFixed(digits) : String(value);
 }
 
+function formatFileSize(value: number | null | undefined): string {
+  if (value === undefined || value === null || value <= 0) {
+    return 'n/a';
+  }
+
+  const units = ['bytes', 'KB', 'MB', 'GB'];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  if (unitIndex === 0) {
+    return `${Math.round(size)} bytes`;
+  }
+
+  return `${size.toFixed(size >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function formatFileSizeDelta(value: number | null | undefined, otherValue: number | null | undefined): string | null {
+  if (
+    value === undefined ||
+    value === null ||
+    otherValue === undefined ||
+    otherValue === null
+  ) {
+    return null;
+  }
+
+  const delta = value - otherValue;
+  if (delta === 0) {
+    return null;
+  }
+
+  const sign = delta > 0 ? '+' : '-';
+  return `${sign}${formatFileSize(Math.abs(delta))} vs other photo`;
+}
+
+function getFileSizeComparisonLabel(
+  value: number | null | undefined,
+  otherValue: number | null | undefined
+): string | null {
+  if (
+    value === undefined ||
+    value === null ||
+    otherValue === undefined ||
+    otherValue === null
+  ) {
+    return null;
+  }
+
+  if (value > otherValue) {
+    return 'Larger file';
+  }
+
+  if (value < otherValue) {
+    return 'Smaller file';
+  }
+
+  return 'Same file size';
+}
+
 function renderSummaryCard(label: string, value: number, note?: string): ReactElement {
   return (
     <section style={summaryCardStyle}>
@@ -375,29 +422,36 @@ function parseStoredFilters(value: string | null): DuplicateReviewFilters {
   }
 
   try {
-    const parsed = JSON.parse(value) as Partial<DuplicateReviewFilters>;
+    const parsed = JSON.parse(value) as Partial<DuplicateReviewFilters> & {
+      highConfidenceOnly?: boolean;
+    };
     return {
       status:
         parsed.status === 'unreviewed' ||
-        parsed.status === 'reviewed' ||
-        parsed.status === 'ignored'
+          parsed.status === 'reviewed' ||
+          parsed.status === 'ignored'
           ? parsed.status
           : 'all',
       classification:
         parsed.classification === 'very_likely_duplicate' ||
-        parsed.classification === 'possible_duplicate' ||
-        parsed.classification === 'similar_image'
+          parsed.classification === 'possible_duplicate' ||
+          parsed.classification === 'similar_image'
           ? parsed.classification
           : 'all',
       outcome:
         parsed.outcome === 'confirmed_duplicate' ||
-        parsed.outcome === 'not_duplicate' ||
-        parsed.outcome === 'ignored' ||
-        parsed.outcome === 'none'
+          parsed.outcome === 'not_duplicate' ||
+          parsed.outcome === 'ignored' ||
+          parsed.outcome === 'none'
           ? parsed.outcome
           : 'all',
       assetId: typeof parsed.assetId === 'string' ? parsed.assetId : '',
-      highConfidenceOnly: parsed.highConfidenceOnly === true
+      minScore:
+        typeof parsed.minScore === 'string'
+          ? parsed.minScore
+          : parsed.highConfidenceOnly === true
+            ? '0.90'
+            : ''
     };
   } catch {
     return defaultDuplicateReviewFilters;
@@ -407,11 +461,11 @@ function parseStoredFilters(value: string | null): DuplicateReviewFilters {
 function renderAssetPanel(input: {
   sideLabel: string;
   asset: DuplicateCandidatePairAssetSummary | null;
-  isFocused?: boolean;
-  isFocusMode?: boolean;
-  onFocus?: () => void;
+  otherAsset?: DuplicateCandidatePairAssetSummary | null;
+  showMetadata?: boolean;
+  imageContainerStyle?: CSSProperties;
 }): ReactElement {
-  const { sideLabel, asset, isFocused = false, isFocusMode = false, onFocus } = input;
+  const { sideLabel, asset, otherAsset = null, showMetadata = true, imageContainerStyle } = input;
   if (!asset) {
     return (
       <section style={assetPanelStyle}>
@@ -420,32 +474,54 @@ function renderAssetPanel(input: {
     );
   }
 
+  const fileSizeLabel = getFileSizeComparisonLabel(asset.originalFileSizeBytes, otherAsset?.originalFileSizeBytes);
+  const fileSizeDelta = formatFileSizeDelta(asset.originalFileSizeBytes, otherAsset?.originalFileSizeBytes);
+
   return (
-    <section style={isFocusMode ? (isFocused ? focusedAssetPanelStyle : secondaryAssetPanelStyle) : assetPanelStyle}>
-      <div style={isFocusMode ? (isFocused ? focusedImageWrapStyle : secondaryImageWrapStyle) : imageWrapStyle}>
+    <section style={assetPanelStyle}>
+      <div style={{ ...imageWrapStyle, position: 'relative', ...(imageContainerStyle ?? {}) }}>
+        {fileSizeLabel ? (
+          <div style={{ ...immersiveBadgeStyle, top: '12px', right: '12px' }}>
+            <div>{fileSizeLabel}</div>
+            {fileSizeDelta ? <div>{fileSizeDelta.replace(' vs other photo', ' vs other')}</div> : null}
+          </div>
+        ) : null}
         <img src={getDisplayMediaUrl(asset.id)} alt={`${sideLabel} ${asset.filename}`} style={imageStyle} />
       </div>
-      <div style={assetMetaStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
-          <strong>{sideLabel}</strong>
-          {isFocusMode ? (
-            <button type="button" style={isFocused ? primaryButtonStyle : mutedButtonStyle} onClick={onFocus}>
-              {isFocused ? 'Focused' : `Focus ${sideLabel === 'Asset A' ? 'Left' : 'Right'}`}
-            </button>
-          ) : null}
-        </div>
-        <div>Filename: {asset.filename}</div>
-        <div>Asset ID: {asset.id}</div>
-        <div>Original Path: {asset.originalArchivePath ?? 'n/a'}</div>
-        <div>Capture: {formatOptionalDate(asset.captureDateTime)}</div>
-        <div>
-          Dimensions: {formatOptionalNumber(asset.width)} x {formatOptionalNumber(asset.height)}
-        </div>
-        {isFocusMode && !isFocused ? (
-          <div style={secondaryMetaStyle}>Secondary reference view while the other asset is focused.</div>
-        ) : null}
-      </div>
+      {showMetadata ? renderAssetMetadata({ sideLabel, asset, fileSizeLabel, fileSizeDelta }) : null}
     </section>
+  );
+}
+
+function renderAssetMetadata(input: {
+  sideLabel: string;
+  asset: DuplicateCandidatePairAssetSummary;
+  fileSizeLabel: string | null;
+  fileSizeDelta: string | null;
+  style?: CSSProperties;
+}): ReactElement {
+  const { sideLabel, asset, fileSizeLabel, fileSizeDelta, style } = input;
+
+  return (
+    <div style={{ ...assetMetaStyle, ...(style ?? {}) }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
+        <strong>{sideLabel}</strong>
+      </div>
+      <div>Filename: {asset.filename}</div>
+      <div>Asset ID: {asset.id}</div>
+      <div>Original Path: {asset.originalArchivePath ?? 'n/a'}</div>
+      <div>Capture: {formatOptionalDate(asset.captureDateTime)}</div>
+      <div>
+        Dimensions: {formatOptionalNumber(asset.width)} x {formatOptionalNumber(asset.height)}
+      </div>
+      <div>File Size: {formatFileSize(asset.originalFileSizeBytes)}</div>
+      {fileSizeLabel ? (
+        <div style={secondaryMetaStyle}>
+          {fileSizeLabel}
+          {fileSizeDelta ? ` · ${fileSizeDelta}` : ''}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -459,6 +535,7 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
 }
 
 export function DuplicateReviewPage(): ReactElement {
+  const [displayMode, setDisplayMode] = useState<'pair' | 'full'>('pair');
   const [draftFilters, setDraftFilters] = useState<DuplicateReviewFilters>(() => {
     if (typeof window === 'undefined') {
       return defaultDuplicateReviewFilters;
@@ -479,24 +556,40 @@ export function DuplicateReviewPage(): ReactElement {
   const [busyPairKey, setBusyPairKey] = useState<string | null>(null);
   const [totalMatching, setTotalMatching] = useState(0);
   const [summary, setSummary] = useState<DuplicateCandidatePairSummaryResponse | null>(null);
-  const [groups, setGroups] = useState<ListDuplicateGroupsResponse | null>(null);
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [groupsError, setGroupsError] = useState<string | null>(null);
-  const [bulkActionMessage, setBulkActionMessage] = useState<string | null>(null);
-  const [comparisonMode, setComparisonMode] = useState<DuplicateReviewComparisonMode>('side_by_side');
   const [focusedSide, setFocusedSide] = useState<DuplicateReviewFocusSide>(
     getDefaultDuplicateReviewFocusSide()
   );
-  const [immersiveOpen, setImmersiveOpen] = useState(false);
 
   const currentPair = queueState.items[queueState.currentIndex] ?? null;
   const trimmedAssetId = appliedFilters.assetId.trim();
-  const minScore = appliedFilters.highConfidenceOnly ? 0.9 : undefined;
-  const immersiveAsset = immersiveOpen
+  const minScore = Number.parseFloat(appliedFilters.minScore);
+  const normalizedMinScore = Number.isFinite(minScore) && minScore > 0 ? minScore : undefined;
+  const draftMinScore = Number.parseFloat(draftFilters.minScore);
+  const draftMinScoreValue = Number.isFinite(draftMinScore) && draftMinScore >= 0 ? draftMinScore : 0;
+  const immersiveAsset = displayMode === 'full'
     ? focusedSide === 'left'
       ? currentPair?.assetA ?? null
       : currentPair?.assetB ?? null
     : null;
+  const immersiveOtherAsset = displayMode === 'full'
+    ? focusedSide === 'left'
+      ? currentPair?.assetB ?? null
+      : currentPair?.assetA ?? null
+    : null;
+  const immersiveFileSizeLabel = getFileSizeComparisonLabel(
+    immersiveAsset?.originalFileSizeBytes,
+    immersiveOtherAsset?.originalFileSizeBytes
+  );
+  const immersiveFileSizeDelta = formatFileSizeDelta(
+    immersiveAsset?.originalFileSizeBytes,
+    immersiveOtherAsset?.originalFileSizeBytes
+  );
+
+  function getKeepDecisionForFocusedSide(): DuplicateReviewActionDecision {
+    return focusedSide === 'left'
+      ? 'confirmed_duplicate_keep_left'
+      : 'confirmed_duplicate_keep_right';
+  }
 
   async function loadQueueAndSummary(activePairKey?: string | null): Promise<void> {
     setLoading(true);
@@ -509,13 +602,13 @@ export function DuplicateReviewPage(): ReactElement {
           classification: appliedFilters.classification,
           outcome: appliedFilters.outcome,
           ...(trimmedAssetId.length > 0 ? { assetId: trimmedAssetId } : {}),
-          ...(minScore !== undefined ? { minScore } : {}),
+          ...(normalizedMinScore !== undefined ? { minScore: normalizedMinScore } : {}),
           limit: maxQueueItems,
           offset: 0
         }),
         getDuplicateCandidatePairSummary({
           ...(trimmedAssetId.length > 0 ? { assetId: trimmedAssetId } : {}),
-          ...(minScore !== undefined ? { minScore } : {})
+          ...(normalizedMinScore !== undefined ? { minScore: normalizedMinScore } : {})
         })
       ]);
 
@@ -535,11 +628,12 @@ export function DuplicateReviewPage(): ReactElement {
 
   useEffect(() => {
     void loadQueueAndSummary();
-  }, [appliedFilters.status, appliedFilters.classification, appliedFilters.outcome, appliedFilters.assetId, appliedFilters.highConfidenceOnly]);
+  }, [appliedFilters.status, appliedFilters.classification, appliedFilters.outcome, appliedFilters.assetId, appliedFilters.minScore]);
 
   useEffect(() => {
-    setFocusedSide(getDefaultDuplicateReviewFocusSide());
-    setImmersiveOpen(false);
+    if (displayMode !== 'full') {
+      setFocusedSide(getDefaultDuplicateReviewFocusSide());
+    }
   }, [currentPair?.pairKey]);
 
   useEffect(() => {
@@ -548,7 +642,13 @@ export function DuplicateReviewPage(): ReactElement {
         return;
       }
 
-      if (immersiveOpen) {
+      if (displayMode === 'full') {
+        if (event.key === 'm' || event.key === 'M') {
+          event.preventDefault();
+          setDisplayMode('pair');
+          return;
+        }
+
         const nextImmersiveSide = getDuplicateReviewImmersiveSideForKey({
           key: event.key,
           currentSide: focusedSide
@@ -563,13 +663,13 @@ export function DuplicateReviewPage(): ReactElement {
         const immersiveAction = getDuplicateReviewImmersiveActionForKey(event.key);
         if (immersiveAction === 'close') {
           event.preventDefault();
-          setImmersiveOpen(false);
+          setDisplayMode('pair');
           return;
         }
 
-        if (immersiveAction === 'confirmed_duplicate') {
+        if (immersiveAction === 'reviewed_uncertain') {
           event.preventDefault();
-          void handleImmersiveDecision('confirmed_duplicate');
+          void handleImmersiveDecision('reviewed_uncertain');
           return;
         }
 
@@ -579,9 +679,15 @@ export function DuplicateReviewPage(): ReactElement {
           return;
         }
 
-        if (immersiveAction === 'ignored') {
+        if (immersiveAction === 'confirmed_duplicate_keep_both') {
           event.preventDefault();
-          void handleImmersiveDecision('ignored');
+          void handleImmersiveDecision('confirmed_duplicate_keep_both');
+          return;
+        }
+
+        if (immersiveAction === 'keep_current_photo') {
+          event.preventDefault();
+          void handleImmersiveDecision(getKeepDecisionForFocusedSide());
           return;
         }
 
@@ -600,33 +706,22 @@ export function DuplicateReviewPage(): ReactElement {
         return;
       }
 
-      if (event.key === 'Tab') {
+      if (event.key === 'm' || event.key === 'M') {
         event.preventDefault();
-        setFocusedSide((previous) => toggleDuplicateReviewFocusSide(previous));
-        if (comparisonMode !== 'focus') {
-          setComparisonMode('focus');
-        }
+        setFocusedSide(getInitialDuplicateReviewImmersiveSide(focusedSide));
+        setDisplayMode('full');
         return;
       }
 
-      if (event.key === 'a' || event.key === 'A') {
+      if (event.key === 'c' || event.key === 'C') {
         event.preventDefault();
-        setFocusedSide('left');
-        if (comparisonMode !== 'focus') {
-          setComparisonMode('focus');
-        }
+        void handleDecision('reviewed_uncertain');
         return;
       }
 
-      if (event.key === 'f' || event.key === 'F') {
+      if (event.key === 'b' || event.key === 'B') {
         event.preventDefault();
-        setComparisonMode((previous) => (previous === 'focus' ? 'side_by_side' : 'focus'));
-        return;
-      }
-
-      if (event.key === 'd' || event.key === 'D') {
-        event.preventDefault();
-        void handleDecision('confirmed_duplicate');
+        void handleDecision('confirmed_duplicate_keep_both');
         return;
       }
 
@@ -636,31 +731,25 @@ export function DuplicateReviewPage(): ReactElement {
         return;
       }
 
-      if (event.key === 'i' || event.key === 'I') {
+      if (event.key === 'g' || event.key === 'G') {
         event.preventDefault();
-        void handleDecision('ignored');
+        void handleDecision('confirmed_duplicate_keep_left');
         return;
       }
 
-      if (event.key === 'ArrowRight' || event.key === 'j' || event.key === 'J') {
-        if (comparisonMode === 'focus') {
-          event.preventDefault();
-          setFocusedSide('right');
-          return;
-        }
+      if (event.key === 'h' || event.key === 'H') {
+        event.preventDefault();
+        void handleDecision('confirmed_duplicate_keep_right');
+        return;
+      }
 
+      if (event.key === 'j' || event.key === 'J') {
         event.preventDefault();
         handleNext();
         return;
       }
 
-      if (event.key === 'ArrowLeft' || event.key === 'k' || event.key === 'K') {
-        if (comparisonMode === 'focus') {
-          event.preventDefault();
-          setFocusedSide('left');
-          return;
-        }
-
+      if (event.key === 'f' || event.key === 'F') {
         event.preventDefault();
         handlePrevious();
       }
@@ -670,9 +759,9 @@ export function DuplicateReviewPage(): ReactElement {
     return () => {
       window.removeEventListener('keydown', handleWindowKeyDown);
     };
-  }, [busyPairKey, queueState, currentPair, comparisonMode, immersiveOpen, focusedSide]);
+  }, [busyPairKey, queueState, currentPair, displayMode, focusedSide]);
 
-  async function handleDecision(decision: DuplicateCandidateReviewDecision): Promise<void> {
+  async function handleDecision(decision: DuplicateReviewActionDecision): Promise<void> {
     if (!currentPair) {
       return;
     }
@@ -689,10 +778,6 @@ export function DuplicateReviewPage(): ReactElement {
       await updateDuplicateCandidatePairReview(currentPair.pairKey, { decision });
       setQueueState((previous) => removeReviewedDuplicatePair(previous, currentPair.pairKey));
       await loadQueueAndSummary(nextCandidatePairKey);
-      setBulkActionMessage(null);
-      if (groups) {
-        void handleLoadGroups();
-      }
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
     } finally {
@@ -700,7 +785,7 @@ export function DuplicateReviewPage(): ReactElement {
     }
   }
 
-  async function handleImmersiveDecision(decision: DuplicateCandidateReviewDecision): Promise<void> {
+  async function handleImmersiveDecision(decision: DuplicateReviewActionDecision): Promise<void> {
     await handleDecision(decision);
   }
 
@@ -711,22 +796,20 @@ export function DuplicateReviewPage(): ReactElement {
 
     setAppliedFilters({
       ...draftFilters,
-      assetId: draftFilters.assetId.trim()
+      assetId: draftFilters.assetId.trim(),
+      minScore: draftFilters.minScore.trim()
     });
-    setBulkActionMessage(null);
   }
 
   function handleResetFilters(): void {
     setDraftFilters(defaultDuplicateReviewFilters);
     setAppliedFilters(defaultDuplicateReviewFilters);
-    setBulkActionMessage(null);
   }
 
   function handleApplyPreset(presetId: DuplicateReviewPresetId): void {
     const presetFilters = getDuplicateReviewPresetFilters(presetId);
     setDraftFilters(presetFilters);
     setAppliedFilters(presetFilters);
-    setBulkActionMessage(null);
   }
 
   function handleNext(): void {
@@ -759,47 +842,6 @@ export function DuplicateReviewPage(): ReactElement {
     handlePrevious();
   }
 
-  async function handleLoadGroups(): Promise<void> {
-    setGroupsLoading(true);
-    setGroupsError(null);
-
-    try {
-      const response = await listDuplicateGroups({
-        ...(trimmedAssetId.length > 0 ? { assetId: trimmedAssetId } : {})
-      });
-      setGroups(response);
-    } catch (loadError) {
-      setGroupsError(loadError instanceof Error ? loadError.message : 'Failed to load duplicate groups');
-    } finally {
-      setGroupsLoading(false);
-    }
-  }
-
-  async function handleBulkIgnoreLoadedPairs(): Promise<void> {
-    const pairKeys = queueState.items.map((item) => item.pairKey);
-
-    if (pairKeys.length === 0) {
-      return;
-    }
-
-    setBusyPairKey('__bulk__');
-    setError(null);
-    setBulkActionMessage(null);
-
-    try {
-      const response = await bulkReviewDuplicateCandidatePairs({
-        pairKeys,
-        decision: 'ignored'
-      });
-      setBulkActionMessage(`Ignored ${response.updatedCount} loaded pairs from the current filtered queue.`);
-      await loadQueueAndSummary(null);
-    } catch (bulkError) {
-      setError(bulkError instanceof Error ? bulkError.message : 'Failed to bulk ignore duplicate pairs');
-    } finally {
-      setBusyPairKey(null);
-    }
-  }
-
   const activePresetId = getActiveDuplicateReviewPresetId(appliedFilters);
   const queueProgress = getDuplicateReviewQueueProgress({
     currentIndex: queueState.currentIndex,
@@ -813,483 +855,368 @@ export function DuplicateReviewPage(): ReactElement {
 
   const summaryCards = summary
     ? [
-        renderSummaryCard('Matching Pairs', totalMatching, `Loaded ${queueState.items.length}`),
-        renderSummaryCard('Unreviewed', summary.statusCounts.unreviewed),
-        renderSummaryCard('Reviewed', summary.statusCounts.reviewed),
-        renderSummaryCard('Confirmed Duplicate', summary.outcomeCounts.confirmed_duplicate),
-        renderSummaryCard(
-          'Remaining Loaded',
-          Math.max(queueState.items.length - queueState.currentIndex - 1, 0),
-          currentPair ? 'After current pair' : undefined
-        ),
-        renderSummaryCard('High Confidence', summary.highConfidenceCount),
-        renderSummaryCard('No Outcome', summary.outcomeCounts.none)
-      ]
+      renderSummaryCard('Matching Pairs', totalMatching, `Loaded ${queueState.items.length}`),
+      renderSummaryCard('Unreviewed', summary.statusCounts.unreviewed),
+      renderSummaryCard('Reviewed', summary.statusCounts.reviewed),
+      renderSummaryCard('Confirmed Duplicate', summary.outcomeCounts.confirmed_duplicate),
+      renderSummaryCard('No Outcome Yet', summary.outcomeCounts.none),
+      renderSummaryCard(
+        'Remaining Loaded',
+        Math.max(queueState.items.length - queueState.currentIndex - 1, 0),
+        currentPair ? 'After current pair' : undefined
+      ),
+      ...(normalizedMinScore !== undefined
+        ? [renderSummaryCard('At Min Score', totalMatching, `score >= ${normalizedMinScore.toFixed(2)}`)]
+        : [])
+    ]
     : [];
 
-  return (
-    <div style={pageStyle}>
-      <header style={pageHeaderStyle}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '28px' }}>Duplicate Review</h1>
-          <p style={{ margin: '6px 0 0 0', color: '#64748b' }}>
-            Filter the queue, inspect scoring context, and review pairs without changing the main photo workflow.
-          </p>
-          <DuplicateWorkspaceNav active="review" />
-        </div>
-        <div style={headerActionsStyle}>
-          <Link to="/" style={linkStyle}>
-            Back to Library
-          </Link>
-          <button type="button" style={mutedButtonStyle} onClick={() => void loadQueueAndSummary(currentPair?.pairKey ?? null)}>
-            Refresh Queue
-          </button>
-          <button type="button" style={mutedButtonStyle} onClick={() => void handleLoadGroups()}>
-            Load Groups
-          </button>
-        </div>
-      </header>
+  function renderPairDisplayHero(): ReactElement | null {
+    if (!currentPair) {
+      return null;
+    }
 
-      <section style={panelStyle}>
-        <h2 style={{ marginTop: 0 }}>Queue Filters</h2>
-        <div style={presetBarStyle}>
-          <span style={{ ...secondaryMetaStyle, fontWeight: 600 }}>Triage Presets</span>
-          {duplicateReviewPresets.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              style={activePresetId === preset.id ? primaryButtonStyle : mutedButtonStyle}
-              onClick={() => handleApplyPreset(preset.id)}
-              title={preset.description}
-            >
-              {preset.label}
-            </button>
-          ))}
+    return (
+      <section style={pairHeroSectionStyle}>
+        <div style={pairHeroGridStyle}>
+          {renderAssetPanel({
+            sideLabel: 'Asset A',
+            asset: currentPair.assetA,
+            otherAsset: currentPair.assetB,
+            showMetadata: true,
+            imageContainerStyle: { height: 'calc(100vh - 40px)' }
+          })}
+          {renderAssetPanel({
+            sideLabel: 'Asset B',
+            asset: currentPair.assetB,
+            otherAsset: currentPair.assetA,
+            showMetadata: true,
+            imageContainerStyle: { height: 'calc(100vh - 40px)' }
+          })}
         </div>
-        <div style={filterGridStyle}>
-          <label style={filterFieldStyle}>
-            <span>Status</span>
-            <select
-              value={draftFilters.status}
-              style={inputStyle}
-              onChange={(event) =>
-                setDraftFilters((previous) => ({
-                  ...previous,
-                  status: event.target.value as DuplicateReviewFilters['status']
-                }))
-              }
-            >
-              <option value="unreviewed">unreviewed</option>
-              <option value="reviewed">reviewed</option>
-              <option value="ignored">ignored</option>
-              <option value="all">all</option>
-            </select>
-          </label>
-          <label style={filterFieldStyle}>
-            <span>Classification</span>
-            <select
-              value={draftFilters.classification}
-              style={inputStyle}
-              onChange={(event) =>
-                setDraftFilters((previous) => ({
-                  ...previous,
-                  classification: event.target.value as DuplicateReviewFilters['classification']
-                }))
-              }
-            >
-              <option value="all">all</option>
-              <option value="very_likely_duplicate">very_likely_duplicate</option>
-              <option value="possible_duplicate">possible_duplicate</option>
-              <option value="similar_image">similar_image</option>
-            </select>
-          </label>
-          <label style={filterFieldStyle}>
-            <span>Outcome</span>
-            <select
-              value={draftFilters.outcome}
-              style={inputStyle}
-              onChange={(event) =>
-                setDraftFilters((previous) => ({
-                  ...previous,
-                  outcome: event.target.value as DuplicateReviewFilters['outcome']
-                }))
-              }
-            >
-              <option value="all">all</option>
-              <option value="none">none</option>
-              <option value="confirmed_duplicate">confirmed_duplicate</option>
-              <option value="not_duplicate">not_duplicate</option>
-              <option value="ignored">ignored</option>
-            </select>
-          </label>
-          <label style={filterFieldStyle}>
-            <span>Asset ID</span>
-            <input
-              value={draftFilters.assetId}
-              style={inputStyle}
-              placeholder="Optional asset id"
-              onChange={(event) =>
-                setDraftFilters((previous) => ({ ...previous, assetId: event.target.value }))
-              }
-              onKeyDown={handleApplyFilters}
-            />
-          </label>
+      </section>
+    );
+  }
+
+  function renderCurrentPairDetails(options?: { fullscreen?: boolean; showImages?: boolean }): ReactElement | null {
+    if (!currentPair) {
+      return null;
+    }
+
+    const fullscreen = options?.fullscreen ?? false;
+    const showImages = options?.showImages ?? !fullscreen;
+    const containerStyle = fullscreen
+      ? {
+        ...panelStyle,
+        margin: '20px',
+        backgroundColor: '#fffdf9',
+        color: '#1e293b'
+      }
+      : panelStyle;
+    const shortcutsText = fullscreen
+      ? 'Shortcuts: M toggle screen mode, F previous, J next, Left/Right toggle photo, K keep this photo, C can’t decide, B keep both, N not duplicate'
+      : 'Shortcuts: M toggle screen mode, F previous, J next, G keep left, H keep right, C can’t decide, B keep both, N not duplicate';
+
+    return (
+      <section style={containerStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Current Pair</h2>
+            <div style={secondaryMetaStyle}>
+              Position {queueState.currentIndex + 1} of {totalMatching}
+              {totalMatching > queueState.items.length ? `, loaded first ${queueState.items.length}` : ''}
+            </div>
+          </div>
+          <div style={secondaryMetaStyle}>{shortcutsText}</div>
         </div>
-        <label style={checkboxRowStyle}>
-          <input
-            type="checkbox"
-            checked={draftFilters.highConfidenceOnly}
-            onChange={(event) =>
-              setDraftFilters((previous) => ({ ...previous, highConfidenceOnly: event.target.checked }))
-            }
-          />
-          High confidence only (score &gt;= 0.90)
-        </label>
-        <div style={filterActionBarStyle}>
-          <button type="button" style={primaryButtonStyle} onClick={() => handleApplyFilters()}>
-            Apply Filters
+
+        {!fullscreen && showImages ? (
+          <>
+            <div style={focusToggleBarStyle}>
+              <button
+                type="button"
+                style={mutedButtonStyle}
+                onClick={() => {
+                  setFocusedSide(getInitialDuplicateReviewImmersiveSide(focusedSide));
+                  setDisplayMode('full');
+                }}
+              >
+                Full Screen
+              </button>
+            </div>
+
+            <div style={comparisonGridStyle}>
+              {renderAssetPanel({
+                sideLabel: 'Asset A',
+                asset: currentPair.assetA,
+                otherAsset: currentPair.assetB
+              })}
+              {renderAssetPanel({
+                sideLabel: 'Asset B',
+                asset: currentPair.assetB,
+                otherAsset: currentPair.assetA
+              })}
+            </div>
+          </>
+        ) : null}
+
+        <div style={metadataGridStyle}>
+          <div>Score: {currentPair.score.toFixed(4)}</div>
+          <div>Classification: {currentPair.classification}</div>
+          <div>Status: {currentPair.status}</div>
+          <div>Outcome: {currentPair.outcome ?? 'n/a'}</div>
+          <div>Analysis Version: {currentPair.analysisVersion}</div>
+          <div>Generation Version: {currentPair.generationVersion}</div>
+        </div>
+
+        <div style={signalGridStyle}>
+          <div>dHashDistance: {formatOptionalNumber(currentPair.signals.dHashDistance)}</div>
+          <div>pHashDistance: {formatOptionalNumber(currentPair.signals.pHashDistance)}</div>
+          <div>Dimension Similarity: {formatOptionalNumber(currentPair.signals.dimensionsSimilarity, 4)}</div>
+          <div>Aspect Ratio Delta: {formatOptionalNumber(currentPair.signals.aspectRatioDelta, 4)}</div>
+          <div>
+            Source Updated Delta Ms: {formatOptionalNumber(currentPair.signals.sourceUpdatedTimeDeltaMs)}
+          </div>
+        </div>
+
+        <div style={actionBarStyle}>
+          <button
+            type="button"
+            style={primaryButtonStyle}
+            onClick={() => void (fullscreen ? handleImmersiveDecision('reviewed_uncertain') : handleDecision('reviewed_uncertain'))}
+            disabled={busyPairKey !== null}
+          >
+            Can’t Decide
           </button>
-          <button type="button" style={mutedButtonStyle} onClick={handleResetFilters}>
-            Reset Filters
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={() =>
+              void (fullscreen
+                ? handleImmersiveDecision('confirmed_duplicate_keep_both')
+                : handleDecision('confirmed_duplicate_keep_both'))
+            }
+            disabled={busyPairKey !== null}
+          >
+            Keep Both
+          </button>
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={() => void (fullscreen ? handleImmersiveDecision('not_duplicate') : handleDecision('not_duplicate'))}
+            disabled={busyPairKey !== null}
+          >
+            Not Duplicates
+          </button>
+          <button
+            type="button"
+            style={primaryButtonStyle}
+            onClick={() =>
+              void (fullscreen ? handleImmersiveDecision(getKeepDecisionForFocusedSide()) : handleDecision('confirmed_duplicate_keep_left'))
+            }
+            disabled={busyPairKey !== null}
+          >
+            {fullscreen ? 'Keep This Photo' : 'Keep Left'}
+          </button>
+          {!fullscreen ? (
+            <button
+              type="button"
+              style={primaryButtonStyle}
+              onClick={() => void handleDecision('confirmed_duplicate_keep_right')}
+              disabled={busyPairKey !== null}
+            >
+              Keep Right
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={mutedButtonStyle}
+            onClick={fullscreen ? handleImmersivePrevious : handlePrevious}
+            disabled={busyPairKey !== null || queueState.currentIndex === 0}
+          >
+            Previous
           </button>
           <button
             type="button"
             style={mutedButtonStyle}
-            onClick={() => void handleBulkIgnoreLoadedPairs()}
-            disabled={busyPairKey !== null || queueState.items.length === 0}
-            title="Ignore every currently loaded pair in the active filtered queue."
+            onClick={fullscreen ? handleImmersiveNext : handleNext}
+            disabled={busyPairKey !== null || queueState.currentIndex >= queueState.items.length - 1}
           >
-            Bulk Ignore Loaded ({queueState.items.length})
+            Next
           </button>
+        </div>
+      </section>
+    );
+  }
+
+  const queueFiltersSection = (
+    <section style={panelStyle}>
+      <h2 style={{ marginTop: 0 }}>Queue Filters</h2>
+      <div style={presetBarStyle}>
+        <span style={{ ...secondaryMetaStyle, fontWeight: 600 }}>Triage Presets</span>
+        {duplicateReviewPresets.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            style={activePresetId === preset.id ? primaryButtonStyle : mutedButtonStyle}
+            onClick={() => handleApplyPreset(preset.id)}
+            title={preset.description}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div style={filterGridStyle}>
+        <label style={filterFieldStyle}>
+          <span>Status</span>
+          <select
+            value={draftFilters.status}
+            style={inputStyle}
+            onChange={(event) =>
+              setDraftFilters((previous) => ({
+                ...previous,
+                status: event.target.value as DuplicateReviewFilters['status']
+              }))
+            }
+          >
+            <option value="unreviewed">unreviewed</option>
+            <option value="reviewed">reviewed</option>
+            <option value="ignored">ignored</option>
+            <option value="all">all</option>
+          </select>
+        </label>
+        <label style={filterFieldStyle}>
+          <span>Classification</span>
+          <select
+            value={draftFilters.classification}
+            style={inputStyle}
+            onChange={(event) =>
+              setDraftFilters((previous) => ({
+                ...previous,
+                classification: event.target.value as DuplicateReviewFilters['classification']
+              }))
+            }
+          >
+            <option value="all">all</option>
+            <option value="very_likely_duplicate">very_likely_duplicate</option>
+            <option value="possible_duplicate">possible_duplicate</option>
+            <option value="similar_image">similar_image</option>
+          </select>
+        </label>
+        <label style={filterFieldStyle}>
+          <span>Outcome</span>
+          <select
+            value={draftFilters.outcome}
+            style={inputStyle}
+            onChange={(event) =>
+              setDraftFilters((previous) => ({
+                ...previous,
+                outcome: event.target.value as DuplicateReviewFilters['outcome']
+              }))
+            }
+          >
+            <option value="all">all</option>
+            <option value="none">none</option>
+            <option value="confirmed_duplicate">confirmed_duplicate</option>
+            <option value="not_duplicate">not_duplicate</option>
+            <option value="ignored">ignored</option>
+          </select>
+        </label>
+        <label style={filterFieldStyle}>
+          <span>Minimum Score</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={draftMinScoreValue}
+            style={sliderStyle}
+            onChange={(event) =>
+              setDraftFilters((previous) => ({
+                ...previous,
+                minScore: Number.parseFloat(event.target.value) <= 0 ? '' : event.target.value
+              }))
+            }
+          />
           <span style={secondaryMetaStyle}>
-            Active queue: {appliedFilters.status}, {appliedFilters.classification}, {appliedFilters.outcome}
-            {trimmedAssetId ? `, asset ${trimmedAssetId}` : ''}
-            {minScore !== undefined ? ', high confidence' : ''}
+            {draftMinScoreValue <= 0 ? 'Any score' : `Score >= ${draftMinScoreValue.toFixed(2)}`}
           </span>
-        </div>
-      </section>
+        </label>
+        <label style={filterFieldStyle}>
+          <span>Asset ID</span>
+          <input
+            value={draftFilters.assetId}
+            style={inputStyle}
+            placeholder="Optional asset id"
+            onChange={(event) =>
+              setDraftFilters((previous) => ({ ...previous, assetId: event.target.value }))
+            }
+            onKeyDown={handleApplyFilters}
+          />
+        </label>
+      </div>
+      <div style={filterActionBarStyle}>
+        <button type="button" style={primaryButtonStyle} onClick={() => handleApplyFilters()}>
+          Apply Filters
+        </button>
+        <button type="button" style={mutedButtonStyle} onClick={handleResetFilters}>
+          Reset Filters
+        </button>
+        <span style={secondaryMetaStyle}>
+          Active queue: {appliedFilters.status}, {appliedFilters.classification}, {appliedFilters.outcome}
+          {trimmedAssetId ? `, asset ${trimmedAssetId}` : ''}
+          {normalizedMinScore !== undefined ? `, score >= ${normalizedMinScore.toFixed(2)}` : ''}
+        </span>
+      </div>
+    </section>
+  );
 
-      <section style={queueProgressStyle}>
+  const queueProgressSection = (
+    <section style={queueProgressStyle}>
+      <div>
+        <strong>Queue Progress</strong>
+        <div style={secondaryMetaStyle}>
+          Current slice: {currentSliceLabel}
+          {activePresetId === null ? ` · ${appliedFilters.status}, ${appliedFilters.classification}, ${appliedFilters.outcome}` : ''}
+          {trimmedAssetId ? ` · asset ${trimmedAssetId}` : ''}
+          {normalizedMinScore !== undefined ? ` · score >= ${normalizedMinScore.toFixed(2)}` : ''}
+        </div>
+      </div>
+      <div style={{ ...secondaryMetaStyle, textAlign: 'right' }}>
+        <div style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+          {queueProgress.currentPosition} of {queueProgress.totalMatching}
+        </div>
         <div>
-          <strong>Queue Progress</strong>
-          <div style={secondaryMetaStyle}>
-            Current slice: {currentSliceLabel}
-            {activePresetId === null ? ` · ${appliedFilters.status}, ${appliedFilters.classification}, ${appliedFilters.outcome}` : ''}
-            {trimmedAssetId ? ` · asset ${trimmedAssetId}` : ''}
-            {minScore !== undefined ? ' · high confidence' : ''}
-          </div>
+          {queueProgress.remainingTotal} remaining · loaded {queueProgress.loadedCount}
+          {queueProgress.loadedCount > 0 ? ` · ${queueProgress.remainingLoaded} loaded after current` : ''}
         </div>
-        <div style={{ ...secondaryMetaStyle, textAlign: 'right' }}>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
-            {queueProgress.currentPosition} of {queueProgress.totalMatching}
-          </div>
-          <div>
-            {queueProgress.remainingTotal} remaining · loaded {queueProgress.loadedCount}
-            {queueProgress.loadedCount > 0 ? ` · ${queueProgress.remainingLoaded} loaded after current` : ''}
-          </div>
-        </div>
-      </section>
+      </div>
+    </section>
+  );
 
-      {summaryCards.length > 0 ? <div style={summaryGridStyle}>{summaryCards}</div> : null}
-      {bulkActionMessage ? <section style={panelStyle}>{bulkActionMessage}</section> : null}
+  const loadingSection = loading ? <section style={panelStyle}>Loading duplicate candidate pairs...</section> : null;
+  const errorSection = error ? <section style={panelStyle}>Failed to load duplicate review queue: {error}</section> : null;
+  const emptySection = !loading && !error && !currentPair ? (
+    <section style={panelStyle}>
+      <h2 style={{ marginTop: 0 }}>No pairs match the current filter</h2>
+      <p style={secondaryMetaStyle}>
+        Adjust the queue filters or generate more candidate pairs if you expect additional review work.
+      </p>
+    </section>
+  ) : null;
 
-      {loading ? <section style={panelStyle}>Loading duplicate candidate pairs...</section> : null}
-      {error ? <section style={panelStyle}>Failed to load duplicate review queue: {error}</section> : null}
-
-      {!loading && !error && !currentPair ? (
-        <section style={panelStyle}>
-          <h2 style={{ marginTop: 0 }}>No pairs match the current filter</h2>
-          <p style={secondaryMetaStyle}>
-            Adjust the queue filters or generate more candidate pairs if you expect additional review work.
-          </p>
-        </section>
-      ) : null}
-
-      {!loading && !error && currentPair ? (
-        <section style={panelStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>Current Pair</h2>
-              <div style={secondaryMetaStyle}>
-                Position {queueState.currentIndex + 1} of {totalMatching}
-                {totalMatching > queueState.items.length ? `, loaded first ${queueState.items.length}` : ''}
-              </div>
-            </div>
-            <div style={secondaryMetaStyle}>
-              Shortcuts: F focus mode, Tab toggle side, A left, → right, D duplicate, N not duplicate, I ignore, ←/K previous, →/J next
-            </div>
-          </div>
-
-          <div style={focusToggleBarStyle}>
-            <button
-              type="button"
-              style={comparisonMode === 'side_by_side' ? primaryButtonStyle : mutedButtonStyle}
-              onClick={() => setComparisonMode('side_by_side')}
-            >
-              Side by Side
-            </button>
-            <button
-              type="button"
-              style={comparisonMode === 'focus' ? primaryButtonStyle : mutedButtonStyle}
-              onClick={() => setComparisonMode('focus')}
-            >
-              Focus Mode
-            </button>
-            <button
-              type="button"
-              style={comparisonMode === 'focus' && focusedSide === 'left' ? primaryButtonStyle : mutedButtonStyle}
-              onClick={() => {
-                setFocusedSide('left');
-                setComparisonMode('focus');
-              }}
-            >
-              Focus Left
-            </button>
-            <button
-              type="button"
-              style={comparisonMode === 'focus' && focusedSide === 'right' ? primaryButtonStyle : mutedButtonStyle}
-              onClick={() => {
-                setFocusedSide('right');
-                setComparisonMode('focus');
-              }}
-            >
-              Focus Right
-            </button>
-            <button
-              type="button"
-              style={mutedButtonStyle}
-              onClick={() => {
-                setFocusedSide(getInitialDuplicateReviewImmersiveSide(focusedSide));
-                setImmersiveOpen(true);
-              }}
-            >
-              Full Screen
-            </button>
-            {comparisonMode === 'focus' ? (
-              <span style={secondaryMetaStyle}>
-                Focused asset: {focusedSide === 'left' ? 'Asset A' : 'Asset B'}
-              </span>
-            ) : null}
-          </div>
-
-          <div style={comparisonMode === 'focus' ? focusComparisonLayoutStyle : comparisonGridStyle}>
-            {comparisonMode === 'focus' ? (
-              <>
-                {renderAssetPanel({
-                  sideLabel: focusedSide === 'left' ? 'Asset A' : 'Asset B',
-                  asset: focusedSide === 'left' ? currentPair.assetA : currentPair.assetB,
-                  isFocused: true,
-                  isFocusMode: true,
-                  onFocus: () => undefined
-                })}
-                {renderAssetPanel({
-                  sideLabel: focusedSide === 'left' ? 'Asset B' : 'Asset A',
-                  asset: focusedSide === 'left' ? currentPair.assetB : currentPair.assetA,
-                  isFocused: false,
-                  isFocusMode: true,
-                  onFocus: () =>
-                    setFocusedSide((previous) => toggleDuplicateReviewFocusSide(previous))
-                })}
-              </>
-            ) : (
-              <>
-                {renderAssetPanel({
-                  sideLabel: 'Asset A',
-                  asset: currentPair.assetA
-                })}
-                {renderAssetPanel({
-                  sideLabel: 'Asset B',
-                  asset: currentPair.assetB
-                })}
-              </>
-            )}
-          </div>
-
-          <div style={metadataGridStyle}>
-            <div>Score: {currentPair.score.toFixed(4)}</div>
-            <div>Classification: {currentPair.classification}</div>
-            <div>Status: {currentPair.status}</div>
-            <div>Outcome: {currentPair.outcome ?? 'n/a'}</div>
-            <div>Analysis Version: {currentPair.analysisVersion}</div>
-            <div>Generation Version: {currentPair.generationVersion}</div>
-          </div>
-
-          <div style={signalGridStyle}>
-            <div>dHashDistance: {formatOptionalNumber(currentPair.signals.dHashDistance)}</div>
-            <div>pHashDistance: {formatOptionalNumber(currentPair.signals.pHashDistance)}</div>
-            <div>Dimension Similarity: {formatOptionalNumber(currentPair.signals.dimensionsSimilarity, 4)}</div>
-            <div>Aspect Ratio Delta: {formatOptionalNumber(currentPair.signals.aspectRatioDelta, 4)}</div>
-            <div>
-              Source Updated Delta Ms: {formatOptionalNumber(currentPair.signals.sourceUpdatedTimeDeltaMs)}
-            </div>
-          </div>
-
-          <div style={actionBarStyle}>
-            <button
-              type="button"
-              style={primaryButtonStyle}
-              onClick={() => void handleDecision('confirmed_duplicate')}
-              disabled={busyPairKey !== null}
-            >
-              Duplicate
-            </button>
-            <button
-              type="button"
-              style={buttonStyle}
-              onClick={() => void handleDecision('not_duplicate')}
-              disabled={busyPairKey !== null}
-            >
-              Not Duplicate
-            </button>
-            <button
-              type="button"
-              style={warningButtonStyle}
-              onClick={() => void handleDecision('ignored')}
-              disabled={busyPairKey !== null}
-            >
-              Ignore
-            </button>
-            <button
-              type="button"
-              style={mutedButtonStyle}
-              onClick={handlePrevious}
-              disabled={queueState.currentIndex === 0 || busyPairKey !== null}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              style={mutedButtonStyle}
-              onClick={handleNext}
-              disabled={queueState.currentIndex >= queueState.items.length - 1 || busyPairKey !== null}
-            >
-              Next
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section style={{ ...panelStyle, marginTop: '18px' }}>
-        <h2 style={{ marginTop: 0 }}>Derived Duplicate Groups</h2>
-        <p style={secondaryMetaStyle}>
-          Connected components derived from reviewed `confirmed_duplicate` pair outcomes. This is not persisted clustering.
-        </p>
-        {groupsLoading ? <div>Loading groups...</div> : null}
-        {groupsError ? <div>Failed to load groups: {groupsError}</div> : null}
-        {groups ? (
-          <>
-            <div style={secondaryMetaStyle}>
-              {groups.totalGroups} groups across {groups.totalAssets} assets
-            </div>
-            <div style={groupListStyle}>
-              {groups.groups.slice(0, 5).map((group) => (
-                <div key={group.groupId} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px' }}>
-                  <strong>{group.groupId}</strong>
-                  <div style={secondaryMetaStyle}>
-                    {group.assetCount} assets, {group.confirmedPairCount} confirmed pair links
-                  </div>
-                  <div style={{ marginTop: '8px', fontSize: '14px' }}>
-                    {group.assets.map((asset) => `${asset.filename} (${asset.id})`).join(', ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <button type="button" style={mutedButtonStyle} onClick={() => void handleLoadGroups()}>
-            Load Confirmed Duplicate Groups
-          </button>
-        )}
-      </section>
-
-      {immersiveOpen && immersiveAsset ? (
-        <div style={immersiveOverlayStyle} onClick={() => setImmersiveOpen(false)}>
-          <section style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }} onClick={(event) => event.stopPropagation()}>
-            <div style={immersiveHeaderStyle}>
-              <div style={immersiveMetaStyle}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#f8fafc' }}>
-                  Duplicate Compare Full Screen
-                </div>
-                <div>
-                  Showing {focusedSide === 'left' ? 'Asset A' : 'Asset B'} · {immersiveAsset.filename}
-                </div>
-                <div>{immersiveAsset.originalArchivePath ?? 'n/a'}</div>
-                {currentPair ? (
-                  <div>
-                    Score {currentPair.score.toFixed(4)} · {currentPair.classification} · Pair{' '}
-                    {queueState.currentIndex + 1} of {totalMatching}
-                  </div>
-                ) : null}
-              </div>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  style={focusedSide === 'left' ? primaryButtonStyle : mutedButtonStyle}
-                  onClick={() => setFocusedSide('left')}
-                >
-                  Show Left
-                </button>
-                <button
-                  type="button"
-                  style={focusedSide === 'right' ? primaryButtonStyle : mutedButtonStyle}
-                  onClick={() => setFocusedSide('right')}
-                >
-                  Show Right
-                </button>
-                <button
-                  type="button"
-                  style={mutedButtonStyle}
-                  onClick={() => setImmersiveOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div style={immersiveControlsStyle}>
-              <button
-                type="button"
-                style={primaryButtonStyle}
-                onClick={() => void handleImmersiveDecision('confirmed_duplicate')}
-                disabled={busyPairKey !== null || !currentPair}
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                style={buttonStyle}
-                onClick={() => void handleImmersiveDecision('not_duplicate')}
-                disabled={busyPairKey !== null || !currentPair}
-              >
-                Not Duplicate
-              </button>
-              <button
-                type="button"
-                style={warningButtonStyle}
-                onClick={() => void handleImmersiveDecision('ignored')}
-                disabled={busyPairKey !== null || !currentPair}
-              >
-                Ignore
-              </button>
-              <button
-                type="button"
-                style={mutedButtonStyle}
-                onClick={handleImmersivePrevious}
-                disabled={busyPairKey !== null || queueState.currentIndex <= 0}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                style={mutedButtonStyle}
-                onClick={handleImmersiveNext}
-                disabled={busyPairKey !== null || queueState.currentIndex >= queueState.items.length - 1}
-              >
-                Next
-              </button>
-            </div>
-
+  if (displayMode === 'full' && immersiveAsset) {
+    return (
+      <div style={fullModePageStyle}>
+        <section style={immersiveOverlayStyle}>
+          <div style={immersiveBodyStyle}>
             <div style={immersiveImageWrapStyle}>
+              {immersiveFileSizeLabel ? (
+                <div style={immersiveBadgeStyle}>
+                  <div>{immersiveFileSizeLabel}</div>
+                  {immersiveFileSizeDelta ? <div>{immersiveFileSizeDelta.replace(' vs other photo', ' vs other')}</div> : null}
+                </div>
+              ) : null}
               <img
                 key={immersiveAsset.id}
                 src={getDisplayMediaUrl(immersiveAsset.id)}
@@ -1298,12 +1225,54 @@ export function DuplicateReviewPage(): ReactElement {
               />
             </div>
 
-            <div style={immersiveHintStyle}>
-              Keyboard: D duplicate, N not duplicate, I ignore, J next, K previous, Tab toggle side, Left show left, Right show right, Escape close full screen.
+            <section
+              style={{
+                ...panelStyle,
+                margin: '0 20px',
+                backgroundColor: '#fffdf9',
+                color: '#1e293b'
+              }}
+            >
+              {renderAssetMetadata({
+                sideLabel: focusedSide === 'left' ? 'Asset A' : 'Asset B',
+                asset: immersiveAsset,
+                fileSizeLabel: immersiveFileSizeLabel,
+                fileSizeDelta: immersiveFileSizeDelta
+              })}
+            </section>
+
+            {renderCurrentPairDetails({ fullscreen: true })}
+
+            <div style={{ padding: '0 20px 20px 20px' }}>
+              {queueFiltersSection}
+              {queueProgressSection}
+              {summaryCards.length > 0 ? <div style={summaryGridStyle}>{summaryCards}</div> : null}
+              {loadingSection}
+              {errorSection}
+              {emptySection}
             </div>
-          </section>
-        </div>
-      ) : null}
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div style={pageStyle}>
+      {!loading && !error && currentPair ? renderPairDisplayHero() : null}
+      <div style={{ ...headerActionsStyle, marginBottom: '18px' }}>
+        <Link to="/" style={linkStyle}>
+          Back to Library
+        </Link>
+      </div>
+
+      {!loading && !error && currentPair ? renderCurrentPairDetails({ showImages: false }) : null}
+      {queueFiltersSection}
+      {queueProgressSection}
+      {summaryCards.length > 0 ? <div style={summaryGridStyle}>{summaryCards}</div> : null}
+      {loadingSection}
+      {errorSection}
+      {emptySection}
     </div>
   );
 }

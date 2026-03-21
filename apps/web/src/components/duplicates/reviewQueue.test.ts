@@ -101,23 +101,23 @@ test('duplicate immersive mode opens on the currently focused side and maps keyb
   assert.equal(getInitialDuplicateReviewImmersiveSide('left'), 'left');
   assert.equal(getInitialDuplicateReviewImmersiveSide('right'), 'right');
   assert.equal(
-    getDuplicateReviewImmersiveSideForKey({ key: 'Tab', currentSide: 'left' }),
+    getDuplicateReviewImmersiveSideForKey({ key: 'ArrowLeft', currentSide: 'left' }),
     'right'
-  );
-  assert.equal(
-    getDuplicateReviewImmersiveSideForKey({ key: 'ArrowLeft', currentSide: 'right' }),
-    'left'
   );
   assert.equal(
     getDuplicateReviewImmersiveSideForKey({ key: 'ArrowRight', currentSide: 'left' }),
     'right'
   );
   assert.equal(
-    getDuplicateReviewImmersiveSideForKey({ key: 'A', currentSide: 'right' }),
+    getDuplicateReviewImmersiveSideForKey({ key: 'ArrowRight', currentSide: 'right' }),
+    'left'
+  );
+  assert.equal(
+    getDuplicateReviewImmersiveSideForKey({ key: 'Tab', currentSide: 'right' }),
     null
   );
   assert.equal(
-    getDuplicateReviewImmersiveSideForKey({ key: 'D', currentSide: 'left' }),
+    getDuplicateReviewImmersiveSideForKey({ key: 'A', currentSide: 'left' }),
     null
   );
   assert.equal(
@@ -127,13 +127,15 @@ test('duplicate immersive mode opens on the currently focused side and maps keyb
 });
 
 test('duplicate immersive mode keyboard actions map to review commands predictably', () => {
-  assert.equal(getDuplicateReviewImmersiveActionForKey('D'), 'confirmed_duplicate');
+  assert.equal(getDuplicateReviewImmersiveActionForKey('C'), 'reviewed_uncertain');
+  assert.equal(getDuplicateReviewImmersiveActionForKey('B'), 'confirmed_duplicate_keep_both');
+  assert.equal(getDuplicateReviewImmersiveActionForKey('K'), 'keep_current_photo');
   assert.equal(getDuplicateReviewImmersiveActionForKey('n'), 'not_duplicate');
-  assert.equal(getDuplicateReviewImmersiveActionForKey('I'), 'ignored');
   assert.equal(getDuplicateReviewImmersiveActionForKey('j'), 'next');
-  assert.equal(getDuplicateReviewImmersiveActionForKey('K'), 'previous');
+  assert.equal(getDuplicateReviewImmersiveActionForKey('F'), 'previous');
   assert.equal(getDuplicateReviewImmersiveActionForKey('Escape'), 'close');
   assert.equal(getDuplicateReviewImmersiveActionForKey('Tab'), null);
+  assert.equal(getDuplicateReviewImmersiveActionForKey('L'), null);
 });
 
 test('duplicate review presets map to concrete filter values and match the active slice', () => {
@@ -146,6 +148,7 @@ test('duplicate review presets map to concrete filter values and match the activ
   });
   assert.equal(getActiveDuplicateReviewPresetId(veryLikely), 'very_likely');
   assert.equal(getActiveDuplicateReviewPresetId(highConfidenceQuickPass), 'high_confidence_quick_pass');
+  assert.equal(highConfidenceQuickPass.minScore, '0.90');
   assert.equal(
     getActiveDuplicateReviewPresetId({
       ...veryLikely,

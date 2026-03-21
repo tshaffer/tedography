@@ -5547,24 +5547,6 @@ export default function App() {
             albumLabels={selectedAssetAlbumLabels}
             duplicateResolutionSummary={selectedAssetDuplicateResolution}
             duplicateReconciliation={selectedAssetReconciliation}
-            onOpenDuplicateGroup={() => {
-              if (!selectedAssetDuplicateResolution) {
-                return;
-              }
-
-              window.location.href = `/duplicates/groups?groupKey=${encodeURIComponent(
-                selectedAssetDuplicateResolution.groupKey
-              )}`;
-            }}
-            onOpenDuplicateReconciliation={() => {
-              if (!selectedAssetReconciliation) {
-                return;
-              }
-
-              window.location.href = `/duplicates/reconciliations?groupKey=${encodeURIComponent(
-                selectedAssetReconciliation.groupKey
-              )}`;
-            }}
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
             assetOperationBusy={assetMaintenanceBusy !== null}
@@ -5606,7 +5588,7 @@ export default function App() {
           >
             Search
           </button>
-          <Link to="/duplicates" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+          <Link to="/duplicates/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             Duplicates
           </Link>
           <button

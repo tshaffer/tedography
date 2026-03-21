@@ -30,6 +30,22 @@ test('review decisions map to preserved workflow state transitions', () => {
     status: 'reviewed',
     outcome: 'confirmed_duplicate'
   });
+  assert.deepEqual(mapDecisionToReviewUpdate('reviewed_uncertain'), {
+    status: 'reviewed',
+    outcome: null
+  });
+  assert.deepEqual(mapDecisionToReviewUpdate('confirmed_duplicate_keep_both'), {
+    status: 'reviewed',
+    outcome: 'confirmed_duplicate'
+  });
+  assert.deepEqual(mapDecisionToReviewUpdate('confirmed_duplicate_keep_left'), {
+    status: 'reviewed',
+    outcome: 'confirmed_duplicate'
+  });
+  assert.deepEqual(mapDecisionToReviewUpdate('confirmed_duplicate_keep_right'), {
+    status: 'reviewed',
+    outcome: 'confirmed_duplicate'
+  });
   assert.deepEqual(mapDecisionToReviewUpdate('not_duplicate'), {
     status: 'reviewed',
     outcome: 'not_duplicate'

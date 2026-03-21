@@ -19,6 +19,11 @@ import {
   updateDuplicateCandidatePairReview,
   type FindDuplicateCandidatePairInput
 } from '../repositories/duplicateCandidatePairRepository.js';
+import { findDuplicateGroupResolutionByKey } from '../repositories/duplicateGroupResolutionRepository.js';
+import {
+  listDerivedDuplicateGroups,
+  updateDerivedDuplicateGroupResolution
+} from './duplicateGroupService.js';
 
 const pairKeySeparator = '__';
 
@@ -49,7 +54,11 @@ function toAssetSummary(asset: MediaAsset | null): DuplicateCandidatePairAssetSu
           : null,
     ...(asset.captureDateTime !== undefined ? { captureDateTime: asset.captureDateTime } : {}),
     ...(asset.width !== undefined ? { width: asset.width } : {}),
-    ...(asset.height !== undefined ? { height: asset.height } : {})
+    ...(asset.height !== undefined ? { height: asset.height } : {}),
+    ...(asset.originalFileFormat ? { originalFileFormat: asset.originalFileFormat } : {}),
+    ...(asset.originalFileSizeBytes !== undefined
+      ? { originalFileSizeBytes: asset.originalFileSizeBytes }
+      : {})
   };
 }
 
@@ -182,9 +191,18 @@ export function mapDecisionToReviewUpdate(
   decision: DuplicateCandidateReviewDecision
 ): {
   status: 'reviewed' | 'ignored';
-  outcome: 'confirmed_duplicate' | 'not_duplicate' | 'ignored';
+  outcome: 'confirmed_duplicate' | 'not_duplicate' | 'ignored' | null;
 } {
-  if (decision === 'confirmed_duplicate') {
+  if (decision === 'reviewed_uncertain') {
+    return { status: 'reviewed', outcome: null };
+  }
+
+  if (
+    decision === 'confirmed_duplicate' ||
+    decision === 'confirmed_duplicate_keep_both' ||
+    decision === 'confirmed_duplicate_keep_left' ||
+    decision === 'confirmed_duplicate_keep_right'
+  ) {
     return { status: 'reviewed', outcome: 'confirmed_duplicate' };
   }
 
@@ -193,6 +211,58 @@ export function mapDecisionToReviewUpdate(
   }
 
   return { status: 'ignored', outcome: 'ignored' };
+}
+
+function getKeeperAssetIdForDecision(input: {
+  decision: DuplicateCandidateReviewDecision;
+  pair: DuplicateCandidatePairDocument;
+}): string | null {
+  if (input.decision === 'confirmed_duplicate_keep_left') {
+    return input.pair.assetIdA;
+  }
+
+  if (input.decision === 'confirmed_duplicate_keep_right') {
+    return input.pair.assetIdB;
+  }
+
+  return null;
+}
+
+async function syncDuplicateGroupResolutionForReviewDecision(
+  pair: DuplicateCandidatePairDocument,
+  decision: DuplicateCandidateReviewDecision
+): Promise<void> {
+  const groupsResponse = await listDerivedDuplicateGroups({
+    assetId: pair.assetIdA
+  });
+  const group = groupsResponse.groups.find(
+    (candidate) =>
+      candidate.assetIds.includes(pair.assetIdA) &&
+      candidate.assetIds.includes(pair.assetIdB)
+  );
+
+  if (!group) {
+    return;
+  }
+
+  const keeperAssetId = getKeeperAssetIdForDecision({ decision, pair });
+  if (keeperAssetId) {
+    await updateDerivedDuplicateGroupResolution(group.groupKey, {
+      canonicalAssetId: keeperAssetId,
+      resolutionStatus: 'confirmed'
+    });
+    return;
+  }
+
+  if (decision === 'confirmed_duplicate_keep_both') {
+    const existingResolution = await findDuplicateGroupResolutionByKey(group.groupKey);
+    if (existingResolution) {
+      await updateDerivedDuplicateGroupResolution(group.groupKey, {
+        canonicalAssetId: group.proposedCanonicalAssetId,
+        resolutionStatus: 'proposed'
+      });
+    }
+  }
 }
 
 export async function reviewDuplicateCandidatePair(
@@ -212,6 +282,8 @@ export async function reviewDuplicateCandidatePair(
   if (!pair) {
     return null;
   }
+
+  await syncDuplicateGroupResolutionForReviewDecision(pair, decision);
 
   const assets = await findByIds([pair.assetIdA, pair.assetIdB]);
   return {

@@ -10,8 +10,6 @@ interface AssetDetailsPanelProps {
   duplicateReconciliation?: DuplicateReconciliationListItem | null;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
-  onOpenDuplicateGroup?: () => void;
-  onOpenDuplicateReconciliation?: () => void;
   assetOperationBusy?: boolean;
   assetOperationMessage?: string | null;
   assetOperationError?: boolean;
@@ -141,8 +139,6 @@ export function AssetDetailsPanel({
   duplicateReconciliation = null,
   onReimportAsset,
   onRebuildDerivedFiles,
-  onOpenDuplicateGroup,
-  onOpenDuplicateReconciliation,
   assetOperationBusy = false,
   assetOperationMessage = null,
   assetOperationError = false
@@ -226,26 +222,6 @@ export function AssetDetailsPanel({
         >
           {assetOperationBusy ? 'Working...' : 'Rebuild Derived Files'}
         </button>
-        {duplicateResolutionSummary ? (
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={onOpenDuplicateGroup}
-            disabled={!onOpenDuplicateGroup}
-          >
-            Open Duplicate Group
-          </button>
-        ) : null}
-        {duplicateReconciliation ? (
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={onOpenDuplicateReconciliation}
-            disabled={!onOpenDuplicateReconciliation}
-          >
-            Open Reconciliation
-          </button>
-        ) : null}
       </div>
       {assetOperationMessage ? (
         <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>

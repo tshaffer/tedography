@@ -1,13 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import App from './App';
 import { store } from './app/store';
-import { DuplicateHubPage } from './components/duplicates/DuplicateHubPage';
-import { DuplicateGroupsPage } from './components/duplicates/DuplicateGroupsPage';
-import { DuplicateActionPlansPage } from './components/duplicates/DuplicateActionPlansPage';
-import { DuplicateReconciliationsPage } from './components/duplicates/DuplicateReconciliationsPage';
 import { DuplicateReviewPage } from './components/duplicates/DuplicateReviewPage';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -16,11 +12,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
-          <Route path="/duplicates" element={<DuplicateHubPage />} />
+          <Route path="/duplicates" element={<Navigate to="/duplicates/review" replace />} />
           <Route path="/duplicates/review" element={<DuplicateReviewPage />} />
-          <Route path="/duplicates/groups" element={<DuplicateGroupsPage />} />
-          <Route path="/duplicates/plans" element={<DuplicateActionPlansPage />} />
-          <Route path="/duplicates/reconciliations" element={<DuplicateReconciliationsPage />} />
+          <Route path="/duplicates/groups" element={<Navigate to="/duplicates/review" replace />} />
+          <Route path="/duplicates/plans" element={<Navigate to="/duplicates/review" replace />} />
+          <Route path="/duplicates/reconciliations" element={<Navigate to="/duplicates/review" replace />} />
         </Routes>
       </BrowserRouter>
     </Provider>

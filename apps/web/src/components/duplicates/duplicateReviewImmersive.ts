@@ -10,16 +10,8 @@ export function getDuplicateReviewImmersiveSideForKey(input: {
   key: string;
   currentSide: DuplicateReviewFocusSide;
 }): DuplicateReviewFocusSide | null {
-  if (input.key === 'Tab') {
+  if (input.key === 'ArrowLeft' || input.key === 'ArrowRight') {
     return input.currentSide === 'left' ? 'right' : 'left';
-  }
-
-  if (input.key === 'ArrowLeft') {
-    return 'left';
-  }
-
-  if (input.key === 'ArrowRight') {
-    return 'right';
   }
 
   return null;
@@ -27,21 +19,25 @@ export function getDuplicateReviewImmersiveSideForKey(input: {
 
 export function getDuplicateReviewImmersiveActionForKey(
   key: string
-): 'confirmed_duplicate' | 'not_duplicate' | 'ignored' | 'next' | 'previous' | 'close' | null {
+):
+  | 'reviewed_uncertain'
+  | 'confirmed_duplicate_keep_both'
+  | 'keep_current_photo'
+  | 'not_duplicate'
+  | 'next'
+  | 'previous'
+  | 'close'
+  | null {
   if (key === 'Escape') {
     return 'close';
   }
 
-  if (key === 'd' || key === 'D') {
-    return 'confirmed_duplicate';
+  if (key === 'c' || key === 'C') {
+    return 'reviewed_uncertain';
   }
 
-  if (key === 'n' || key === 'N') {
-    return 'not_duplicate';
-  }
-
-  if (key === 'i' || key === 'I') {
-    return 'ignored';
+  if (key === 'b' || key === 'B') {
+    return 'confirmed_duplicate_keep_both';
   }
 
   if (key === 'j' || key === 'J') {
@@ -49,6 +45,14 @@ export function getDuplicateReviewImmersiveActionForKey(
   }
 
   if (key === 'k' || key === 'K') {
+    return 'keep_current_photo';
+  }
+
+  if (key === 'n' || key === 'N') {
+    return 'not_duplicate';
+  }
+
+  if (key === 'f' || key === 'F') {
     return 'previous';
   }
 

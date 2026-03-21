@@ -19,6 +19,13 @@ import type {
   UpdateDuplicateCandidatePairReviewResponse
 } from '@tedography/shared';
 
+export type DuplicateReviewActionDecision =
+  | UpdateDuplicateCandidatePairReviewRequest['decision']
+  | 'reviewed_uncertain'
+  | 'confirmed_duplicate_keep_both'
+  | 'confirmed_duplicate_keep_left'
+  | 'confirmed_duplicate_keep_right';
+
 type ApiErrorPayload = {
   error?: string;
 };
@@ -182,7 +189,7 @@ export async function bulkUpdateDuplicateGroups(
 
 export async function updateDuplicateCandidatePairReview(
   pairKey: string,
-  request: UpdateDuplicateCandidatePairReviewRequest
+  request: { decision: DuplicateReviewActionDecision }
 ): Promise<UpdateDuplicateCandidatePairReviewResponse> {
   return fetchJson<UpdateDuplicateCandidatePairReviewResponse>(
     `/api/duplicate-candidate-pairs/${encodeURIComponent(pairKey)}`,

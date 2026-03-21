@@ -21,7 +21,11 @@ export type DuplicateCandidateOutcomeFilter =
 export type DuplicateCandidateReviewDecision =
   | 'confirmed_duplicate'
   | 'not_duplicate'
-  | 'ignored';
+  | 'ignored'
+  | 'reviewed_uncertain'
+  | 'confirmed_duplicate_keep_both'
+  | 'confirmed_duplicate_keep_left'
+  | 'confirmed_duplicate_keep_right';
 
 export type DuplicateGroupResolutionStatus = 'proposed' | 'confirmed';
 export type DuplicateGroupSortMode = 'unresolved_first' | 'size_asc' | 'size_desc';

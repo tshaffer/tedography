@@ -36,7 +36,11 @@ const validClassifications = new Set<DuplicateCandidateClassification>([
 const validDecisions = new Set<DuplicateCandidateReviewDecision>([
   'confirmed_duplicate',
   'not_duplicate',
-  'ignored'
+  'ignored',
+  'reviewed_uncertain',
+  'confirmed_duplicate_keep_both',
+  'confirmed_duplicate_keep_left',
+  'confirmed_duplicate_keep_right'
 ]);
 const validOutcomeFilters = new Set<DuplicateCandidateOutcomeFilter>([
   'confirmed_duplicate',
@@ -453,7 +457,8 @@ duplicateCandidatePairRoutes.post('/bulk-review', async (req, res) => {
 
   if (!body.decision || !validDecisions.has(body.decision)) {
     const errorResponse: ImportApiErrorResponse = {
-      error: 'decision must be confirmed_duplicate, not_duplicate, or ignored'
+      error:
+        'decision must be confirmed_duplicate, not_duplicate, ignored, reviewed_uncertain, confirmed_duplicate_keep_both, confirmed_duplicate_keep_left, or confirmed_duplicate_keep_right'
     };
     res.status(400).json(errorResponse);
     return;
@@ -492,7 +497,8 @@ duplicateCandidatePairRoutes.patch('/:pairKey', async (req, res) => {
 
   if (typeof decision !== 'string' || !validDecisions.has(decision)) {
     const errorResponse: ImportApiErrorResponse = {
-      error: 'decision must be confirmed_duplicate, not_duplicate, or ignored'
+      error:
+        'decision must be confirmed_duplicate, not_duplicate, ignored, reviewed_uncertain, confirmed_duplicate_keep_both, confirmed_duplicate_keep_left, or confirmed_duplicate_keep_right'
     };
     res.status(400).json(errorResponse);
     return;

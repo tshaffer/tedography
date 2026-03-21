@@ -9,7 +9,7 @@ export type DuplicateReviewFilters = {
   classification: DuplicateCandidateClassification | 'all';
   outcome: DuplicateCandidateOutcomeFilter | 'all';
   assetId: string;
-  highConfidenceOnly: boolean;
+  minScore: string;
 };
 
 export type DuplicateReviewPresetId =
@@ -32,7 +32,7 @@ export const defaultDuplicateReviewFilters: DuplicateReviewFilters = {
   classification: 'all',
   outcome: 'all',
   assetId: '',
-  highConfidenceOnly: false
+  minScore: ''
 };
 
 export const duplicateReviewPresets: ReadonlyArray<{
@@ -83,7 +83,7 @@ export const duplicateReviewPresets: ReadonlyArray<{
     filters: {
       ...defaultDuplicateReviewFilters,
       classification: 'very_likely_duplicate',
-      highConfidenceOnly: true
+      minScore: '0.90'
     }
   }
 ];
@@ -106,7 +106,7 @@ export function getActiveDuplicateReviewPresetId(
     preset.filters.classification === normalized.classification &&
     preset.filters.outcome === normalized.outcome &&
     preset.filters.assetId === normalized.assetId &&
-    preset.filters.highConfidenceOnly === normalized.highConfidenceOnly
+    preset.filters.minScore === normalized.minScore
   );
 
   return match?.id ?? null;

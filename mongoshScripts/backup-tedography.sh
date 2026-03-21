@@ -27,6 +27,12 @@ fi
 
 EXPORT_COLLECTIONS=(
   albumTreeNodes
+  duplicateActionExecutions
+  duplicateActionPlans
+  duplicateCandidatePairs
+  duplicateGroupResolutions
+  duplicateReconciliations
+  imageAnalyses
 )
 
 echo "Backing up Tedography to: $OUTPUT_DIR"
