@@ -1,8 +1,11 @@
 import type {
   CreatePersonRequest,
   CreatePersonResponse,
+  ListAssetFaceDetectionsResponse,
   ListPeopleResponse,
+  ListPeoplePipelineRecentAssetsResponse,
   ListPeopleReviewQueueResponse,
+  ProcessPeopleAssetResponse,
   ReviewFaceDetectionRequest,
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
@@ -60,6 +63,44 @@ export async function listPeopleReviewQueue(input?: {
   const search = query.toString();
   return fetchJson<ListPeopleReviewQueueResponse>(
     `/api/people-pipeline/review${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function listPeoplePipelineRecentAssets(input?: {
+  limit?: number;
+}): Promise<ListPeoplePipelineRecentAssetsResponse> {
+  const query = new URLSearchParams();
+  if (input?.limit !== undefined) {
+    query.set('limit', String(input.limit));
+  }
+
+  const search = query.toString();
+  return fetchJson<ListPeoplePipelineRecentAssetsResponse>(
+    `/api/people-pipeline/dev/recent-assets${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function getPeoplePipelineAssetState(
+  assetId: string
+): Promise<ListAssetFaceDetectionsResponse> {
+  return fetchJson<ListAssetFaceDetectionsResponse>(
+    `/api/people-pipeline/assets/${encodeURIComponent(assetId)}`
+  );
+}
+
+export async function processPeopleAsset(
+  assetId: string,
+  input?: { force?: boolean }
+): Promise<ProcessPeopleAssetResponse> {
+  return fetchJson<ProcessPeopleAssetResponse>(
+    `/api/people-pipeline/assets/${encodeURIComponent(assetId)}/process`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(input ?? {})
+    }
   );
 }
 

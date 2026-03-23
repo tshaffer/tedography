@@ -150,6 +150,7 @@ export function AssetDetailsPanel({
   }
 
   const rows: Array<{ label: string; value: string }> = [
+    { label: 'Asset ID', value: formatValue(asset.id) },
     { label: 'Filename', value: formatValue(asset.filename) },
     { label: 'Photo State', value: formatValue(asset.photoState) },
     { label: 'Media Type', value: formatValue(asset.mediaType) },

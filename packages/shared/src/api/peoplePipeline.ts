@@ -43,6 +43,21 @@ export interface ListPeopleReviewQueueResponse {
   counts: Record<FaceDetectionMatchStatus, number>;
 }
 
+export interface ListPeoplePipelineRecentAssetsResponse {
+  items: Array<
+    Pick<
+      MediaAsset,
+      | 'id'
+      | 'filename'
+      | 'originalArchivePath'
+      | 'captureDateTime'
+      | 'importedAt'
+      | 'photoState'
+      | 'people'
+    >
+  >;
+}
+
 export interface ProcessPeopleAssetRequest {
   force?: boolean;
 }

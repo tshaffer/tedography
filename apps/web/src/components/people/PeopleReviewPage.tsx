@@ -217,6 +217,32 @@ function formatPeopleList(items: Array<{ displayName: string }>): string {
   return items.map((item) => item.displayName).join(', ');
 }
 
+function getConfirmActionLabel(item: PeopleReviewQueueItem): string {
+  const suggestedPersonName = item.suggestedPerson?.displayName?.trim() ?? '';
+  const assignedPersonName = item.matchedPerson?.displayName?.trim() ?? '';
+
+  if (suggestedPersonName.length > 0 && suggestedPersonName !== assignedPersonName) {
+    return `Confirm Suggested (${suggestedPersonName})`;
+  }
+
+  if (assignedPersonName.length > 0) {
+    return `Confirm ${assignedPersonName}`;
+  }
+
+  return 'Confirm';
+}
+
+function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
+  const suggestedPersonName = item.suggestedPerson?.displayName?.trim() ?? '';
+  const assignedPersonName = item.matchedPerson?.displayName?.trim() ?? '';
+
+  if (suggestedPersonName.length > 0 && assignedPersonName.length > 0 && suggestedPersonName !== assignedPersonName) {
+    return `This confirms the suggested person (${suggestedPersonName}), not the currently assigned person (${assignedPersonName}).`;
+  }
+
+  return null;
+}
+
 export function PeopleReviewPage() {
   const [items, setItems] = useState<PeopleReviewQueueItem[]>([]);
   const [counts, setCounts] = useState<Record<FaceDetectionMatchStatus, number>>({
@@ -354,6 +380,9 @@ export function PeopleReviewPage() {
         <Link to="/" style={linkStyle}>
           Back to Library
         </Link>
+        <Link to="/people/dev" style={linkStyle}>
+          People Dev Harness
+        </Link>
         <Link to="/duplicates/review" style={linkStyle}>
           Duplicate Review
         </Link>
@@ -435,6 +464,8 @@ export function PeopleReviewPage() {
             const canConfirm =
               typeof item.detection.autoMatchCandidatePersonId === 'string' ||
               typeof item.detection.matchedPersonId === 'string';
+            const confirmActionLabel = getConfirmActionLabel(item);
+            const confirmActionHint = getConfirmActionHint(item);
 
             return (
               <section key={item.detection.id} style={cardStyle}>
@@ -520,8 +551,9 @@ export function PeopleReviewPage() {
                         style={isBusy || !canConfirm ? disabledButtonStyle : primaryButtonStyle}
                         disabled={isBusy || !canConfirm}
                         onClick={() => void runAction(item, { type: 'confirm' })}
+                        title={confirmActionHint ?? undefined}
                       >
-                        Confirm
+                        {confirmActionLabel}
                       </button>
                       <button
                         type="button"
@@ -532,6 +564,9 @@ export function PeopleReviewPage() {
                         Reject
                       </button>
                     </div>
+                    {confirmActionHint ? (
+                      <div style={{ fontSize: '12px', color: '#6a4d00' }}>{confirmActionHint}</div>
+                    ) : null}
 
                     <div style={inlineRowStyle}>
                       <select

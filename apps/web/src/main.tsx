@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import App from './App';
 import { store } from './app/store';
 import { DuplicateReviewPage } from './components/duplicates/DuplicateReviewPage';
+import { PeopleDevPage } from './components/people/PeopleDevPage';
 import { PeopleReviewPage } from './components/people/PeopleReviewPage';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/duplicates" element={<Navigate to="/duplicates/review" replace />} />
           <Route path="/duplicates/review" element={<DuplicateReviewPage />} />
           <Route path="/people" element={<Navigate to="/people/review" replace />} />
+          <Route path="/people/dev" element={<PeopleDevPage />} />
           <Route path="/people/review" element={<PeopleReviewPage />} />
         </Routes>
       </BrowserRouter>

@@ -93,6 +93,14 @@ export async function findPhotoAssets(): Promise<MediaAsset[]> {
   return normalizeMediaAssets(assets);
 }
 
+export async function findRecentPhotoAssets(limit = 20): Promise<MediaAsset[]> {
+  const assets = await MediaAssetModel.find({ mediaType: MediaType.Photo }, { _id: 0 })
+    .sort({ importedAt: -1, captureDateTime: -1, id: -1 })
+    .limit(limit)
+    .lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
+}
+
 export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;

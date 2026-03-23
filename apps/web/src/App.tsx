@@ -5547,6 +5547,9 @@ export default function App() {
           <Link to="/people/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             People
           </Link>
+          <Link to="/people/dev" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+            People Dev
+          </Link>
           <button
             type="button"
             style={compareButtonStyle}

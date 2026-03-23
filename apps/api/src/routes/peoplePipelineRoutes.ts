@@ -6,6 +6,7 @@ import type {
   ReviewFaceDetectionRequest
 } from '@tedography/shared';
 import { createPerson, listPeople } from '../repositories/personRepository.js';
+import { findRecentPhotoAssets } from '../repositories/assetRepository.js';
 import {
   listAssetFaceDetections,
   listPeopleReviewQueue,
@@ -57,6 +58,31 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
   } catch (error) {
     log.error('Failed to list people review queue', error);
     res.status(500).json({ error: 'Failed to list people review queue' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.get('/dev/recent-assets', async (req, res) => {
+  const limit =
+    typeof req.query.limit === 'string' && Number.isFinite(Number(req.query.limit))
+      ? Math.max(1, Math.min(100, Number(req.query.limit)))
+      : 20;
+
+  try {
+    const assets = await findRecentPhotoAssets(limit);
+    res.json({
+      items: assets.map((asset) => ({
+        id: asset.id,
+        filename: asset.filename,
+        originalArchivePath: asset.originalArchivePath,
+        captureDateTime: asset.captureDateTime ?? null,
+        importedAt: asset.importedAt,
+        photoState: asset.photoState,
+        people: asset.people ?? []
+      }))
+    });
+  } catch (error) {
+    log.error('Failed to list recent assets for people dev harness', error);
+    res.status(500).json({ error: 'Failed to list recent assets for people dev harness' } satisfies ImportApiErrorResponse);
   }
 });
 
