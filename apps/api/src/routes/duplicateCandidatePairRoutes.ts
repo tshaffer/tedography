@@ -1,29 +1,22 @@
 import { Router } from 'express';
 import type { ImportApiErrorResponse } from '@tedography/domain';
 import type {
-  BulkReviewDuplicateCandidatePairsRequest,
-  BulkUpdateDuplicateGroupsRequest,
   DuplicateCandidateClassification,
   DuplicateCandidateOutcomeFilter,
   DuplicateCandidateReviewDecision,
   DuplicateGroupResolutionStatus,
   DuplicateGroupSortMode,
   DuplicateCandidateStatus,
-  UpdateDuplicateGroupResolutionRequest,
   UpdateDuplicateCandidatePairReviewRequest
 } from '@tedography/shared';
 import {
-  bulkReviewDuplicateCandidatePairs,
   getDuplicateCandidatePairForReview,
   getDuplicateCandidatePairQueueSummary,
   listDuplicateCandidatePairsForReview,
   reviewDuplicateCandidatePair
 } from '../services/duplicateCandidatePairService.js';
 import {
-  bulkConfirmDerivedDuplicateGroupProposals,
-  getDerivedDuplicateGroup,
   listDerivedDuplicateGroups,
-  updateDerivedDuplicateGroupResolution
 } from '../services/duplicateGroupService.js';
 import { log } from '../logger.js';
 
@@ -351,125 +344,6 @@ duplicateCandidatePairRoutes.get('/groups', async (req, res) => {
   } catch (error) {
     log.error('Failed to load duplicate groups', error);
     const errorResponse: ImportApiErrorResponse = { error: 'Failed to load duplicate groups' };
-    res.status(500).json(errorResponse);
-  }
-});
-
-duplicateCandidatePairRoutes.post('/groups/bulk', async (req, res) => {
-  const body = req.body as Partial<BulkUpdateDuplicateGroupsRequest> | undefined;
-
-  if (body?.action !== 'confirm_proposals') {
-    const errorResponse: ImportApiErrorResponse = { error: 'action must be confirm_proposals' };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  if (!Array.isArray(body.groupKeys) || body.groupKeys.some((value) => typeof value !== 'string' || value.trim().length === 0)) {
-    const errorResponse: ImportApiErrorResponse = { error: 'groupKeys must be a non-empty array of strings' };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  try {
-    const response = await bulkConfirmDerivedDuplicateGroupProposals(body.groupKeys);
-    res.json(response);
-  } catch (error) {
-    log.error('Failed to bulk update duplicate groups', error);
-    const errorResponse: ImportApiErrorResponse = { error: 'Failed to bulk update duplicate groups' };
-    res.status(500).json(errorResponse);
-  }
-});
-
-duplicateCandidatePairRoutes.get('/groups/:groupKey', async (req, res) => {
-  try {
-    const response = await getDerivedDuplicateGroup(req.params.groupKey);
-    if (!response) {
-      const errorResponse: ImportApiErrorResponse = { error: 'Duplicate group not found' };
-      res.status(404).json(errorResponse);
-      return;
-    }
-
-    res.json(response);
-  } catch (error) {
-    log.error('Failed to load duplicate group', error);
-    const errorResponse: ImportApiErrorResponse = { error: 'Failed to load duplicate group' };
-    res.status(500).json(errorResponse);
-  }
-});
-
-duplicateCandidatePairRoutes.patch('/groups/:groupKey', async (req, res) => {
-  const body = req.body as Partial<UpdateDuplicateGroupResolutionRequest> | undefined;
-
-  if (
-    body?.canonicalAssetId !== undefined &&
-    (typeof body.canonicalAssetId !== 'string' || body.canonicalAssetId.trim().length === 0)
-  ) {
-    const errorResponse: ImportApiErrorResponse = { error: 'canonicalAssetId must be a non-empty string' };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  if (
-    body?.resolutionStatus !== undefined &&
-    body.resolutionStatus !== 'proposed' &&
-    body.resolutionStatus !== 'confirmed'
-  ) {
-    const errorResponse: ImportApiErrorResponse = {
-      error: 'resolutionStatus must be proposed or confirmed'
-    };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  try {
-    const response = await updateDerivedDuplicateGroupResolution(req.params.groupKey, {
-      ...(body?.canonicalAssetId ? { canonicalAssetId: body.canonicalAssetId.trim() } : {}),
-      ...(body?.resolutionStatus ? { resolutionStatus: body.resolutionStatus } : {})
-    });
-    if (!response) {
-      const errorResponse: ImportApiErrorResponse = { error: 'Duplicate group not found' };
-      res.status(404).json(errorResponse);
-      return;
-    }
-
-    res.json(response);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('is not part of duplicate group')) {
-      const errorResponse: ImportApiErrorResponse = { error: error.message };
-      res.status(400).json(errorResponse);
-      return;
-    }
-
-    log.error('Failed to update duplicate group resolution', error);
-    const errorResponse: ImportApiErrorResponse = { error: 'Failed to update duplicate group resolution' };
-    res.status(500).json(errorResponse);
-  }
-});
-
-duplicateCandidatePairRoutes.post('/bulk-review', async (req, res) => {
-  const body = req.body as Partial<BulkReviewDuplicateCandidatePairsRequest> | undefined;
-
-  if (!Array.isArray(body?.pairKeys) || body.pairKeys.some((value) => typeof value !== 'string' || value.trim().length === 0)) {
-    const errorResponse: ImportApiErrorResponse = { error: 'pairKeys must be a non-empty array of strings' };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  if (!body.decision || !validDecisions.has(body.decision)) {
-    const errorResponse: ImportApiErrorResponse = {
-      error:
-        'decision must be confirmed_duplicate, not_duplicate, ignored, reviewed_uncertain, confirmed_duplicate_keep_both, confirmed_duplicate_keep_left, or confirmed_duplicate_keep_right'
-    };
-    res.status(400).json(errorResponse);
-    return;
-  }
-
-  try {
-    const response = await bulkReviewDuplicateCandidatePairs(body.pairKeys, body.decision);
-    res.json(response);
-  } catch (error) {
-    log.error('Failed to bulk update duplicate candidate pairs', error);
-    const errorResponse: ImportApiErrorResponse = { error: 'Failed to bulk update duplicate candidate pairs' };
     res.status(500).json(errorResponse);
   }
 });

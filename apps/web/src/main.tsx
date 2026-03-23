@@ -14,9 +14,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/duplicates" element={<Navigate to="/duplicates/review" replace />} />
           <Route path="/duplicates/review" element={<DuplicateReviewPage />} />
-          <Route path="/duplicates/groups" element={<Navigate to="/duplicates/review" replace />} />
-          <Route path="/duplicates/plans" element={<Navigate to="/duplicates/review" replace />} />
-          <Route path="/duplicates/reconciliations" element={<Navigate to="/duplicates/review" replace />} />
         </Routes>
       </BrowserRouter>
     </Provider>

@@ -1,7 +1,6 @@
 import { type MediaAsset } from '@tedography/domain';
 import { type DuplicateCandidatePairDocument } from '../models/duplicateCandidatePairModel.js';
 import type {
-  BulkReviewDuplicateCandidatePairsResponse,
   DuplicateCandidateOutcomeFilter,
   DuplicateCandidatePairAssetSummary,
   DuplicateCandidatePairListItem,
@@ -288,25 +287,5 @@ export async function reviewDuplicateCandidatePair(
   const assets = await findByIds([pair.assetIdA, pair.assetIdB]);
   return {
     item: toListItem(pair, buildAssetMap(assets))
-  };
-}
-
-export async function bulkReviewDuplicateCandidatePairs(
-  pairKeys: string[],
-  decision: DuplicateCandidateReviewDecision
-): Promise<BulkReviewDuplicateCandidatePairsResponse> {
-  const uniquePairKeys = Array.from(new Set(pairKeys.filter((value) => value.trim().length > 0)));
-  let updatedCount = 0;
-
-  for (const pairKey of uniquePairKeys) {
-    const reviewed = await reviewDuplicateCandidatePair(pairKey, decision);
-    if (reviewed) {
-      updatedCount += 1;
-    }
-  }
-
-  return {
-    updatedCount,
-    pairKeys: uniquePairKeys
   };
 }

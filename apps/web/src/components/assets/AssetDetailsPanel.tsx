@@ -1,13 +1,11 @@
 import { type CSSProperties } from 'react';
 import { type MediaAsset } from '@tedography/domain';
-import type { DuplicateReconciliationListItem } from '@tedography/shared';
 import { type DuplicateResolutionVisibilitySummary } from '../duplicates/duplicateResolutionVisibility';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
   duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
-  duplicateReconciliation?: DuplicateReconciliationListItem | null;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
   assetOperationBusy?: boolean;
@@ -136,7 +134,6 @@ export function AssetDetailsPanel({
   asset,
   albumLabels = [],
   duplicateResolutionSummary = null,
-  duplicateReconciliation = null,
   onReimportAsset,
   onRebuildDerivedFiles,
   assetOperationBusy = false,
@@ -187,18 +184,6 @@ export function AssetDetailsPanel({
         value: duplicateResolutionSummary.role === 'canonical' ? 'Canonical keeper' : 'Suppressed duplicate'
       },
       { label: 'Duplicate Group', value: duplicateResolutionSummary.groupKey }
-    );
-  }
-
-  if (duplicateReconciliation) {
-    rows.push(
-      { label: 'Reconciliation', value: duplicateReconciliation.status },
-      {
-        label: 'Added Albums',
-        value: String(
-          duplicateReconciliation.entries.reduce((sum, entry) => sum + entry.addedValues.length, 0)
-        )
-      }
     );
   }
 

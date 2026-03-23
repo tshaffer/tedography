@@ -1,11 +1,8 @@
 import { PhotoState, type MediaAsset } from '@tedography/domain';
 import type {
-  BulkUpdateDuplicateGroupsResponse,
-  DuplicateGroupDetailResponse,
   DuplicateGroupListItem,
   DuplicateGroupListSummary,
-  ListDuplicateGroupsResponse,
-  UpdateDuplicateGroupResolutionResponse
+  ListDuplicateGroupsResponse
 } from '@tedography/shared';
 import { findByIds } from '../repositories/assetRepository.js';
 import {
@@ -442,28 +439,13 @@ export async function listDerivedDuplicateGroups(
   };
 }
 
-export async function getDerivedDuplicateGroup(
-  groupKey: string
-): Promise<DuplicateGroupDetailResponse | null> {
-  const derivedGroups = await loadDerivedGroups();
-  const group = derivedGroups.find((candidate) => buildDuplicateGroupKey(candidate.assetIds) === groupKey);
-
-  if (!group) {
-    return null;
-  }
-
-  return {
-    group: await buildDuplicateGroupListItem(group)
-  };
-}
-
 export async function updateDerivedDuplicateGroupResolution(
   groupKey: string,
   input: {
     canonicalAssetId?: string;
     resolutionStatus?: 'proposed' | 'confirmed';
   }
-): Promise<UpdateDuplicateGroupResolutionResponse | null> {
+): Promise<void | null> {
   const derivedGroups = await loadDerivedGroups();
   const group = derivedGroups.find((candidate) => buildDuplicateGroupKey(candidate.assetIds) === groupKey);
 
@@ -487,29 +469,4 @@ export async function updateDerivedDuplicateGroupResolution(
       nextCanonicalAssetId === proposedCanonical.canonicalAssetId ? null : nextCanonicalAssetId,
     resolutionStatus: input.resolutionStatus ?? 'proposed'
   });
-
-  return getDerivedDuplicateGroup(groupKey);
-}
-
-export async function bulkConfirmDerivedDuplicateGroupProposals(
-  groupKeys: string[]
-): Promise<BulkUpdateDuplicateGroupsResponse> {
-  const uniqueGroupKeys = Array.from(new Set(groupKeys.filter((value) => value.trim().length > 0)));
-
-  let updatedCount = 0;
-
-  for (const groupKey of uniqueGroupKeys) {
-    const result = await updateDerivedDuplicateGroupResolution(groupKey, {
-      resolutionStatus: 'confirmed'
-    });
-
-    if (result) {
-      updatedCount += 1;
-    }
-  }
-
-  return {
-    updatedCount,
-    groupKeys: uniqueGroupKeys
-  };
 }

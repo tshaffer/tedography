@@ -1,9 +1,4 @@
 import type {
-  BulkReviewDuplicateCandidatePairsRequest,
-  BulkReviewDuplicateCandidatePairsResponse,
-  BulkUpdateDuplicateGroupsRequest,
-  BulkUpdateDuplicateGroupsResponse,
-  DuplicateGroupDetailResponse,
   DuplicateCandidateClassification,
   DuplicateGroupResolutionStatus,
   DuplicateGroupSortMode,
@@ -13,8 +8,6 @@ import type {
   GetDuplicateCandidatePairResponse,
   ListDuplicateGroupsResponse,
   ListDuplicateCandidatePairsResponse,
-  UpdateDuplicateGroupResolutionRequest,
-  UpdateDuplicateGroupResolutionResponse,
   UpdateDuplicateCandidatePairReviewRequest,
   UpdateDuplicateCandidatePairReviewResponse
 } from '@tedography/shared';
@@ -153,40 +146,6 @@ export async function listDuplicateGroups(input?: {
   );
 }
 
-export async function getDuplicateGroup(groupKey: string): Promise<DuplicateGroupDetailResponse> {
-  return fetchJson<DuplicateGroupDetailResponse>(
-    `/api/duplicate-candidate-pairs/groups/${encodeURIComponent(groupKey)}`
-  );
-}
-
-export async function updateDuplicateGroupResolution(
-  groupKey: string,
-  request: UpdateDuplicateGroupResolutionRequest
-): Promise<UpdateDuplicateGroupResolutionResponse> {
-  return fetchJson<UpdateDuplicateGroupResolutionResponse>(
-    `/api/duplicate-candidate-pairs/groups/${encodeURIComponent(groupKey)}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(request)
-    }
-  );
-}
-
-export async function bulkUpdateDuplicateGroups(
-  request: BulkUpdateDuplicateGroupsRequest
-): Promise<BulkUpdateDuplicateGroupsResponse> {
-  return fetchJson<BulkUpdateDuplicateGroupsResponse>('/api/duplicate-candidate-pairs/groups/bulk', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(request)
-  });
-}
-
 export async function updateDuplicateCandidatePairReview(
   pairKey: string,
   request: { decision: DuplicateReviewActionDecision }
@@ -201,16 +160,4 @@ export async function updateDuplicateCandidatePairReview(
       body: JSON.stringify(request)
     }
   );
-}
-
-export async function bulkReviewDuplicateCandidatePairs(
-  request: BulkReviewDuplicateCandidatePairsRequest
-): Promise<BulkReviewDuplicateCandidatePairsResponse> {
-  return fetchJson<BulkReviewDuplicateCandidatePairsResponse>('/api/duplicate-candidate-pairs/bulk-review', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(request)
-  });
 }

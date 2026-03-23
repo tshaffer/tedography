@@ -17,7 +17,6 @@ import {
   type AlbumTreeNode,
   type MediaAsset
 } from '@tedography/domain';
-import type { DuplicateReconciliationListItem } from '@tedography/shared';
 import {
   addAssetsToAlbum,
   createAlbumTreeNode,
@@ -30,7 +29,6 @@ import {
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
-import { listDuplicateReconciliations } from './api/duplicateReconciliationApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
@@ -1857,13 +1855,11 @@ function AssetCard({
 type AssetDetailPanelProps = {
   asset: MediaAsset | null;
   duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
-  duplicateReconciliation?: DuplicateReconciliationListItem | null;
 };
 
 function AssetDetailPanel({
   asset,
-  duplicateResolutionSummary = null,
-  duplicateReconciliation = null
+  duplicateResolutionSummary = null
 }: AssetDetailPanelProps) {
   if (!asset) {
     return <p style={detailPanelStyle}>No asset selected.</p>;
@@ -1897,27 +1893,6 @@ function AssetDetailPanel({
           </p>
           <p>
             <strong>Duplicate Group:</strong> {duplicateResolutionSummary.groupKey}
-          </p>
-          <p>
-            <Link to={`/duplicates/groups?groupKey=${encodeURIComponent(duplicateResolutionSummary.groupKey)}`}>
-              Open duplicate group
-            </Link>
-          </p>
-        </>
-      ) : null}
-      {duplicateReconciliation ? (
-        <>
-          <p>
-            <strong>Reconciliation:</strong> {duplicateReconciliation.status}
-          </p>
-          <p>
-            <Link
-              to={`/duplicates/reconciliations?groupKey=${encodeURIComponent(
-                duplicateReconciliation.groupKey
-              )}`}
-            >
-              Open reconciliation detail
-            </Link>
           </p>
         </>
       ) : null}
@@ -2551,8 +2526,6 @@ export default function App() {
   });
   const [duplicateResolutionVisibilityByAssetId, setDuplicateResolutionVisibilityByAssetId] =
     useState<Map<string, DuplicateResolutionVisibilitySummary>>(() => new Map());
-  const [selectedAssetReconciliation, setSelectedAssetReconciliation] =
-    useState<DuplicateReconciliationListItem | null>(null);
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
@@ -2901,24 +2874,6 @@ export default function App() {
     void loadAlbumTreeNodes({ showLoading: true });
     void loadDuplicateResolutionVisibility();
   }, []);
-
-  useEffect(() => {
-    async function loadSelectedAssetReconciliation(): Promise<void> {
-      if (!selectedAssetId) {
-        setSelectedAssetReconciliation(null);
-        return;
-      }
-
-      try {
-        const response = await listDuplicateReconciliations({ assetId: selectedAssetId });
-        setSelectedAssetReconciliation(response.items[0] ?? null);
-      } catch {
-        setSelectedAssetReconciliation(null);
-      }
-    }
-
-    void loadSelectedAssetReconciliation();
-  }, [selectedAssetId]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -5540,13 +5495,11 @@ export default function App() {
           <AssetDetailPanel
             asset={selectedAsset}
             duplicateResolutionSummary={selectedAssetDuplicateResolution}
-            duplicateReconciliation={selectedAssetReconciliation}
           />
           <AssetDetailsPanel
             asset={selectedAsset}
             albumLabels={selectedAssetAlbumLabels}
             duplicateResolutionSummary={selectedAssetDuplicateResolution}
-            duplicateReconciliation={selectedAssetReconciliation}
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
             assetOperationBusy={assetMaintenanceBusy !== null}

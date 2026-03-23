@@ -10,10 +10,7 @@ import {
 } from './import/refreshService.js';
 import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
-import { duplicateActionExecutionRoutes } from './routes/duplicateActionExecutionRoutes.js';
-import { duplicateActionPlanRoutes } from './routes/duplicateActionPlanRoutes.js';
 import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRoutes.js';
-import { duplicateReconciliationRoutes } from './routes/duplicateReconciliationRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 
@@ -31,9 +28,6 @@ export function createServer(): Express {
   app.use('/api/album-tree', albumTreeRoutes);
   app.use('/api/albums', albumMembershipRoutes);
   app.use('/api/duplicate-candidate-pairs', duplicateCandidatePairRoutes);
-  app.use('/api/duplicate-action-plans', duplicateActionPlanRoutes);
-  app.use('/api/duplicate-action-executions', duplicateActionExecutionRoutes);
-  app.use('/api/duplicate-reconciliations', duplicateReconciliationRoutes);
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.

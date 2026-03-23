@@ -89,16 +89,6 @@ export interface UpdateDuplicateCandidatePairReviewResponse {
   item: DuplicateCandidatePairListItem;
 }
 
-export interface BulkReviewDuplicateCandidatePairsRequest {
-  pairKeys: string[];
-  decision: DuplicateCandidateReviewDecision;
-}
-
-export interface BulkReviewDuplicateCandidatePairsResponse {
-  updatedCount: number;
-  pairKeys: string[];
-}
-
 export interface DuplicateCandidatePairSummaryResponse {
   total: number;
   highConfidenceCount: number;
@@ -133,27 +123,4 @@ export interface ListDuplicateGroupsResponse {
   totalGroups: number;
   totalAssets: number;
   summary: DuplicateGroupListSummary;
-}
-
-export interface DuplicateGroupDetailResponse {
-  group: DuplicateGroupListItem;
-}
-
-export interface UpdateDuplicateGroupResolutionRequest {
-  canonicalAssetId?: string;
-  resolutionStatus?: DuplicateGroupResolutionStatus;
-}
-
-export interface UpdateDuplicateGroupResolutionResponse {
-  group: DuplicateGroupListItem;
-}
-
-export interface BulkUpdateDuplicateGroupsRequest {
-  groupKeys: string[];
-  action: 'confirm_proposals';
-}
-
-export interface BulkUpdateDuplicateGroupsResponse {
-  updatedCount: number;
-  groupKeys: string[];
 }
