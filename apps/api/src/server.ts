@@ -13,6 +13,7 @@ import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes
 import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
+import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -28,6 +29,7 @@ export function createServer(): Express {
   app.use('/api/album-tree', albumTreeRoutes);
   app.use('/api/albums', albumMembershipRoutes);
   app.use('/api/duplicate-candidate-pairs', duplicateCandidatePairRoutes);
+  app.use('/api/people-pipeline', peoplePipelineRoutes);
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.

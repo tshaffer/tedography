@@ -23,6 +23,7 @@ import { getStorageRootById, getStorageRoots } from './storageRoots.js';
 import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
 import { generateJpegThumbnail } from './thumbnailGeneration.js';
+import { schedulePeoplePipelineForAsset } from '../people/peoplePipelineService.js';
 
 export type RegisterErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'UNAVAILABLE';
 
@@ -293,6 +294,7 @@ export async function registerImportedFiles(input: {
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);
       existingByContentHashMap.set(originalContentHash, createdAsset);
+      schedulePeoplePipelineForAsset(createdAsset.id);
 
       results.push({
         relativePath: normalizedRelativePath,

@@ -41,6 +41,19 @@ export interface StorageRootConfig {
   absolutePath: string;
 }
 
+export interface PeoplePipelineConfig {
+  enabled: boolean;
+  engine: 'compreface' | 'rekognition' | 'insightface' | 'none' | 'mock';
+  minDetectionConfidence: number;
+  minFaceAreaPercent: number;
+  minCropWidthPx: number;
+  minCropHeightPx: number;
+  autoMatchThreshold: number;
+  reviewThreshold: number;
+  storeFaceCrops: boolean;
+  pipelineVersion: string;
+}
+
 function parseStorageRoots(value: string | undefined): StorageRootConfig[] {
   if (!value || value.trim().length === 0) {
     return [];
@@ -84,6 +97,55 @@ function parseStorageRoots(value: string | undefined): StorageRootConfig[] {
   return roots;
 }
 
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+    return true;
+  }
+
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+    return false;
+  }
+
+  throw new Error(`[config] Invalid boolean value: "${value}"`);
+}
+
+function parsePositiveNumberEnv(value: string | undefined, fallback: number, name: string): number {
+  if (value === undefined || value.trim().length === 0) {
+    return fallback;
+  }
+
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`[config] ${name} must be a non-negative number`);
+  }
+
+  return parsed;
+}
+
+function parsePeoplePipelineEngine(value: string | undefined): PeoplePipelineConfig['engine'] {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return 'mock';
+  }
+
+  if (
+    normalized === 'compreface' ||
+    normalized === 'rekognition' ||
+    normalized === 'insightface' ||
+    normalized === 'none' ||
+    normalized === 'mock'
+  ) {
+    return normalized;
+  }
+
+  throw new Error(`[config] Unsupported TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE: "${value}"`);
+}
+
 export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
@@ -91,6 +153,43 @@ export const config = {
   duplicateQuarantineSubdir:
     (process.env.TEDOGRAPHY_DUPLICATE_QUARANTINE_SUBDIR ?? '.tedography-quarantine/duplicates').trim() ||
     '.tedography-quarantine/duplicates',
+  peoplePipeline: {
+    enabled: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED, false),
+    engine: parsePeoplePipelineEngine(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE),
+    minDetectionConfidence: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_DETECTION_CONFIDENCE,
+      0.85,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_DETECTION_CONFIDENCE'
+    ),
+    minFaceAreaPercent: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_FACE_AREA_PERCENT,
+      1.5,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_FACE_AREA_PERCENT'
+    ),
+    minCropWidthPx: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_WIDTH_PX,
+      120,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_WIDTH_PX'
+    ),
+    minCropHeightPx: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_HEIGHT_PX,
+      120,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_HEIGHT_PX'
+    ),
+    autoMatchThreshold: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_AUTO_MATCH_THRESHOLD,
+      0.97,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_AUTO_MATCH_THRESHOLD'
+    ),
+    reviewThreshold: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REVIEW_THRESHOLD,
+      0.8,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_REVIEW_THRESHOLD'
+    ),
+    storeFaceCrops: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_STORE_FACE_CROPS, false),
+    pipelineVersion:
+      (process.env.TEDOGRAPHY_PEOPLE_PIPELINE_VERSION ?? 'people-pipeline-v1').trim() || 'people-pipeline-v1'
+  } satisfies PeoplePipelineConfig,
 
   port: Number(process.env.PORT ?? 4000),
 };

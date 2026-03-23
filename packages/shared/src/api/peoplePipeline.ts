@@ -1,0 +1,67 @@
+import type {
+  FaceDetection,
+  FaceDetectionIgnoredReason,
+  FaceMatchReview,
+  MediaAssetPerson,
+  Person
+} from '@tedography/domain';
+
+export interface ListPeopleResponse {
+  items: Person[];
+}
+
+export interface CreatePersonRequest {
+  displayName: string;
+  sortName?: string;
+  aliases?: string[];
+  notes?: string;
+}
+
+export interface CreatePersonResponse {
+  item: Person;
+}
+
+export interface ListAssetFaceDetectionsResponse {
+  assetId: string;
+  detections: FaceDetection[];
+  reviews: FaceMatchReview[];
+  people: MediaAssetPerson[];
+}
+
+export interface ProcessPeopleAssetRequest {
+  force?: boolean;
+}
+
+export interface ProcessPeopleAssetResponse {
+  assetId: string;
+  processed: boolean;
+  skippedReason?: string;
+  engine: string;
+  pipelineVersion: string;
+  detectionsCreated: number;
+  detections: FaceDetection[];
+  reviews: FaceMatchReview[];
+  people: MediaAssetPerson[];
+}
+
+export type ReviewFaceDetectionAction =
+  | 'confirm'
+  | 'reject'
+  | 'assign'
+  | 'createAndAssign'
+  | 'ignore';
+
+export interface ReviewFaceDetectionRequest {
+  action: ReviewFaceDetectionAction;
+  personId?: string;
+  displayName?: string;
+  reviewer?: string;
+  notes?: string;
+  ignoredReason?: FaceDetectionIgnoredReason;
+}
+
+export interface ReviewFaceDetectionResponse {
+  detection: FaceDetection;
+  review: FaceMatchReview;
+  people: MediaAssetPerson[];
+}

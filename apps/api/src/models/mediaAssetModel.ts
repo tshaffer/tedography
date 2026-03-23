@@ -43,6 +43,25 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       type: [String],
       required: true,
       default: []
+    },
+    people: {
+      type: [
+        new Schema(
+          {
+            personId: { type: String, required: true, trim: true },
+            displayName: { type: String, required: true, trim: true },
+            source: {
+              type: String,
+              required: true,
+              enum: ['confirmed-face-detection', 'imported-shafferography', 'manual-asset-tag']
+            },
+            confirmedAt: { type: String, required: false, trim: true }
+          },
+          { _id: false }
+        )
+      ],
+      required: true,
+      default: []
     }
   },
   {

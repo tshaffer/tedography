@@ -3,6 +3,18 @@ import { PhotoState } from '../enums/PhotoState.js';
 
 export type DisplayStorageType = 'archive-root' | 'derived-root';
 
+export type MediaAssetPersonSource =
+  | 'confirmed-face-detection'
+  | 'imported-shafferography'
+  | 'manual-asset-tag';
+
+export interface MediaAssetPerson {
+  personId: string;
+  displayName: string;
+  source: MediaAssetPersonSource;
+  confirmedAt?: string | null;
+}
+
 export interface MediaAsset {
   id: string;
 
@@ -38,6 +50,9 @@ export interface MediaAsset {
 
   // Virtual organization only; does not affect filesystem storage layout.
   albumIds?: string[];
+
+  // Derived convenience field populated from confirmed person assignments.
+  people?: MediaAssetPerson[];
 
   // Optional capture location metadata when available.
   locationLabel?: string | null;

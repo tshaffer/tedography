@@ -2,6 +2,7 @@ import {
   MediaType,
   PhotoState,
   normalizePhotoState,
+  type MediaAssetPerson,
   type DisplayStorageType,
   type MediaAsset
 } from '@tedography/domain';
@@ -125,7 +126,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
 
   const createPayload: Record<
     string,
-    string | number | null | string[] | MediaType | PhotoState
+    string | number | null | string[] | MediaAssetPerson[] | MediaType | PhotoState
   > = {
     id,
     filename: input.filename,
@@ -148,7 +149,8 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayArchivePath: input.displayArchivePath,
     displayDerivedPath: input.displayDerivedPath,
     displayFileFormat: input.displayFileFormat,
-    albumIds: input.albumIds ?? []
+    albumIds: input.albumIds ?? [],
+    people: []
   };
 
   if (input.thumbnailStorageType) {
@@ -317,6 +319,32 @@ export async function removeAssetFromAlbum(assetId: string, albumId: string): Pr
     { $pull: { albumIds: albumId } },
     { runValidators: true }
   );
+}
+
+export async function updateMediaAssetPeople(
+  id: string,
+  people: MediaAssetPerson[]
+): Promise<MediaAsset | null> {
+  const normalizedPeople = [...people]
+    .sort((left, right) =>
+      left.displayName === right.displayName
+        ? left.personId.localeCompare(right.personId)
+        : left.displayName.localeCompare(right.displayName)
+    )
+    .map((person) => ({
+      personId: person.personId,
+      displayName: person.displayName,
+      source: person.source,
+      confirmedAt: person.confirmedAt ?? null
+    }));
+
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id },
+    { $set: { people: normalizedPeople } },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+
+  return asset ? normalizeMediaAsset(asset) : null;
 }
 
 export async function addAssetsToAlbum(assetIds: string[], albumId: string): Promise<void> {
