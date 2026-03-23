@@ -368,6 +368,18 @@ export async function listAssetFaceDetections(assetId: string): Promise<ListAsse
   return loadPeoplePipelineAssetState(assetId);
 }
 
+function determineConfirmedReviewDecision(
+  detection: FaceDetection,
+  requestedPersonId: string | null
+): FaceMatchReview['decision'] {
+  const suggestedPersonId = detection.autoMatchCandidatePersonId ?? detection.matchedPersonId ?? null;
+  if (!suggestedPersonId || !requestedPersonId) {
+    return 'confirmed';
+  }
+
+  return suggestedPersonId === requestedPersonId ? 'confirmed' : 'assignedToDifferentPerson';
+}
+
 export async function reviewFaceDetection(
   detectionId: string,
   request: ReviewFaceDetectionRequest
@@ -389,7 +401,7 @@ export async function reviewFaceDetection(
     }
 
     finalPerson = await createOrResolveExistingPerson(personId, undefined);
-    nextDecision = 'confirmed';
+    nextDecision = determineConfirmedReviewDecision(detection, finalPerson.id);
     nextStatus = 'confirmed';
   } else if (request.action === 'assign') {
     if (!request.personId) {
@@ -397,7 +409,7 @@ export async function reviewFaceDetection(
     }
 
     finalPerson = await createOrResolveExistingPerson(request.personId, undefined);
-    nextDecision = 'assignedToDifferentPerson';
+    nextDecision = determineConfirmedReviewDecision(detection, finalPerson.id);
     nextStatus = 'confirmed';
   } else if (request.action === 'createAndAssign') {
     if (typeof request.displayName !== 'string' || request.displayName.trim().length === 0) {
@@ -405,7 +417,7 @@ export async function reviewFaceDetection(
     }
 
     finalPerson = await createPerson({ displayName: request.displayName.trim() });
-    nextDecision = 'assignedToDifferentPerson';
+    nextDecision = determineConfirmedReviewDecision(detection, finalPerson.id);
     nextStatus = 'confirmed';
   } else if (request.action === 'ignore') {
     ignoredReason = request.ignoredReason ?? 'user-ignored';

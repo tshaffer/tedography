@@ -1,4 +1,4 @@
-import { MediaType, type MediaAsset, type MediaAssetPerson } from '@tedography/domain';
+import { MediaType, type FaceDetection, type FaceMatchReview, type MediaAsset, type MediaAssetPerson } from '@tedography/domain';
 
 export function determinePeoplePipelineEligibilityForTest(
   asset: MediaAsset
@@ -25,4 +25,16 @@ export function normalizeDerivedAssetPeopleForTest(people: MediaAssetPerson[]): 
       ? left.personId.localeCompare(right.personId)
       : left.displayName.localeCompare(right.displayName)
   );
+}
+
+export function determineConfirmedReviewDecisionForTest(
+  detection: FaceDetection,
+  requestedPersonId: string | null
+): FaceMatchReview['decision'] {
+  const suggestedPersonId = detection.autoMatchCandidatePersonId ?? detection.matchedPersonId ?? null;
+  if (!suggestedPersonId || !requestedPersonId) {
+    return 'confirmed';
+  }
+
+  return suggestedPersonId === requestedPersonId ? 'confirmed' : 'assignedToDifferentPerson';
 }

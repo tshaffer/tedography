@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
-import { determinePeoplePipelineEligibilityForTest, normalizeDerivedAssetPeopleForTest } from './peoplePipelineService.testable.js';
+import { MediaType, PhotoState, type FaceDetection, type MediaAsset } from '@tedography/domain';
+import {
+  determineConfirmedReviewDecisionForTest,
+  determinePeoplePipelineEligibilityForTest,
+  normalizeDerivedAssetPeopleForTest
+} from './peoplePipelineService.testable.js';
 
 function createAsset(overrides?: Partial<MediaAsset>): MediaAsset {
   return {
@@ -53,4 +57,46 @@ test('derived mediaAsset.people includes unique confirmed people sorted determin
   ]);
 
   assert.deepEqual(derived.map((item) => item.personId), ['person-a', 'person-b']);
+});
+
+function createDetection(overrides?: Partial<FaceDetection>): FaceDetection {
+  return {
+    id: 'detection-1',
+    mediaAssetId: 'asset-1',
+    faceIndex: 0,
+    boundingBox: { left: 0.1, top: 0.1, width: 0.2, height: 0.2 },
+    cropPath: null,
+    previewPath: null,
+    detectionConfidence: 0.9,
+    qualityScore: 0.8,
+    faceAreaPercent: 4.0,
+    engine: 'mock',
+    engineVersion: 'mock-v1',
+    pipelineVersion: 'people-pipeline-v1',
+    matchedPersonId: null,
+    matchConfidence: null,
+    matchStatus: 'unmatched',
+    autoMatchCandidatePersonId: null,
+    autoMatchCandidateConfidence: null,
+    ignoredReason: null,
+    ...overrides
+  };
+}
+
+test('assigning an unmatched face records a confirmed review decision', () => {
+  assert.equal(determineConfirmedReviewDecisionForTest(createDetection(), 'person-1'), 'confirmed');
+});
+
+test('assigning a different person than the suggestion records assignedToDifferentPerson', () => {
+  assert.equal(
+    determineConfirmedReviewDecisionForTest(
+      createDetection({
+        autoMatchCandidatePersonId: 'person-1',
+        autoMatchCandidateConfidence: 0.91,
+        matchStatus: 'suggested'
+      }),
+      'person-2'
+    ),
+    'assignedToDifferentPerson'
+  );
 });
