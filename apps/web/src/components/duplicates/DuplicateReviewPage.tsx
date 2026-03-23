@@ -458,6 +458,57 @@ function parseStoredFilters(value: string | null): DuplicateReviewFilters {
   }
 }
 
+function getDuplicateReviewOutcomeForDecision(
+  decision: DuplicateReviewActionDecision
+): 'confirmed_duplicate' | 'not_duplicate' | 'none' {
+  if (
+    decision === 'confirmed_duplicate_keep_both' ||
+    decision === 'confirmed_duplicate_keep_left' ||
+    decision === 'confirmed_duplicate_keep_right'
+  ) {
+    return 'confirmed_duplicate';
+  }
+
+  if (decision === 'not_duplicate') {
+    return 'not_duplicate';
+  }
+
+  return 'none';
+}
+
+function applyOptimisticDuplicateReviewUpdate(input: {
+  pairKey: string;
+  decision: DuplicateReviewActionDecision;
+  setQueueState: React.Dispatch<React.SetStateAction<DuplicateReviewQueueState>>;
+  setTotalMatching: React.Dispatch<React.SetStateAction<number>>;
+  setSummary: React.Dispatch<React.SetStateAction<DuplicateCandidatePairSummaryResponse | null>>;
+}): void {
+  const { pairKey, decision, setQueueState, setTotalMatching, setSummary } = input;
+  const outcome = getDuplicateReviewOutcomeForDecision(decision);
+
+  setQueueState((previous) => removeReviewedDuplicatePair(previous, pairKey));
+  setTotalMatching((previous) => Math.max(previous - 1, 0));
+  setSummary((previous) => {
+    if (!previous) {
+      return previous;
+    }
+
+    return {
+      ...previous,
+      total: Math.max(previous.total - 1, 0),
+      statusCounts: {
+        ...previous.statusCounts,
+        unreviewed: Math.max(previous.statusCounts.unreviewed - 1, 0),
+        reviewed: previous.statusCounts.reviewed + 1
+      },
+      outcomeCounts: {
+        ...previous.outcomeCounts,
+        [outcome]: previous.outcomeCounts[outcome] + 1
+      }
+    };
+  });
+}
+
 function renderAssetPanel(input: {
   sideLabel: string;
   asset: DuplicateCandidatePairAssetSummary | null;
@@ -766,18 +817,34 @@ export function DuplicateReviewPage(): ReactElement {
       return;
     }
 
+    const reviewedPairKey = currentPair.pairKey;
     const nextCandidatePairKey =
       queueState.items[queueState.currentIndex + 1]?.pairKey ??
       queueState.items[queueState.currentIndex - 1]?.pairKey ??
       null;
 
-    setBusyPairKey(currentPair.pairKey);
+    setBusyPairKey(reviewedPairKey);
     setError(null);
 
     try {
-      await updateDuplicateCandidatePairReview(currentPair.pairKey, { decision });
-      setQueueState((previous) => removeReviewedDuplicatePair(previous, currentPair.pairKey));
-      await loadQueueAndSummary(nextCandidatePairKey);
+      applyOptimisticDuplicateReviewUpdate({
+        pairKey: reviewedPairKey,
+        decision,
+        setQueueState,
+        setTotalMatching,
+        setSummary
+      });
+
+      setBusyPairKey(null);
+
+      void (async () => {
+        try {
+          await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });
+        } catch (updateError) {
+          setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
+          await loadQueueAndSummary(nextCandidatePairKey);
+        }
+      })();
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
     } finally {
