@@ -5544,6 +5544,9 @@ export default function App() {
           <Link to="/duplicates/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             Duplicates
           </Link>
+          <Link to="/people/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+            People
+          </Link>
           <button
             type="button"
             style={compareButtonStyle}

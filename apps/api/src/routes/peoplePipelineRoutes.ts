@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ImportApiErrorResponse } from '@tedography/domain';
+import type { FaceDetectionMatchStatus, ImportApiErrorResponse } from '@tedography/domain';
 import type {
   CreatePersonRequest,
   ProcessPeopleAssetRequest,
@@ -8,6 +8,7 @@ import type {
 import { createPerson, listPeople } from '../repositories/personRepository.js';
 import {
   listAssetFaceDetections,
+  listPeopleReviewQueue,
   processPeoplePipelineForAsset,
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
@@ -15,12 +16,47 @@ import { log } from '../logger.js';
 
 export const peoplePipelineRoutes: Router = Router();
 
+const validDetectionStatuses: FaceDetectionMatchStatus[] = [
+  'unmatched',
+  'suggested',
+  'autoMatched',
+  'confirmed',
+  'rejected',
+  'ignored'
+];
+
 peoplePipelineRoutes.get('/people', async (_req, res) => {
   try {
     res.json({ items: await listPeople() });
   } catch (error) {
     log.error('Failed to list people', error);
     res.status(500).json({ error: 'Failed to list people' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.get('/review', async (req, res) => {
+  const rawStatuses = typeof req.query.statuses === 'string' ? req.query.statuses : '';
+  const statuses = rawStatuses
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value): value is FaceDetectionMatchStatus => validDetectionStatuses.includes(value as FaceDetectionMatchStatus));
+  const limit =
+    typeof req.query.limit === 'string' && Number.isFinite(Number(req.query.limit))
+      ? Math.max(1, Math.min(500, Number(req.query.limit)))
+      : undefined;
+  const assetId = typeof req.query.assetId === 'string' && req.query.assetId.trim().length > 0 ? req.query.assetId.trim() : undefined;
+
+  try {
+    res.json(
+      await listPeopleReviewQueue({
+        statuses: statuses.length > 0 ? statuses : ['suggested', 'autoMatched', 'unmatched'],
+        ...(assetId ? { assetId } : {}),
+        ...(limit !== undefined ? { limit } : {})
+      })
+    );
+  } catch (error) {
+    log.error('Failed to list people review queue', error);
+    res.status(500).json({ error: 'Failed to list people review queue' } satisfies ImportApiErrorResponse);
   }
 });
 

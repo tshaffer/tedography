@@ -53,6 +53,17 @@ export async function listFaceMatchReviewsByAssetId(mediaAssetId: string): Promi
   return reviews.map(normalizeFaceMatchReview);
 }
 
+export async function listFaceMatchReviewsByDetectionIds(faceDetectionIds: string[]): Promise<FaceMatchReview[]> {
+  if (faceDetectionIds.length === 0) {
+    return [];
+  }
+
+  const reviews = await FaceMatchReviewModel.find({ faceDetectionId: { $in: faceDetectionIds } }, { _id: 0 })
+    .sort({ faceDetectionId: 1, id: 1 })
+    .lean<FaceMatchReview[]>();
+  return reviews.map(normalizeFaceMatchReview);
+}
+
 export async function findFaceMatchReviewByDetectionId(faceDetectionId: string): Promise<FaceMatchReview | null> {
   const review = await FaceMatchReviewModel.findOne({ faceDetectionId }, { _id: 0 }).lean<FaceMatchReview | null>();
   return review ? normalizeFaceMatchReview(review) : null;

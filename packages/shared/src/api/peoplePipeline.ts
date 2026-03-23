@@ -1,7 +1,9 @@
 import type {
   FaceDetection,
+  FaceDetectionMatchStatus,
   FaceDetectionIgnoredReason,
   FaceMatchReview,
+  MediaAsset,
   MediaAssetPerson,
   Person
 } from '@tedography/domain';
@@ -26,6 +28,19 @@ export interface ListAssetFaceDetectionsResponse {
   detections: FaceDetection[];
   reviews: FaceMatchReview[];
   people: MediaAssetPerson[];
+}
+
+export interface PeopleReviewQueueItem {
+  detection: FaceDetection;
+  review: FaceMatchReview | null;
+  asset: Pick<MediaAsset, 'id' | 'filename' | 'originalArchivePath' | 'captureDateTime' | 'photoState' | 'people'>;
+  suggestedPerson: Person | null;
+  matchedPerson: Person | null;
+}
+
+export interface ListPeopleReviewQueueResponse {
+  items: PeopleReviewQueueItem[];
+  counts: Record<FaceDetectionMatchStatus, number>;
 }
 
 export interface ProcessPeopleAssetRequest {

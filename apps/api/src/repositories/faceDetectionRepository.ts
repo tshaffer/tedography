@@ -51,6 +51,56 @@ export async function listFaceDetectionsByAssetId(mediaAssetId: string): Promise
   return detections.map(normalizeFaceDetection);
 }
 
+export async function listFaceDetections(input?: {
+  mediaAssetId?: string;
+  statuses?: FaceDetection['matchStatus'][];
+  limit?: number;
+}): Promise<FaceDetection[]> {
+  const query: Record<string, unknown> = {};
+  if (input?.mediaAssetId) {
+    query.mediaAssetId = input.mediaAssetId;
+  }
+
+  if (input?.statuses && input.statuses.length > 0) {
+    query.matchStatus = { $in: input.statuses };
+  }
+
+  const detections = await FaceDetectionModel.find(query, { _id: 0 })
+    .sort({ updatedAt: -1, createdAt: -1, mediaAssetId: 1, faceIndex: 1, id: 1 })
+    .limit(input?.limit ?? 500)
+    .lean<FaceDetection[]>();
+  return detections.map(normalizeFaceDetection);
+}
+
+export async function countFaceDetectionsByStatus(input?: {
+  mediaAssetId?: string;
+}): Promise<Record<FaceDetection['matchStatus'], number>> {
+  const query: Record<string, unknown> = {};
+  if (input?.mediaAssetId) {
+    query.mediaAssetId = input.mediaAssetId;
+  }
+
+  const grouped = await FaceDetectionModel.aggregate<{ _id: FaceDetection['matchStatus']; count: number }>([
+    { $match: query },
+    { $group: { _id: '$matchStatus', count: { $sum: 1 } } }
+  ]);
+
+  const counts: Record<FaceDetection['matchStatus'], number> = {
+    unmatched: 0,
+    suggested: 0,
+    autoMatched: 0,
+    confirmed: 0,
+    rejected: 0,
+    ignored: 0
+  };
+
+  for (const item of grouped) {
+    counts[item._id] = item.count;
+  }
+
+  return counts;
+}
+
 export async function findFaceDetectionById(id: string): Promise<FaceDetection | null> {
   const detection = await FaceDetectionModel.findOne({ id }, { _id: 0 }).lean<FaceDetection | null>();
   return detection ? normalizeFaceDetection(detection) : null;

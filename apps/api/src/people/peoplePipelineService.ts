@@ -9,19 +9,24 @@ import type {
 import { MediaType } from '@tedography/domain';
 import type {
   ListAssetFaceDetectionsResponse,
+  ListPeopleReviewQueueResponse,
+  PeopleReviewQueueItem,
   ProcessPeopleAssetResponse,
   ReviewFaceDetectionRequest,
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
 import { config } from '../config.js';
-import { findById, updateMediaAssetPeople } from '../repositories/assetRepository.js';
+import { findById, findByIds, updateMediaAssetPeople } from '../repositories/assetRepository.js';
 import {
+  countFaceDetectionsByStatus,
   findFaceDetectionById,
+  listFaceDetections,
   listFaceDetectionsByAssetId,
   replaceFaceDetectionsForAsset,
   updateFaceDetection
 } from '../repositories/faceDetectionRepository.js';
 import {
+  listFaceMatchReviewsByDetectionIds,
   listFaceMatchReviewsByAssetId,
   replaceFaceMatchReviewsForAsset,
   upsertFaceMatchReview
@@ -366,6 +371,64 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
 
 export async function listAssetFaceDetections(assetId: string): Promise<ListAssetFaceDetectionsResponse> {
   return loadPeoplePipelineAssetState(assetId);
+}
+
+export async function listPeopleReviewQueue(input?: {
+  statuses?: FaceDetection['matchStatus'][];
+  assetId?: string;
+  limit?: number;
+}): Promise<ListPeopleReviewQueueResponse> {
+  const detections = await listFaceDetections({
+    ...(input?.assetId ? { mediaAssetId: input.assetId } : {}),
+    ...(input?.statuses ? { statuses: input.statuses } : {}),
+    ...(input?.limit !== undefined ? { limit: input.limit } : {})
+  });
+  const [reviews, assets, counts] = await Promise.all([
+    listFaceMatchReviewsByDetectionIds(detections.map((item) => item.id)),
+    findByIds(Array.from(new Set(detections.map((item) => item.mediaAssetId)))),
+    countFaceDetectionsByStatus(input?.assetId ? { mediaAssetId: input.assetId } : undefined)
+  ]);
+
+  const reviewsByDetectionId = new Map(reviews.map((review) => [review.faceDetectionId, review]));
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const personIds = Array.from(
+    new Set(
+      detections.flatMap((detection) =>
+        [detection.autoMatchCandidatePersonId ?? null, detection.matchedPersonId ?? null].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      )
+    )
+  );
+  const peopleById = new Map((await findPeopleByIds(personIds)).map((person) => [person.id, person]));
+
+  const items: PeopleReviewQueueItem[] = detections.flatMap((detection) => {
+    const asset = assetsById.get(detection.mediaAssetId);
+    if (!asset) {
+      return [];
+    }
+
+    return [
+      {
+        detection,
+        review: reviewsByDetectionId.get(detection.id) ?? null,
+        asset: {
+          id: asset.id,
+          filename: asset.filename,
+          originalArchivePath: asset.originalArchivePath,
+          captureDateTime: asset.captureDateTime ?? null,
+          photoState: asset.photoState,
+          people: asset.people ?? []
+        },
+        suggestedPerson: detection.autoMatchCandidatePersonId
+          ? peopleById.get(detection.autoMatchCandidatePersonId) ?? null
+          : null,
+        matchedPerson: detection.matchedPersonId ? peopleById.get(detection.matchedPersonId) ?? null : null
+      }
+    ];
+  });
+
+  return { items, counts };
 }
 
 function determineConfirmedReviewDecision(
