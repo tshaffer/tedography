@@ -17,6 +17,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.914.0",
     "@tedography/domain": "workspace:*",
     "@tedography/duplicate-domain": "workspace:*",
     "@tedography/import-pipeline": "workspace:*",

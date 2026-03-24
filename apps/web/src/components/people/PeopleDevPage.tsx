@@ -492,7 +492,7 @@ export function PeopleDevPage() {
         detectionId: item.detection.id
       });
       setNoticeMessage(
-        `Enrolled ${response.person.displayName} from detection ${response.detection.id} into subject ${response.subjectKey}.`
+        `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
       );
       const assetState = await getPeoplePipelineAssetState(item.asset.id).catch(() => null);
       setLastAssetState(assetState);

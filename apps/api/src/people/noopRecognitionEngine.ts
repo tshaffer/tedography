@@ -5,6 +5,7 @@ export class NoopRecognitionEngine implements PeopleRecognitionEngine {
   public readonly engineName = 'none';
   public readonly engineVersion = 'none';
   public readonly supportsEnrollment = false;
+  public readonly prefersFaceCrop = false;
 
   public async detectFaces(_input: { asset: MediaAsset; imagePath: string }): Promise<DetectedFaceResult[]> {
     return [];

@@ -43,7 +43,7 @@ export interface StorageRootConfig {
 
 export interface PeoplePipelineConfig {
   enabled: boolean;
-  engine: 'compreface' | 'rekognition' | 'insightface' | 'none' | 'mock';
+  engine: 'rekognition' | 'none' | 'mock';
   minDetectionConfidence: number;
   minFaceAreaPercent: number;
   minCropWidthPx: number;
@@ -52,12 +52,12 @@ export interface PeoplePipelineConfig {
   reviewThreshold: number;
   storeFaceCrops: boolean;
   pipelineVersion: string;
-  compreface: {
-    baseUrl: string | null;
-    detectionApiKey: string | null;
-    recognitionApiKey: string | null;
-    requestTimeoutMs: number;
-    detectionProbabilityThreshold: number | null;
+  rekognition: {
+    region: string | null;
+    collectionId: string | null;
+    maxAttempts: number;
+    faceMatchThreshold: number | null;
+    maxResults: number;
   };
 }
 
@@ -141,9 +141,7 @@ function parsePeoplePipelineEngine(value: string | undefined): PeoplePipelineCon
   }
 
   if (
-    normalized === 'compreface' ||
     normalized === 'rekognition' ||
-    normalized === 'insightface' ||
     normalized === 'none' ||
     normalized === 'mock'
   ) {
@@ -205,26 +203,29 @@ export const config = {
     storeFaceCrops: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_STORE_FACE_CROPS, false),
     pipelineVersion:
       (process.env.TEDOGRAPHY_PEOPLE_PIPELINE_VERSION ?? 'people-pipeline-v1').trim() || 'people-pipeline-v1',
-    compreface: {
-      baseUrl: parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_BASE_URL),
-      detectionApiKey:
-        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_API_KEY) ??
-        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_API_KEY),
-      recognitionApiKey:
-        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_RECOGNITION_API_KEY) ??
-        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_API_KEY),
-      requestTimeoutMs: parsePositiveNumberEnv(
-        process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_TIMEOUT_MS,
-        15000,
-        'TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_TIMEOUT_MS'
+    rekognition: {
+      region:
+        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_REGION) ??
+        parseNonEmptyStringEnv(process.env.AWS_REGION) ??
+        parseNonEmptyStringEnv(process.env.AWS_DEFAULT_REGION),
+      collectionId: parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_COLLECTION_ID),
+      maxAttempts: parsePositiveNumberEnv(
+        process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_MAX_ATTEMPTS,
+        3,
+        'TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_MAX_ATTEMPTS'
       ),
-      detectionProbabilityThreshold: process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD
+      faceMatchThreshold: process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_FACE_MATCH_THRESHOLD
         ? parsePositiveNumberEnv(
-            process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD,
+            process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_FACE_MATCH_THRESHOLD,
             0,
-            'TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD'
+            'TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_FACE_MATCH_THRESHOLD'
           )
-        : null
+        : null,
+      maxResults: parsePositiveNumberEnv(
+        process.env.TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_MAX_RESULTS,
+        5,
+        'TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_MAX_RESULTS'
+      )
     }
   } satisfies PeoplePipelineConfig,
 

@@ -74,6 +74,15 @@ TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED=true
 TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=mock
 ```
 
+Or, to test the real AWS-backed engine:
+
+```bash
+TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED=true
+TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=rekognition
+TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_REGION=us-west-2
+TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_COLLECTION_ID=tedography-people-dev
+```
+
 2. Start the API
 
 ```bash
@@ -102,5 +111,5 @@ pnpm --filter @tedography/web dev
 
 ## Current Limitations
 
-- Face crops/previews are not generated yet, so the page shows the source asset thumbnail rather than a cropped face image.
+- Face crops/previews are shown when the active engine generated them. With `mock`, the page usually falls back to the source asset thumbnail.
 - The page is intentionally lightweight and does not provide broader person-management workflows yet.

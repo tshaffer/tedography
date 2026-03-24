@@ -34,6 +34,7 @@ export interface PeopleRecognitionEngine {
   readonly engineName: string;
   readonly engineVersion: string;
   readonly supportsEnrollment: boolean;
+  readonly prefersFaceCrop: boolean;
   detectFaces(input: {
     asset: MediaAsset;
     imagePath: string;

@@ -301,7 +301,7 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       pipelineVersion: config.peoplePipeline.pipelineVersion
     };
 
-    const shouldPersistFaceCrop = config.peoplePipeline.storeFaceCrops || engine.engineName === 'compreface';
+    const shouldPersistFaceCrop = config.peoplePipeline.storeFaceCrops || engine.prefersFaceCrop;
     let cropImagePath: string | null = null;
     let cropRelativePath: string | null = null;
     if (shouldPersistFaceCrop) {

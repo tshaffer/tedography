@@ -39,6 +39,15 @@ TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED=true
 TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=mock
 ```
 
+Or, to test the real AWS-backed engine:
+
+```bash
+TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED=true
+TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=rekognition
+TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_REGION=us-west-2
+TEDOGRAPHY_PEOPLE_PIPELINE_REKOGNITION_COLLECTION_ID=tedography-people-dev
+```
+
 2. Start the API
 
 ```bash
@@ -84,4 +93,4 @@ http://localhost:3000/people/dev
 
 - The harness is intentionally utilitarian and internal-facing.
 - It uses the real people-pipeline routes where possible.
-- Face crops are not generated yet, so the harness uses the source asset thumbnail for context.
+- Face crops appear when the active engine generated them. With `mock`, the harness usually falls back to the source asset thumbnail.

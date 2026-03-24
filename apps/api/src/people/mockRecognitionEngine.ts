@@ -49,6 +49,7 @@ export class MockRecognitionEngine implements PeopleRecognitionEngine {
   public readonly engineName = 'mock';
   public readonly engineVersion = 'mock-v1';
   public readonly supportsEnrollment = false;
+  public readonly prefersFaceCrop = false;
 
   public async detectFaces(input: { asset: MediaAsset; imagePath: string }): Promise<DetectedFaceResult[]> {
     return buildMockFaces(input.asset);
