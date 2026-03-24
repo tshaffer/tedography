@@ -8,6 +8,7 @@ import type {
 } from '@tedography/domain';
 import { MediaType } from '@tedography/domain';
 import type {
+  EnrollPersonFromDetectionResponse,
   ListAssetFaceDetectionsResponse,
   ListPeopleReviewQueueResponse,
   PeopleReviewQueueItem,
@@ -31,14 +32,16 @@ import {
   replaceFaceMatchReviewsForAsset,
   upsertFaceMatchReview
 } from '../repositories/faceMatchReviewRepository.js';
-import { createPerson, findPeopleByIds, listPeople } from '../repositories/personRepository.js';
+import { createPerson, findPeopleByIds, findPersonById, listPeople } from '../repositories/personRepository.js';
 import {
   AssetMediaPathResolutionError,
   resolveDisplayAbsolutePathForAsset,
   resolveOriginalAbsolutePathForAsset
 } from '../media/resolveAssetMediaPath.js';
 import { log } from '../logger.js';
+import { generateFaceCropForAsset } from './faceCropStorage.js';
 import { getPeopleRecognitionEngine } from './engineFactory.js';
+import { PeopleRecognitionEngineError } from './recognitionEngine.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -246,7 +249,26 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
 
   const people = await listPeople();
   const engine = getPeopleRecognitionEngine();
-  const detectedFaces = await engine.detectFaces({ asset, imagePath });
+  let detectedFaces;
+  try {
+    detectedFaces = await engine.detectFaces({ asset, imagePath });
+  } catch (error) {
+    if (error instanceof PeopleRecognitionEngineError) {
+      return {
+        assetId,
+        processed: false,
+        skippedReason: error.message,
+        engine: engine.engineName,
+        pipelineVersion: config.peoplePipeline.pipelineVersion,
+        detectionsCreated: 0,
+        detections: await listFaceDetectionsByAssetId(assetId),
+        reviews: await listFaceMatchReviewsByAssetId(assetId),
+        people: asset.people ?? []
+      };
+    }
+
+    throw error;
+  }
 
   const nextDetections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>> = [];
   const pendingReviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
@@ -269,8 +291,8 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       mediaAssetId: asset.id,
       faceIndex: index,
       boundingBox: normalizedBoundingBox,
-      cropPath: null,
-      previewPath: null,
+      cropPath: null as string | null,
+      previewPath: null as string | null,
       detectionConfidence: detectedFace.detectionConfidence ?? null,
       qualityScore: detectedFace.qualityScore ?? null,
       faceAreaPercent: computeFaceAreaPercent(asset, { boundingBox: normalizedBoundingBox }),
@@ -278,6 +300,22 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       engineVersion: engine.engineVersion,
       pipelineVersion: config.peoplePipeline.pipelineVersion
     };
+
+    const shouldPersistFaceCrop = config.peoplePipeline.storeFaceCrops || engine.engineName === 'compreface';
+    let cropImagePath: string | null = null;
+    let cropRelativePath: string | null = null;
+    if (shouldPersistFaceCrop) {
+      const crop = await generateFaceCropForAsset({
+        asset,
+        imagePath,
+        detection: { faceIndex: index, boundingBox: normalizedBoundingBox },
+        pipelineVersion: config.peoplePipeline.pipelineVersion
+      });
+      cropImagePath = crop.absolutePath;
+      cropRelativePath = crop.relativePath;
+      faceDetectionBase.cropPath = cropRelativePath;
+      faceDetectionBase.previewPath = cropRelativePath;
+    }
 
     if (ignoredReason) {
       nextDetections.push({
@@ -292,12 +330,32 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       continue;
     }
 
-    const candidates = await engine.matchFace({
-      asset,
-      imagePath,
-      detection: { faceIndex: index, boundingBox: normalizedBoundingBox },
-      people
-    });
+    let candidates;
+    try {
+      candidates = await engine.matchFace({
+        asset,
+        imagePath,
+        cropImagePath,
+        detection: { faceIndex: index, boundingBox: normalizedBoundingBox },
+        people
+      });
+    } catch (error) {
+      if (error instanceof PeopleRecognitionEngineError) {
+        return {
+          assetId,
+          processed: false,
+          skippedReason: error.message,
+          engine: engine.engineName,
+          pipelineVersion: config.peoplePipeline.pipelineVersion,
+          detectionsCreated: 0,
+          detections: await listFaceDetectionsByAssetId(assetId),
+          reviews: await listFaceMatchReviewsByAssetId(assetId),
+          people: asset.people ?? []
+        };
+      }
+
+      throw error;
+    }
     const bestCandidate = candidates[0] ?? null;
 
     if (!bestCandidate || bestCandidate.confidence < config.peoplePipeline.reviewThreshold) {
@@ -429,6 +487,73 @@ export async function listPeopleReviewQueue(input?: {
   });
 
   return { items, counts };
+}
+
+export async function enrollPersonFromDetection(input: {
+  personId: string;
+  detectionId: string;
+}): Promise<EnrollPersonFromDetectionResponse> {
+  const engine = getPeopleRecognitionEngine();
+  if (!engine.supportsEnrollment || !engine.enrollFaceExample) {
+    throw new Error(`People engine "${engine.engineName}" does not support enrollment.`);
+  }
+
+  const [person, detection] = await Promise.all([
+    findPersonById(input.personId),
+    findFaceDetectionById(input.detectionId)
+  ]);
+  if (!person) {
+    throw new Error(`Person not found: ${input.personId}`);
+  }
+
+  if (!detection) {
+    throw new Error(`Face detection not found: ${input.detectionId}`);
+  }
+
+  const asset = await findById(detection.mediaAssetId);
+  if (!asset) {
+    throw new Error(`Media asset not found: ${detection.mediaAssetId}`);
+  }
+
+  const imagePath = resolvePipelineImagePath(asset);
+  const crop = await generateFaceCropForAsset({
+    asset,
+    imagePath,
+    detection: { faceIndex: detection.faceIndex, boundingBox: detection.boundingBox },
+    pipelineVersion: config.peoplePipeline.pipelineVersion,
+    forceRegenerate: true
+  });
+
+  const enrollment = await engine.enrollFaceExample({
+    person,
+    asset,
+    imagePath,
+    cropImagePath: crop.absolutePath,
+    detection: {
+      id: detection.id,
+      faceIndex: detection.faceIndex,
+      boundingBox: detection.boundingBox
+    }
+  });
+
+  const updatedDetection = await updateFaceDetection({
+    id: detection.id,
+    cropPath: crop.relativePath,
+    previewPath: crop.relativePath,
+    matchedPersonId: detection.matchedPersonId ?? null,
+    matchConfidence: detection.matchConfidence ?? null,
+    matchStatus: detection.matchStatus,
+    autoMatchCandidatePersonId: detection.autoMatchCandidatePersonId ?? null,
+    autoMatchCandidateConfidence: detection.autoMatchCandidateConfidence ?? null,
+    ignoredReason: detection.ignoredReason ?? null
+  });
+
+  return {
+    person,
+    detection: updatedDetection ?? { ...detection, cropPath: crop.relativePath, previewPath: crop.relativePath },
+    subjectKey: enrollment.subjectKey,
+    ...(enrollment.exampleId ? { exampleId: enrollment.exampleId } : {})
+  };
 }
 
 function determineConfirmedReviewDecision(

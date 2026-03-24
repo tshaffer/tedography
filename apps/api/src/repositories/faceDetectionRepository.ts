@@ -108,6 +108,8 @@ export async function findFaceDetectionById(id: string): Promise<FaceDetection |
 
 export async function updateFaceDetection(input: {
   id: string;
+  cropPath?: string | null;
+  previewPath?: string | null;
   matchedPersonId?: string | null;
   matchConfidence?: number | null;
   matchStatus: FaceDetection['matchStatus'];
@@ -119,6 +121,8 @@ export async function updateFaceDetection(input: {
     { id: input.id },
     {
       $set: {
+        ...(input.cropPath !== undefined ? { cropPath: input.cropPath } : {}),
+        ...(input.previewPath !== undefined ? { previewPath: input.previewPath } : {}),
         matchedPersonId: input.matchedPersonId ?? null,
         matchConfidence: input.matchConfidence ?? null,
         matchStatus: input.matchStatus,

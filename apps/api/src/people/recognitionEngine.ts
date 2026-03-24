@@ -11,9 +11,29 @@ export interface FaceMatchCandidate {
   confidence: number;
 }
 
+export class PeopleRecognitionEngineError extends Error {
+  constructor(
+    message: string,
+    public readonly code:
+      | 'config-missing'
+      | 'service-unavailable'
+      | 'request-failed'
+      | 'invalid-response'
+      | 'unsupported-operation'
+  ) {
+    super(message);
+  }
+}
+
+export interface FaceEnrollmentResult {
+  subjectKey: string;
+  exampleId?: string | null;
+}
+
 export interface PeopleRecognitionEngine {
   readonly engineName: string;
   readonly engineVersion: string;
+  readonly supportsEnrollment: boolean;
   detectFaces(input: {
     asset: MediaAsset;
     imagePath: string;
@@ -21,7 +41,15 @@ export interface PeopleRecognitionEngine {
   matchFace(input: {
     asset: MediaAsset;
     imagePath: string;
+    cropImagePath?: string | null;
     detection: Pick<FaceDetection, 'faceIndex' | 'boundingBox'>;
     people: Person[];
   }): Promise<FaceMatchCandidate[]>;
+  enrollFaceExample?(input: {
+    person: Person;
+    asset: MediaAsset;
+    imagePath: string;
+    cropImagePath: string;
+    detection: Pick<FaceDetection, 'id' | 'faceIndex' | 'boundingBox'>;
+  }): Promise<FaceEnrollmentResult>;
 }

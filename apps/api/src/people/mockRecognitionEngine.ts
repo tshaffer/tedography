@@ -48,6 +48,7 @@ function buildMockFaces(asset: MediaAsset): DetectedFaceResult[] {
 export class MockRecognitionEngine implements PeopleRecognitionEngine {
   public readonly engineName = 'mock';
   public readonly engineVersion = 'mock-v1';
+  public readonly supportsEnrollment = false;
 
   public async detectFaces(input: { asset: MediaAsset; imagePath: string }): Promise<DetectedFaceResult[]> {
     return buildMockFaces(input.asset);
@@ -56,6 +57,7 @@ export class MockRecognitionEngine implements PeopleRecognitionEngine {
   public async matchFace(input: {
     asset: MediaAsset;
     imagePath: string;
+    cropImagePath?: string | null;
     detection: { faceIndex: number; boundingBox: DetectedFaceResult['boundingBox'] };
     people: Person[];
   }): Promise<FaceMatchCandidate[]> {

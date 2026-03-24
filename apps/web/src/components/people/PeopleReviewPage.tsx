@@ -7,7 +7,7 @@ import {
   listPeopleReviewQueue,
   reviewFaceDetection
 } from '../../api/peoplePipelineApi';
-import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -473,7 +473,11 @@ export function PeopleReviewPage() {
                   <div style={previewBoxStyle}>
                     {item.asset.id ? (
                       <img
-                        src={getThumbnailMediaUrl(item.asset.id)}
+                        src={
+                          item.detection.previewPath || item.detection.cropPath
+                            ? getFaceDetectionPreviewUrl(item.detection.id)
+                            : getThumbnailMediaUrl(item.asset.id)
+                        }
                         alt={item.asset.filename}
                         style={previewImageStyle}
                       />
@@ -482,7 +486,9 @@ export function PeopleReviewPage() {
                     )}
                   </div>
                   <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
-                    Face crops are not generated yet in v1, so this shows the source asset thumbnail.
+                    {item.detection.previewPath || item.detection.cropPath
+                      ? 'Detected face crop preview'
+                      : 'Source asset thumbnail'}
                   </div>
                 </div>
 

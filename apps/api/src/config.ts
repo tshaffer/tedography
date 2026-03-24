@@ -52,6 +52,13 @@ export interface PeoplePipelineConfig {
   reviewThreshold: number;
   storeFaceCrops: boolean;
   pipelineVersion: string;
+  compreface: {
+    baseUrl: string | null;
+    detectionApiKey: string | null;
+    recognitionApiKey: string | null;
+    requestTimeoutMs: number;
+    detectionProbabilityThreshold: number | null;
+  };
 }
 
 function parseStorageRoots(value: string | undefined): StorageRootConfig[] {
@@ -146,6 +153,15 @@ function parsePeoplePipelineEngine(value: string | undefined): PeoplePipelineCon
   throw new Error(`[config] Unsupported TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE: "${value}"`);
 }
 
+function parseNonEmptyStringEnv(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
@@ -188,7 +204,28 @@ export const config = {
     ),
     storeFaceCrops: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_STORE_FACE_CROPS, false),
     pipelineVersion:
-      (process.env.TEDOGRAPHY_PEOPLE_PIPELINE_VERSION ?? 'people-pipeline-v1').trim() || 'people-pipeline-v1'
+      (process.env.TEDOGRAPHY_PEOPLE_PIPELINE_VERSION ?? 'people-pipeline-v1').trim() || 'people-pipeline-v1',
+    compreface: {
+      baseUrl: parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_BASE_URL),
+      detectionApiKey:
+        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_API_KEY) ??
+        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_API_KEY),
+      recognitionApiKey:
+        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_RECOGNITION_API_KEY) ??
+        parseNonEmptyStringEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_API_KEY),
+      requestTimeoutMs: parsePositiveNumberEnv(
+        process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_TIMEOUT_MS,
+        15000,
+        'TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_TIMEOUT_MS'
+      ),
+      detectionProbabilityThreshold: process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD
+        ? parsePositiveNumberEnv(
+            process.env.TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD,
+            0,
+            'TEDOGRAPHY_PEOPLE_PIPELINE_COMPREFACE_DETECTION_PROBABILITY_THRESHOLD'
+          )
+        : null
+    }
   } satisfies PeoplePipelineConfig,
 
   port: Number(process.env.PORT ?? 4000),

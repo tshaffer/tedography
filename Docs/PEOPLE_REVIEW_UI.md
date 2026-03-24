@@ -60,8 +60,10 @@ From the main app:
 Or go directly to:
 
 ```text
-http://localhost:8080/people/review
+http://localhost:3000/people/review
 ```
+
+Use whatever frontend dev URL your local web server prints. `3000` is an example from one local setup.
 
 ## Typical Local Test Flow
 
@@ -76,6 +78,12 @@ TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=mock
 
 ```bash
 pnpm --filter @tedography/api dev
+```
+
+By default, the Tedography API runs on:
+
+```text
+http://localhost:4000
 ```
 
 3. Start the web app

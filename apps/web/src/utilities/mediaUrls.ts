@@ -9,3 +9,7 @@ export function getThumbnailMediaUrl(assetId: string): string {
 export function getOriginalMediaUrl(assetId: string): string {
   return `/api/media/original/${encodeURIComponent(assetId)}`;
 }
+
+export function getFaceDetectionPreviewUrl(detectionId: string): string {
+  return `/api/people-pipeline/detections/${encodeURIComponent(detectionId)}/preview`;
+}

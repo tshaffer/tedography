@@ -95,3 +95,14 @@ export interface ReviewFaceDetectionResponse {
   review: FaceMatchReview;
   people: MediaAssetPerson[];
 }
+
+export interface EnrollPersonFromDetectionRequest {
+  detectionId: string;
+}
+
+export interface EnrollPersonFromDetectionResponse {
+  person: Person;
+  detection: FaceDetection;
+  subjectKey: string;
+  exampleId?: string | null;
+}

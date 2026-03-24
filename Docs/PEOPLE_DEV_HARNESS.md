@@ -45,16 +45,22 @@ TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE=mock
 pnpm --filter @tedography/api dev
 ```
 
+By default, the Tedography API runs on:
+
+```text
+http://localhost:4000
+```
+
 3. Start the web app
 
 ```bash
 pnpm --filter @tedography/web dev
 ```
 
-4. Open:
+4. Open the frontend dev URL printed by the web server. For example, if your frontend runs on port `3000`:
 
 ```text
-http://localhost:8080/people/dev
+http://localhost:3000/people/dev
 ```
 
 5. Click `Create Sample People`

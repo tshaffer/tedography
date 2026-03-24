@@ -1,13 +1,18 @@
+import fs from 'node:fs/promises';
 import { Router } from 'express';
 import type { FaceDetectionMatchStatus, ImportApiErrorResponse } from '@tedography/domain';
 import type {
   CreatePersonRequest,
+  EnrollPersonFromDetectionRequest,
   ProcessPeopleAssetRequest,
   ReviewFaceDetectionRequest
 } from '@tedography/shared';
 import { createPerson, listPeople } from '../repositories/personRepository.js';
 import { findRecentPhotoAssets } from '../repositories/assetRepository.js';
+import { resolveDerivedAbsolutePath } from '../import/derivedStorage.js';
+import { findFaceDetectionById } from '../repositories/faceDetectionRepository.js';
 import {
+  enrollPersonFromDetection,
   listAssetFaceDetections,
   listPeopleReviewQueue,
   processPeoplePipelineForAsset,
@@ -107,12 +112,63 @@ peoplePipelineRoutes.post('/people', async (req, res) => {
   }
 });
 
+peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req, res) => {
+  const body = req.body as Partial<EnrollPersonFromDetectionRequest> | undefined;
+  if (typeof body?.detectionId !== 'string' || body.detectionId.trim().length === 0) {
+    res.status(400).json({ error: 'detectionId is required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    res.json(
+      await enrollPersonFromDetection({
+        personId: req.params.personId,
+        detectionId: body.detectionId.trim()
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to enroll person from detection';
+    log.error('Failed to enroll person from detection', error);
+    res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
+  }
+});
+
 peoplePipelineRoutes.get('/assets/:assetId', async (req, res) => {
   try {
     res.json(await listAssetFaceDetections(req.params.assetId));
   } catch (error) {
     log.error('Failed to load people pipeline asset state', error);
     res.status(500).json({ error: 'Failed to load people pipeline asset state' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.get('/detections/:detectionId/preview', async (req, res) => {
+  try {
+    const detection = await findFaceDetectionById(req.params.detectionId);
+    if (!detection) {
+      res.status(404).json({ error: 'Face detection not found' } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    const relativePath = detection.previewPath ?? detection.cropPath ?? null;
+    if (!relativePath) {
+      res.status(404).json({ error: 'Face preview not available' } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    const absolutePath = resolveDerivedAbsolutePath(relativePath);
+    const stat = await fs.stat(absolutePath);
+    if (!stat.isFile()) {
+      res.status(404).json({ error: 'Face preview not available' } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.type('image/jpeg');
+    res.sendFile(absolutePath);
+  } catch (error) {
+    log.error('Failed to serve face preview', error);
+    res.status(404).json({ error: 'Face preview not available' } satisfies ImportApiErrorResponse);
   }
 });
 

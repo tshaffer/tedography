@@ -1,6 +1,8 @@
 import type {
   CreatePersonRequest,
   CreatePersonResponse,
+  EnrollPersonFromDetectionRequest,
+  EnrollPersonFromDetectionResponse,
   ListAssetFaceDetectionsResponse,
   ListPeopleResponse,
   ListPeoplePipelineRecentAssetsResponse,
@@ -110,6 +112,22 @@ export async function reviewFaceDetection(
 ): Promise<ReviewFaceDetectionResponse> {
   return fetchJson<ReviewFaceDetectionResponse>(
     `/api/people-pipeline/detections/${encodeURIComponent(detectionId)}/review`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function enrollPersonFromDetection(
+  personId: string,
+  request: EnrollPersonFromDetectionRequest
+): Promise<EnrollPersonFromDetectionResponse> {
+  return fetchJson<EnrollPersonFromDetectionResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}/enroll-from-detection`,
     {
       method: 'POST',
       headers: {

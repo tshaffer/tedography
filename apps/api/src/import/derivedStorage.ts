@@ -46,6 +46,28 @@ export function buildThumbnailDerivedRelativePath(originalContentHash: string): 
   return `thumbnails/${normalizedHash}.jpg`;
 }
 
+export function buildPeopleFaceCropDerivedRelativePath(input: {
+  originalContentHash: string;
+  pipelineVersion: string;
+  faceIndex: number;
+}): string {
+  const normalizedHash = input.originalContentHash.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalizedHash)) {
+    throw new Error('originalContentHash must be a SHA-256 hex string');
+  }
+
+  const normalizedPipelineVersion = input.pipelineVersion.trim();
+  if (normalizedPipelineVersion.length === 0) {
+    throw new Error('pipelineVersion must be non-empty');
+  }
+
+  if (!Number.isInteger(input.faceIndex) || input.faceIndex < 0) {
+    throw new Error('faceIndex must be a non-negative integer');
+  }
+
+  return `people-faces/${normalizedPipelineVersion}/${normalizedHash}/face-${String(input.faceIndex).padStart(3, '0')}.jpg`;
+}
+
 export function resolveDerivedAbsolutePath(relativeDerivedPath: string): string {
   const normalizedRelativePath = normalizeDerivedRelativePath(relativeDerivedPath);
   const absolutePath = path.resolve(config.derivedRoot, normalizedRelativePath);

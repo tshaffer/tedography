@@ -12,6 +12,7 @@ import type {
 } from '@tedography/shared';
 import {
   createPerson,
+  enrollPersonFromDetection,
   getPeoplePipelineAssetState,
   listPeople,
   listPeoplePipelineRecentAssets,
@@ -19,7 +20,7 @@ import {
   processPeopleAsset,
   reviewFaceDetection
 } from '../../api/peoplePipelineApi';
-import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 const samplePeople = ['Ted', 'Lori', 'Joel', 'Morgan', 'Annie'];
 const allStatuses: FaceDetectionMatchStatus[] = [
@@ -481,6 +482,28 @@ export function PeopleDevPage() {
     }
   }
 
+  async function handleEnroll(item: PeopleReviewQueueItem, personId: string) {
+    setBusyKey(`enroll-${item.detection.id}`);
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const response = await enrollPersonFromDetection(personId, {
+        detectionId: item.detection.id
+      });
+      setNoticeMessage(
+        `Enrolled ${response.person.displayName} from detection ${response.detection.id} into subject ${response.subjectKey}.`
+      );
+      const assetState = await getPeoplePipelineAssetState(item.asset.id).catch(() => null);
+      setLastAssetState(assetState);
+      await refreshAll();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to enroll person from detection');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <div style={linkRowStyle}>
@@ -690,22 +713,30 @@ export function PeopleDevPage() {
         ? queueItems.map((item) => {
             const draft = getDraft(item.detection.id);
             const isBusy = busyKey === item.detection.id;
+            const enrollmentBusy = busyKey === `enroll-${item.detection.id}`;
             const canConfirm =
               typeof item.detection.autoMatchCandidatePersonId === 'string' ||
               typeof item.detection.matchedPersonId === 'string';
             const confirmActionLabel = getConfirmActionLabel(item);
             const confirmActionHint = getConfirmActionHint(item);
+            const enrollPersonId = item.matchedPerson?.id ?? (draft.selectedPersonId || '');
 
             return (
               <section key={item.detection.id} style={detectionCardStyle}>
                 <div>
                   <img
-                    src={getThumbnailMediaUrl(item.asset.id)}
+                    src={
+                      item.detection.previewPath || item.detection.cropPath
+                        ? getFaceDetectionPreviewUrl(item.detection.id)
+                        : getThumbnailMediaUrl(item.asset.id)
+                    }
                     alt={item.asset.filename}
                     style={previewImageStyle}
                   />
                   <div style={{ marginTop: '8px', fontSize: '12px', color: '#586676' }}>
-                    Source asset thumbnail
+                    {item.detection.previewPath || item.detection.cropPath
+                      ? 'Detected face crop preview'
+                      : 'Source asset thumbnail'}
                   </div>
                 </div>
                 <div>
@@ -777,6 +808,17 @@ export function PeopleDevPage() {
                     {confirmActionHint ? (
                       <div style={{ fontSize: '12px', color: '#6a4d00' }}>{confirmActionHint}</div>
                     ) : null}
+
+                    <div style={inlineRowStyle}>
+                      <button
+                        type="button"
+                        style={enrollmentBusy || enrollPersonId.length === 0 ? disabledButtonStyle : buttonStyle}
+                        disabled={enrollmentBusy || enrollPersonId.length === 0}
+                        onClick={() => void handleEnroll(item, enrollPersonId)}
+                      >
+                        {item.matchedPerson ? `Enroll ${item.matchedPerson.displayName}` : 'Enroll Selected Person'}
+                      </button>
+                    </div>
 
                     <div style={inlineRowStyle}>
                       <select
