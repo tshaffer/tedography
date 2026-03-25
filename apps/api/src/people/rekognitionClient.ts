@@ -48,6 +48,23 @@ type IndexFaceRecord = {
 };
 
 let sdkModulePromise: Promise<AwsSdkModule> | null = null;
+const REKOGNITION_IMAGE_BYTES_LIMIT = 5_242_880;
+const REKOGNITION_IMAGE_BYTES_TARGET = 4_800_000;
+
+type SharpLikeModule = {
+  default: (input: string | Uint8Array) => SharpLikePipeline;
+};
+
+type SharpLikePipeline = {
+  rotate(): SharpLikePipeline;
+  resize(options: { width?: number; height?: number; fit?: 'inside'; withoutEnlargement?: boolean }): SharpLikePipeline;
+  jpeg(options?: { quality?: number; mozjpeg?: boolean }): SharpLikePipeline;
+  toBuffer(): Promise<Uint8Array>;
+};
+
+type ImagePreparationMode = 'default' | 'aggressive';
+
+let sharpModulePromise: Promise<SharpLikeModule> | null = null;
 
 async function loadAwsSdkModule(): Promise<AwsSdkModule> {
   if (!sdkModulePromise) {
@@ -56,6 +73,15 @@ async function loadAwsSdkModule(): Promise<AwsSdkModule> {
   }
 
   return sdkModulePromise;
+}
+
+async function loadSharpModule(): Promise<SharpLikeModule> {
+  if (!sharpModulePromise) {
+    const moduleName = 'sharp';
+    sharpModulePromise = import(moduleName) as Promise<SharpLikeModule>;
+  }
+
+  return sharpModulePromise;
 }
 
 function requireRekognitionRegion(): string {
@@ -90,6 +116,69 @@ function normalizeBytes(input: Uint8Array): Uint8Array {
 
 function getErrorName(error: unknown): string {
   return typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+}
+
+function getErrorMessage(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '';
+}
+
+export function isRekognitionImageBytesTooLargeError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return (
+    getErrorName(error) === 'InvalidParameterException' &&
+    message.includes("image.bytes") &&
+    message.includes('5242880')
+  );
+}
+
+async function encodeJpegToTargetSize(inputPath: string, mode: ImagePreparationMode): Promise<Uint8Array> {
+  const sharpModule = await loadSharpModule();
+  const attempts =
+    mode === 'aggressive'
+      ? [
+          { maxDimension: 1800, quality: 76 },
+          { maxDimension: 1440, quality: 68 },
+          { maxDimension: 1200, quality: 62 }
+        ]
+      : [
+          { maxDimension: 2560, quality: 86 },
+          { maxDimension: 2200, quality: 80 },
+          { maxDimension: 1800, quality: 74 }
+        ];
+
+  let smallestBuffer: Uint8Array | null = null;
+
+  for (const attempt of attempts) {
+    const buffer = await (sharpModule.default(inputPath) as SharpLikePipeline)
+      .rotate()
+      .resize({
+        width: attempt.maxDimension,
+        height: attempt.maxDimension,
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: attempt.quality, mozjpeg: true })
+      .toBuffer();
+
+    if (!smallestBuffer || buffer.byteLength < smallestBuffer.byteLength) {
+      smallestBuffer = buffer;
+    }
+
+    if (buffer.byteLength <= REKOGNITION_IMAGE_BYTES_TARGET) {
+      return normalizeBytes(buffer);
+    }
+  }
+
+  return normalizeBytes(smallestBuffer ?? new Uint8Array());
+}
+
+async function prepareImageBytes(inputPath: string, mode: ImagePreparationMode): Promise<Uint8Array> {
+  const rawBytes = normalizeBytes(await fs.readFile(inputPath));
+  if (rawBytes.byteLength <= REKOGNITION_IMAGE_BYTES_LIMIT && mode === 'default') {
+    return rawBytes;
+  }
+
+  return encodeJpegToTargetSize(inputPath, mode);
 }
 
 function mapAwsError(error: unknown, fallbackMessage: string): PeopleRecognitionEngineError {
@@ -194,6 +283,37 @@ export class RekognitionClient {
     return client.send(new Command(input));
   }
 
+  private async sendImageCommandWithPreparedBytes<T>(input: {
+    commandName: 'DetectFacesCommand' | 'SearchUsersByImageCommand' | 'IndexFacesCommand';
+    imagePath: string;
+    buildInput: (bytes: Uint8Array) => object;
+    fallbackMessage: string;
+  }): Promise<T> {
+    let bytes = await prepareImageBytes(input.imagePath, 'default');
+
+    try {
+      return (await this.send(input.commandName, input.buildInput(bytes))) as T;
+    } catch (error) {
+      if (!isRekognitionImageBytesTooLargeError(error)) {
+        throw error;
+      }
+
+      bytes = await prepareImageBytes(input.imagePath, 'aggressive');
+      if (bytes.byteLength > REKOGNITION_IMAGE_BYTES_LIMIT) {
+        throw new PeopleRecognitionEngineError(
+          `Image payload is still too large for Rekognition after recompression (${bytes.byteLength} bytes).`,
+          'request-failed'
+        );
+      }
+
+      try {
+        return (await this.send(input.commandName, input.buildInput(bytes))) as T;
+      } catch (retryError) {
+        throw mapAwsError(retryError, input.fallbackMessage);
+      }
+    }
+  }
+
   public async ensureCollectionExists(): Promise<void> {
     if (!this.collectionReadyPromise) {
       this.collectionReadyPromise = (async () => {
@@ -233,13 +353,17 @@ export class RekognitionClient {
   public async detectFaces(imagePath: string): Promise<RekognitionDetectedFace[]> {
     await this.ensureCollectionExists();
 
-    const bytes = normalizeBytes(await fs.readFile(imagePath));
-    const response = (await this.send('DetectFacesCommand', {
-      Image: { Bytes: bytes },
-      Attributes: ['DEFAULT']
-    })) as {
+    const response = await this.sendImageCommandWithPreparedBytes<{
       FaceDetails?: DetectFaceDetail[];
-    };
+    }>({
+      commandName: 'DetectFacesCommand',
+      imagePath,
+      buildInput: (bytes) => ({
+        Image: { Bytes: bytes },
+        Attributes: ['DEFAULT']
+      }),
+      fallbackMessage: 'Rekognition DetectFaces request failed.'
+    });
 
     const faceDetails = Array.isArray(response.FaceDetails) ? response.FaceDetails : [];
     return faceDetails.flatMap((item) => {
@@ -272,17 +396,21 @@ export class RekognitionClient {
   public async searchUsersByImage(imagePath: string): Promise<RekognitionUserMatch[]> {
     await this.ensureCollectionExists();
 
-    const bytes = normalizeBytes(await fs.readFile(imagePath));
     const threshold = config.peoplePipeline.rekognition.faceMatchThreshold;
-    const response = (await this.send('SearchUsersByImageCommand', {
-      CollectionId: requireCollectionId(),
-      Image: { Bytes: bytes },
-      ...(threshold !== null ? { FaceMatchThreshold: threshold * 100 } : {}),
-      MaxUsers: Math.max(1, Math.floor(config.peoplePipeline.rekognition.maxResults)),
-      QualityFilter: 'AUTO'
-    })) as {
+    const response = await this.sendImageCommandWithPreparedBytes<{
       UserMatches?: SearchUserMatch[];
-    };
+    }>({
+      commandName: 'SearchUsersByImageCommand',
+      imagePath,
+      buildInput: (bytes) => ({
+        CollectionId: requireCollectionId(),
+        Image: { Bytes: bytes },
+        ...(threshold !== null ? { FaceMatchThreshold: threshold * 100 } : {}),
+        MaxUsers: Math.max(1, Math.floor(config.peoplePipeline.rekognition.maxResults)),
+        QualityFilter: 'AUTO'
+      }),
+      fallbackMessage: 'Rekognition SearchUsersByImage request failed.'
+    });
 
     const matches = Array.isArray(response.UserMatches) ? response.UserMatches : [];
     return matches.flatMap((item) => {
@@ -322,17 +450,21 @@ export class RekognitionClient {
   }): Promise<RekognitionEnrollmentResult> {
     await this.ensureUserExists(input.userId);
 
-    const bytes = normalizeBytes(await fs.readFile(input.imagePath));
-    const indexResponse = (await this.send('IndexFacesCommand', {
-      CollectionId: requireCollectionId(),
-      Image: { Bytes: bytes },
-      ExternalImageId: input.externalImageId,
-      MaxFaces: 1,
-      QualityFilter: 'AUTO',
-      DetectionAttributes: ['DEFAULT']
-    })) as {
+    const indexResponse = await this.sendImageCommandWithPreparedBytes<{
       FaceRecords?: IndexFaceRecord[];
-    };
+    }>({
+      commandName: 'IndexFacesCommand',
+      imagePath: input.imagePath,
+      buildInput: (bytes) => ({
+        CollectionId: requireCollectionId(),
+        Image: { Bytes: bytes },
+        ExternalImageId: input.externalImageId,
+        MaxFaces: 1,
+        QualityFilter: 'AUTO',
+        DetectionAttributes: ['DEFAULT']
+      }),
+      fallbackMessage: 'Rekognition IndexFaces request failed.'
+    });
 
     const faceIds = (Array.isArray(indexResponse.FaceRecords) ? indexResponse.FaceRecords : [])
       .flatMap((record) => (typeof record.Face?.FaceId === 'string' ? [record.Face.FaceId] : []));
