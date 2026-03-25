@@ -309,7 +309,8 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
         asset,
         imagePath,
         detection: { faceIndex: index, boundingBox: normalizedBoundingBox },
-        pipelineVersion: config.peoplePipeline.pipelineVersion
+        pipelineVersion: config.peoplePipeline.pipelineVersion,
+        forceRegenerate: true
       });
       cropImagePath = crop.absolutePath;
       cropRelativePath = crop.relativePath;
