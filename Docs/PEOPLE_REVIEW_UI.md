@@ -66,6 +66,7 @@ The page also supports queue sorting for validation:
 From the main app:
 
 - use the `People` link in the top bar
+- or, from `Library`, select one or more assets and click `Run People Recognition`
 
 Or go directly to:
 
@@ -118,6 +119,26 @@ pnpm --filter @tedography/web dev
 6. Use the inline actions to confirm, reject, assign, create-and-assign, or ignore
 
 7. Verify the `Derived Asset People` field changes as expected after each action
+
+## Library Shortcut
+
+The main `Library` page now includes a selection-based action:
+
+- `Run People Recognition`
+
+Behavior:
+
+- if one asset is selected, Tedography processes that asset and shows a `Review Faces` follow-up link
+- if multiple assets are selected, Tedography processes all selected assets and reports success / partial failure
+- if no assets are selected, the action is disabled
+
+For single-asset runs, the follow-up link opens:
+
+```text
+/people/review?assetId=<asset-id>
+```
+
+so the People Review page is immediately filtered to that asset.
 
 ## Current Limitations
 

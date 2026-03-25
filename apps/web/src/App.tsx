@@ -29,6 +29,7 @@ import {
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
+import { processPeopleAsset } from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
@@ -2493,10 +2494,16 @@ export default function App() {
     kind: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [peopleRecognitionNotice, setPeopleRecognitionNotice] = useState<{
+    kind: 'success' | 'error';
+    message: string;
+    reviewAssetId?: string;
+  } | null>(null);
   const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
   const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
   const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
+  const [peopleRecognitionBusy, setPeopleRecognitionBusy] = useState(false);
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [reviewVisiblePhotoStates, setReviewVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
@@ -3981,6 +3988,60 @@ export default function App() {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
       }
+    }
+  }
+
+  async function handleRunPeopleRecognitionForSelectedAssets(): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0 || peopleRecognitionBusy) {
+      return;
+    }
+
+    setPeopleRecognitionBusy(true);
+    setPeopleRecognitionNotice(null);
+    setUpdateError(null);
+
+    try {
+      const results = await Promise.allSettled(
+        assetIds.map(async (assetId) => {
+          const response = await processPeopleAsset(assetId);
+          return { assetId, response };
+        })
+      );
+
+      const succeeded = results.filter((result) => result.status === 'fulfilled');
+      const failed = results.filter((result) => result.status === 'rejected');
+
+      if (failed.length === 0) {
+        setPeopleRecognitionNotice({
+          kind: 'success',
+          message:
+            succeeded.length === 1
+              ? 'People recognition completed for 1 asset.'
+              : `People recognition completed for ${succeeded.length} assets.`,
+          ...(assetIds.length === 1 ? { reviewAssetId: assetIds[0] } : {})
+        });
+        return;
+      }
+
+      if (succeeded.length === 0) {
+        setPeopleRecognitionNotice({
+          kind: 'error',
+          message:
+            failed[0]?.reason instanceof Error
+              ? `People recognition failed: ${failed[0].reason.message}`
+              : 'People recognition failed for all selected assets.'
+        });
+        return;
+      }
+
+      setPeopleRecognitionNotice({
+        kind: 'error',
+        message: `People recognition completed for ${succeeded.length} assets, ${failed.length} failed.`,
+        ...(assetIds.length === 1 ? { reviewAssetId: assetIds[0] } : {})
+      });
+    } finally {
+      setPeopleRecognitionBusy(false);
     }
   }
 
@@ -6108,6 +6169,23 @@ export default function App() {
                 Slide
               </button>
             ) : null}
+            {isLibraryArea ? (
+              <button
+                type="button"
+                style={hasSelectedAssets && !peopleRecognitionBusy ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
+                disabled={!hasSelectedAssets || peopleRecognitionBusy}
+                title={
+                  !hasSelectedAssets
+                    ? 'Select one or more photos to run people recognition'
+                    : peopleRecognitionBusy
+                      ? 'Running people recognition for the current selection'
+                      : 'Run people recognition for the current selection'
+                }
+              >
+                {peopleRecognitionBusy ? 'Running People...' : 'Run People Recognition'}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -6164,6 +6242,29 @@ export default function App() {
         >
           {albumMembershipNotice.message}
         </p>
+      ) : null}
+      {peopleRecognitionNotice ? (
+        <div
+          style={{
+            color: peopleRecognitionNotice.kind === 'error' ? '#b00020' : '#136f2d',
+            fontSize: '12px',
+            margin: '0 0 8px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <span>{peopleRecognitionNotice.message}</span>
+          {peopleRecognitionNotice.reviewAssetId ? (
+            <Link
+              to={`/people/review?assetId=${encodeURIComponent(peopleRecognitionNotice.reviewAssetId)}`}
+              style={{ ...compareButtonStyle, textDecoration: 'none', padding: '4px 8px' }}
+            >
+              Review Faces
+            </Link>
+          ) : null}
+        </div>
       ) : null}
       {isSearchArea && !assetsLoading && !assetsError ? (
         <p

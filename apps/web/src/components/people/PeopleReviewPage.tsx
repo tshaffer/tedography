@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
 import {
@@ -257,6 +257,7 @@ function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
 }
 
 export function PeopleReviewPage() {
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<PeopleReviewQueueItem[]>([]);
   const [counts, setCounts] = useState<Record<FaceDetectionMatchStatus, number>>({
     unmatched: 0,
@@ -268,7 +269,7 @@ export function PeopleReviewPage() {
   });
   const [peopleOptions, setPeopleOptions] = useState<Array<{ id: string; displayName: string }>>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<FaceDetectionMatchStatus[]>(defaultStatuses);
-  const [assetIdFilter, setAssetIdFilter] = useState('');
+  const [assetIdFilter, setAssetIdFilter] = useState(() => searchParams.get('assetId')?.trim() ?? '');
   const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
@@ -309,6 +310,11 @@ export function PeopleReviewPage() {
   useEffect(() => {
     void loadPageData();
   }, [selectedStatuses, assetIdFilter, sortBy]);
+
+  useEffect(() => {
+    const queryAssetId = searchParams.get('assetId')?.trim() ?? '';
+    setAssetIdFilter(queryAssetId);
+  }, [searchParams]);
 
   function getDraft(detectionId: string): ReviewDraftState {
     return (
