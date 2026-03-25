@@ -134,6 +134,28 @@ export async function findRecentPhotoAssets(limit = 20): Promise<MediaAsset[]> {
   return normalizeMediaAssets(assets);
 }
 
+export async function listPeopleBrowseSourceAssets(): Promise<
+  Array<Pick<MediaAsset, 'id' | 'captureDateTime' | 'importedAt' | 'people'>>
+> {
+  const assets = await MediaAssetModel.find(
+    { people: { $exists: true, $ne: [] } },
+    {
+      _id: 0,
+      id: 1,
+      captureDateTime: 1,
+      importedAt: 1,
+      people: 1
+    }
+  ).lean<Array<Pick<MediaAsset, 'id' | 'captureDateTime' | 'importedAt' | 'people'>>>();
+
+  return assets.map((asset) => ({
+    id: asset.id,
+    captureDateTime: asset.captureDateTime ?? null,
+    importedAt: asset.importedAt,
+    people: asset.people ?? []
+  }));
+}
+
 export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;

@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type WheelEvent as ReactWheelEvent
 } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   MediaType,
   type Person,
@@ -2521,6 +2521,8 @@ function SurveyMode({
 }
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState('loading');
   const [assets, setAssets] = useState<MediaAsset[]>(() => {
     const cached = appBootstrapCache.assets ?? readCachedBootstrapAssets();
@@ -2651,6 +2653,79 @@ export default function App() {
   const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
   const [searchPeopleError, setSearchPeopleError] = useState<string | null>(null);
   const searchPeopleAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!location.search) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const requestedArea = params.get('area');
+    const requestedPeopleIds = (params.get('people') ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const requestedPeopleMode = params.get('peopleMode');
+    const requestedHasNoPeople = params.get('hasNoPeople');
+    const requestedHasReviewableFaces = params.get('hasReviewableFaces');
+    const requestedPeopleQuery = params.get('peopleQuery');
+
+    let applied = false;
+
+    if (
+      requestedArea === 'Search' ||
+      requestedPeopleIds.length > 0 ||
+      requestedHasNoPeople === 'true' ||
+      requestedHasReviewableFaces === 'true'
+    ) {
+      setPrimaryArea('Search');
+      applied = true;
+    } else if (requestedArea === 'Library' || requestedArea === 'Review') {
+      setPrimaryArea(requestedArea);
+      applied = true;
+    }
+
+    if (requestedPeopleIds.length > 0) {
+      setSearchPeopleIds(requestedPeopleIds);
+      setSearchHasNoPeople(false);
+      applied = true;
+    }
+
+    if (requestedPeopleMode === 'Any' || requestedPeopleMode === 'All') {
+      setSearchPeopleMatchMode(requestedPeopleMode);
+      applied = true;
+    }
+
+    if (requestedHasNoPeople === 'true' || requestedHasNoPeople === 'false') {
+      const nextHasNoPeople = requestedHasNoPeople === 'true';
+      setSearchHasNoPeople(nextHasNoPeople);
+      if (nextHasNoPeople) {
+        setSearchPeopleIds([]);
+      }
+      applied = true;
+    }
+
+    if (requestedHasReviewableFaces === 'true' || requestedHasReviewableFaces === 'false') {
+      setSearchHasReviewableFaces(requestedHasReviewableFaces === 'true');
+      applied = true;
+    }
+
+    if (requestedPeopleQuery !== null) {
+      setSearchPeopleQuery(requestedPeopleQuery);
+      applied = true;
+    }
+
+    if (!applied) {
+      return;
+    }
+
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: ''
+      },
+      { replace: true }
+    );
+  }, [location.pathname, location.search, navigate]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
@@ -6285,7 +6360,7 @@ export default function App() {
           <Link to="/duplicates/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             Duplicates
           </Link>
-          <Link to="/people/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+          <Link to="/people" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             People
           </Link>
           <Link to="/people/dev" style={{ ...compareButtonStyle, textDecoration: 'none' }}>

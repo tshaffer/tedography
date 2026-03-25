@@ -21,6 +21,7 @@ import {
   processPeoplePipelineForAsset,
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
+import { listPeopleBrowseSummaries } from '../people/peopleBrowseService.js';
 import { log } from '../logger.js';
 
 export const peoplePipelineRoutes: Router = Router();
@@ -40,6 +41,15 @@ peoplePipelineRoutes.get('/people', async (_req, res) => {
   } catch (error) {
     log.error('Failed to list people', error);
     res.status(500).json({ error: 'Failed to list people' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.get('/people/browse', async (_req, res) => {
+  try {
+    res.json(await listPeopleBrowseSummaries());
+  } catch (error) {
+    log.error('Failed to list people browse summaries', error);
+    res.status(500).json({ error: 'Failed to list people browse summaries' } satisfies ImportApiErrorResponse);
   }
 });
 

@@ -4,6 +4,7 @@ import type {
   EnrollPersonFromDetectionRequest,
   EnrollPersonFromDetectionResponse,
   ListAssetFaceDetectionsResponse,
+  ListPeopleBrowseResponse,
   ListPeopleResponse,
   ListPeoplePipelineRecentAssetsResponse,
   PeoplePipelineSummaryResponse,
@@ -33,6 +34,10 @@ export async function listPeople(input?: { signal?: AbortSignal }): Promise<List
   return fetchJson<ListPeopleResponse>('/api/people-pipeline/people', {
     ...(input?.signal ? { signal: input.signal } : {})
   });
+}
+
+export async function listPeopleBrowse(): Promise<ListPeopleBrowseResponse> {
+  return fetchJson<ListPeopleBrowseResponse>('/api/people-pipeline/people/browse');
 }
 
 export async function createPerson(

@@ -12,6 +12,24 @@ export interface ListPeopleResponse {
   items: Person[];
 }
 
+export type PeopleBrowseSort =
+  | 'alphabetical'
+  | 'mostAssets'
+  | 'mostRecentlySeen'
+  | 'needsReview';
+
+export interface PeopleBrowseSummaryItem {
+  person: Person;
+  assetCount: number;
+  representativeAssetId?: string | null;
+  lastSeenAt?: string | null;
+  reviewableAssetCount: number;
+}
+
+export interface ListPeopleBrowseResponse {
+  items: PeopleBrowseSummaryItem[];
+}
+
 export interface CreatePersonRequest {
   displayName: string;
   sortName?: string;
