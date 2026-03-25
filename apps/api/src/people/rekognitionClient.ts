@@ -215,6 +215,18 @@ function mapAwsError(error: unknown, fallbackMessage: string): PeopleRecognition
   return new PeopleRecognitionEngineError(message, 'service-unavailable');
 }
 
+function wrapEnrollmentStepError(
+  error: unknown,
+  fallbackMessage: string,
+  code: PeopleRecognitionEngineError['code']
+): PeopleRecognitionEngineError {
+  const detail = getErrorMessage(error).trim();
+  return new PeopleRecognitionEngineError(
+    detail.length > 0 ? `${fallbackMessage} ${detail}` : fallbackMessage,
+    code
+  );
+}
+
 export interface RekognitionDetectedFace {
   boundingBox: {
     left: number;
@@ -437,8 +449,23 @@ export class RekognitionClient {
       });
     } catch (error) {
       const name = getErrorName(error);
-      if (name !== 'ConflictException' && name !== 'ResourceAlreadyExistsException') {
-        throw mapAwsError(error, 'Failed to create Rekognition user.');
+      const message = getErrorMessage(error);
+      const looksLikeExistingUserFallback =
+        name === 'InvalidParameterException' && message.includes('Request has invalid parameters');
+
+      // Rekognition's CreateUser can return a generic InvalidParameterException
+      // when the user already exists in the collection. Treat that like an
+      // already-created user so enrollment can continue to IndexFaces/AssociateFaces.
+      if (
+        name !== 'ConflictException' &&
+        name !== 'ResourceAlreadyExistsException' &&
+        !looksLikeExistingUserFallback
+      ) {
+        throw wrapEnrollmentStepError(
+          error,
+          'Failed to create Rekognition user for enrollment. Check Rekognition user support, IAM permissions, and user-id constraints.',
+          'request-failed'
+        );
       }
     }
   }
@@ -450,21 +477,32 @@ export class RekognitionClient {
   }): Promise<RekognitionEnrollmentResult> {
     await this.ensureUserExists(input.userId);
 
-    const indexResponse = await this.sendImageCommandWithPreparedBytes<{
+    let indexResponse: {
       FaceRecords?: IndexFaceRecord[];
-    }>({
-      commandName: 'IndexFacesCommand',
-      imagePath: input.imagePath,
-      buildInput: (bytes) => ({
-        CollectionId: requireCollectionId(),
-        Image: { Bytes: bytes },
-        ExternalImageId: input.externalImageId,
-        MaxFaces: 1,
-        QualityFilter: 'AUTO',
-        DetectionAttributes: ['DEFAULT']
-      }),
-      fallbackMessage: 'Rekognition IndexFaces request failed.'
-    });
+    };
+    try {
+      indexResponse = await this.sendImageCommandWithPreparedBytes<{
+        FaceRecords?: IndexFaceRecord[];
+      }>({
+        commandName: 'IndexFacesCommand',
+        imagePath: input.imagePath,
+        buildInput: (bytes) => ({
+          CollectionId: requireCollectionId(),
+          Image: { Bytes: bytes },
+          ExternalImageId: input.externalImageId,
+          MaxFaces: 1,
+          QualityFilter: 'AUTO',
+          DetectionAttributes: ['DEFAULT']
+        }),
+        fallbackMessage: 'Failed to index face example in Rekognition.'
+      });
+    } catch (error) {
+      throw wrapEnrollmentStepError(
+        error,
+        'Failed to index face example in Rekognition. The crop may not contain a clear, usable single face, or the Rekognition request parameters may be invalid.',
+        'request-failed'
+      );
+    }
 
     const faceIds = (Array.isArray(indexResponse.FaceRecords) ? indexResponse.FaceRecords : [])
       .flatMap((record) => (typeof record.Face?.FaceId === 'string' ? [record.Face.FaceId] : []));
@@ -476,11 +514,19 @@ export class RekognitionClient {
       );
     }
 
-    await this.send('AssociateFacesCommand', {
-      CollectionId: requireCollectionId(),
-      UserId: input.userId,
-      FaceIds: faceIds
-    });
+    try {
+      await this.send('AssociateFacesCommand', {
+        CollectionId: requireCollectionId(),
+        UserId: input.userId,
+        FaceIds: faceIds
+      });
+    } catch (error) {
+      throw wrapEnrollmentStepError(
+        error,
+        'Failed to associate indexed face with the Rekognition user. Check collection user support and IAM permissions.',
+        'request-failed'
+      );
+    }
 
     return {
       userId: input.userId,
