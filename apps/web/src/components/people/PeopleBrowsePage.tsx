@@ -241,7 +241,7 @@ export function PeopleBrowsePage() {
       <section style={panelStyle}>
         <h1 style={{ margin: '0 0 10px', fontSize: '32px' }}>People</h1>
         <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
-          Browse known people by confirmed asset presence. Click a person to jump into Search scoped to photos containing that person.
+          Browse known people by confirmed asset presence. Click a person to open their tedography detail page and jump from there into Search or review work.
         </p>
 
         <div style={controlsGridStyle}>
@@ -306,7 +306,7 @@ export function PeopleBrowsePage() {
       {!loading && !errorMessage && visibleItems.length > 0 ? (
         <section style={gridStyle}>
           {visibleItems.map((item) => {
-            const searchHref = `/?area=Search&people=${encodeURIComponent(item.person.id)}&peopleMode=Any`;
+            const personHref = `/people/${encodeURIComponent(item.person.id)}`;
             const personInitial = item.person.displayName.trim().charAt(0).toUpperCase() || '?';
 
             return (
@@ -348,8 +348,8 @@ export function PeopleBrowsePage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <Link to={searchHref} style={buttonLinkStyle}>
-                    View Photos
+                  <Link to={personHref} style={buttonLinkStyle}>
+                    Open Person
                   </Link>
                   <Link to="/people/review" style={buttonLinkStyle}>
                     Open Review Queue

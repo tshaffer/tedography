@@ -69,3 +69,35 @@ export async function createPerson(input: {
 
   return person;
 }
+
+export async function updatePerson(input: {
+  id: string;
+  displayName?: string;
+  isHidden?: boolean;
+  isArchived?: boolean;
+}): Promise<Person | null> {
+  const update: Record<string, unknown> = {};
+
+  if (input.displayName !== undefined) {
+    update.displayName = input.displayName.trim();
+  }
+
+  if (input.isHidden !== undefined) {
+    update.isHidden = input.isHidden;
+  }
+
+  if (input.isArchived !== undefined) {
+    update.isArchived = input.isArchived;
+  }
+
+  if (Object.keys(update).length === 0) {
+    return findPersonById(input.id);
+  }
+
+  const person = await PersonModel.findOneAndUpdate(
+    { id: input.id },
+    { $set: update },
+    { new: true, projection: { _id: 0 }, runValidators: true }
+  ).lean<Person | null>();
+  return person ? normalizePerson(person) : null;
+}

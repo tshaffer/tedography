@@ -1,0 +1,434 @@
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import type { GetPersonDetailResponse } from '@tedography/shared';
+import { getPersonDetail, updatePerson } from '../../api/peoplePipelineApi';
+import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+
+const pageStyle: CSSProperties = {
+  fontFamily: 'Arial, sans-serif',
+  margin: '0 auto',
+  padding: '16px',
+  maxWidth: '1500px',
+  backgroundColor: '#f3f4f6',
+  minHeight: '100vh',
+  boxSizing: 'border-box'
+};
+
+const linkRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '12px',
+  flexWrap: 'wrap',
+  marginBottom: '12px'
+};
+
+const linkStyle: CSSProperties = {
+  color: '#0f5f73',
+  fontWeight: 700,
+  textDecoration: 'none'
+};
+
+const panelStyle: CSSProperties = {
+  backgroundColor: '#fff',
+  border: '1px solid #d7dce2',
+  borderRadius: '16px',
+  padding: '16px',
+  marginBottom: '14px',
+  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.06)'
+};
+
+const previewFrameStyle: CSSProperties = {
+  borderRadius: '14px',
+  overflow: 'hidden',
+  border: '1px solid #d7dce2',
+  backgroundColor: '#edf2f7'
+};
+
+const previewImageStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  aspectRatio: '1 / 1',
+  objectFit: 'cover',
+  backgroundColor: '#d8e1ea'
+};
+
+const placeholderStyle: CSSProperties = {
+  ...previewImageStyle,
+  display: 'grid',
+  placeItems: 'center',
+  color: '#516273',
+  fontSize: '42px',
+  fontWeight: 700
+};
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#556677',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  marginBottom: '6px'
+};
+
+const inputStyle: CSSProperties = {
+  border: '1px solid #c8d0d9',
+  borderRadius: '8px',
+  padding: '8px 10px',
+  fontSize: '13px',
+  minWidth: '0'
+};
+
+const buttonStyle: CSSProperties = {
+  border: '1px solid #c6d0da',
+  borderRadius: '8px',
+  backgroundColor: '#f7f9fb',
+  color: '#163246',
+  fontSize: '13px',
+  fontWeight: 700,
+  padding: '8px 12px',
+  cursor: 'pointer'
+};
+
+const primaryButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  backgroundColor: '#0f5f73',
+  color: '#fff',
+  borderColor: '#0f5f73'
+};
+
+const disabledButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  opacity: 0.55,
+  cursor: 'not-allowed'
+};
+
+const gridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+  gap: '16px'
+};
+
+const assetCardStyle: CSSProperties = {
+  ...panelStyle,
+  marginBottom: 0,
+  padding: '12px',
+  display: 'grid',
+  gap: '8px'
+};
+
+const badgeRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px'
+};
+
+const badgeStyle: CSSProperties = {
+  borderRadius: '999px',
+  border: '1px solid #d5dbe3',
+  backgroundColor: '#f8fafc',
+  padding: '4px 10px',
+  fontSize: '12px',
+  fontWeight: 700
+};
+
+const warningBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  backgroundColor: '#fff7e8',
+  borderColor: '#e7c77d',
+  color: '#805a00'
+};
+
+function formatSeenAt(value: string | null | undefined): string {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString();
+}
+
+function formatAssetCount(count: number): string {
+  return `${count} asset${count === 1 ? '' : 's'}`;
+}
+
+export function PersonDetailPage() {
+  const { personId = '' } = useParams();
+  const [detail, setDetail] = useState<GetPersonDetailResponse | null>(null);
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  async function loadDetail(): Promise<void> {
+    if (!personId.trim()) {
+      setLoadErrorMessage('Person not found');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadErrorMessage(null);
+    try {
+      const response = await getPersonDetail(personId);
+      setDetail(response);
+      setDisplayNameDraft(response.person.displayName);
+    } catch (error) {
+      setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load person detail');
+      setDetail(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDetail();
+  }, [personId]);
+
+  const personSearchHref = useMemo(
+    () => `/?area=Search&people=${encodeURIComponent(personId)}&peopleMode=Any`,
+    [personId]
+  );
+  const personReviewHref = useMemo(
+    () => `/people/review?personId=${encodeURIComponent(personId)}`,
+    [personId]
+  );
+
+  async function handleSavePerson(): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const response = await updatePerson(detail.person.id, {
+        displayName: displayNameDraft.trim(),
+        isHidden: detail.person.isHidden ?? false,
+        isArchived: detail.person.isArchived ?? false
+      });
+      setDetail((current) => (current ? { ...current, person: response.item } : current));
+      setDisplayNameDraft(response.item.displayName);
+      setNoticeMessage(`Updated ${response.item.displayName}.`);
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to update person');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleFlag(flag: 'isHidden' | 'isArchived'): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const response = await updatePerson(detail.person.id, {
+        [flag]: !(detail.person[flag] ?? false)
+      });
+      setDetail((current) => (current ? { ...current, person: response.item } : current));
+      setNoticeMessage(
+        `${response.item.displayName} is now ${flag === 'isHidden'
+          ? response.item.isHidden ? 'hidden' : 'visible'
+          : response.item.isArchived ? 'archived' : 'active'}.`
+      );
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to update person');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={pageStyle}>
+      <div style={linkRowStyle}>
+        <Link to="/people" style={linkStyle}>
+          Back to People
+        </Link>
+        <Link to={personSearchHref} style={linkStyle}>
+          View In Search
+        </Link>
+        <Link to={personReviewHref} style={linkStyle}>
+          Review Related Faces
+        </Link>
+      </div>
+
+      {loading ? <section style={panelStyle}>Loading person...</section> : null}
+      {!loading && loadErrorMessage ? <section style={panelStyle}>Person not found or unavailable: {loadErrorMessage}</section> : null}
+
+      {!loading && !loadErrorMessage && detail ? (
+        <>
+          <section
+            style={{
+              ...panelStyle,
+              display: 'grid',
+              gridTemplateColumns: '220px minmax(0, 1fr)',
+              gap: '18px'
+            }}
+          >
+            <div style={previewFrameStyle}>
+              {detail.representativeAssetId ? (
+                <img
+                  src={getThumbnailMediaUrl(detail.representativeAssetId)}
+                  alt={detail.person.displayName}
+                  style={previewImageStyle}
+                />
+              ) : (
+                <div style={placeholderStyle}>
+                  {detail.person.displayName.trim().charAt(0).toUpperCase() || '?'}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h1 style={{ margin: '0 0 10px', fontSize: '32px' }}>{detail.person.displayName}</h1>
+              <div style={badgeRowStyle}>
+                <span style={badgeStyle}>{formatAssetCount(detail.assetCount)}</span>
+                <span style={badgeStyle}>Last seen {formatSeenAt(detail.lastSeenAt)}</span>
+                {detail.reviewableAssetCount > 0 ? (
+                  <span style={warningBadgeStyle}>
+                    {detail.reviewableAssetCount} asset{detail.reviewableAssetCount === 1 ? '' : 's'} still need review
+                  </span>
+                ) : null}
+                {detail.person.isArchived ? <span style={badgeStyle}>Archived</span> : null}
+                {detail.person.isHidden ? <span style={badgeStyle}>Hidden</span> : null}
+              </div>
+
+              <p style={{ margin: '12px 0', color: '#5b6673' }}>
+                Confirmed photos below come from derived <code>mediaAsset.people</code>. Review-needed work is shown separately and does not imply confirmed presence.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px) auto auto', gap: '10px', alignItems: 'end' }}>
+                <div>
+                  <span style={labelStyle}>Display Name</span>
+                  <input
+                    type="text"
+                    value={displayNameDraft}
+                    onChange={(event) => setDisplayNameDraft(event.target.value)}
+                    style={{ ...inputStyle, width: '100%' }}
+                    disabled={saving}
+                  />
+                </div>
+                <button
+                  type="button"
+                  style={saving || displayNameDraft.trim().length === 0 ? disabledButtonStyle : primaryButtonStyle}
+                  disabled={saving || displayNameDraft.trim().length === 0}
+                  onClick={() => void handleSavePerson()}
+                >
+                  Save Name
+                </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    style={saving ? disabledButtonStyle : buttonStyle}
+                    disabled={saving}
+                    onClick={() => void handleToggleFlag('isHidden')}
+                  >
+                    {detail.person.isHidden ? 'Unhide' : 'Hide'}
+                  </button>
+                  <button
+                    type="button"
+                    style={saving ? disabledButtonStyle : buttonStyle}
+                    disabled={saving}
+                    onClick={() => void handleToggleFlag('isArchived')}
+                  >
+                    {detail.person.isArchived ? 'Unarchive' : 'Archive'}
+                  </button>
+                </div>
+              </div>
+
+              {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
+              {actionErrorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{actionErrorMessage}</p> : null}
+            </div>
+          </section>
+
+          <section style={panelStyle}>
+            <h2 style={{ marginTop: 0, fontSize: '22px' }}>Needs Review</h2>
+            {detail.reviewableAssetCount > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <p style={{ margin: 0, color: '#5b6673' }}>
+                  {detail.reviewableAssetCount} asset{detail.reviewableAssetCount === 1 ? '' : 's'} containing {detail.person.displayName} still have reviewable faces.
+                </p>
+                <Link to={personReviewHref} style={{ ...buttonStyle, textDecoration: 'none', display: 'inline-block' }}>
+                  Open People Review
+                </Link>
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: '#5b6673' }}>No review-needed face detections are currently tied to this person.</p>
+            )}
+          </section>
+
+          <section style={panelStyle}>
+            <h2 style={{ marginTop: 0, fontSize: '22px' }}>Example Faces</h2>
+            {detail.exampleFaces.length === 0 ? (
+              <p style={{ margin: 0, color: '#5b6673' }}>No example faces available yet.</p>
+            ) : (
+              <div style={gridStyle}>
+                {detail.exampleFaces.map((face) => (
+                  <article key={face.id} style={assetCardStyle}>
+                    <div style={previewFrameStyle}>
+                      <img
+                        src={getFaceDetectionPreviewUrl(face.id)}
+                        alt={`${detail.person?.displayName ?? 'Person'} face example`}
+                        style={previewImageStyle}
+                      />
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{face.asset.filename}</div>
+                    <div style={{ fontSize: '12px', color: '#5b6673' }}>
+                      {formatSeenAt(face.asset.captureDateTime)}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section style={panelStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' }}>
+              <h2 style={{ margin: 0, fontSize: '22px' }}>Confirmed Photos</h2>
+              <Link to={personSearchHref} style={{ ...buttonStyle, textDecoration: 'none', display: 'inline-block' }}>
+                View In Search
+              </Link>
+            </div>
+            {detail.assets.length === 0 ? (
+              <p style={{ margin: 0, color: '#5b6673' }}>No confirmed photos for this person yet.</p>
+            ) : (
+              <div style={gridStyle}>
+                {detail.assets.map((asset) => (
+                  <article key={asset.id} style={assetCardStyle}>
+                    <div style={previewFrameStyle}>
+                      <img
+                        src={getThumbnailMediaUrl(asset.id)}
+                        alt={asset.filename}
+                        style={previewImageStyle}
+                      />
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 700 }}>{asset.filename}</div>
+                    <div style={{ fontSize: '12px', color: '#5b6673' }}>{asset.originalArchivePath}</div>
+                    <div style={badgeRowStyle}>
+                      <span style={badgeStyle}>{asset.photoState}</span>
+                      {asset.reviewableDetectionsCount > 0 ? (
+                        <span style={warningBadgeStyle}>
+                          {asset.reviewableDetectionsCount} reviewable
+                        </span>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}

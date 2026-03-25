@@ -30,6 +30,57 @@ export interface ListPeopleBrowseResponse {
   items: PeopleBrowseSummaryItem[];
 }
 
+export interface PersonDetailAssetItem
+  extends Pick<
+    MediaAsset,
+    | 'id'
+    | 'filename'
+    | 'captureDateTime'
+    | 'importedAt'
+    | 'photoState'
+    | 'originalArchivePath'
+    | 'people'
+  > {
+  reviewableDetectionsCount: number;
+}
+
+export interface PersonExampleFaceItem
+  extends Pick<
+    FaceDetection,
+    | 'id'
+    | 'mediaAssetId'
+    | 'faceIndex'
+    | 'previewPath'
+    | 'cropPath'
+    | 'matchStatus'
+    | 'matchedPersonId'
+    | 'autoMatchCandidatePersonId'
+    | 'updatedAt'
+    | 'createdAt'
+  > {
+  asset: Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime'>;
+}
+
+export interface GetPersonDetailResponse {
+  person: Person;
+  assetCount: number;
+  representativeAssetId?: string | null;
+  lastSeenAt?: string | null;
+  reviewableAssetCount: number;
+  assets: PersonDetailAssetItem[];
+  exampleFaces: PersonExampleFaceItem[];
+}
+
+export interface UpdatePersonRequest {
+  displayName?: string;
+  isHidden?: boolean;
+  isArchived?: boolean;
+}
+
+export interface UpdatePersonResponse {
+  item: Person;
+}
+
 export interface CreatePersonRequest {
   displayName: string;
   sortName?: string;

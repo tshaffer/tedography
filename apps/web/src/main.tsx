@@ -7,6 +7,7 @@ import { store } from './app/store';
 import { DuplicateReviewPage } from './components/duplicates/DuplicateReviewPage';
 import { PeopleBrowsePage } from './components/people/PeopleBrowsePage';
 import { PeopleDevPage } from './components/people/PeopleDevPage';
+import { PersonDetailPage } from './components/people/PersonDetailPage';
 import { PeopleReviewPage } from './components/people/PeopleReviewPage';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/duplicates" element={<Navigate to="/duplicates/review" replace />} />
           <Route path="/duplicates/review" element={<DuplicateReviewPage />} />
           <Route path="/people" element={<PeopleBrowsePage />} />
+          <Route path="/people/:personId" element={<PersonDetailPage />} />
           <Route path="/people/dev" element={<PeopleDevPage />} />
           <Route path="/people/review" element={<PeopleReviewPage />} />
         </Routes>

@@ -477,18 +477,26 @@ export async function listAssetFaceDetections(assetId: string): Promise<ListAsse
 export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetection['matchStatus'][];
   assetId?: string;
+  personId?: string;
   limit?: number;
   sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
   const detections = await listFaceDetections({
     ...(input?.assetId ? { mediaAssetId: input.assetId } : {}),
+    ...(input?.personId ? { personId: input.personId } : {}),
     ...(input?.statuses ? { statuses: input.statuses } : {}),
     ...(input?.limit !== undefined ? { limit: input.limit } : {})
   });
   const [reviews, assets, counts] = await Promise.all([
     listFaceMatchReviewsByDetectionIds(detections.map((item) => item.id)),
     findByIds(Array.from(new Set(detections.map((item) => item.mediaAssetId)))),
-    countFaceDetectionsByStatus(input?.assetId ? { mediaAssetId: input.assetId } : undefined)
+    countFaceDetectionsByStatus(
+      input?.assetId
+        ? { mediaAssetId: input.assetId, ...(input?.personId ? { personId: input.personId } : {}) }
+        : input?.personId
+          ? { personId: input.personId }
+          : undefined
+    )
   ]);
 
   const reviewsByDetectionId = new Map(reviews.map((review) => [review.faceDetectionId, review]));

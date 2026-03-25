@@ -4,11 +4,12 @@ import type { FaceDetectionMatchStatus, ImportApiErrorResponse } from '@tedograp
 import type {
   CreatePersonRequest,
   EnrollPersonFromDetectionRequest,
+  UpdatePersonRequest,
   PeopleReviewQueueSort,
   ProcessPeopleAssetRequest,
   ReviewFaceDetectionRequest
 } from '@tedography/shared';
-import { createPerson, listPeople } from '../repositories/personRepository.js';
+import { createPerson, listPeople, updatePerson } from '../repositories/personRepository.js';
 import { findRecentPhotoAssets } from '../repositories/assetRepository.js';
 import { resolveDerivedAbsolutePath } from '../import/derivedStorage.js';
 import { findFaceDetectionById } from '../repositories/faceDetectionRepository.js';
@@ -22,6 +23,7 @@ import {
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
 import { listPeopleBrowseSummaries } from '../people/peopleBrowseService.js';
+import { getPersonDetail } from '../people/personDetailService.js';
 import { log } from '../logger.js';
 
 export const peoplePipelineRoutes: Router = Router();
@@ -53,6 +55,21 @@ peoplePipelineRoutes.get('/people/browse', async (_req, res) => {
   }
 });
 
+peoplePipelineRoutes.get('/people/:personId', async (req, res) => {
+  try {
+    const detail = await getPersonDetail(req.params.personId);
+    if (!detail) {
+      res.status(404).json({ error: 'Person not found' } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    res.json(detail);
+  } catch (error) {
+    log.error('Failed to load person detail', error);
+    res.status(500).json({ error: 'Failed to load person detail' } satisfies ImportApiErrorResponse);
+  }
+});
+
 peoplePipelineRoutes.get('/review', async (req, res) => {
   const rawStatuses = typeof req.query.statuses === 'string' ? req.query.statuses : '';
   const statuses = rawStatuses
@@ -64,6 +81,7 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
       ? Math.max(1, Math.min(500, Number(req.query.limit)))
       : undefined;
   const assetId = typeof req.query.assetId === 'string' && req.query.assetId.trim().length > 0 ? req.query.assetId.trim() : undefined;
+  const personId = typeof req.query.personId === 'string' && req.query.personId.trim().length > 0 ? req.query.personId.trim() : undefined;
   const sort: PeopleReviewQueueSort | undefined =
     typeof req.query.sort === 'string' &&
     ['newest', 'highestConfidence', 'lowestConfidence', 'filename', 'assetId'].includes(req.query.sort)
@@ -75,6 +93,7 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
       await listPeopleReviewQueue({
         statuses: statuses.length > 0 ? statuses : ['suggested', 'autoMatched', 'unmatched'],
         ...(assetId ? { assetId } : {}),
+        ...(personId ? { personId } : {}),
         ...(limit !== undefined ? { limit } : {}),
         ...(sort ? { sort } : {})
       })
@@ -82,6 +101,34 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
   } catch (error) {
     log.error('Failed to list people review queue', error);
     res.status(500).json({ error: 'Failed to list people review queue' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.patch('/people/:personId', async (req, res) => {
+  const body = req.body as Partial<UpdatePersonRequest> | undefined;
+
+  if (body?.displayName !== undefined && body.displayName.trim().length === 0) {
+    res.status(400).json({ error: 'displayName cannot be empty' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    const item = await updatePerson({
+      id: req.params.personId,
+      ...(body?.displayName !== undefined ? { displayName: body.displayName } : {}),
+      ...(body?.isHidden !== undefined ? { isHidden: body.isHidden } : {}),
+      ...(body?.isArchived !== undefined ? { isArchived: body.isArchived } : {})
+    });
+
+    if (!item) {
+      res.status(404).json({ error: 'Person not found' } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    res.json({ item });
+  } catch (error) {
+    log.error('Failed to update person', error);
+    res.status(400).json({ error: 'Failed to update person' } satisfies ImportApiErrorResponse);
   }
 });
 

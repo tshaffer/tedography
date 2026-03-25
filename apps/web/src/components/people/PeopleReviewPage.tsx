@@ -363,6 +363,7 @@ export function PeopleReviewPage() {
     getDefaultStatusesForAssetScope(searchParams.get('assetId')?.trim() ?? '')
   );
   const [assetIdFilter, setAssetIdFilter] = useState(() => searchParams.get('assetId')?.trim() ?? '');
+  const [personIdFilter, setPersonIdFilter] = useState(() => searchParams.get('personId')?.trim() ?? '');
   const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
@@ -403,6 +404,7 @@ export function PeopleReviewPage() {
         listPeopleReviewQueue({
           statuses: selectedStatuses,
           ...(assetIdFilter.trim() ? { assetId: assetIdFilter.trim() } : {}),
+          ...(personIdFilter.trim() ? { personId: personIdFilter.trim() } : {}),
           limit: 200,
           sort: sortBy
         }),
@@ -424,7 +426,7 @@ export function PeopleReviewPage() {
 
   useEffect(() => {
     void loadPageData();
-  }, [selectedStatuses, assetIdFilter, sortBy]);
+  }, [selectedStatuses, assetIdFilter, personIdFilter, sortBy]);
 
   useEffect(() => {
     try {
@@ -436,7 +438,9 @@ export function PeopleReviewPage() {
 
   useEffect(() => {
     const queryAssetId = searchParams.get('assetId')?.trim() ?? '';
+    const queryPersonId = searchParams.get('personId')?.trim() ?? '';
     setAssetIdFilter(queryAssetId);
+    setPersonIdFilter(queryPersonId);
     setSelectedStatuses((current) => {
       const defaultForScope = getDefaultStatusesForAssetScope(queryAssetId);
       const currentSet = new Set(current);
@@ -650,6 +654,7 @@ export function PeopleReviewPage() {
 
   const selectedStatusSet = useMemo(() => new Set(selectedStatuses), [selectedStatuses]);
   const trimmedAssetIdFilter = assetIdFilter.trim();
+  const trimmedPersonIdFilter = personIdFilter.trim();
 
   async function runBatchAction(action: 'confirm' | 'reject' | 'ignore'): Promise<void> {
     const selectedItems = filteredItems.filter((item) => selectedDetectionIdSet.has(item.detection.id));
@@ -844,6 +849,41 @@ export function PeopleReviewPage() {
           </div>
         ) : null}
 
+        {!trimmedAssetIdFilter && trimmedPersonIdFilter ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginBottom: '14px',
+              padding: '10px 12px',
+              backgroundColor: '#eef7fb',
+              borderColor: '#bfd6e0',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
+              Filtered to person {trimmedPersonIdFilter}
+            </div>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
+              This queue is scoped to detections related to the selected person. Confirmed asset people remain distinct from unresolved review work.
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Link
+                to={`/people/${encodeURIComponent(trimmedPersonIdFilter)}`}
+                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+              >
+                Back to Person
+              </Link>
+              <button
+                type="button"
+                style={buttonStyle}
+                onClick={() => setPersonIdFilter('')}
+              >
+                Clear Person Filter
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div style={controlsGridStyle}>
           <div>
             <span style={labelStyle}>Asset ID Filter</span>
@@ -854,6 +894,21 @@ export function PeopleReviewPage() {
               style={{ ...inputStyle, width: '100%' }}
               placeholder="Optional asset id"
             />
+          </div>
+          <div>
+            <span style={labelStyle}>Person ID Filter</span>
+            <select
+              value={personIdFilter}
+              onChange={(event) => setPersonIdFilter(event.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+            >
+              <option value="">Any related person</option>
+              {peopleOptions.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.displayName}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <span style={labelStyle}>Sort</span>

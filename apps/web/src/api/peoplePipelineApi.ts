@@ -3,6 +3,7 @@ import type {
   CreatePersonResponse,
   EnrollPersonFromDetectionRequest,
   EnrollPersonFromDetectionResponse,
+  GetPersonDetailResponse,
   ListAssetFaceDetectionsResponse,
   ListPeopleBrowseResponse,
   ListPeopleResponse,
@@ -11,6 +12,8 @@ import type {
   PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
   ProcessPeopleAssetResponse,
+  UpdatePersonRequest,
+  UpdatePersonResponse,
   ReviewFaceDetectionRequest,
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
@@ -40,6 +43,26 @@ export async function listPeopleBrowse(): Promise<ListPeopleBrowseResponse> {
   return fetchJson<ListPeopleBrowseResponse>('/api/people-pipeline/people/browse');
 }
 
+export async function getPersonDetail(personId: string): Promise<GetPersonDetailResponse> {
+  return fetchJson<GetPersonDetailResponse>(`/api/people-pipeline/people/${encodeURIComponent(personId)}`);
+}
+
+export async function updatePerson(
+  personId: string,
+  request: UpdatePersonRequest
+): Promise<UpdatePersonResponse> {
+  return fetchJson<UpdatePersonResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
 export async function createPerson(
   request: CreatePersonRequest
 ): Promise<CreatePersonResponse> {
@@ -55,6 +78,7 @@ export async function createPerson(
 export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetectionMatchStatus[];
   assetId?: string;
+  personId?: string;
   limit?: number;
   sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
@@ -66,6 +90,10 @@ export async function listPeopleReviewQueue(input?: {
 
   if (input?.assetId) {
     query.set('assetId', input.assetId);
+  }
+
+  if (input?.personId) {
+    query.set('personId', input.personId);
   }
 
   if (input?.limit !== undefined) {

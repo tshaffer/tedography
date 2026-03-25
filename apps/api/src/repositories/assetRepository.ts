@@ -156,6 +156,48 @@ export async function listPeopleBrowseSourceAssets(): Promise<
   }));
 }
 
+export async function listAssetsByConfirmedPersonId(personId: string): Promise<
+  Array<
+    Pick<
+      MediaAsset,
+      'id' | 'filename' | 'captureDateTime' | 'importedAt' | 'photoState' | 'originalArchivePath' | 'people'
+    >
+  >
+> {
+  const assets = await MediaAssetModel.find(
+    { 'people.personId': personId },
+    {
+      _id: 0,
+      id: 1,
+      filename: 1,
+      captureDateTime: 1,
+      importedAt: 1,
+      photoState: 1,
+      originalArchivePath: 1,
+      people: 1
+    }
+  )
+    .sort({ captureDateTime: -1, importedAt: -1, id: -1 })
+    .lean<
+      Array<
+        Pick<
+          MediaAsset,
+          'id' | 'filename' | 'captureDateTime' | 'importedAt' | 'photoState' | 'originalArchivePath' | 'people'
+        >
+      >
+    >();
+
+  return assets.map((asset) => ({
+    id: asset.id,
+    filename: asset.filename,
+    captureDateTime: asset.captureDateTime ?? null,
+    importedAt: asset.importedAt,
+    photoState: asset.photoState,
+    originalArchivePath: asset.originalArchivePath,
+    people: asset.people ?? []
+  }));
+}
+
 export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;
