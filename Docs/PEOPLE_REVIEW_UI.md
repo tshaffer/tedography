@@ -15,6 +15,7 @@ It lets you verify:
 - review actions write correctly
 - `mediaAsset.people` recomputes after each review action
 - confidence and sort order are usable enough for real-corpus validation
+- queue review is fast enough to work through many detections in one sitting
 
 ## What The Screen Shows
 
@@ -63,6 +64,44 @@ The page also supports queue sorting for validation:
 - lowest confidence
 - filename
 - asset id
+
+It now also supports productivity-oriented queue work:
+
+- one clear current review card at a time
+- previous / next navigation
+- keyboard shortcuts for common actions
+- checkbox-based batch selection
+- batch confirm / reject / ignore
+- a recent-people quick-assign row above the normal assign-existing picker
+- optional person filtering inside the current queue view
+
+## Keyboard Shortcuts
+
+On the standalone `/people/review` page, when focus is not inside a text/select input:
+
+- `J` or `ArrowDown`: next face
+- `K` or `ArrowUp`: previous face
+- `C`: confirm current face
+- `X`: reject current face
+- `I`: ignore current face using the selected ignored reason
+- `A`: focus the current card's assign-existing picker
+- `N`: focus the current card's create-and-assign input
+
+The page highlights the current card so it is obvious which detection these shortcuts affect.
+
+## Batch Actions
+
+The standalone review page now supports lightweight multi-select:
+
+- check one or more face cards
+- use `Select All Visible` to select the current filtered queue
+- use `Clear Selection` to clear the current selection
+- use the batch action bar to:
+  - confirm selected
+  - reject selected
+  - ignore selected
+
+Batch actions operate on the currently visible queue view and then reload the queue so updated derived asset people remain visible.
 
 ## How To Reach It
 
@@ -120,8 +159,8 @@ pnpm --filter @tedography/web dev
 5. Open `/people/review`
 
 6. Use the inline actions to confirm, reject, assign, create-and-assign, or ignore
-
-7. Verify the `Derived Asset People` field changes as expected after each action
+7. Use keyboard shortcuts or batch actions when working through many detections
+8. Verify the `Derived Asset People` field changes as expected after each action
 
 ## Library Shortcut
 
@@ -185,9 +224,11 @@ Use the standalone `/people/review` page when:
 
 - you want a broader queue across many assets
 - you want explicit queue sorting/filtering controls
+- you want keyboard shortcuts and batch actions
 - you are doing batch/admin-style people review
 
 ## Current Limitations
 
 - Face crops/previews are shown when the active engine generated them. With `mock`, the page usually falls back to the source asset thumbnail.
 - The page is intentionally lightweight and does not provide broader person-management workflows yet.
+- Batch actions currently cover confirm / reject / ignore. Assignment remains intentionally per-face so confirmed person identity stays explicit.

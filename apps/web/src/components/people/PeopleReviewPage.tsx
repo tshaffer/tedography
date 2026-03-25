@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
@@ -54,6 +54,12 @@ const cardStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '220px minmax(0, 1fr)',
   gap: '16px'
+};
+
+const currentCardStyle: CSSProperties = {
+  ...cardStyle,
+  borderColor: '#0f5f73',
+  boxShadow: '0 0 0 2px rgba(15, 95, 115, 0.12), 0 10px 24px rgba(15, 23, 42, 0.08)'
 };
 
 const previewBoxStyle: CSSProperties = {
@@ -118,6 +124,13 @@ const badgeStyle: CSSProperties = {
   fontWeight: 700
 };
 
+const currentBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  borderColor: '#0f5f73',
+  backgroundColor: '#e8f5f8',
+  color: '#0d4f60'
+};
+
 const actionsSectionStyle: CSSProperties = {
   display: 'grid',
   gap: '10px'
@@ -174,6 +187,12 @@ const disabledButtonStyle: CSSProperties = {
   cursor: 'not-allowed'
 };
 
+const compactButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  padding: '6px 10px',
+  fontSize: '12px'
+};
+
 const statusOptions: Array<{ value: FaceDetectionMatchStatus; label: string }> = [
   { value: 'suggested', label: 'Suggested' },
   { value: 'autoMatched', label: 'Auto Matched' },
@@ -209,6 +228,48 @@ type ReviewDraftState = {
   newPersonName: string;
   ignoredReason: FaceDetectionIgnoredReason;
 };
+
+const recentPeopleStorageKey = 'tedography.peopleReview.recentPeople';
+const autoAdvanceStorageKey = 'tedography.peopleReview.autoAdvance';
+
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select' || tagName === 'option';
+}
+
+function readRecentPeopleIds(): string[] {
+  try {
+    const raw = window.localStorage.getItem(recentPeopleStorageKey);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((value): value is string => typeof value === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function readAutoAdvanceDefault(): boolean {
+  try {
+    return window.localStorage.getItem(autoAdvanceStorageKey) !== 'false';
+  } catch {
+    return true;
+  }
+}
 
 function formatDateTime(value?: string | null): string {
   if (!value) {
@@ -305,12 +366,34 @@ export function PeopleReviewPage() {
   const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
+  const [currentDetectionId, setCurrentDetectionId] = useState<string | null>(null);
+  const [selectedDetectionIds, setSelectedDetectionIds] = useState<string[]>([]);
+  const [personFilterId, setPersonFilterId] = useState('');
+  const [recentPeopleIds, setRecentPeopleIds] = useState<string[]>(() => readRecentPeopleIds());
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState<boolean>(() => readAutoAdvanceDefault());
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<PeoplePipelineSummaryResponse | null>(null);
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  const assignSelectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
+  const createInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const queueCount = items.length;
+  function rememberRecentPerson(personId: string | null | undefined): void {
+    if (!personId) {
+      return;
+    }
+
+    setRecentPeopleIds((current) => {
+      const next = [personId, ...current.filter((value) => value !== personId)].slice(0, 6);
+      try {
+        window.localStorage.setItem(recentPeopleStorageKey, JSON.stringify(next));
+      } catch {
+        // Best-effort only.
+      }
+      return next;
+    });
+  }
 
   async function loadPageData() {
     setLoading(true);
@@ -342,6 +425,14 @@ export function PeopleReviewPage() {
   useEffect(() => {
     void loadPageData();
   }, [selectedStatuses, assetIdFilter, sortBy]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(autoAdvanceStorageKey, autoAdvanceEnabled ? 'true' : 'false');
+    } catch {
+      // Best-effort only.
+    }
+  }, [autoAdvanceEnabled]);
 
   useEffect(() => {
     const queryAssetId = searchParams.get('assetId')?.trim() ?? '';
@@ -384,6 +475,88 @@ export function PeopleReviewPage() {
     }));
   }
 
+  const filteredItems = useMemo(() => {
+    const trimmedPersonFilterId = personFilterId.trim();
+    if (trimmedPersonFilterId.length === 0) {
+      return items;
+    }
+
+    return items.filter((item) => {
+      const confirmedPeople = item.asset.people ?? [];
+      return (
+        item.detection.matchedPersonId === trimmedPersonFilterId ||
+        item.detection.autoMatchCandidatePersonId === trimmedPersonFilterId ||
+        item.matchedPerson?.id === trimmedPersonFilterId ||
+        item.suggestedPerson?.id === trimmedPersonFilterId ||
+        confirmedPeople.some((person) => person.personId === trimmedPersonFilterId)
+      );
+    });
+  }, [items, personFilterId]);
+
+  const filteredItemIds = useMemo(() => filteredItems.map((item) => item.detection.id), [filteredItems]);
+  const selectedDetectionIdSet = useMemo(() => new Set(selectedDetectionIds), [selectedDetectionIds]);
+  const visibleSelectedCount = useMemo(
+    () => filteredItemIds.filter((id) => selectedDetectionIdSet.has(id)).length,
+    [filteredItemIds, selectedDetectionIdSet]
+  );
+  const currentItemIndex = filteredItems.findIndex((item) => item.detection.id === currentDetectionId);
+  const currentItem = currentItemIndex >= 0 ? filteredItems[currentItemIndex] : filteredItems[0] ?? null;
+  const recentPeople = useMemo(
+    () =>
+      recentPeopleIds
+        .map((personId) => peopleOptions.find((person) => person.id === personId))
+        .filter((person): person is { id: string; displayName: string } => Boolean(person)),
+    [peopleOptions, recentPeopleIds]
+  );
+
+  useEffect(() => {
+    setSelectedDetectionIds((current) => current.filter((id) => filteredItemIds.includes(id)));
+  }, [filteredItemIds]);
+
+  useEffect(() => {
+    if (filteredItems.length === 0) {
+      setCurrentDetectionId(null);
+      return;
+    }
+
+    if (!currentDetectionId || !filteredItemIds.includes(currentDetectionId)) {
+      setCurrentDetectionId(filteredItems[0]?.detection.id ?? null);
+    }
+  }, [currentDetectionId, filteredItemIds, filteredItems]);
+
+  function focusDetectionCard(detectionId: string): void {
+    setCurrentDetectionId(detectionId);
+    const node = cardRefs.current[detectionId];
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  function focusRelativeItem(direction: -1 | 1): void {
+    if (filteredItems.length === 0 || !currentItem) {
+      return;
+    }
+
+    const currentIndex = filteredItems.findIndex((item) => item.detection.id === currentItem.detection.id);
+    const nextIndex = Math.min(filteredItems.length - 1, Math.max(0, currentIndex + direction));
+    const nextItem = filteredItems[nextIndex];
+    if (nextItem) {
+      focusDetectionCard(nextItem.detection.id);
+    }
+  }
+
+  function advanceAfterAction(completedDetectionId: string): void {
+    if (!autoAdvanceEnabled || filteredItems.length === 0) {
+      return;
+    }
+
+    const currentIndexInFiltered = filteredItems.findIndex((item) => item.detection.id === completedDetectionId);
+    const nextItem = filteredItems[currentIndexInFiltered + 1] ?? filteredItems[currentIndexInFiltered - 1] ?? null;
+    if (nextItem) {
+      setCurrentDetectionId(nextItem.detection.id);
+    }
+  }
+
   async function runAction(
     item: PeopleReviewQueueItem,
     action:
@@ -392,7 +565,7 @@ export function PeopleReviewPage() {
       | { type: 'assign'; personId: string }
       | { type: 'createAndAssign'; displayName: string }
       | { type: 'ignore'; ignoredReason: FaceDetectionIgnoredReason }
-  ) {
+  ): Promise<boolean> {
     setBusyDetectionId(item.detection.id);
     setErrorMessage(null);
     setNoticeMessage(null);
@@ -406,6 +579,7 @@ export function PeopleReviewPage() {
           ...(confirmPersonId ? { personId: confirmPersonId } : {}),
           reviewer: 'people-review-ui'
         });
+        rememberRecentPerson(confirmPersonId);
         if (assetIdFilter.trim().length > 0) {
           setSelectedStatuses((current) =>
             current.includes('confirmed') ? current : [...current, 'confirmed']
@@ -424,6 +598,7 @@ export function PeopleReviewPage() {
           personId: action.personId,
           reviewer: 'people-review-ui'
         });
+        rememberRecentPerson(action.personId);
         setNoticeMessage(`Assigned face ${item.detection.id}.`);
       } else if (action.type === 'createAndAssign') {
         await reviewFaceDetection(item.detection.id, {
@@ -442,14 +617,17 @@ export function PeopleReviewPage() {
       }
 
       await loadPageData();
+      advanceAfterAction(item.detection.id);
+      return true;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to update face review');
+      return false;
     } finally {
       setBusyDetectionId(null);
     }
   }
 
-  async function handleEnroll(item: PeopleReviewQueueItem, personId: string) {
+  async function handleEnroll(item: PeopleReviewQueueItem, personId: string): Promise<void> {
     setBusyDetectionId(item.detection.id);
     setErrorMessage(null);
     setNoticeMessage(null);
@@ -458,6 +636,7 @@ export function PeopleReviewPage() {
       const response = await enrollPersonFromDetection(personId, {
         detectionId: item.detection.id
       });
+      rememberRecentPerson(response.person.id);
       setNoticeMessage(
         `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
       );
@@ -471,6 +650,144 @@ export function PeopleReviewPage() {
 
   const selectedStatusSet = useMemo(() => new Set(selectedStatuses), [selectedStatuses]);
   const trimmedAssetIdFilter = assetIdFilter.trim();
+
+  async function runBatchAction(action: 'confirm' | 'reject' | 'ignore'): Promise<void> {
+    const selectedItems = filteredItems.filter((item) => selectedDetectionIdSet.has(item.detection.id));
+    if (selectedItems.length === 0 || busyDetectionId) {
+      return;
+    }
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled(
+        selectedItems.map((item) => {
+          if (action === 'confirm') {
+            const confirmPersonId =
+              item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId ?? null;
+            if (!confirmPersonId) {
+              return Promise.reject(new Error(`Face ${item.detection.id} has no person to confirm`));
+            }
+            rememberRecentPerson(confirmPersonId);
+            return reviewFaceDetection(item.detection.id, {
+              action: 'confirm',
+              personId: confirmPersonId,
+              reviewer: 'people-review-ui'
+            });
+          }
+
+          if (action === 'reject') {
+            return reviewFaceDetection(item.detection.id, {
+              action: 'reject',
+              reviewer: 'people-review-ui'
+            });
+          }
+
+          const ignoredReason = getDraft(item.detection.id).ignoredReason;
+          return reviewFaceDetection(item.detection.id, {
+            action: 'ignore',
+            ignoredReason,
+            reviewer: 'people-review-ui'
+          });
+        })
+      );
+
+      const succeededCount = results.filter((result) => result.status === 'fulfilled').length;
+      const failedCount = results.length - succeededCount;
+
+      if (action === 'confirm' && trimmedAssetIdFilter.length > 0 && succeededCount > 0) {
+        setSelectedStatuses((current) => (current.includes('confirmed') ? current : [...current, 'confirmed']));
+      }
+
+      if (succeededCount > 0) {
+        setSelectedDetectionIds((current) =>
+          current.filter((id) => !selectedItems.some((item) => item.detection.id === id))
+        );
+      }
+
+      await loadPageData();
+
+      if (failedCount === 0) {
+        setNoticeMessage(
+          `${action === 'confirm' ? 'Confirmed' : action === 'reject' ? 'Rejected' : 'Ignored'} ${succeededCount} selected face${succeededCount === 1 ? '' : 's'}.`
+        );
+      } else {
+        setNoticeMessage(
+          `${action === 'confirm' ? 'Confirmed' : action === 'reject' ? 'Rejected' : 'Ignored'} ${succeededCount} selected face${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+        );
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update selected face reviews');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
+  useEffect(() => {
+    function handleWindowKeyDown(event: KeyboardEvent): void {
+      if (loading || busyDetectionId || isEditableEventTarget(event.target)) {
+        return;
+      }
+
+      if (filteredItems.length === 0 || !currentItem) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'j' || event.key === 'J') {
+        event.preventDefault();
+        focusRelativeItem(1);
+        return;
+      }
+
+      if (event.key === 'ArrowUp' || event.key === 'k' || event.key === 'K') {
+        event.preventDefault();
+        focusRelativeItem(-1);
+        return;
+      }
+
+      if (event.key === 'c' || event.key === 'C') {
+        const canConfirm =
+          typeof currentItem.detection.autoMatchCandidatePersonId === 'string' ||
+          typeof currentItem.detection.matchedPersonId === 'string';
+        if (canConfirm) {
+          event.preventDefault();
+          void runAction(currentItem, { type: 'confirm' });
+        }
+        return;
+      }
+
+      if (event.key === 'x' || event.key === 'X') {
+        event.preventDefault();
+        void runAction(currentItem, { type: 'reject' });
+        return;
+      }
+
+      if (event.key === 'i' || event.key === 'I') {
+        event.preventDefault();
+        const draft = getDraft(currentItem.detection.id);
+        void runAction(currentItem, { type: 'ignore', ignoredReason: draft.ignoredReason });
+        return;
+      }
+
+      if (event.key === 'a' || event.key === 'A') {
+        event.preventDefault();
+        assignSelectRefs.current[currentItem.detection.id]?.focus();
+        return;
+      }
+
+      if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        createInputRefs.current[currentItem.detection.id]?.focus();
+      }
+    }
+
+    window.addEventListener('keydown', handleWindowKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeyDown);
+    };
+  }, [busyDetectionId, currentItem, filteredItems, loading]);
 
   return (
     <div style={pageStyle}>
@@ -553,16 +870,132 @@ export function PeopleReviewPage() {
             </select>
           </div>
           <div>
+            <span style={labelStyle}>Person Filter</span>
+            <select
+              value={personFilterId}
+              onChange={(event) => setPersonFilterId(event.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+            >
+              <option value="">Any person state</option>
+              {peopleOptions.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <span style={labelStyle}>Queue Size</span>
-            <div style={{ ...inputStyle, backgroundColor: '#f7f9fb' }}>{queueCount} loaded</div>
+            <div style={{ ...inputStyle, backgroundColor: '#f7f9fb' }}>{filteredItems.length} loaded</div>
           </div>
           <div>
             <span style={labelStyle}>Actions</span>
-            <button type="button" style={buttonStyle} onClick={() => void loadPageData()}>
-              Refresh
-            </button>
+            <div style={inlineRowStyle}>
+              <button type="button" style={compactButtonStyle} onClick={() => void loadPageData()}>
+                Refresh
+              </button>
+              <button
+                type="button"
+                style={filteredItems.length === 0 || currentItemIndex <= 0 ? disabledButtonStyle : compactButtonStyle}
+                disabled={filteredItems.length === 0 || currentItemIndex <= 0}
+                onClick={() => focusRelativeItem(-1)}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                style={
+                  filteredItems.length === 0 || currentItemIndex < 0 || currentItemIndex >= filteredItems.length - 1
+                    ? disabledButtonStyle
+                    : compactButtonStyle
+                }
+                disabled={filteredItems.length === 0 || currentItemIndex < 0 || currentItemIndex >= filteredItems.length - 1}
+                onClick={() => focusRelativeItem(1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
+
+        <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: '14px' }}>
+          <div style={metaItemStyle}>
+            <span style={labelStyle}>Current Item</span>
+            {currentItem ? `${currentItemIndex + 1} of ${filteredItems.length}` : 'None'}
+          </div>
+          <div style={metaItemStyle}>
+            <span style={labelStyle}>Selection</span>
+            {visibleSelectedCount} selected
+          </div>
+          <div style={metaItemStyle}>
+            <span style={labelStyle}>Auto Advance</span>
+            <label style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={autoAdvanceEnabled}
+                onChange={(event) => setAutoAdvanceEnabled(event.target.checked)}
+              />
+              Move to next face after action
+            </label>
+          </div>
+          <div style={metaItemStyle}>
+            <span style={labelStyle}>Shortcuts</span>
+            <span>J/K or arrows next/previous, C confirm, X reject, I ignore, A assign, N create</span>
+          </div>
+        </div>
+
+        {visibleSelectedCount > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginTop: '14px',
+              marginBottom: '14px',
+              padding: '12px',
+              backgroundColor: '#f6fafb',
+              borderColor: '#bfd6e0',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ ...inlineRowStyle, justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
+                {visibleSelectedCount} selected in current queue view
+              </div>
+              <div style={inlineRowStyle}>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void runBatchAction('confirm')}
+                >
+                  Confirm Selected
+                </button>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void runBatchAction('reject')}
+                >
+                  Reject Selected
+                </button>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void runBatchAction('ignore')}
+                >
+                  Ignore Selected
+                </button>
+                <button
+                  type="button"
+                  style={compactButtonStyle}
+                  onClick={() => setSelectedDetectionIds([])}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {summary ? (
           <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: 0 }}>
@@ -637,10 +1070,33 @@ export function PeopleReviewPage() {
         </section>
       ) : null}
 
+      {!loading && filteredItems.length > 0 ? (
+        <div style={{ ...inlineRowStyle, marginBottom: '12px' }}>
+          <button
+            type="button"
+            style={compactButtonStyle}
+            onClick={() => setSelectedDetectionIds(filteredItemIds)}
+          >
+            Select All Visible
+          </button>
+          <button
+            type="button"
+            style={compactButtonStyle}
+            onClick={() => setSelectedDetectionIds([])}
+          >
+            Clear Selection
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && items.length > 0 && filteredItems.length === 0 ? (
+        <section style={panelStyle}>No face detections matched the current person filter.</section>
+      ) : null}
+
       {!loading
-        ? items.map((item) => {
+        ? filteredItems.map((item) => {
             const draft = getDraft(item.detection.id);
-            const isBusy = busyDetectionId === item.detection.id;
+            const isBusy = busyDetectionId === item.detection.id || busyDetectionId === '__batch__';
             const canConfirm =
               typeof item.detection.autoMatchCandidatePersonId === 'string' ||
               typeof item.detection.matchedPersonId === 'string';
@@ -648,9 +1104,18 @@ export function PeopleReviewPage() {
             const enrollPersonName = item.matchedPerson?.displayName ?? item.suggestedPerson?.displayName ?? '';
             const confirmActionLabel = getConfirmActionLabel(item);
             const confirmActionHint = getConfirmActionHint(item);
+            const isCurrent = currentItem?.detection.id === item.detection.id;
+            const isSelected = selectedDetectionIdSet.has(item.detection.id);
 
             return (
-              <section key={item.detection.id} style={cardStyle}>
+              <section
+                key={item.detection.id}
+                ref={(node) => {
+                  cardRefs.current[item.detection.id] = node;
+                }}
+                style={isCurrent ? currentCardStyle : cardStyle}
+                onClick={() => setCurrentDetectionId(item.detection.id)}
+              >
                 <div>
                   <div style={previewColumnStyle}>
                     <div>
@@ -694,7 +1159,23 @@ export function PeopleReviewPage() {
 
                 <div>
                   <div style={badgeRowStyle}>
-                    <span style={badgeStyle}>Status: {item.detection.matchStatus}</span>
+                    <label style={{ ...badgeStyle, display: 'inline-flex', gap: '8px', alignItems: 'center', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(event) =>
+                          setSelectedDetectionIds((current) =>
+                            event.target.checked
+                              ? [...current, item.detection.id]
+                              : current.filter((id) => id !== item.detection.id)
+                          )
+                        }
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                      Select
+                    </label>
+                    <span style={isCurrent ? currentBadgeStyle : badgeStyle}>Status: {item.detection.matchStatus}</span>
+                    {isCurrent ? <span style={currentBadgeStyle}>Current</span> : null}
                     <span style={badgeStyle}>Face #{item.detection.faceIndex}</span>
                     <span style={badgeStyle}>Asset: {item.asset.id}</span>
                   </div>
@@ -773,6 +1254,14 @@ export function PeopleReviewPage() {
                       >
                         Reject
                       </button>
+                      <button
+                        type="button"
+                        style={isBusy ? disabledButtonStyle : buttonStyle}
+                        disabled={isBusy}
+                        onClick={() => focusDetectionCard(item.detection.id)}
+                      >
+                        Focus
+                      </button>
                     </div>
                     {confirmActionHint ? (
                       <div style={{ fontSize: '12px', color: '#6a4d00' }}>{confirmActionHint}</div>
@@ -793,8 +1282,30 @@ export function PeopleReviewPage() {
                       </button>
                     </div>
 
+                    {recentPeople.length > 0 ? (
+                      <div style={inlineRowStyle}>
+                        {recentPeople.map((person) => (
+                          <button
+                            key={person.id}
+                            type="button"
+                            style={isBusy ? disabledButtonStyle : compactButtonStyle}
+                            disabled={isBusy}
+                            onClick={() => {
+                              updateDraft(item.detection.id, { selectedPersonId: person.id });
+                              void runAction(item, { type: 'assign', personId: person.id });
+                            }}
+                          >
+                            Assign {person.displayName}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
                     <div style={inlineRowStyle}>
                       <select
+                        ref={(node) => {
+                          assignSelectRefs.current[item.detection.id] = node;
+                        }}
                         value={draft.selectedPersonId}
                         onChange={(event) => updateDraft(item.detection.id, { selectedPersonId: event.target.value })}
                         style={{ ...inputStyle, minWidth: '240px' }}
@@ -819,6 +1330,9 @@ export function PeopleReviewPage() {
 
                     <div style={inlineRowStyle}>
                       <input
+                        ref={(node) => {
+                          createInputRefs.current[item.detection.id] = node;
+                        }}
                         type="text"
                         value={draft.newPersonName}
                         onChange={(event) => updateDraft(item.detection.id, { newPersonName: event.target.value })}
