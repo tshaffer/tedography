@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
+import { summarizeFaceDetectionsByAssetIds } from './faceDetectionRepository.js';
 
 export async function syncMediaAssetIndexes(): Promise<void> {
   await MediaAssetModel.syncIndexes();
@@ -52,7 +53,15 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
   )
     .sort({ id: 1 })
     .lean<MediaAsset[]>();
-  return normalizeMediaAssets(assets);
+  const normalizedAssets = normalizeMediaAssets(assets);
+  const summariesByAssetId = await summarizeFaceDetectionsByAssetIds(normalizedAssets.map((asset) => asset.id));
+
+  return normalizedAssets.map((asset) => ({
+    ...asset,
+    detectionsCount: summariesByAssetId[asset.id]?.detectionsCount ?? 0,
+    reviewableDetectionsCount: summariesByAssetId[asset.id]?.reviewableDetectionsCount ?? 0,
+    confirmedDetectionsCount: summariesByAssetId[asset.id]?.confirmedDetectionsCount ?? 0
+  }));
 }
 
 export async function findById(id: string): Promise<MediaAsset | null> {

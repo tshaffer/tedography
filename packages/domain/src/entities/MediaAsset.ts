@@ -54,6 +54,11 @@ export interface MediaAsset {
   // Derived convenience field populated from confirmed person assignments.
   people?: MediaAssetPerson[];
 
+  // Derived face-review summary fields used by Library/Search flows.
+  detectionsCount?: number;
+  reviewableDetectionsCount?: number;
+  confirmedDetectionsCount?: number;
+
   // Optional capture location metadata when available.
   locationLabel?: string | null;
   locationLatitude?: number | null;

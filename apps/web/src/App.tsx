@@ -12,6 +12,7 @@ import {
 import { Link } from 'react-router-dom';
 import {
   MediaType,
+  type Person,
   PhotoState,
   normalizePhotoState,
   type AlbumTreeNode,
@@ -29,7 +30,7 @@ import {
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
-import { getPeoplePipelineAssetState, processPeopleAsset } from './api/peoplePipelineApi';
+import { getPeoplePipelineAssetState, listPeople, processPeopleAsset } from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
@@ -78,6 +79,10 @@ const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
+const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
+const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
+const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
+const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
 const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 const leftPanelVisibleStorageKey = 'tedography.leftPanelVisible';
@@ -97,6 +102,7 @@ type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type AlbumTreeSortMode = 'Custom' | 'Name' | 'Month/Name';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
+type SearchPeopleMatchMode = 'Any' | 'All';
 
 type AppBootstrapCache = {
   assets: MediaAsset[] | null;
@@ -427,6 +433,25 @@ const filterSubsectionStyle: CSSProperties = {
   display: 'grid',
   gap: '6px',
   marginTop: '8px'
+};
+
+const searchPeopleChipRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '6px',
+  marginTop: '6px'
+};
+
+const searchPeopleChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  borderRadius: '999px',
+  border: '1px solid #cdd9ed',
+  backgroundColor: '#eef4ff',
+  padding: '4px 10px',
+  fontSize: '12px',
+  fontWeight: 600
 };
 
 const filterSubsectionTitleStyle: CSSProperties = {
@@ -1321,6 +1346,14 @@ function parseStringArrayFromStorage(value: string | null): string[] {
   }
 }
 
+function parseBooleanFromStorage(value: string | null): boolean {
+  return value === 'true';
+}
+
+function parseSearchPeopleMatchModeFromStorage(value: string | null): SearchPeopleMatchMode {
+  return value === 'All' ? 'All' : 'Any';
+}
+
 function parsePrimaryAreaFromStorage(value: string | null): TedographyPrimaryArea {
   if (value === 'Review' || value === 'Library' || value === 'Search') {
     return value;
@@ -1451,6 +1484,35 @@ function doesAssetMatchSearchCaptureDateRange(
   }
 
   return true;
+}
+
+function doesAssetMatchSearchPeopleFilters(
+  asset: MediaAsset,
+  peopleIds: string[],
+  peopleMatchMode: SearchPeopleMatchMode,
+  hasNoPeople: boolean,
+  hasReviewableFaces: boolean
+): boolean {
+  const confirmedPeopleIds = new Set((asset.people ?? []).map((person) => person.personId));
+  const reviewableDetectionsCount = (asset as MediaAsset & { reviewableDetectionsCount?: number }).reviewableDetectionsCount ?? 0;
+
+  if (hasNoPeople && confirmedPeopleIds.size > 0) {
+    return false;
+  }
+
+  if (hasReviewableFaces && reviewableDetectionsCount <= 0) {
+    return false;
+  }
+
+  if (peopleIds.length === 0) {
+    return true;
+  }
+
+  if (peopleMatchMode === 'All') {
+    return peopleIds.every((personId) => confirmedPeopleIds.has(personId));
+  }
+
+  return peopleIds.some((personId) => confirmedPeopleIds.has(personId));
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -2556,6 +2618,39 @@ export default function App() {
 
     return window.localStorage.getItem(searchCaptureDateToStorageKey) ?? '';
   });
+  const [searchPeopleIds, setSearchPeopleIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    return parseStringArrayFromStorage(window.localStorage.getItem(searchPeopleIdsStorageKey));
+  });
+  const [searchPeopleMatchMode, setSearchPeopleMatchMode] = useState<SearchPeopleMatchMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'Any';
+    }
+
+    return parseSearchPeopleMatchModeFromStorage(window.localStorage.getItem(searchPeopleMatchModeStorageKey));
+  });
+  const [searchHasNoPeople, setSearchHasNoPeople] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return parseBooleanFromStorage(window.localStorage.getItem(searchHasNoPeopleStorageKey));
+  });
+  const [searchHasReviewableFaces, setSearchHasReviewableFaces] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return parseBooleanFromStorage(window.localStorage.getItem(searchHasReviewableFacesStorageKey));
+  });
+  const [searchPeopleQuery, setSearchPeopleQuery] = useState('');
+  const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
+  const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
+  const [searchPeopleError, setSearchPeopleError] = useState<string | null>(null);
+  const searchPeopleAttemptedRef = useRef(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
@@ -2913,6 +3008,22 @@ export default function App() {
   }, [searchCaptureDateTo]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchPeopleIdsStorageKey, JSON.stringify(searchPeopleIds));
+  }, [searchPeopleIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchPeopleMatchModeStorageKey, searchPeopleMatchMode);
+  }, [searchPeopleMatchMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasNoPeopleStorageKey, String(searchHasNoPeople));
+  }, [searchHasNoPeople]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasReviewableFacesStorageKey, String(searchHasReviewableFaces));
+  }, [searchHasReviewableFaces]);
+
+  useEffect(() => {
     if (assets.length > 0) {
       writeSessionStorageJson(assetsBootstrapStorageKey, assets);
     }
@@ -2976,6 +3087,44 @@ export default function App() {
     try {
       const state = await getPeoplePipelineAssetState(assetId);
       setSelectedAssetPeopleStatus(state);
+      setAssets((previous) =>
+        previous.map((asset) =>
+          asset.id === assetId
+            ? {
+                ...asset,
+                people: state.people,
+                detectionsCount: state.detections.length,
+                reviewableDetectionsCount: state.detections.filter(
+                  (detection) =>
+                    detection.matchStatus === 'unmatched' ||
+                    detection.matchStatus === 'suggested' ||
+                    detection.matchStatus === 'autoMatched'
+                ).length,
+                confirmedDetectionsCount: state.detections.filter(
+                  (detection) => detection.matchStatus === 'confirmed'
+                ).length
+              }
+            : asset
+        )
+      );
+      setSelectedAssetDetails((current) =>
+        current?.id === assetId
+          ? {
+              ...current,
+              people: state.people,
+              detectionsCount: state.detections.length,
+              reviewableDetectionsCount: state.detections.filter(
+                (detection) =>
+                  detection.matchStatus === 'unmatched' ||
+                  detection.matchStatus === 'suggested' ||
+                  detection.matchStatus === 'autoMatched'
+              ).length,
+              confirmedDetectionsCount: state.detections.filter(
+                (detection) => detection.matchStatus === 'confirmed'
+              ).length
+            }
+          : current
+      );
     } catch (error) {
       setSelectedAssetPeopleStatus(null);
       setSelectedAssetPeopleStatusError(
@@ -3087,6 +3236,58 @@ export default function App() {
 
     void loadSelectedAssetPeopleStatus(selectedAssetId);
   }, [primaryArea, selectedAssetId, selectedAssetIds.length]);
+
+  useEffect(() => {
+    if (primaryArea !== 'Search') {
+      return;
+    }
+
+    if (searchPeopleOptions.length > 0 || searchPeopleLoading || searchPeopleAttemptedRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      abortController.abort();
+    }, 8000);
+    setSearchPeopleLoading(true);
+    setSearchPeopleError(null);
+    searchPeopleAttemptedRef.current = true;
+
+    void listPeople({ signal: abortController.signal })
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSearchPeopleOptions(response.items);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          setSearchPeopleError('Timed out loading the people list. Showing confirmed people already present in library data.');
+          return;
+        }
+
+        setSearchPeopleError(error instanceof Error ? error.message : 'Failed to load people');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          window.clearTimeout(timeoutId);
+          setSearchPeopleLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      abortController.abort();
+    };
+  }, [primaryArea, searchPeopleLoading, searchPeopleOptions.length]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -3238,8 +3439,15 @@ export default function App() {
         searchCaptureDateFrom,
         searchCaptureDateTo
       );
+      const matchesPeople = doesAssetMatchSearchPeopleFilters(
+        asset,
+        searchPeopleIds,
+        searchPeopleMatchMode,
+        searchHasNoPeople,
+        searchHasReviewableFaces
+      );
 
-      return matchesPhotoState && matchesAlbum && matchesCaptureDateRange;
+      return matchesPhotoState && matchesAlbum && matchesCaptureDateRange && matchesPeople;
     });
 
     return sortVisibleAssetsForTimeline(filtered);
@@ -3249,6 +3457,10 @@ export default function App() {
     searchAlbumIds,
     searchCaptureDateFrom,
     searchCaptureDateTo,
+    searchHasNoPeople,
+    searchHasReviewableFaces,
+    searchPeopleIds,
+    searchPeopleMatchMode,
     searchPhotoStates
   ]);
 
@@ -3504,6 +3716,54 @@ export default function App() {
       selectedAssetsForAlbumMembershipAction.length - selectedAssetsInFocusedAlbum.length
     );
   }, [selectedAssetsForAlbumMembershipAction.length, selectedAssetsInFocusedAlbum.length]);
+  const searchPeopleById = useMemo(
+    () => new Map(searchPeopleOptions.map((person) => [person.id, person])),
+    [searchPeopleOptions]
+  );
+  const fallbackSearchPeople = useMemo(() => {
+    const byId = new Map<string, Person>();
+
+    for (const asset of assets) {
+      for (const person of asset.people ?? []) {
+        if (!byId.has(person.personId)) {
+          byId.set(person.personId, {
+            id: person.personId,
+            displayName: person.displayName,
+            sortName: null,
+            aliases: [],
+            notes: null,
+            isHidden: false,
+            isArchived: false,
+            createdAt: '',
+            updatedAt: ''
+          });
+        }
+      }
+    }
+
+    return Array.from(byId.values()).sort((left, right) => left.displayName.localeCompare(right.displayName));
+  }, [assets]);
+  const availableSearchPeopleOptions = searchPeopleOptions.length > 0 ? searchPeopleOptions : fallbackSearchPeople;
+  const selectedSearchPeople = useMemo(
+    () =>
+      searchPeopleIds
+        .map((personId) => (searchPeopleById.get(personId) ?? availableSearchPeopleOptions.find((person) => person.id === personId)))
+        .filter((person): person is Person => Boolean(person)),
+    [availableSearchPeopleOptions, searchPeopleById, searchPeopleIds]
+  );
+  const filteredSearchPeopleOptions = useMemo(() => {
+    const query = searchPeopleQuery.trim().toLowerCase();
+    const selectedIds = new Set(searchPeopleIds);
+    const unselected = availableSearchPeopleOptions.filter((person) => !selectedIds.has(person.id));
+
+    if (!query) {
+      return unselected.slice(0, 18);
+    }
+
+    return unselected
+      .filter((person) => person.displayName.toLowerCase().includes(query))
+      .slice(0, 18);
+  }, [availableSearchPeopleOptions, searchPeopleIds, searchPeopleQuery]);
 
   const selectedAlbumTreeGroupNode = useMemo(() => {
     if (!selectedTreeNodeId) {
@@ -3596,7 +3856,10 @@ export default function App() {
     searchPhotoStates.length > 0 ||
     searchAlbumIds.length > 0 ||
     searchCaptureDateFrom.length > 0 ||
-    searchCaptureDateTo.length > 0;
+    searchCaptureDateTo.length > 0 ||
+    searchPeopleIds.length > 0 ||
+    searchHasNoPeople ||
+    searchHasReviewableFaces;
   const hasCheckedAlbums = checkedAlbumIds.length > 0;
   const hasAssetsInCheckedAlbumsAfterFilters = checkedAlbumSections.length > 0;
   const isReviewArea = primaryArea === 'Review';
@@ -3947,8 +4210,15 @@ export default function App() {
             searchCaptureDateFrom,
             searchCaptureDateTo
           );
+          const matchesSearchPeople = doesAssetMatchSearchPeopleFilters(
+            updatedAsset,
+            searchPeopleIds,
+            searchPeopleMatchMode,
+            searchHasNoPeople,
+            searchHasReviewableFaces
+          );
 
-          return matchesSearchPhotoState && matchesSearchAlbum && matchesSearchDate;
+          return matchesSearchPhotoState && matchesSearchAlbum && matchesSearchDate && matchesSearchPeople;
         }
 
         const matchesPhotoStateAfterUpdate = currentAreaPhotoStates.includes(updatedAsset.photoState);
@@ -4467,6 +4737,15 @@ export default function App() {
     );
   }
 
+  function toggleSearchPerson(personId: string): void {
+    setSearchHasNoPeople(false);
+    setSearchPeopleIds((previous) =>
+      previous.includes(personId)
+        ? previous.filter((id) => id !== personId)
+        : [...previous, personId]
+    );
+  }
+
   function clearFilters(): void {
     const defaultStates = getDefaultPhotoStatesForPrimaryArea(primaryArea);
     if (defaultStates) {
@@ -4480,6 +4759,11 @@ export default function App() {
     setSearchAlbumIds([]);
     setSearchCaptureDateFrom('');
     setSearchCaptureDateTo('');
+    setSearchPeopleIds([]);
+    setSearchPeopleMatchMode('Any');
+    setSearchHasNoPeople(false);
+    setSearchHasReviewableFaces(false);
+    setSearchPeopleQuery('');
   }
 
   function clearSelection(): void {
@@ -5708,6 +5992,106 @@ export default function App() {
                 value={searchCaptureDateTo}
                 onChange={(event) => setSearchCaptureDateTo(event.target.value)}
               />
+            </label>
+          </div>
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>People</h3>
+          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
+            People filters match confirmed derived asset people. Reviewable faces are unresolved face detections.
+          </div>
+          <div style={filterRowStyle}>
+            <label style={filterOptionLabelStyle}>
+              Match
+              <select
+                value={searchPeopleMatchMode}
+                onChange={(event) => setSearchPeopleMatchMode(event.target.value as SearchPeopleMatchMode)}
+                style={compactSelectStyle}
+                disabled={searchPeopleIds.length === 0}
+              >
+                <option value="Any">Any</option>
+                <option value="All">All</option>
+              </select>
+            </label>
+          </div>
+          <div style={filterRowStyle}>
+            <label style={{ ...filterOptionLabelStyle, display: 'grid', gap: '4px', width: '100%' }}>
+              Find person
+              <input
+                type="text"
+                value={searchPeopleQuery}
+                onChange={(event) => setSearchPeopleQuery(event.target.value)}
+                placeholder="Filter people list"
+                style={{ minWidth: 0 }}
+              />
+            </label>
+          </div>
+          {selectedSearchPeople.length > 0 ? (
+            <div style={searchPeopleChipRowStyle}>
+              {selectedSearchPeople.map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  style={searchPeopleChipStyle}
+                  onClick={() => toggleSearchPerson(person.id)}
+                  title={`Remove ${person.displayName}`}
+                >
+                  {person.displayName} ×
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div style={filterGroupStyle}>
+            {searchPeopleError ? (
+              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load people: {searchPeopleError}</p>
+            ) : filteredSearchPeopleOptions.length > 0 ? (
+              <>
+                {searchPeopleLoading ? (
+                  <p style={{ margin: 0, color: '#666', fontSize: '12px', width: '100%' }}>
+                    Loading full people list...
+                  </p>
+                ) : null}
+                {filteredSearchPeopleOptions.map((person) => (
+                  <label key={person.id} style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchPeopleIds.includes(person.id)}
+                      onChange={() => toggleSearchPerson(person.id)}
+                    />
+                    {person.displayName}
+                  </label>
+                ))}
+              </>
+            ) : availableSearchPeopleOptions.length === 0 ? (
+              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No people exist yet.</p>
+            ) : (
+              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No people match the current text filter.</p>
+            )}
+          </div>
+          <div style={filterRowStyle}>
+            <label style={filterOptionLabelStyle}>
+              <input
+                type="checkbox"
+                checked={searchHasNoPeople}
+                onChange={(event) => {
+                  const nextChecked = event.target.checked;
+                  setSearchHasNoPeople(nextChecked);
+                  if (nextChecked) {
+                    setSearchPeopleIds([]);
+                  }
+                }}
+              />
+              Has no confirmed people
+            </label>
+          </div>
+          <div style={filterRowStyle}>
+            <label style={filterOptionLabelStyle}>
+              <input
+                type="checkbox"
+                checked={searchHasReviewableFaces}
+                onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
+              />
+              Has reviewable faces
             </label>
           </div>
         </div>

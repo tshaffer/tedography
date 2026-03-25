@@ -29,8 +29,10 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   return (await response.json()) as T;
 }
 
-export async function listPeople(): Promise<ListPeopleResponse> {
-  return fetchJson<ListPeopleResponse>('/api/people-pipeline/people');
+export async function listPeople(input?: { signal?: AbortSignal }): Promise<ListPeopleResponse> {
+  return fetchJson<ListPeopleResponse>('/api/people-pipeline/people', {
+    ...(input?.signal ? { signal: input.signal } : {})
+  });
 }
 
 export async function createPerson(
