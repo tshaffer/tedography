@@ -401,10 +401,8 @@ export function PeopleDevPage() {
     setErrorMessage(null);
     setNoticeMessage(null);
     try {
-      const [processResponse, assetStateResponse] = await Promise.all([
-        processPeopleAsset(trimmed),
-        getPeoplePipelineAssetState(trimmed).catch(() => null)
-      ]);
+      const processResponse = await processPeopleAsset(trimmed);
+      const assetStateResponse = await getPeoplePipelineAssetState(processResponse.assetId).catch(() => null);
       setProcessAssetId(trimmed);
       setLastProcessResult(processResponse);
       setLastAssetState(assetStateResponse);
