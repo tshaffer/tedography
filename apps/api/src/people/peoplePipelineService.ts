@@ -10,6 +10,8 @@ import { MediaType } from '@tedography/domain';
 import type {
   EnrollPersonFromDetectionResponse,
   ListAssetFaceDetectionsResponse,
+  PeoplePipelineSummaryResponse,
+  PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
   PeopleReviewQueueItem,
   ProcessPeopleAssetResponse,
@@ -29,6 +31,7 @@ import {
 import {
   listFaceMatchReviewsByDetectionIds,
   listFaceMatchReviewsByAssetId,
+  countFaceMatchReviewsByDecision,
   replaceFaceMatchReviewsForAsset,
   upsertFaceMatchReview
 } from '../repositories/faceMatchReviewRepository.js';
@@ -187,6 +190,45 @@ async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetF
     reviews,
     people: asset?.people ?? []
   };
+}
+
+function getDetectionSortConfidence(detection: FaceDetection): number {
+  return detection.autoMatchCandidateConfidence ?? detection.matchConfidence ?? detection.detectionConfidence ?? -1;
+}
+
+function sortPeopleReviewItems(items: PeopleReviewQueueItem[], sort: PeopleReviewQueueSort): PeopleReviewQueueItem[] {
+  const sorted = [...items];
+  sorted.sort((left, right) => {
+    if (sort === 'assetId') {
+      return left.asset.id === right.asset.id
+        ? left.detection.faceIndex - right.detection.faceIndex
+        : left.asset.id.localeCompare(right.asset.id);
+    }
+
+    if (sort === 'filename') {
+      return left.asset.filename === right.asset.filename
+        ? left.asset.id.localeCompare(right.asset.id)
+        : left.asset.filename.localeCompare(right.asset.filename);
+    }
+
+    if (sort === 'highestConfidence' || sort === 'lowestConfidence') {
+      const leftConfidence = getDetectionSortConfidence(left.detection);
+      const rightConfidence = getDetectionSortConfidence(right.detection);
+      if (leftConfidence !== rightConfidence) {
+        return sort === 'highestConfidence' ? rightConfidence - leftConfidence : leftConfidence - rightConfidence;
+      }
+    }
+
+    const leftUpdated = left.detection.updatedAt ?? left.detection.createdAt ?? '';
+    const rightUpdated = right.detection.updatedAt ?? right.detection.createdAt ?? '';
+    if (leftUpdated !== rightUpdated) {
+      return rightUpdated.localeCompare(leftUpdated);
+    }
+
+    return left.detection.id.localeCompare(right.detection.id);
+  });
+
+  return sorted;
 }
 
 export async function processPeoplePipelineForAsset(assetId: string, _options?: {
@@ -436,6 +478,7 @@ export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetection['matchStatus'][];
   assetId?: string;
   limit?: number;
+  sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
   const detections = await listFaceDetections({
     ...(input?.assetId ? { mediaAssetId: input.assetId } : {}),
@@ -487,7 +530,50 @@ export async function listPeopleReviewQueue(input?: {
     ];
   });
 
-  return { items, counts };
+  return { items: sortPeopleReviewItems(items, input?.sort ?? 'newest'), counts };
+}
+
+export async function getPeoplePipelineSummary(): Promise<PeoplePipelineSummaryResponse> {
+  const [detectionCounts, reviewDecisionCounts, people, detections] = await Promise.all([
+    countFaceDetectionsByStatus(),
+    countFaceMatchReviewsByDecision(),
+    listPeople(),
+    listFaceDetections({ limit: 5000 })
+  ]);
+  const reviews = await listFaceMatchReviewsByDetectionIds(detections.map((item) => item.id));
+
+  return {
+    config: {
+      enabled: config.peoplePipeline.enabled,
+      engine: config.peoplePipeline.engine,
+      pipelineVersion: config.peoplePipeline.pipelineVersion,
+      thresholds: {
+        minDetectionConfidence: config.peoplePipeline.minDetectionConfidence,
+        minFaceAreaPercent: config.peoplePipeline.minFaceAreaPercent,
+        minCropWidthPx: config.peoplePipeline.minCropWidthPx,
+        minCropHeightPx: config.peoplePipeline.minCropHeightPx,
+        reviewThreshold: config.peoplePipeline.reviewThreshold,
+        autoMatchThreshold: config.peoplePipeline.autoMatchThreshold
+      },
+      engineConfig: {
+        ...(config.peoplePipeline.engine === 'rekognition'
+          ? {
+              region: config.peoplePipeline.rekognition.region,
+              collectionId: config.peoplePipeline.rekognition.collectionId,
+              maxResults: config.peoplePipeline.rekognition.maxResults,
+              faceMatchThreshold: config.peoplePipeline.rekognition.faceMatchThreshold
+            }
+          : {})
+      }
+    },
+    detectionCounts,
+    reviewDecisionCounts,
+    totals: {
+      peopleCount: people.length,
+      detectionsCount: Object.values(detectionCounts).reduce((sum, value) => sum + value, 0),
+      reviewsCount: reviews.length
+    }
+  };
 }
 
 export async function enrollPersonFromDetection(input: {

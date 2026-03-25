@@ -111,3 +111,23 @@ export async function upsertFaceMatchReview(input: {
 
   return normalizeFaceMatchReview(review);
 }
+
+export async function countFaceMatchReviewsByDecision(): Promise<Record<FaceMatchReview['decision'], number>> {
+  const grouped = await FaceMatchReviewModel.aggregate<{ _id: FaceMatchReview['decision']; count: number }>([
+    { $group: { _id: '$decision', count: { $sum: 1 } } }
+  ]);
+
+  const counts: Record<FaceMatchReview['decision'], number> = {
+    pending: 0,
+    confirmed: 0,
+    rejected: 0,
+    assignedToDifferentPerson: 0,
+    ignored: 0
+  };
+
+  for (const item of grouped) {
+    counts[item._id] = item.count;
+  }
+
+  return counts;
+}

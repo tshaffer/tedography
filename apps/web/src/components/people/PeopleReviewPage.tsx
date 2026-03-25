@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
-import type { PeopleReviewQueueItem } from '@tedography/shared';
+import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
 import {
+  getPeoplePipelineSummary,
   listPeople,
   listPeopleReviewQueue,
   reviewFaceDetection
@@ -121,6 +122,11 @@ const actionsSectionStyle: CSSProperties = {
   gap: '10px'
 };
 
+const previewColumnStyle: CSSProperties = {
+  display: 'grid',
+  gap: '10px'
+};
+
 const inlineRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -177,6 +183,13 @@ const statusOptions: Array<{ value: FaceDetectionMatchStatus; label: string }> =
 ];
 
 const defaultStatuses: FaceDetectionMatchStatus[] = ['suggested', 'autoMatched', 'unmatched'];
+const sortOptions: Array<{ value: PeopleReviewQueueSort; label: string }> = [
+  { value: 'newest', label: 'Newest First' },
+  { value: 'highestConfidence', label: 'Highest Confidence' },
+  { value: 'lowestConfidence', label: 'Lowest Confidence' },
+  { value: 'filename', label: 'Filename' },
+  { value: 'assetId', label: 'Asset ID' }
+];
 const ignoredReasonOptions: FaceDetectionIgnoredReason[] = [
   'user-ignored',
   'too-small',
@@ -256,11 +269,13 @@ export function PeopleReviewPage() {
   const [peopleOptions, setPeopleOptions] = useState<Array<{ id: string; displayName: string }>>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<FaceDetectionMatchStatus[]>(defaultStatuses);
   const [assetIdFilter, setAssetIdFilter] = useState('');
+  const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [summary, setSummary] = useState<PeoplePipelineSummaryResponse | null>(null);
 
   const queueCount = items.length;
 
@@ -268,19 +283,22 @@ export function PeopleReviewPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const [queueResponse, peopleResponse] = await Promise.all([
+      const [queueResponse, peopleResponse, summaryResponse] = await Promise.all([
         listPeopleReviewQueue({
           statuses: selectedStatuses,
           ...(assetIdFilter.trim() ? { assetId: assetIdFilter.trim() } : {}),
-          limit: 200
+          limit: 200,
+          sort: sortBy
         }),
-        listPeople()
+        listPeople(),
+        getPeoplePipelineSummary()
       ]);
       setItems(queueResponse.items);
       setCounts(queueResponse.counts);
       setPeopleOptions(
         peopleResponse.items.map((person) => ({ id: person.id, displayName: person.displayName }))
       );
+      setSummary(summaryResponse);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load people review data');
     } finally {
@@ -290,7 +308,7 @@ export function PeopleReviewPage() {
 
   useEffect(() => {
     void loadPageData();
-  }, [selectedStatuses, assetIdFilter]);
+  }, [selectedStatuses, assetIdFilter, sortBy]);
 
   function getDraft(detectionId: string): ReviewDraftState {
     return (
@@ -406,6 +424,20 @@ export function PeopleReviewPage() {
             />
           </div>
           <div>
+            <span style={labelStyle}>Sort</span>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as PeopleReviewQueueSort)}
+              style={{ ...inputStyle, width: '100%' }}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <span style={labelStyle}>Queue Size</span>
             <div style={{ ...inputStyle, backgroundColor: '#f7f9fb' }}>{queueCount} loaded</div>
           </div>
@@ -416,6 +448,35 @@ export function PeopleReviewPage() {
             </button>
           </div>
         </div>
+
+        {summary ? (
+          <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: 0 }}>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Active Engine</span>
+              {summary.config.engine}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Pipeline Version</span>
+              {summary.config.pipelineVersion}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Thresholds</span>
+              Review {summary.config.thresholds.reviewThreshold.toFixed(2)} / Auto {summary.config.thresholds.autoMatchThreshold.toFixed(2)}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Detection Filters</span>
+              Conf {summary.config.thresholds.minDetectionConfidence.toFixed(2)} / Area {summary.config.thresholds.minFaceAreaPercent.toFixed(1)}%
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>People / Detections / Reviews</span>
+              {summary.totals.peopleCount} / {summary.totals.detectionsCount} / {summary.totals.reviewsCount}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Review Decisions</span>
+              Pending {summary.reviewDecisionCounts.pending}, Confirmed {summary.reviewDecisionCounts.confirmed}, Rejected {summary.reviewDecisionCounts.rejected}
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ ...badgeRowStyle, marginTop: '14px' }}>
           {statusOptions.map((status) => {
@@ -470,25 +531,43 @@ export function PeopleReviewPage() {
             return (
               <section key={item.detection.id} style={cardStyle}>
                 <div>
-                  <div style={previewBoxStyle}>
-                    {item.asset.id ? (
-                      <img
-                        src={
-                          item.detection.previewPath || item.detection.cropPath
-                            ? getFaceDetectionPreviewUrl(item.detection.id)
-                            : getThumbnailMediaUrl(item.asset.id)
-                        }
-                        alt={item.asset.filename}
-                        style={previewImageStyle}
-                      />
-                    ) : (
-                      <div style={placeholderStyle}>No asset preview</div>
-                    )}
-                  </div>
-                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
-                    {item.detection.previewPath || item.detection.cropPath
-                      ? 'Detected face crop preview'
-                      : 'Source asset thumbnail'}
+                  <div style={previewColumnStyle}>
+                    <div>
+                      <div style={previewBoxStyle}>
+                        {item.asset.id ? (
+                          <img
+                            src={
+                              item.detection.previewPath || item.detection.cropPath
+                                ? getFaceDetectionPreviewUrl(item.detection.id)
+                                : getThumbnailMediaUrl(item.asset.id)
+                            }
+                            alt={item.asset.filename}
+                            style={previewImageStyle}
+                          />
+                        ) : (
+                          <div style={placeholderStyle}>No asset preview</div>
+                        )}
+                      </div>
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
+                        {item.detection.previewPath || item.detection.cropPath
+                          ? 'Detected face crop preview'
+                          : 'Source asset thumbnail'}
+                      </div>
+                    </div>
+                    {item.detection.previewPath || item.detection.cropPath ? (
+                      <div>
+                        <div style={previewBoxStyle}>
+                          <img
+                            src={getThumbnailMediaUrl(item.asset.id)}
+                            alt={`${item.asset.filename} source thumbnail`}
+                            style={previewImageStyle}
+                          />
+                        </div>
+                        <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
+                          Source asset thumbnail
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

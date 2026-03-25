@@ -6,6 +6,8 @@ import type {
   ListAssetFaceDetectionsResponse,
   ListPeopleResponse,
   ListPeoplePipelineRecentAssetsResponse,
+  PeoplePipelineSummaryResponse,
+  PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
   ProcessPeopleAssetResponse,
   ReviewFaceDetectionRequest,
@@ -47,6 +49,7 @@ export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetectionMatchStatus[];
   assetId?: string;
   limit?: number;
+  sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
   const query = new URLSearchParams();
 
@@ -62,10 +65,18 @@ export async function listPeopleReviewQueue(input?: {
     query.set('limit', String(input.limit));
   }
 
+  if (input?.sort) {
+    query.set('sort', input.sort);
+  }
+
   const search = query.toString();
   return fetchJson<ListPeopleReviewQueueResponse>(
     `/api/people-pipeline/review${search.length > 0 ? `?${search}` : ''}`
   );
+}
+
+export async function getPeoplePipelineSummary(): Promise<PeoplePipelineSummaryResponse> {
+  return fetchJson<PeoplePipelineSummaryResponse>('/api/people-pipeline/summary');
 }
 
 export async function listPeoplePipelineRecentAssets(input?: {

@@ -13,10 +13,13 @@ The harness lets you:
 - create people by display name
 - create a default sample set (`Ted`, `Lori`, `Joel`, `Morgan`, `Annie`)
 - process an asset by id
+- load current asset state by id without reprocessing
+- process recent assets in bulk (`Process Recent 5`)
 - process recent assets directly from the page
 - inspect detections across all match states
 - force detections into `confirmed`, `rejected`, `ignored`, `assign existing`, and `create + assign`
 - inspect current derived `mediaAsset.people`
+- inspect active threshold values and detection/review summary counts
 
 ## How It Fits With `/people/review`
 
@@ -77,6 +80,7 @@ http://localhost:3000/people/dev
 6. Process one or more assets by:
    - pasting an asset id into `Process Asset`, or
    - clicking `Process` next to a recent asset
+   - or clicking `Process Recent 5`
 
 7. Use the Detection Browser to:
    - confirm
@@ -86,8 +90,9 @@ http://localhost:3000/people/dev
    - create and assign a new person
 
 8. Verify `Derived Asset People` changes as expected
+9. Use the threshold/summary panel to judge how the current config is behaving on your corpus
 
-9. Open `/people/review` to verify the same data in the actual review screen
+10. Open `/people/review` to verify the same data in the actual review screen
 
 ## Notes
 

@@ -4,6 +4,7 @@ import type { FaceDetectionMatchStatus, ImportApiErrorResponse } from '@tedograp
 import type {
   CreatePersonRequest,
   EnrollPersonFromDetectionRequest,
+  PeopleReviewQueueSort,
   ProcessPeopleAssetRequest,
   ReviewFaceDetectionRequest
 } from '@tedography/shared';
@@ -11,8 +12,10 @@ import { createPerson, listPeople } from '../repositories/personRepository.js';
 import { findRecentPhotoAssets } from '../repositories/assetRepository.js';
 import { resolveDerivedAbsolutePath } from '../import/derivedStorage.js';
 import { findFaceDetectionById } from '../repositories/faceDetectionRepository.js';
+import { summarizeFaceDetectionsByAssetIds } from '../repositories/faceDetectionRepository.js';
 import {
   enrollPersonFromDetection,
+  getPeoplePipelineSummary,
   listAssetFaceDetections,
   listPeopleReviewQueue,
   processPeoplePipelineForAsset,
@@ -51,18 +54,33 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
       ? Math.max(1, Math.min(500, Number(req.query.limit)))
       : undefined;
   const assetId = typeof req.query.assetId === 'string' && req.query.assetId.trim().length > 0 ? req.query.assetId.trim() : undefined;
+  const sort: PeopleReviewQueueSort | undefined =
+    typeof req.query.sort === 'string' &&
+    ['newest', 'highestConfidence', 'lowestConfidence', 'filename', 'assetId'].includes(req.query.sort)
+      ? (req.query.sort as PeopleReviewQueueSort)
+      : undefined;
 
   try {
     res.json(
       await listPeopleReviewQueue({
         statuses: statuses.length > 0 ? statuses : ['suggested', 'autoMatched', 'unmatched'],
         ...(assetId ? { assetId } : {}),
-        ...(limit !== undefined ? { limit } : {})
+        ...(limit !== undefined ? { limit } : {}),
+        ...(sort ? { sort } : {})
       })
     );
   } catch (error) {
     log.error('Failed to list people review queue', error);
     res.status(500).json({ error: 'Failed to list people review queue' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.get('/summary', async (_req, res) => {
+  try {
+    res.json(await getPeoplePipelineSummary());
+  } catch (error) {
+    log.error('Failed to load people pipeline summary', error);
+    res.status(500).json({ error: 'Failed to load people pipeline summary' } satisfies ImportApiErrorResponse);
   }
 });
 
@@ -74,6 +92,7 @@ peoplePipelineRoutes.get('/dev/recent-assets', async (req, res) => {
 
   try {
     const assets = await findRecentPhotoAssets(limit);
+    const summariesByAssetId = await summarizeFaceDetectionsByAssetIds(assets.map((asset) => asset.id));
     res.json({
       items: assets.map((asset) => ({
         id: asset.id,
@@ -82,7 +101,10 @@ peoplePipelineRoutes.get('/dev/recent-assets', async (req, res) => {
         captureDateTime: asset.captureDateTime ?? null,
         importedAt: asset.importedAt,
         photoState: asset.photoState,
-        people: asset.people ?? []
+        people: asset.people ?? [],
+        detectionsCount: summariesByAssetId[asset.id]?.detectionsCount ?? 0,
+        reviewableDetectionsCount: summariesByAssetId[asset.id]?.reviewableDetectionsCount ?? 0,
+        confirmedDetectionsCount: summariesByAssetId[asset.id]?.confirmedDetectionsCount ?? 0
       }))
     });
   } catch (error) {

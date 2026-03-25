@@ -7,6 +7,8 @@ import type {
 } from '@tedography/domain';
 import type {
   ListAssetFaceDetectionsResponse,
+  ListPeoplePipelineRecentAssetsResponse,
+  PeoplePipelineSummaryResponse,
   PeopleReviewQueueItem,
   ProcessPeopleAssetResponse
 } from '@tedography/shared';
@@ -14,6 +16,7 @@ import {
   createPerson,
   enrollPersonFromDetection,
   getPeoplePipelineAssetState,
+  getPeoplePipelineSummary,
   listPeople,
   listPeoplePipelineRecentAssets,
   listPeopleReviewQueue,
@@ -260,17 +263,7 @@ function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
 
 export function PeopleDevPage() {
   const [people, setPeople] = useState<Person[]>([]);
-  const [recentAssets, setRecentAssets] = useState<
-    Array<{
-      id: string;
-      filename: string;
-      originalArchivePath: string;
-      captureDateTime?: string | null;
-      importedAt: string;
-      photoState: string;
-      people?: Array<{ personId: string; displayName: string }>;
-    }>
-  >([]);
+  const [recentAssets, setRecentAssets] = useState<ListPeoplePipelineRecentAssetsResponse['items']>([]);
   const [queueItems, setQueueItems] = useState<PeopleReviewQueueItem[]>([]);
   const [counts, setCounts] = useState<Record<FaceDetectionMatchStatus, number>>({
     unmatched: 0,
@@ -291,6 +284,7 @@ export function PeopleDevPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [summary, setSummary] = useState<PeoplePipelineSummaryResponse | null>(null);
 
   const peopleOptions = useMemo(
     () => people.map((person) => ({ id: person.id, displayName: person.displayName })),
@@ -302,20 +296,22 @@ export function PeopleDevPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const [peopleResponse, queueResponse, recentAssetsResponse] = await Promise.all([
+      const [peopleResponse, queueResponse, recentAssetsResponse, summaryResponse] = await Promise.all([
         listPeople(),
         listPeopleReviewQueue({
           statuses: selectedStatuses,
           ...(filterAssetId.trim() ? { assetId: filterAssetId.trim() } : {}),
           limit: 250
         }),
-        listPeoplePipelineRecentAssets({ limit: 18 })
+        listPeoplePipelineRecentAssets({ limit: 18 }),
+        getPeoplePipelineSummary()
       ]);
 
       setPeople(peopleResponse.items);
       setQueueItems(queueResponse.items);
       setCounts(queueResponse.counts);
       setRecentAssets(recentAssetsResponse.items);
+      setSummary(summaryResponse);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load people dev harness data');
     } finally {
@@ -414,6 +410,61 @@ export function PeopleDevPage() {
       await refreshAll();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to process asset');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleProcessRecentAssets(limit: number) {
+    const candidates = recentAssets.slice(0, limit);
+    if (candidates.length === 0) {
+      return;
+    }
+
+    setBusyKey(`process-recent-${limit}`);
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      let processedCount = 0;
+      let lastResult: ProcessPeopleAssetResponse | null = null;
+      let lastState: ListAssetFaceDetectionsResponse | null = null;
+
+      for (const asset of candidates) {
+        lastResult = await processPeopleAsset(asset.id);
+        lastState = await getPeoplePipelineAssetState(asset.id).catch(() => null);
+        processedCount += 1;
+      }
+
+      if (lastResult) {
+        setLastProcessResult(lastResult);
+      }
+      if (lastState) {
+        setLastAssetState(lastState);
+      }
+      setNoticeMessage(`Processed ${processedCount} recent asset(s).`);
+      await refreshAll();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to process recent assets');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleLoadAssetState(assetId: string) {
+    const trimmed = assetId.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+
+    setBusyKey(`state-${trimmed}`);
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const assetState = await getPeoplePipelineAssetState(trimmed);
+      setLastAssetState(assetState);
+      setNoticeMessage(`Loaded asset state for ${trimmed}.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load asset state');
     } finally {
       setBusyKey(null);
     }
@@ -521,6 +572,34 @@ export function PeopleDevPage() {
         </p>
         {errorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{errorMessage}</p> : null}
         {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
+        {summary ? (
+          <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: 0 }}>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Engine</span>
+              {summary.config.engine}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Pipeline Version</span>
+              {summary.config.pipelineVersion}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Thresholds</span>
+              Review {summary.config.thresholds.reviewThreshold.toFixed(2)} / Auto {summary.config.thresholds.autoMatchThreshold.toFixed(2)}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Detection Filters</span>
+              Conf {summary.config.thresholds.minDetectionConfidence.toFixed(2)} / Area {summary.config.thresholds.minFaceAreaPercent.toFixed(1)}% / Crop {summary.config.thresholds.minCropWidthPx}x{summary.config.thresholds.minCropHeightPx}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Detection Counts</span>
+              U {summary.detectionCounts.unmatched}, S {summary.detectionCounts.suggested}, A {summary.detectionCounts.autoMatched}, C {summary.detectionCounts.confirmed}
+            </div>
+            <div style={metaItemStyle}>
+              <span style={labelStyle}>Review Decisions</span>
+              Pending {summary.reviewDecisionCounts.pending}, Confirmed {summary.reviewDecisionCounts.confirmed}, Rejected {summary.reviewDecisionCounts.rejected}, Ignored {summary.reviewDecisionCounts.ignored}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <div style={twoColumnStyle}>
@@ -589,8 +668,24 @@ export function PeopleDevPage() {
               >
                 Process Asset
               </button>
+              <button
+                type="button"
+                style={processAssetId.trim().length === 0 ? disabledButtonStyle : buttonStyle}
+                disabled={processAssetId.trim().length === 0}
+                onClick={() => void handleLoadAssetState(processAssetId)}
+              >
+                Load Asset State
+              </button>
               <button type="button" style={buttonStyle} onClick={() => void refreshAll()}>
                 Refresh Harness
+              </button>
+              <button
+                type="button"
+                style={busyKey === 'process-recent-5' ? disabledButtonStyle : buttonStyle}
+                disabled={busyKey === 'process-recent-5' || recentAssets.length === 0}
+                onClick={() => void handleProcessRecentAssets(5)}
+              >
+                Process Recent 5
               </button>
             </div>
           </div>
@@ -624,15 +719,30 @@ export function PeopleDevPage() {
                     <div style={{ fontSize: '12px', color: '#586676' }}>
                       Imported: {formatDateTime(asset.importedAt)} | Derived People: {formatPeople(asset.people ?? [])}
                     </div>
+                    <div style={{ ...inlineRowStyle, marginTop: '6px' }}>
+                      <span style={badgeStyle}>Detections: {asset.detectionsCount}</span>
+                      <span style={badgeStyle}>Reviewable: {asset.reviewableDetectionsCount}</span>
+                      <span style={badgeStyle}>Confirmed: {asset.confirmedDetectionsCount}</span>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    style={busyKey === `process-${asset.id}` ? disabledButtonStyle : buttonStyle}
-                    disabled={busyKey === `process-${asset.id}`}
-                    onClick={() => void handleProcessAsset(asset.id)}
-                  >
-                    Process
-                  </button>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    <button
+                      type="button"
+                      style={busyKey === `process-${asset.id}` ? disabledButtonStyle : buttonStyle}
+                      disabled={busyKey === `process-${asset.id}`}
+                      onClick={() => void handleProcessAsset(asset.id)}
+                    >
+                      Process
+                    </button>
+                    <button
+                      type="button"
+                      style={busyKey === `state-${asset.id}` ? disabledButtonStyle : buttonStyle}
+                      disabled={busyKey === `state-${asset.id}`}
+                      onClick={() => void handleLoadAssetState(asset.id)}
+                    >
+                      Load State
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -43,19 +43,50 @@ export interface ListPeopleReviewQueueResponse {
   counts: Record<FaceDetectionMatchStatus, number>;
 }
 
+export type PeopleReviewQueueSort =
+  | 'newest'
+  | 'highestConfidence'
+  | 'lowestConfidence'
+  | 'filename'
+  | 'assetId';
+
 export interface ListPeoplePipelineRecentAssetsResponse {
   items: Array<
-    Pick<
-      MediaAsset,
-      | 'id'
-      | 'filename'
-      | 'originalArchivePath'
-      | 'captureDateTime'
-      | 'importedAt'
-      | 'photoState'
-      | 'people'
-    >
+    Pick<MediaAsset, 'id' | 'filename' | 'originalArchivePath' | 'captureDateTime' | 'importedAt' | 'photoState' | 'people'> & {
+      detectionsCount: number;
+      reviewableDetectionsCount: number;
+      confirmedDetectionsCount: number;
+    }
   >;
+}
+
+export interface PeoplePipelineSummaryResponse {
+  config: {
+    enabled: boolean;
+    engine: string;
+    pipelineVersion: string;
+    thresholds: {
+      minDetectionConfidence: number;
+      minFaceAreaPercent: number;
+      minCropWidthPx: number;
+      minCropHeightPx: number;
+      reviewThreshold: number;
+      autoMatchThreshold: number;
+    };
+    engineConfig: {
+      region?: string | null;
+      collectionId?: string | null;
+      maxResults?: number;
+      faceMatchThreshold?: number | null;
+    };
+  };
+  detectionCounts: Record<FaceDetectionMatchStatus, number>;
+  reviewDecisionCounts: Record<FaceMatchReview['decision'], number>;
+  totals: {
+    peopleCount: number;
+    detectionsCount: number;
+    reviewsCount: number;
+  };
 }
 
 export interface ProcessPeopleAssetRequest {

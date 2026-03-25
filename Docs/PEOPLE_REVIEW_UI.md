@@ -14,6 +14,7 @@ It lets you verify:
 - suggested and unmatched detections are visible
 - review actions write correctly
 - `mediaAsset.people` recomputes after each review action
+- confidence and sort order are usable enough for real-corpus validation
 
 ## What The Screen Shows
 
@@ -30,6 +31,7 @@ It can also include:
 
 Each review card shows:
 
+- face crop preview when available
 - source asset thumbnail
 - detection status and face index
 - source asset id, filename, and archive path
@@ -50,6 +52,14 @@ Each review card supports:
 - ignore face
 
 All actions call the People Pipeline backend review route and then reload the queue so the latest derived asset people are visible.
+
+The page also supports queue sorting for validation:
+
+- newest first
+- highest confidence
+- lowest confidence
+- filename
+- asset id
 
 ## How To Reach It
 

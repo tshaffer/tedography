@@ -101,6 +101,65 @@ export async function countFaceDetectionsByStatus(input?: {
   return counts;
 }
 
+export async function summarizeFaceDetectionsByAssetIds(mediaAssetIds: string[]): Promise<
+  Record<
+    string,
+    {
+      detectionsCount: number;
+      reviewableDetectionsCount: number;
+      confirmedDetectionsCount: number;
+    }
+  >
+> {
+  if (mediaAssetIds.length === 0) {
+    return {};
+  }
+
+  const grouped = await FaceDetectionModel.aggregate<{
+    _id: string;
+    detectionsCount: number;
+    reviewableDetectionsCount: number;
+    confirmedDetectionsCount: number;
+  }>([
+    { $match: { mediaAssetId: { $in: mediaAssetIds } } },
+    {
+      $group: {
+        _id: '$mediaAssetId',
+        detectionsCount: { $sum: 1 },
+        reviewableDetectionsCount: {
+          $sum: {
+            $cond: [{ $in: ['$matchStatus', ['unmatched', 'suggested', 'autoMatched']] }, 1, 0]
+          }
+        },
+        confirmedDetectionsCount: {
+          $sum: {
+            $cond: [{ $eq: ['$matchStatus', 'confirmed'] }, 1, 0]
+          }
+        }
+      }
+    }
+  ]);
+
+  const summaries: Record<
+    string,
+    {
+      detectionsCount: number;
+      reviewableDetectionsCount: number;
+      confirmedDetectionsCount: number;
+    }
+  > = {};
+
+  for (const item of grouped) {
+    summaries[item._id] = {
+      detectionsCount: item.detectionsCount,
+      reviewableDetectionsCount: item.reviewableDetectionsCount,
+      confirmedDetectionsCount: item.confirmedDetectionsCount
+    };
+  }
+
+  return summaries;
+}
+
 export async function findFaceDetectionById(id: string): Promise<FaceDetection | null> {
   const detection = await FaceDetectionModel.findOne({ id }, { _id: 0 }).lean<FaceDetection | null>();
   return detection ? normalizeFaceDetection(detection) : null;
