@@ -45,6 +45,7 @@ import {
   type ImportAssetsDialogInitialAlbumDestination
 } from './components/import/ImportAssetsDialog';
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
+import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
 import {
@@ -2488,6 +2489,7 @@ export default function App() {
     useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
   const [moveDialogNodeId, setMoveDialogNodeId] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -3079,6 +3081,7 @@ export default function App() {
       setSelectedAssetPeopleStatus(null);
       setSelectedAssetPeopleStatusError(null);
       setSelectedAssetPeopleStatusLoading(false);
+      setAssetPeopleReviewDialogOpen(false);
       return;
     }
 
@@ -4081,6 +4084,14 @@ export default function App() {
     } finally {
       setPeopleRecognitionBusy(false);
     }
+  }
+
+  function handleOpenAssetPeopleReviewDialog(): void {
+    if (!isLibraryArea || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return;
+    }
+
+    setAssetPeopleReviewDialogOpen(true);
   }
 
   function handleSelectRelativeInList(list: MediaAsset[], offset: number): void {
@@ -5846,7 +5857,8 @@ export default function App() {
                     confirmedPeopleNames: (selectedAssetPeopleStatus?.people ?? []).map((person) => person.displayName),
                     loading: selectedAssetPeopleStatusLoading,
                     errorMessage: selectedAssetPeopleStatusError,
-                    reviewHref: `/people/review?assetId=${encodeURIComponent(selectedAsset.id)}`
+                    reviewHref: `/people/review?assetId=${encodeURIComponent(selectedAsset.id)}`,
+                    onOpenReview: handleOpenAssetPeopleReviewDialog
                   }
                 : null
             }
@@ -6595,6 +6607,17 @@ export default function App() {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });
         }}
+      />
+      <AssetPeopleReviewDialog
+        open={assetPeopleReviewDialogOpen}
+        asset={isLibraryArea && selectedAssetIds.length === 1 ? selectedAssetForDetails : null}
+        initialState={selectedAssetPeopleStatus}
+        onClose={() => setAssetPeopleReviewDialogOpen(false)}
+        onUpdated={() =>
+          selectedAssetId && isLibraryArea && selectedAssetIds.length === 1
+            ? loadSelectedAssetPeopleStatus(selectedAssetId)
+            : undefined
+        }
       />
     </div>
   );

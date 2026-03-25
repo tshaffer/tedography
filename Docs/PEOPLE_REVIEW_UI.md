@@ -155,7 +155,8 @@ When exactly one asset is selected in `Library`, the inspector now also shows a 
 - reviewable count
 - confirmed people names
 - a small note explaining whether the asset still needs review or already has confirmed derived people
-- a `Review Faces` deep link for that asset
+- a primary `Review Faces` action that opens an in-context asset-scoped review dialog without leaving `Library`
+- an `Open Full People Review` link for the standalone queue/page flow
 
 ## Phase 1 Validation Loop
 
@@ -167,9 +168,24 @@ For the current Practical Validation UI phase, the intended loop is:
    - reviewable faces
    - confirmed people
 3. Click `Review Faces`
-4. In `/people/review`, confirm, reject, assign, create-and-assign, ignore, or enroll from a confirmed detection
-5. Verify `Derived Asset People` on the review card
-6. Return to `Library` and confirm the inspector now reflects the same confirmed people
+4. In the asset-scoped review dialog, confirm, reject, assign, create-and-assign, ignore, or enroll from a confirmed detection
+5. Verify `Derived Asset People` in the dialog
+6. Close the dialog and confirm the `Library` inspector now reflects the same confirmed people
+7. Use `Open Full People Review` when you want the standalone queue-based workflow instead of the in-context asset modal
+
+## Modal Vs Full Page
+
+Use the in-context asset review dialog when:
+
+- you are already in `Library`
+- you want to review faces for one selected asset
+- you want to keep the same Library selection and scroll context
+
+Use the standalone `/people/review` page when:
+
+- you want a broader queue across many assets
+- you want explicit queue sorting/filtering controls
+- you are doing batch/admin-style people review
 
 ## Current Limitations
 

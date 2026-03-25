@@ -19,6 +19,7 @@ interface AssetDetailsPanelProps {
     loading?: boolean;
     errorMessage?: string | null;
     reviewHref?: string;
+    onOpenReview?: () => void;
   } | null;
 }
 
@@ -265,9 +266,14 @@ export function AssetDetailsPanel({
             </>
           )}
           {peopleStatus.reviewHref ? (
-            <div style={{ marginTop: '8px' }}>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {peopleStatus.onOpenReview ? (
+                <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
+                  Review Faces
+                </button>
+              ) : null}
               <Link to={peopleStatus.reviewHref} style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}>
-                Review Faces
+                Open Full People Review
               </Link>
             </div>
           ) : null}
