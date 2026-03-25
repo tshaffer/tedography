@@ -26,6 +26,7 @@ The page loads a queue of face detections in review-relevant states by default:
 
 It can also include:
 
+- `confirmed`
 - `rejected`
 - `ignored`
 
@@ -34,6 +35,7 @@ Each review card shows:
 - face crop preview when available
 - source asset thumbnail
 - detection status and face index
+- a short status summary explaining whether the face is still reviewable or already confirmed into derived asset people
 - source asset id, filename, and archive path
 - suggested person and suggested confidence
 - assigned person if present
@@ -50,6 +52,7 @@ Each review card supports:
 - assign to an existing person
 - create a new person and assign
 - ignore face
+- enroll a confirmed person example into the active recognition engine
 
 All actions call the People Pipeline backend review route and then reload the queue so the latest derived asset people are visible.
 
@@ -140,12 +143,33 @@ For single-asset runs, the follow-up link opens:
 
 so the People Review page is immediately filtered to that asset.
 
+When the page is filtered to a single asset, it now also shows a visible asset-scoped banner so it is obvious that:
+
+- the queue is scoped to one asset
+- review actions are affecting that asset only
+- only confirmed matches become derived `mediaAsset.people`
+
 When exactly one asset is selected in `Library`, the inspector now also shows a compact `People` section with:
 
 - detections count
 - reviewable count
 - confirmed people names
+- a small note explaining whether the asset still needs review or already has confirmed derived people
 - a `Review Faces` deep link for that asset
+
+## Phase 1 Validation Loop
+
+For the current Practical Validation UI phase, the intended loop is:
+
+1. In `Library`, select one asset and click `Run People Recognition`
+2. Check the `People` section in the inspector:
+   - detections
+   - reviewable faces
+   - confirmed people
+3. Click `Review Faces`
+4. In `/people/review`, confirm, reject, assign, create-and-assign, ignore, or enroll from a confirmed detection
+5. Verify `Derived Asset People` on the review card
+6. Return to `Library` and confirm the inspector now reflects the same confirmed people
 
 ## Current Limitations
 

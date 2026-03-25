@@ -244,7 +244,9 @@ export function AssetDetailsPanel({
           ) : peopleStatus.errorMessage ? (
             <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
           ) : peopleStatus.detectionsCount === 0 ? (
-            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>No face detections yet.</p>
+            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>
+              No people data yet. Run People Recognition to detect faces for this asset.
+            </p>
           ) : (
             <>
               {renderRow('Detections', String(peopleStatus.detectionsCount))}
@@ -253,6 +255,13 @@ export function AssetDetailsPanel({
                 'Confirmed',
                 peopleStatus.confirmedPeopleNames.length > 0 ? peopleStatus.confirmedPeopleNames.join(', ') : 'None'
               )}
+              <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
+                {peopleStatus.reviewableCount > 0
+                  ? 'Reviewable faces still need confirmation before they become derived asset people.'
+                  : peopleStatus.confirmedPeopleNames.length > 0
+                    ? 'Confirmed people here come from reviewed face detections and drive derived asset metadata.'
+                    : 'Detections exist, but nothing is confirmed into derived asset people yet.'}
+              </p>
             </>
           )}
           {peopleStatus.reviewHref ? (

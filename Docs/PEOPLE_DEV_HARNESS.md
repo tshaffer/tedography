@@ -18,6 +18,7 @@ The harness lets you:
 - process recent assets directly from the page
 - inspect detections across all match states
 - force detections into `confirmed`, `rejected`, `ignored`, `assign existing`, and `create + assign`
+- enroll a confirmed or manually assigned person example from a detection
 - inspect current derived `mediaAsset.people`
 - inspect active threshold values and detection/review summary counts
 
@@ -29,6 +30,7 @@ Use the two pages together:
    - seed sample people
    - process assets
    - force raw detection states
+   - enroll face examples into the active engine
    - inspect derived asset people directly
 2. `/people/review`
    - verify the actual review workflow on the same data
@@ -93,6 +95,14 @@ http://localhost:3000/people/dev
 9. Use the threshold/summary panel to judge how the current config is behaving on your corpus
 
 10. Open `/people/review` to verify the same data in the actual review screen
+
+The harness now includes direct `Review Faces` links from:
+
+- `Last Process Result`
+- `Last Asset State`
+- each recent asset card
+
+so the validation loop does not require copying asset ids manually.
 
 ## Notes
 

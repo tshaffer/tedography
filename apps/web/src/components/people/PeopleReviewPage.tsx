@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
 import {
+  enrollPersonFromDetection,
   getPeoplePipelineSummary,
   listPeople,
   listPeopleReviewQueue,
@@ -199,6 +200,10 @@ const ignoredReasonOptions: FaceDetectionIgnoredReason[] = [
   'other'
 ];
 
+function getDefaultStatusesForAssetScope(assetId: string): FaceDetectionMatchStatus[] {
+  return assetId.trim().length > 0 ? [...defaultStatuses, 'confirmed'] : defaultStatuses;
+}
+
 type ReviewDraftState = {
   selectedPersonId: string;
   newPersonName: string;
@@ -228,6 +233,31 @@ function formatPeopleList(items: Array<{ displayName: string }>): string {
   }
 
   return items.map((item) => item.displayName).join(', ');
+}
+
+function getMatchStatusSummary(item: PeopleReviewQueueItem): string {
+  switch (item.detection.matchStatus) {
+    case 'confirmed':
+      return item.matchedPerson?.displayName
+        ? `Confirmed people metadata now includes ${item.matchedPerson.displayName} for this asset.`
+        : 'Confirmed face. Derived asset people should now reflect the reviewed assignment.';
+    case 'autoMatched':
+      return item.suggestedPerson?.displayName
+        ? `Auto-matched candidate ${item.suggestedPerson.displayName} is still not confirmed for derived asset people.`
+        : 'Auto-matched face still requires confirmation before it becomes derived asset people.';
+    case 'suggested':
+      return item.suggestedPerson?.displayName
+        ? `Suggested match ${item.suggestedPerson.displayName} still needs review before it becomes derived asset people.`
+        : 'Suggested face still needs review before it becomes derived asset people.';
+    case 'unmatched':
+      return 'Detected face has no accepted person yet. It does not affect derived asset people.';
+    case 'rejected':
+      return 'Rejected match stays out of derived asset people until it is explicitly reassigned and confirmed.';
+    case 'ignored':
+      return 'Ignored face is excluded from derived asset people.';
+    default:
+      return 'Review this face before trusting it as derived asset people.';
+  }
 }
 
 function getConfirmActionLabel(item: PeopleReviewQueueItem): string {
@@ -268,7 +298,9 @@ export function PeopleReviewPage() {
     ignored: 0
   });
   const [peopleOptions, setPeopleOptions] = useState<Array<{ id: string; displayName: string }>>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<FaceDetectionMatchStatus[]>(defaultStatuses);
+  const [selectedStatuses, setSelectedStatuses] = useState<FaceDetectionMatchStatus[]>(() =>
+    getDefaultStatusesForAssetScope(searchParams.get('assetId')?.trim() ?? '')
+  );
   const [assetIdFilter, setAssetIdFilter] = useState(() => searchParams.get('assetId')?.trim() ?? '');
   const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
@@ -314,6 +346,22 @@ export function PeopleReviewPage() {
   useEffect(() => {
     const queryAssetId = searchParams.get('assetId')?.trim() ?? '';
     setAssetIdFilter(queryAssetId);
+    setSelectedStatuses((current) => {
+      const defaultForScope = getDefaultStatusesForAssetScope(queryAssetId);
+      const currentSet = new Set(current);
+      const isStillDefaultReviewSet =
+        current.length === defaultStatuses.length && defaultStatuses.every((status) => currentSet.has(status));
+
+      if (queryAssetId.length > 0 && isStillDefaultReviewSet) {
+        return defaultForScope;
+      }
+
+      if (queryAssetId.length === 0 && current.length === defaultForScope.length && defaultForScope.every((status) => currentSet.has(status))) {
+        return defaultStatuses;
+      }
+
+      return current;
+    });
   }, [searchParams]);
 
   function getDraft(detectionId: string): ReviewDraftState {
@@ -358,6 +406,11 @@ export function PeopleReviewPage() {
           ...(confirmPersonId ? { personId: confirmPersonId } : {}),
           reviewer: 'people-review-ui'
         });
+        if (assetIdFilter.trim().length > 0) {
+          setSelectedStatuses((current) =>
+            current.includes('confirmed') ? current : [...current, 'confirmed']
+          );
+        }
         setNoticeMessage(`Confirmed face ${item.detection.id}.`);
       } else if (action.type === 'reject') {
         await reviewFaceDetection(item.detection.id, {
@@ -396,7 +449,28 @@ export function PeopleReviewPage() {
     }
   }
 
+  async function handleEnroll(item: PeopleReviewQueueItem, personId: string) {
+    setBusyDetectionId(item.detection.id);
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const response = await enrollPersonFromDetection(personId, {
+        detectionId: item.detection.id
+      });
+      setNoticeMessage(
+        `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
+      );
+      await loadPageData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to enroll person from detection');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
   const selectedStatusSet = useMemo(() => new Set(selectedStatuses), [selectedStatuses]);
+  const trimmedAssetIdFilter = assetIdFilter.trim();
 
   return (
     <div style={pageStyle}>
@@ -417,6 +491,41 @@ export function PeopleReviewPage() {
         <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
           Minimal review workbench for persisted face detections and derived <code>mediaAsset.people</code>.
         </p>
+
+        {trimmedAssetIdFilter ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginBottom: '14px',
+              padding: '10px 12px',
+              backgroundColor: '#eef7fb',
+              borderColor: '#bfd6e0',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
+              Filtered to asset {trimmedAssetIdFilter}
+            </div>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
+              Review actions here affect this asset only. Confirmed matches are what drive derived <code>mediaAsset.people</code>.
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Link
+                to="/"
+                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+              >
+                Back to Library
+              </Link>
+              <button
+                type="button"
+                style={buttonStyle}
+                onClick={() => setAssetIdFilter('')}
+              >
+                Clear Asset Filter
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div style={controlsGridStyle}>
           <div>
@@ -521,7 +630,11 @@ export function PeopleReviewPage() {
       {loading ? <section style={panelStyle}>Loading people review queue...</section> : null}
 
       {!loading && items.length === 0 ? (
-        <section style={panelStyle}>No face detections matched the current filters.</section>
+        <section style={panelStyle}>
+          {trimmedAssetIdFilter
+            ? `No face detections matched the current filters for asset ${trimmedAssetIdFilter}.`
+            : 'No face detections matched the current filters.'}
+        </section>
       ) : null}
 
       {!loading
@@ -531,6 +644,8 @@ export function PeopleReviewPage() {
             const canConfirm =
               typeof item.detection.autoMatchCandidatePersonId === 'string' ||
               typeof item.detection.matchedPersonId === 'string';
+            const enrollPersonId = item.detection.matchedPersonId ?? item.detection.autoMatchCandidatePersonId ?? '';
+            const enrollPersonName = item.matchedPerson?.displayName ?? item.suggestedPerson?.displayName ?? '';
             const confirmActionLabel = getConfirmActionLabel(item);
             const confirmActionHint = getConfirmActionHint(item);
 
@@ -582,6 +697,10 @@ export function PeopleReviewPage() {
                     <span style={badgeStyle}>Status: {item.detection.matchStatus}</span>
                     <span style={badgeStyle}>Face #{item.detection.faceIndex}</span>
                     <span style={badgeStyle}>Asset: {item.asset.id}</span>
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
+                    {getMatchStatusSummary(item)}
                   </div>
 
                   <div style={metaGridStyle}>
@@ -658,6 +777,21 @@ export function PeopleReviewPage() {
                     {confirmActionHint ? (
                       <div style={{ fontSize: '12px', color: '#6a4d00' }}>{confirmActionHint}</div>
                     ) : null}
+
+                    <div style={inlineRowStyle}>
+                      <button
+                        type="button"
+                        style={
+                          isBusy || item.detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0
+                            ? disabledButtonStyle
+                            : buttonStyle
+                        }
+                        disabled={isBusy || item.detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0}
+                        onClick={() => void handleEnroll(item, enrollPersonId)}
+                      >
+                        {enrollPersonName ? `Enroll ${enrollPersonName}` : 'Enroll Person'}
+                      </button>
+                    </div>
 
                     <div style={inlineRowStyle}>
                       <select

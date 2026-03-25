@@ -400,6 +400,7 @@ export function PeopleDevPage() {
       const processResponse = await processPeopleAsset(trimmed);
       const assetStateResponse = await getPeoplePipelineAssetState(processResponse.assetId).catch(() => null);
       setProcessAssetId(trimmed);
+      setFilterAssetId(trimmed);
       setLastProcessResult(processResponse);
       setLastAssetState(assetStateResponse);
       setNoticeMessage(
@@ -461,6 +462,7 @@ export function PeopleDevPage() {
     setNoticeMessage(null);
     try {
       const assetState = await getPeoplePipelineAssetState(trimmed);
+      setFilterAssetId(trimmed);
       setLastAssetState(assetState);
       setNoticeMessage(`Loaded asset state for ${trimmed}.`);
     } catch (error) {
@@ -569,6 +571,9 @@ export function PeopleDevPage() {
         <p style={{ margin: 0, color: '#5b6673' }}>
           Internal dev/test page for seeding sample people, processing assets, forcing face-review states, and
           verifying derived <code>mediaAsset.people</code>.
+        </p>
+        <p style={{ margin: '8px 0 0', color: '#5b6673', fontSize: '13px' }}>
+          Use this page to train and debug. Use <strong>People Review</strong> to validate the actual review queue for the same assets.
         </p>
         {errorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{errorMessage}</p> : null}
         {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
@@ -705,6 +710,14 @@ export function PeopleDevPage() {
               {lastProcessResult.skippedReason ? (
                 <div style={{ fontSize: '12px', color: '#8a2a2a' }}>Skipped: {lastProcessResult.skippedReason}</div>
               ) : null}
+              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <Link
+                  to={`/people/review?assetId=${encodeURIComponent(lastProcessResult.assetId)}`}
+                  style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+                >
+                  Review Faces
+                </Link>
+              </div>
             </div>
           ) : null}
 
@@ -742,6 +755,12 @@ export function PeopleDevPage() {
                     >
                       Load State
                     </button>
+                    <Link
+                      to={`/people/review?assetId=${encodeURIComponent(asset.id)}`}
+                      style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}
+                    >
+                      Review Faces
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -810,11 +829,26 @@ export function PeopleDevPage() {
           <div style={{ fontSize: '13px', color: '#44515d' }}>
             Detections: {lastAssetState.detections.length} | Reviews: {lastAssetState.reviews.length}
           </div>
+          <div style={{ marginTop: '6px', fontSize: '12px', color: '#586676' }}>
+            Confirmed people here are the derived <code>mediaAsset.people</code> values for this asset.
+          </div>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <Link
+              to={`/people/review?assetId=${encodeURIComponent(lastAssetState.assetId)}`}
+              style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+            >
+              Review Faces
+            </Link>
+          </div>
         </section>
       ) : null}
 
       {!loading && queueItems.length === 0 ? (
-        <section style={panelStyle}>No detections matched the current dev-harness filters.</section>
+        <section style={panelStyle}>
+          {filterAssetId.trim()
+            ? `No detections matched the current dev-harness filters for asset ${filterAssetId.trim()}.`
+            : 'No detections matched the current dev-harness filters.'}
+        </section>
       ) : null}
 
       {!loading
@@ -852,6 +886,18 @@ export function PeopleDevPage() {
                     <span style={badgeStyle}>Status: {item.detection.matchStatus}</span>
                     <span style={badgeStyle}>Detection: {item.detection.id}</span>
                     <span style={badgeStyle}>Asset: {item.asset.id}</span>
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
+                    {item.detection.matchStatus === 'confirmed'
+                      ? 'Confirmed person is now part of derived asset people for this asset.'
+                      : item.detection.matchStatus === 'suggested' || item.detection.matchStatus === 'autoMatched'
+                        ? 'Suggested and auto-matched faces still need confirmation before they become derived asset people.'
+                        : item.detection.matchStatus === 'unmatched'
+                          ? 'Detected face has no accepted person yet.'
+                          : item.detection.matchStatus === 'ignored'
+                            ? 'Ignored face is excluded from derived asset people.'
+                            : 'Rejected match is excluded from derived asset people until reassigned and confirmed.'}
                   </div>
 
                   <div style={metaGridStyle}>
