@@ -6,6 +6,7 @@ export * from './entities/FaceMatchReview.js';
 export * from './entities/MediaAsset.js';
 export * from './entities/PendingGroup.js';
 export * from './entities/Person.js';
+export * from './entities/PersonFaceExample.js';
 export * from './entities/PublicationRecord.js';
 export * from './entities/StorageInstance.js';
 export * from './enums/AssetEventType.js';

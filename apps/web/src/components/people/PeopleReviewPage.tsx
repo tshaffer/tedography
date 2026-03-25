@@ -642,7 +642,7 @@ export function PeopleReviewPage() {
       });
       rememberRecentPerson(response.person.id);
       setNoticeMessage(
-        `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
+        `Added example face for ${response.person.displayName} from detection ${response.detection.id}.`
       );
       await loadPageData();
     } catch (error) {
@@ -1333,7 +1333,7 @@ export function PeopleReviewPage() {
                         disabled={isBusy || item.detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0}
                         onClick={() => void handleEnroll(item, enrollPersonId)}
                       >
-                        {enrollPersonName ? `Enroll ${enrollPersonName}` : 'Enroll Person'}
+                        {enrollPersonName ? `Add ${enrollPersonName} As Example` : 'Add As Example'}
                       </button>
                     </div>
 

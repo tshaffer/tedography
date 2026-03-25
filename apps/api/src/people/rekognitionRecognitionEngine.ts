@@ -3,7 +3,8 @@ import type {
   DetectedFaceResult,
   FaceEnrollmentResult,
   FaceMatchCandidate,
-  PeopleRecognitionEngine
+  PeopleRecognitionEngine,
+  RemoveEnrollmentExampleResult
 } from './recognitionEngine.js';
 import { buildPeopleEngineIdentityKey, parsePeopleEngineIdentityKey } from './peopleEngineIdentityKey.js';
 import { RekognitionClient } from './rekognitionClient.js';
@@ -26,6 +27,7 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
   public readonly engineName = 'rekognition';
   public readonly engineVersion = 'rekognition-v1';
   public readonly supportsEnrollment = true;
+  public readonly supportsEnrollmentExampleRemoval = true;
   public readonly prefersFaceCrop = true;
 
   private readonly client = new RekognitionClient();
@@ -94,6 +96,23 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
     return {
       subjectKey,
       exampleId: response.faceIds[0] ?? null
+    };
+  }
+
+  public async removeEnrolledFaceExample(input: {
+    person: Person;
+    exampleId: string;
+    subjectKey?: string | null;
+  }): Promise<RemoveEnrollmentExampleResult> {
+    const subjectKey = input.subjectKey ?? buildPeopleEngineIdentityKey(input.person);
+    await this.client.removeUserFaceExample({
+      userId: subjectKey,
+      faceId: input.exampleId
+    });
+
+    return {
+      subjectKey,
+      exampleId: input.exampleId
     };
   }
 }

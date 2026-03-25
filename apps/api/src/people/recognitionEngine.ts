@@ -30,11 +30,17 @@ export interface FaceEnrollmentResult {
   exampleId?: string | null;
 }
 
+export interface RemoveEnrollmentExampleResult {
+  subjectKey?: string | null;
+  exampleId?: string | null;
+}
+
 export interface PeopleRecognitionEngine {
   readonly engineName: string;
   readonly engineVersion: string;
   readonly supportsEnrollment: boolean;
   readonly prefersFaceCrop: boolean;
+  readonly supportsEnrollmentExampleRemoval?: boolean;
   detectFaces(input: {
     asset: MediaAsset;
     imagePath: string;
@@ -53,4 +59,9 @@ export interface PeopleRecognitionEngine {
     cropImagePath: string;
     detection: Pick<FaceDetection, 'id' | 'faceIndex' | 'boundingBox'>;
   }): Promise<FaceEnrollmentResult>;
+  removeEnrolledFaceExample?(input: {
+    person: Person;
+    exampleId: string;
+    subjectKey?: string | null;
+  }): Promise<RemoveEnrollmentExampleResult>;
 }

@@ -5,7 +5,8 @@ import type {
   FaceMatchReview,
   MediaAsset,
   MediaAssetPerson,
-  Person
+  Person,
+  PersonFaceExample
 } from '@tedography/domain';
 
 export interface ListPeopleResponse {
@@ -24,6 +25,7 @@ export interface PeopleBrowseSummaryItem {
   representativeAssetId?: string | null;
   lastSeenAt?: string | null;
   reviewableAssetCount: number;
+  exampleCount: number;
 }
 
 export interface ListPeopleBrowseResponse {
@@ -45,10 +47,10 @@ export interface PersonDetailAssetItem
 }
 
 export interface PersonExampleFaceItem
-  extends Pick<
+  extends Pick<PersonFaceExample, 'id' | 'personId' | 'faceDetectionId' | 'mediaAssetId' | 'engine' | 'subjectKey' | 'engineExampleId' | 'createdAt' | 'updatedAt'> {
+  detection: Pick<
     FaceDetection,
     | 'id'
-    | 'mediaAssetId'
     | 'faceIndex'
     | 'previewPath'
     | 'cropPath'
@@ -57,7 +59,7 @@ export interface PersonExampleFaceItem
     | 'autoMatchCandidatePersonId'
     | 'updatedAt'
     | 'createdAt'
-  > {
+  >;
   asset: Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime'>;
 }
 
@@ -67,6 +69,7 @@ export interface GetPersonDetailResponse {
   representativeAssetId?: string | null;
   lastSeenAt?: string | null;
   reviewableAssetCount: number;
+  exampleCount: number;
   assets: PersonDetailAssetItem[];
   exampleFaces: PersonExampleFaceItem[];
 }
@@ -203,6 +206,11 @@ export interface EnrollPersonFromDetectionRequest {
 export interface EnrollPersonFromDetectionResponse {
   person: Person;
   detection: FaceDetection;
+  example: PersonFaceExample;
   subjectKey: string;
   exampleId?: string | null;
+}
+
+export interface RemovePersonExampleResponse {
+  item: PersonFaceExample;
 }

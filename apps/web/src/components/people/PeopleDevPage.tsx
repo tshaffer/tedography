@@ -543,7 +543,7 @@ export function PeopleDevPage() {
         detectionId: item.detection.id
       });
       setNoticeMessage(
-        `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
+        `Added example face for ${response.person.displayName} from detection ${response.detection.id}.`
       );
       const assetState = await getPeoplePipelineAssetState(item.asset.id).catch(() => null);
       setLastAssetState(assetState);
@@ -970,7 +970,7 @@ export function PeopleDevPage() {
                         disabled={enrollmentBusy || enrollPersonId.length === 0}
                         onClick={() => void handleEnroll(item, enrollPersonId)}
                       >
-                        {item.matchedPerson ? `Enroll ${item.matchedPerson.displayName}` : 'Enroll Selected Person'}
+                        {item.matchedPerson ? `Add ${item.matchedPerson.displayName} As Example` : 'Add Selected Person As Example'}
                       </button>
                     </div>
 

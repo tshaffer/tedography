@@ -409,7 +409,7 @@ export function AssetPeopleReviewDialog({
     try {
       const response = await enrollPersonFromDetection(personId, { detectionId });
       await refreshAfterMutation(
-        `Enrolled ${response.person.displayName} from detection ${response.detection.id} using engine identity ${response.subjectKey}.`
+        `Added example face for ${response.person.displayName} from detection ${response.detection.id}.`
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to enroll person from detection');
@@ -635,7 +635,7 @@ export function AssetPeopleReviewDialog({
                         disabled={isBusy || detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0}
                         onClick={() => void handleEnroll(detection.id, enrollPersonId)}
                       >
-                        {matchedPersonName ? `Enroll ${matchedPersonName}` : 'Enroll Person'}
+                        {matchedPersonName ? `Add ${matchedPersonName} As Example` : 'Add As Example'}
                       </button>
                     </div>
 

@@ -19,6 +19,7 @@ import {
   getPeoplePipelineSummary,
   listAssetFaceDetections,
   listPeopleReviewQueue,
+  removePersonFaceExample,
   processPeoplePipelineForAsset,
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
@@ -208,6 +209,21 @@ peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req,
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to enroll person from detection';
     log.error('Failed to enroll person from detection', error);
+    res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.delete('/people/:personId/examples/:exampleId', async (req, res) => {
+  try {
+    res.json(
+      await removePersonFaceExample({
+        personId: req.params.personId,
+        exampleId: req.params.exampleId
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove person example';
+    log.error('Failed to remove person example', error);
     res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
   }
 });

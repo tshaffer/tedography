@@ -10,6 +10,7 @@ import { MediaType } from '@tedography/domain';
 import type {
   EnrollPersonFromDetectionResponse,
   ListAssetFaceDetectionsResponse,
+  RemovePersonExampleResponse,
   PeoplePipelineSummaryResponse,
   PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
@@ -36,6 +37,12 @@ import {
   upsertFaceMatchReview
 } from '../repositories/faceMatchReviewRepository.js';
 import { createPerson, findPeopleByIds, findPersonById, listPeople } from '../repositories/personRepository.js';
+import {
+  createPersonFaceExample,
+  findActivePersonFaceExampleByPersonAndDetection,
+  findPersonFaceExampleById,
+  markPersonFaceExampleRemoved
+} from '../repositories/personFaceExampleRepository.js';
 import {
   AssetMediaPathResolutionError,
   resolveDisplayAbsolutePathForAsset,
@@ -610,6 +617,20 @@ export async function enrollPersonFromDetection(input: {
     throw new Error(`Media asset not found: ${detection.mediaAssetId}`);
   }
 
+  const existingExample = await findActivePersonFaceExampleByPersonAndDetection({
+    personId: input.personId,
+    faceDetectionId: input.detectionId
+  });
+  if (existingExample) {
+    return {
+      person,
+      detection,
+      example: existingExample,
+      subjectKey: existingExample.subjectKey ?? '',
+      ...(existingExample.engineExampleId ? { exampleId: existingExample.engineExampleId } : {})
+    };
+  }
+
   const imagePath = resolvePipelineImagePath(asset);
   const crop = await generateFaceCropForAsset({
     asset,
@@ -643,12 +664,60 @@ export async function enrollPersonFromDetection(input: {
     ignoredReason: detection.ignoredReason ?? null
   });
 
+  const example = await createPersonFaceExample({
+    personId: person.id,
+    faceDetectionId: detection.id,
+    mediaAssetId: detection.mediaAssetId,
+    engine: engine.engineName,
+    subjectKey: enrollment.subjectKey,
+    engineExampleId: enrollment.exampleId ?? null
+  });
+
   return {
     person,
     detection: updatedDetection ?? { ...detection, cropPath: crop.relativePath, previewPath: crop.relativePath },
+    example,
     subjectKey: enrollment.subjectKey,
     ...(enrollment.exampleId ? { exampleId: enrollment.exampleId } : {})
   };
+}
+
+export async function removePersonFaceExample(input: {
+  personId: string;
+  exampleId: string;
+}): Promise<RemovePersonExampleResponse> {
+  const engine = getPeopleRecognitionEngine();
+  const [person, example] = await Promise.all([
+    findPersonById(input.personId),
+    findPersonFaceExampleById(input.exampleId)
+  ]);
+
+  if (!person) {
+    throw new Error(`Person not found: ${input.personId}`);
+  }
+
+  if (!example || example.personId !== input.personId) {
+    throw new Error(`Person face example not found: ${input.exampleId}`);
+  }
+
+  if (example.status === 'removed') {
+    return { item: example };
+  }
+
+  if (example.engineExampleId && engine.supportsEnrollmentExampleRemoval && engine.removeEnrolledFaceExample) {
+    await engine.removeEnrolledFaceExample({
+      person,
+      exampleId: example.engineExampleId,
+      subjectKey: example.subjectKey ?? null
+    });
+  }
+
+  const item = await markPersonFaceExampleRemoved(example.id);
+  if (!item) {
+    throw new Error(`Failed to remove example: ${example.id}`);
+  }
+
+  return { item };
 }
 
 function determineConfirmedReviewDecision(

@@ -13,6 +13,8 @@ type AwsSdkModule = {
   CreateUserCommand: new (input: object) => object;
   IndexFacesCommand: new (input: object) => object;
   AssociateFacesCommand: new (input: object) => object;
+  DisassociateFacesCommand: new (input: object) => object;
+  DeleteFacesCommand: new (input: object) => object;
 };
 
 type DetectFaceBoundingBox = {
@@ -532,5 +534,39 @@ export class RekognitionClient {
       userId: input.userId,
       faceIds
     };
+  }
+
+  public async removeUserFaceExample(input: {
+    userId: string;
+    faceId: string;
+  }): Promise<void> {
+    await this.ensureCollectionExists();
+
+    try {
+      await this.send('DisassociateFacesCommand', {
+        CollectionId: requireCollectionId(),
+        UserId: input.userId,
+        FaceIds: [input.faceId]
+      });
+    } catch (error) {
+      throw wrapEnrollmentStepError(
+        error,
+        'Failed to disassociate face example from the Rekognition user.',
+        'request-failed'
+      );
+    }
+
+    try {
+      await this.send('DeleteFacesCommand', {
+        CollectionId: requireCollectionId(),
+        FaceIds: [input.faceId]
+      });
+    } catch (error) {
+      throw wrapEnrollmentStepError(
+        error,
+        'Failed to delete face example from the Rekognition collection.',
+        'request-failed'
+      );
+    }
   }
 }

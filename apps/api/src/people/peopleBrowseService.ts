@@ -2,6 +2,7 @@ import type { ListPeopleBrowseResponse } from '@tedography/shared';
 import { listPeople } from '../repositories/personRepository.js';
 import { listPeopleBrowseSourceAssets } from '../repositories/assetRepository.js';
 import { summarizeFaceDetectionsByAssetIds } from '../repositories/faceDetectionRepository.js';
+import { countActivePersonFaceExamplesByPersonIds } from '../repositories/personFaceExampleRepository.js';
 
 function getSortableTimestamp(candidate: string | null | undefined): number {
   if (!candidate) {
@@ -15,6 +16,7 @@ function getSortableTimestamp(candidate: string | null | undefined): number {
 export async function listPeopleBrowseSummaries(): Promise<ListPeopleBrowseResponse> {
   const [people, assets] = await Promise.all([listPeople(), listPeopleBrowseSourceAssets()]);
   const faceSummariesByAssetId = await summarizeFaceDetectionsByAssetIds(assets.map((asset) => asset.id));
+  const exampleCountsByPersonId = await countActivePersonFaceExamplesByPersonIds(people.map((person) => person.id));
 
   const summariesByPersonId = new Map<
     string,
@@ -65,7 +67,8 @@ export async function listPeopleBrowseSummaries(): Promise<ListPeopleBrowseRespo
         assetCount: summary?.assetCount ?? 0,
         representativeAssetId: summary?.representativeAssetId ?? null,
         lastSeenAt: summary?.lastSeenAt ?? null,
-        reviewableAssetCount: summary?.reviewableAssetCount ?? 0
+        reviewableAssetCount: summary?.reviewableAssetCount ?? 0,
+        exampleCount: exampleCountsByPersonId[person.id] ?? 0
       };
     })
   };

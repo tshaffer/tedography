@@ -8,6 +8,7 @@ import type {
   ListPeopleBrowseResponse,
   ListPeopleResponse,
   ListPeoplePipelineRecentAssetsResponse,
+  RemovePersonExampleResponse,
   PeoplePipelineSummaryResponse,
   PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
@@ -59,6 +60,18 @@ export async function updatePerson(
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function removePersonExample(
+  personId: string,
+  exampleId: string
+): Promise<RemovePersonExampleResponse> {
+  return fetchJson<RemovePersonExampleResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}/examples/${encodeURIComponent(exampleId)}`,
+    {
+      method: 'DELETE'
     }
   );
 }

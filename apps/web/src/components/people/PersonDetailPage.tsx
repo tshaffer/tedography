@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { GetPersonDetailResponse } from '@tedography/shared';
-import { getPersonDetail, updatePerson } from '../../api/peoplePipelineApi';
+import {
+  getPersonDetail,
+  processPeopleAsset,
+  removePersonExample,
+  updatePerson
+} from '../../api/peoplePipelineApi';
 import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 const pageStyle: CSSProperties = {
@@ -161,6 +166,7 @@ export function PersonDetailPage() {
   const [displayNameDraft, setDisplayNameDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -248,6 +254,59 @@ export function PersonDetailPage() {
     }
   }
 
+  async function handleRemoveExample(exampleId: string): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      await removePersonExample(detail.person.id, exampleId);
+      await loadDetail();
+      setNoticeMessage('Removed example face from the enrolled set.');
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to remove example face');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReprocessRelatedAssets(): Promise<void> {
+    if (!detail || detail.assets.length === 0) {
+      return;
+    }
+
+    setReprocessing(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const assetIds = detail.assets.slice(0, 20).map((asset) => asset.id);
+      const results = await Promise.allSettled(assetIds.map((assetId) => processPeopleAsset(assetId, { force: true })));
+      const succeededCount = results.filter((result) => result.status === 'fulfilled').length;
+      const failedCount = results.length - succeededCount;
+      await loadDetail();
+      setNoticeMessage(
+        failedCount === 0
+          ? `Reprocessed ${succeededCount} related asset${succeededCount === 1 ? '' : 's'}.`
+          : `Reprocessed ${succeededCount} related asset${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+      );
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to reprocess related assets');
+    } finally {
+      setReprocessing(false);
+    }
+  }
+
+  const enrollmentStatusLabel = detail
+    ? detail.exampleCount === 0
+      ? 'Not enrolled'
+      : detail.exampleCount < 3
+        ? `Enrolled: ${detail.exampleCount} examples (thin set)`
+        : `Enrolled: ${detail.exampleCount} examples`
+    : '—';
+
   return (
     <div style={pageStyle}>
       <div style={linkRowStyle}>
@@ -294,6 +353,7 @@ export function PersonDetailPage() {
               <div style={badgeRowStyle}>
                 <span style={badgeStyle}>{formatAssetCount(detail.assetCount)}</span>
                 <span style={badgeStyle}>Last seen {formatSeenAt(detail.lastSeenAt)}</span>
+                <span style={detail.exampleCount < 3 ? warningBadgeStyle : badgeStyle}>{enrollmentStatusLabel}</span>
                 {detail.reviewableAssetCount > 0 ? (
                   <span style={warningBadgeStyle}>
                     {detail.reviewableAssetCount} asset{detail.reviewableAssetCount === 1 ? '' : 's'} still need review
@@ -305,6 +365,9 @@ export function PersonDetailPage() {
 
               <p style={{ margin: '12px 0', color: '#5b6673' }}>
                 Confirmed photos below come from derived <code>mediaAsset.people</code>. Review-needed work is shown separately and does not imply confirmed presence.
+              </p>
+              <p style={{ margin: '0 0 12px', color: '#5b6673', fontSize: '13px' }}>
+                Example faces are the specific confirmed detections tedography uses to improve future recognition quality for this person.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 320px) auto auto', gap: '10px', alignItems: 'end' }}>
@@ -365,10 +428,27 @@ export function PersonDetailPage() {
             ) : (
               <p style={{ margin: 0, color: '#5b6673' }}>No review-needed face detections are currently tied to this person.</p>
             )}
+            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={reprocessing ? disabledButtonStyle : buttonStyle}
+                disabled={reprocessing || detail.assets.length === 0}
+                onClick={() => void handleReprocessRelatedAssets()}
+              >
+                {reprocessing ? 'Reprocessing...' : 'Reprocess Related Assets'}
+              </button>
+            </div>
           </section>
 
           <section style={panelStyle}>
             <h2 style={{ marginTop: 0, fontSize: '22px' }}>Example Faces</h2>
+            <p style={{ margin: '0 0 12px', color: '#5b6673' }}>
+              {detail.exampleCount === 0
+                ? 'No example faces are enrolled yet.'
+                : detail.exampleCount < 3
+                  ? 'This person has a thin example set. Adding a few more clean examples can improve recognition quality.'
+                  : 'This example set is large enough to be useful, but you can still remove weak examples to improve quality.'}
+            </p>
             {detail.exampleFaces.length === 0 ? (
               <p style={{ margin: 0, color: '#5b6673' }}>No example faces available yet.</p>
             ) : (
@@ -377,7 +457,7 @@ export function PersonDetailPage() {
                   <article key={face.id} style={assetCardStyle}>
                     <div style={previewFrameStyle}>
                       <img
-                        src={getFaceDetectionPreviewUrl(face.id)}
+                        src={getFaceDetectionPreviewUrl(face.detection.id)}
                         alt={`${detail.person?.displayName ?? 'Person'} face example`}
                         style={previewImageStyle}
                       />
@@ -386,6 +466,18 @@ export function PersonDetailPage() {
                     <div style={{ fontSize: '12px', color: '#5b6673' }}>
                       {formatSeenAt(face.asset.captureDateTime)}
                     </div>
+                    <div style={badgeRowStyle}>
+                      <span style={badgeStyle}>{face.engine}</span>
+                      <span style={badgeStyle}>Face #{face.detection.faceIndex}</span>
+                    </div>
+                    <button
+                      type="button"
+                      style={saving ? disabledButtonStyle : buttonStyle}
+                      disabled={saving}
+                      onClick={() => void handleRemoveExample(face.id)}
+                    >
+                      Remove Example
+                    </button>
                   </article>
                 ))}
               </div>
