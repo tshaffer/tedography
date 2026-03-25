@@ -83,6 +83,9 @@ const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoState
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showSuppressedDuplicatesStorageKey = 'tedography.showSuppressedDuplicates';
+const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
+const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
+const duplicateVisibilityBootstrapStorageKey = 'tedography.bootstrap.duplicateVisibility';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
@@ -91,6 +94,62 @@ type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type AlbumTreeSortMode = 'Custom' | 'Name' | 'Month/Name';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
+
+type AppBootstrapCache = {
+  assets: MediaAsset[] | null;
+  albumTreeNodes: AlbumTreeNode[] | null;
+  duplicateResolutionVisibilityByAssetId: Map<string, DuplicateResolutionVisibilitySummary> | null;
+};
+
+const appBootstrapCache: AppBootstrapCache = {
+  assets: null,
+  albumTreeNodes: null,
+  duplicateResolutionVisibilityByAssetId: null
+};
+
+function readSessionStorageJson<T>(key: string): T | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const value = window.sessionStorage.getItem(key);
+    if (!value) {
+      return null;
+    }
+
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionStorageJson(key: string, value: unknown): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore quota/storage issues and fall back to in-memory cache only.
+  }
+}
+
+function readCachedBootstrapAssets(): MediaAsset[] | null {
+  return readSessionStorageJson<MediaAsset[]>(assetsBootstrapStorageKey);
+}
+
+function readCachedBootstrapAlbumTreeNodes(): AlbumTreeNode[] | null {
+  return readSessionStorageJson<AlbumTreeNode[]>(albumTreeBootstrapStorageKey);
+}
+
+function readCachedBootstrapDuplicateVisibility(): Map<string, DuplicateResolutionVisibilitySummary> | null {
+  const entries = readSessionStorageJson<Array<[string, DuplicateResolutionVisibilitySummary]>>(
+    duplicateVisibilityBootstrapStorageKey
+  );
+  return Array.isArray(entries) ? new Map(entries) : null;
+}
 
 type AlbumTreeContextMenuState = {
   nodeId: string;
@@ -2398,10 +2457,28 @@ function SurveyMode({
 
 export default function App() {
   const [healthStatus, setHealthStatus] = useState('loading');
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [albumTreeNodes, setAlbumTreeNodes] = useState<AlbumTreeNode[]>([]);
-  const [assetsLoading, setAssetsLoading] = useState(true);
-  const [albumTreeLoading, setAlbumTreeLoading] = useState(true);
+  const [assets, setAssets] = useState<MediaAsset[]>(() => {
+    const cached = appBootstrapCache.assets ?? readCachedBootstrapAssets();
+    if (cached) {
+      appBootstrapCache.assets = cached;
+      return cached;
+    }
+
+    return [];
+  });
+  const [albumTreeNodes, setAlbumTreeNodes] = useState<AlbumTreeNode[]>(() => {
+    const cached = appBootstrapCache.albumTreeNodes ?? readCachedBootstrapAlbumTreeNodes();
+    if (cached) {
+      appBootstrapCache.albumTreeNodes = cached;
+      return cached;
+    }
+
+    return [];
+  });
+  const [assetsLoading, setAssetsLoading] = useState(() => !(appBootstrapCache.assets ?? readCachedBootstrapAssets()));
+  const [albumTreeLoading, setAlbumTreeLoading] = useState(
+    () => !(appBootstrapCache.albumTreeNodes ?? readCachedBootstrapAlbumTreeNodes())
+  );
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -2471,6 +2548,7 @@ export default function App() {
   });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
   const [selectionAnchorAssetId, setSelectionAnchorAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<ViewerMode>('Grid');
   const [immersiveOpen, setImmersiveOpen] = useState(false);
@@ -2525,7 +2603,15 @@ export default function App() {
     return window.localStorage.getItem(showSuppressedDuplicatesStorageKey) === 'true';
   });
   const [duplicateResolutionVisibilityByAssetId, setDuplicateResolutionVisibilityByAssetId] =
-    useState<Map<string, DuplicateResolutionVisibilitySummary>>(() => new Map());
+    useState<Map<string, DuplicateResolutionVisibilitySummary>>(() => {
+      const cached = appBootstrapCache.duplicateResolutionVisibilityByAssetId ?? readCachedBootstrapDuplicateVisibility();
+      if (cached) {
+        appBootstrapCache.duplicateResolutionVisibilityByAssetId = cached;
+        return cached;
+      }
+
+      return new Map<string, DuplicateResolutionVisibilitySummary>();
+    });
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
@@ -2813,6 +2899,27 @@ export default function App() {
     window.localStorage.setItem(searchCaptureDateToStorageKey, searchCaptureDateTo);
   }, [searchCaptureDateTo]);
 
+  useEffect(() => {
+    if (assets.length > 0) {
+      writeSessionStorageJson(assetsBootstrapStorageKey, assets);
+    }
+  }, [assets]);
+
+  useEffect(() => {
+    if (albumTreeNodes.length > 0) {
+      writeSessionStorageJson(albumTreeBootstrapStorageKey, albumTreeNodes);
+    }
+  }, [albumTreeNodes]);
+
+  useEffect(() => {
+    if (duplicateResolutionVisibilityByAssetId.size > 0) {
+      writeSessionStorageJson(
+        duplicateVisibilityBootstrapStorageKey,
+        Array.from(duplicateResolutionVisibilityByAssetId.entries())
+      );
+    }
+  }, [duplicateResolutionVisibilityByAssetId]);
+
   async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
       setAssetsLoading(true);
@@ -2828,6 +2935,7 @@ export default function App() {
 
       const data = (await response.json()) as MediaAsset[];
       setAssets(data);
+      appBootstrapCache.assets = data;
     } catch (error: unknown) {
       if (error instanceof Error) {
         setAssetsError(error.message);
@@ -2839,12 +2947,25 @@ export default function App() {
     }
   }
 
+  async function loadAssetDetails(assetId: string): Promise<MediaAsset> {
+    const response = await fetch(`/api/assets/${encodeURIComponent(assetId)}`);
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    return (await response.json()) as MediaAsset;
+  }
+
   async function loadDuplicateResolutionVisibility(): Promise<void> {
     try {
       const response = await listDuplicateGroups();
-      setDuplicateResolutionVisibilityByAssetId(buildDuplicateResolutionVisibilityMap(response.groups));
+      const nextMap = buildDuplicateResolutionVisibilityMap(response.groups);
+      setDuplicateResolutionVisibilityByAssetId(nextMap);
+      appBootstrapCache.duplicateResolutionVisibilityByAssetId = nextMap;
     } catch {
-      setDuplicateResolutionVisibilityByAssetId(new Map());
+      const emptyMap = new Map<string, DuplicateResolutionVisibilitySummary>();
+      setDuplicateResolutionVisibilityByAssetId(emptyMap);
+      appBootstrapCache.duplicateResolutionVisibilityByAssetId = emptyMap;
     }
   }
 
@@ -2858,6 +2979,7 @@ export default function App() {
     try {
       const data = await listAlbumTreeNodes();
       setAlbumTreeNodes(data);
+      appBootstrapCache.albumTreeNodes = data;
     } catch (error: unknown) {
       if (error instanceof Error) {
         setAlbumTreeError(error.message);
@@ -2870,10 +2992,59 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadAssets({ showLoading: true });
-    void loadAlbumTreeNodes({ showLoading: true });
-    void loadDuplicateResolutionVisibility();
+    const hasCachedAssets = Array.isArray(appBootstrapCache.assets);
+    const hasCachedAlbumTree = Array.isArray(appBootstrapCache.albumTreeNodes);
+    const hasCachedDuplicateVisibility = appBootstrapCache.duplicateResolutionVisibilityByAssetId instanceof Map;
+
+    if (hasCachedAssets && appBootstrapCache.assets) {
+      setAssets(appBootstrapCache.assets);
+      setAssetsLoading(false);
+      void loadAssets({ showLoading: false });
+    } else {
+      void loadAssets({ showLoading: true });
+    }
+
+    if (hasCachedAlbumTree && appBootstrapCache.albumTreeNodes) {
+      setAlbumTreeNodes(appBootstrapCache.albumTreeNodes);
+      setAlbumTreeLoading(false);
+      void loadAlbumTreeNodes({ showLoading: false });
+    } else {
+      void loadAlbumTreeNodes({ showLoading: true });
+    }
+
+    if (hasCachedDuplicateVisibility && appBootstrapCache.duplicateResolutionVisibilityByAssetId) {
+      setDuplicateResolutionVisibilityByAssetId(appBootstrapCache.duplicateResolutionVisibilityByAssetId);
+      void loadDuplicateResolutionVisibility();
+    } else {
+      void loadDuplicateResolutionVisibility();
+    }
   }, []);
+
+  useEffect(() => {
+    if (!selectedAssetId) {
+      setSelectedAssetDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const asset = await loadAssetDetails(selectedAssetId);
+        if (!cancelled) {
+          setSelectedAssetDetails(asset);
+        }
+      } catch {
+        if (!cancelled) {
+          setSelectedAssetDetails(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAssetId]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -3008,6 +3179,10 @@ export default function App() {
   );
 
   const searchResults = useMemo(() => {
+    if (primaryArea !== 'Search') {
+      return [];
+    }
+
     const searchAlbumIdsSet = new Set(searchAlbumIds);
 
     const filtered = duplicateVisibilityScopedAssets.filter((asset) => {
@@ -3028,6 +3203,7 @@ export default function App() {
     return sortVisibleAssetsForTimeline(filtered);
   }, [
     duplicateVisibilityScopedAssets,
+    primaryArea,
     searchAlbumIds,
     searchCaptureDateFrom,
     searchCaptureDateTo,
@@ -3051,6 +3227,16 @@ export default function App() {
   }, [checkedAlbumIds.length, checkedAlbumIdsSet, duplicateVisibilityScopedAssets]);
 
   const checkedAlbumsAssetsById = useMemo(() => {
+    if (
+      !(
+        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
+        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
+      ) ||
+      checkedAlbumIds.length === 0
+    ) {
+      return new Map<string, MediaAsset[]>();
+    }
+
     const byAlbum = new Map<string, MediaAsset[]>();
 
     for (const albumId of checkedAlbumIds) {
@@ -3071,9 +3257,19 @@ export default function App() {
     }
 
     return byAlbum;
-  }, [assetsAfterAdditionalFilters, checkedAlbumIds, checkedAlbumIdsSet]);
+  }, [assetsAfterAdditionalFilters, checkedAlbumIds, checkedAlbumIdsSet, libraryBrowseMode, primaryArea, reviewBrowseMode]);
 
   const checkedAlbumSections = useMemo<AlbumAssetSection[]>(() => {
+    if (
+      !(
+        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
+        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
+      ) ||
+      checkedAlbumIds.length === 0
+    ) {
+      return [];
+    }
+
     return checkedAlbumIds
       .map((albumId) => {
         const albumNode = albumNodesById.get(albumId);
@@ -3093,7 +3289,7 @@ export default function App() {
         };
       })
       .filter((section): section is AlbumAssetSection => section !== null);
-  }, [albumNodesById, checkedAlbumIds, checkedAlbumsAssetsById]);
+  }, [albumNodesById, checkedAlbumIds, checkedAlbumsAssetsById, libraryBrowseMode, primaryArea, reviewBrowseMode]);
 
   const mergedAlbumAssets = useMemo(() => {
     const deduped = new Map<string, MediaAsset>();
@@ -3107,6 +3303,16 @@ export default function App() {
   }, [checkedAlbumSections]);
 
   const groupedAlbumNavigationAssets = useMemo(() => {
+    if (
+      !(
+        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
+        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
+      ) ||
+      checkedAlbumSections.length === 0
+    ) {
+      return [];
+    }
+
     const deduped = new Map<string, MediaAsset>();
     for (const section of checkedAlbumSections) {
       for (const asset of section.assets) {
@@ -3117,7 +3323,12 @@ export default function App() {
     }
 
     return [...deduped.values()];
-  }, [checkedAlbumSections]);
+  }, [checkedAlbumSections, libraryBrowseMode, primaryArea, reviewBrowseMode]);
+
+  const sortedAssetsAfterAdditionalFilters = useMemo(
+    () => sortVisibleAssetsForTimeline(assetsAfterAdditionalFilters),
+    [assetsAfterAdditionalFilters]
+  );
 
   const visibleAssets = useMemo(() => {
     if (primaryArea === 'Search') {
@@ -3133,12 +3344,12 @@ export default function App() {
         return groupedAlbumNavigationAssets;
       }
 
-      return sortVisibleAssetsForTimeline(assetsAfterAdditionalFilters);
+      return sortedAssetsAfterAdditionalFilters;
     }
 
     const isLibraryAlbumsMode = primaryArea === 'Library' && libraryBrowseMode === 'Albums';
     if (!isLibraryAlbumsMode) {
-      return sortVisibleAssetsForTimeline(assetsAfterAdditionalFilters);
+      return sortedAssetsAfterAdditionalFilters;
     }
 
     if (checkedAlbumIds.length === 0) {
@@ -3152,19 +3363,23 @@ export default function App() {
     return mergedAlbumAssets;
   }, [
     albumResultsPresentation,
-    assetsAfterAdditionalFilters,
     checkedAlbumIds.length,
     groupedAlbumNavigationAssets,
     libraryBrowseMode,
     mergedAlbumAssets,
     primaryArea,
     reviewBrowseMode,
-    searchResults
+    searchResults,
+    sortedAssetsAfterAdditionalFilters
   ]);
 
   const timelineMonthGroups = useMemo(
-    () => groupAssetsByCaptureMonth(visibleAssets),
-    [visibleAssets]
+    () =>
+      (primaryArea === 'Library' && libraryBrowseMode === 'Timeline') ||
+      (primaryArea === 'Review' && reviewBrowseMode === 'Timeline')
+        ? groupAssetsByCaptureMonth(visibleAssets)
+        : [],
+    [libraryBrowseMode, primaryArea, reviewBrowseMode, visibleAssets]
   );
 
   const timelineNavigationYears = useMemo<TimelineNavigationYear[]>(
@@ -3192,6 +3407,17 @@ export default function App() {
     () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [visibleAssets, selectedAssetId]
   );
+  const selectedAssetForDetails = useMemo(() => {
+    if (!selectedAsset) {
+      return null;
+    }
+
+    if (selectedAssetDetails?.id === selectedAsset.id) {
+      return { ...selectedAsset, ...selectedAssetDetails };
+    }
+
+    return selectedAsset;
+  }, [selectedAsset, selectedAssetDetails]);
   const selectedAssetDuplicateResolution = useMemo(
     () =>
       selectedAsset
@@ -3662,6 +3888,9 @@ export default function App() {
       setAssets((previous) =>
         previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
       );
+      if (selectedAssetId === updatedAsset.id) {
+        setSelectedAssetDetails(updatedAsset);
+      }
 
       const remainsVisibleAfterUpdate = (() => {
         if (primaryArea === 'Search') {
@@ -5497,7 +5726,7 @@ export default function App() {
             duplicateResolutionSummary={selectedAssetDuplicateResolution}
           />
           <AssetDetailsPanel
-            asset={selectedAsset}
+            asset={selectedAssetForDetails}
             albumLabels={selectedAssetAlbumLabels}
             duplicateResolutionSummary={selectedAssetDuplicateResolution}
             onReimportAsset={() => void handleReimportSelectedAsset()}

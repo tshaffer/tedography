@@ -8,7 +8,7 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
-import { getAllAssets, updatePhotoState } from './repositories/assetRepository.js';
+import { findById, getAllAssetsForLibrary, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
@@ -39,11 +39,26 @@ export function createServer(): Express {
 
   app.get('/api/assets', async (_req, res) => {
     try {
-      const assets = await getAllAssets();
+      const assets = await getAllAssetsForLibrary();
       res.json(assets);
     } catch (error) {
       log.error('Failed to read assets', error);
       res.status(500).json({ error: 'Failed to load assets' });
+    }
+  });
+
+  app.get('/api/assets/:id', async (req, res) => {
+    try {
+      const asset = await findById(req.params.id);
+      if (!asset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      res.json(asset);
+    } catch (error) {
+      log.error('Failed to read asset details', error);
+      res.status(500).json({ error: 'Failed to load asset details' });
     }
   });
 

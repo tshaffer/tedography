@@ -31,6 +31,30 @@ export async function getAllAssets(): Promise<MediaAsset[]> {
   return normalizeMediaAssets(assets);
 }
 
+export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
+  const assets = await MediaAssetModel.find(
+    {},
+    {
+      _id: 0,
+      id: 1,
+      filename: 1,
+      mediaType: 1,
+      photoState: 1,
+      captureDateTime: 1,
+      width: 1,
+      height: 1,
+      importedAt: 1,
+      originalFileFormat: 1,
+      displayFileFormat: 1,
+      albumIds: 1,
+      people: 1
+    }
+  )
+    .sort({ id: 1 })
+    .lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
+}
+
 export async function findById(id: string): Promise<MediaAsset | null> {
   const asset = await MediaAssetModel.findOne({ id }, { _id: 0 }).lean<MediaAsset | null>();
   return asset ? normalizeMediaAsset(asset) : null;
