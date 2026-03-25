@@ -29,7 +29,7 @@ import {
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
-import { processPeopleAsset } from './api/peoplePipelineApi';
+import { getPeoplePipelineAssetState, processPeopleAsset } from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
@@ -54,6 +54,7 @@ import {
   type TimelineNavigationYear
 } from './utilities/libraryTimeline';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
+import type { ListAssetFaceDetectionsResponse } from '@tedography/shared';
 
 const photoStateFilterOptions: PhotoState[] = [
   PhotoState.New,
@@ -2556,6 +2557,9 @@ export default function App() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
+  const [selectedAssetPeopleStatus, setSelectedAssetPeopleStatus] = useState<ListAssetFaceDetectionsResponse | null>(null);
+  const [selectedAssetPeopleStatusLoading, setSelectedAssetPeopleStatusLoading] = useState(false);
+  const [selectedAssetPeopleStatusError, setSelectedAssetPeopleStatusError] = useState<string | null>(null);
   const [selectionAnchorAssetId, setSelectionAnchorAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<ViewerMode>('Grid');
   const [immersiveOpen, setImmersiveOpen] = useState(false);
@@ -2963,6 +2967,23 @@ export default function App() {
     return (await response.json()) as MediaAsset;
   }
 
+  async function loadSelectedAssetPeopleStatus(assetId: string): Promise<void> {
+    setSelectedAssetPeopleStatusLoading(true);
+    setSelectedAssetPeopleStatusError(null);
+
+    try {
+      const state = await getPeoplePipelineAssetState(assetId);
+      setSelectedAssetPeopleStatus(state);
+    } catch (error) {
+      setSelectedAssetPeopleStatus(null);
+      setSelectedAssetPeopleStatusError(
+        error instanceof Error ? error.message : 'Failed to load people status'
+      );
+    } finally {
+      setSelectedAssetPeopleStatusLoading(false);
+    }
+  }
+
   async function loadDuplicateResolutionVisibility(): Promise<void> {
     try {
       const response = await listDuplicateGroups();
@@ -3052,6 +3073,17 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedAssetId]);
+
+  useEffect(() => {
+    if (primaryArea !== 'Library' || !selectedAssetId || selectedAssetIds.length !== 1) {
+      setSelectedAssetPeopleStatus(null);
+      setSelectedAssetPeopleStatusError(null);
+      setSelectedAssetPeopleStatusLoading(false);
+      return;
+    }
+
+    void loadSelectedAssetPeopleStatus(selectedAssetId);
+  }, [primaryArea, selectedAssetId, selectedAssetIds.length]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -4013,6 +4045,9 @@ export default function App() {
       const failed = results.filter((result) => result.status === 'rejected');
 
       if (failed.length === 0) {
+        if (assetIds.length === 1 && selectedAssetId === assetIds[0]) {
+          await loadSelectedAssetPeopleStatus(assetIds[0]);
+        }
         setPeopleRecognitionNotice({
           kind: 'success',
           message:
@@ -4035,6 +4070,9 @@ export default function App() {
         return;
       }
 
+      if (assetIds.length === 1 && selectedAssetId === assetIds[0]) {
+        await loadSelectedAssetPeopleStatus(assetIds[0]);
+      }
       setPeopleRecognitionNotice({
         kind: 'error',
         message: `People recognition completed for ${succeeded.length} assets, ${failed.length} failed.`,
@@ -5795,6 +5833,23 @@ export default function App() {
             assetOperationBusy={assetMaintenanceBusy !== null}
             assetOperationMessage={assetMaintenanceMessage}
             assetOperationError={assetMaintenanceError}
+            peopleStatus={
+              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+                ? {
+                    detectionsCount: selectedAssetPeopleStatus?.detections.length ?? 0,
+                    reviewableCount:
+                      selectedAssetPeopleStatus?.detections.filter((detection) =>
+                        detection.matchStatus === 'unmatched' ||
+                        detection.matchStatus === 'suggested' ||
+                        detection.matchStatus === 'autoMatched'
+                      ).length ?? 0,
+                    confirmedPeopleNames: (selectedAssetPeopleStatus?.people ?? []).map((person) => person.displayName),
+                    loading: selectedAssetPeopleStatusLoading,
+                    errorMessage: selectedAssetPeopleStatusError,
+                    reviewHref: `/people/review?assetId=${encodeURIComponent(selectedAsset.id)}`
+                  }
+                : null
+            }
           />
         </section>
       </aside>

@@ -1,4 +1,5 @@
 import { type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { type MediaAsset } from '@tedography/domain';
 import { type DuplicateResolutionVisibilitySummary } from '../duplicates/duplicateResolutionVisibility';
 
@@ -11,6 +12,14 @@ interface AssetDetailsPanelProps {
   assetOperationBusy?: boolean;
   assetOperationMessage?: string | null;
   assetOperationError?: boolean;
+  peopleStatus?: {
+    detectionsCount: number;
+    reviewableCount: number;
+    confirmedPeopleNames: string[];
+    loading?: boolean;
+    errorMessage?: string | null;
+    reviewHref?: string;
+  } | null;
 }
 
 const panelStyle: CSSProperties = {
@@ -51,6 +60,17 @@ const actionsStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: '6px',
   marginBottom: '10px'
+};
+
+const subSectionStyle: CSSProperties = {
+  borderTop: '1px solid #efefef',
+  marginTop: '10px',
+  paddingTop: '10px'
+};
+
+const subSectionTitleStyle: CSSProperties = {
+  margin: '0 0 8px',
+  fontSize: '13px'
 };
 
 const buttonStyle: CSSProperties = {
@@ -138,7 +158,8 @@ export function AssetDetailsPanel({
   onRebuildDerivedFiles,
   assetOperationBusy = false,
   assetOperationMessage = null,
-  assetOperationError = false
+  assetOperationError = false,
+  peopleStatus = null
 }: AssetDetailsPanelProps) {
   if (!asset) {
     return (
@@ -215,6 +236,34 @@ export function AssetDetailsPanel({
         </p>
       ) : null}
       {rows.map((row) => renderRow(row.label, row.value))}
+      {peopleStatus ? (
+        <section style={subSectionStyle}>
+          <h4 style={subSectionTitleStyle}>People</h4>
+          {peopleStatus.loading ? (
+            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>Loading people status...</p>
+          ) : peopleStatus.errorMessage ? (
+            <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
+          ) : peopleStatus.detectionsCount === 0 ? (
+            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>No face detections yet.</p>
+          ) : (
+            <>
+              {renderRow('Detections', String(peopleStatus.detectionsCount))}
+              {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
+              {renderRow(
+                'Confirmed',
+                peopleStatus.confirmedPeopleNames.length > 0 ? peopleStatus.confirmedPeopleNames.join(', ') : 'None'
+              )}
+            </>
+          )}
+          {peopleStatus.reviewHref ? (
+            <div style={{ marginTop: '8px' }}>
+              <Link to={peopleStatus.reviewHref} style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}>
+                Review Faces
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </section>
   );
 }

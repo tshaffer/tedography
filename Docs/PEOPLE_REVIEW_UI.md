@@ -140,6 +140,13 @@ For single-asset runs, the follow-up link opens:
 
 so the People Review page is immediately filtered to that asset.
 
+When exactly one asset is selected in `Library`, the inspector now also shows a compact `People` section with:
+
+- detections count
+- reviewable count
+- confirmed people names
+- a `Review Faces` deep link for that asset
+
 ## Current Limitations
 
 - Face crops/previews are shown when the active engine generated them. With `mock`, the page usually falls back to the source asset thumbnail.
