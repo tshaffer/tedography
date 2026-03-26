@@ -5,6 +5,7 @@ import type {
   CreatePersonRequest,
   EnrollPersonFromDetectionRequest,
   MergePersonRequest,
+  SplitPersonRequest,
   UpdatePersonRequest,
   PeopleReviewQueueSort,
   ProcessPeopleAssetRequest,
@@ -23,6 +24,7 @@ import {
   mergePersonIntoTarget,
   removePersonFaceExample,
   processPeoplePipelineForAsset,
+  splitPersonFromConfirmedFaces,
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
 import { listPeopleBrowseSummaries } from '../people/peopleBrowseService.js';
@@ -232,6 +234,33 @@ peoplePipelineRoutes.post('/people/:personId/merge', async (req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to merge person';
     log.error('Failed to merge person', error);
+    res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.post('/people/:personId/split', async (req, res) => {
+  const body = req.body as Partial<SplitPersonRequest> | undefined;
+  const detectionIds = Array.isArray(body?.detectionIds)
+    ? body.detectionIds.map((value: unknown) => String(value))
+    : [];
+
+  if (detectionIds.length === 0) {
+    res.status(400).json({ error: 'detectionIds are required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    res.json(
+      await splitPersonFromConfirmedFaces({
+        sourcePersonId: req.params.personId,
+        detectionIds,
+        ...(typeof body?.targetPersonId === 'string' ? { targetPersonId: body.targetPersonId } : {}),
+        ...(typeof body?.newDisplayName === 'string' ? { newDisplayName: body.newDisplayName } : {})
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to split person';
+    log.error('Failed to split person', error);
     res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
   }
 });

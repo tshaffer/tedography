@@ -20,6 +20,37 @@ What merge does not do:
 - it does not run a full-library reprocess
 - it does not merge unrelated person metadata beyond the current practical scope
 
+## Split Person v1
+
+Use `Split Selected Faces` on Person Detail when a person record is mostly correct, but some confirmed faces actually belong to a different real person.
+
+Flow:
+
+1. Open a person detail page
+2. In `Confirmed Faces`, select one or more faces
+3. Click `Split Selected Faces`
+4. Choose either:
+   - an existing destination person
+   - or a new person name
+5. Confirm the move
+
+What split does:
+
+- selected confirmed detections move from the source person to the destination person
+- affected assets recompute derived `mediaAsset.people`
+- selected example faces move with those detections when they were already part of the source example set
+- unselected confirmed faces stay on the source person
+
+How split differs from merge:
+
+- merge combines one whole person into another surviving person
+- split moves only a selected subset of confirmed faces out of the current person
+
+Split is the right tool when:
+
+- the current person is mostly correct
+- but a subset of confirmed faces belong to someone else
+
 ## Correct Mistaken Confirmed Assignments
 
 On Person Detail, the `Confirmed Faces` section now supports:
@@ -46,6 +77,7 @@ Examples:
 - removing an example does not by itself remove the confirmed detection
 - removing a confirmed face from a person updates the derived asset people state
 - reassigning a confirmed face removes stale example enrollment tied to the old person
+- splitting selected faces moves only the chosen detections/examples, not the whole person
 
 ## Reprocess After Maintenance
 

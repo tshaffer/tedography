@@ -15,6 +15,8 @@ import type {
   PeopleReviewQueueSort,
   ListPeopleReviewQueueResponse,
   ProcessPeopleAssetResponse,
+  SplitPersonRequest,
+  SplitPersonResponse,
   UpdatePersonRequest,
   UpdatePersonResponse,
   ReviewFaceDetectionRequest,
@@ -84,6 +86,22 @@ export async function mergePerson(
 ): Promise<MergePersonResponse> {
   return fetchJson<MergePersonResponse>(
     `/api/people-pipeline/people/${encodeURIComponent(personId)}/merge`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function splitPerson(
+  personId: string,
+  request: SplitPersonRequest
+): Promise<SplitPersonResponse> {
+  return fetchJson<SplitPersonResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}/split`,
     {
       method: 'POST',
       headers: {

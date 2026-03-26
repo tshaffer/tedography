@@ -244,3 +244,18 @@ export interface MergePersonResponse {
   movedExampleCount: number;
   affectedAssetCount: number;
 }
+
+export interface SplitPersonRequest {
+  detectionIds: string[];
+  targetPersonId?: string;
+  newDisplayName?: string;
+}
+
+export interface SplitPersonResponse {
+  sourcePerson: Person;
+  targetPerson: Person;
+  movedConfirmedDetectionsCount: number;
+  movedExampleCount: number;
+  affectedAssetCount: number;
+  createdTargetPerson: boolean;
+}

@@ -17,6 +17,7 @@ import type {
   ListPeopleReviewQueueResponse,
   PeopleReviewQueueItem,
   ProcessPeopleAssetResponse,
+  SplitPersonResponse,
   ReviewFaceDetectionRequest,
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
@@ -883,6 +884,108 @@ export async function mergePersonIntoTarget(input: {
     movedConfirmedDetectionsCount,
     movedExampleCount,
     affectedAssetCount: affectedAssetIds.size
+  };
+}
+
+export async function splitPersonFromConfirmedFaces(input: {
+  sourcePersonId: string;
+  detectionIds: string[];
+  targetPersonId?: string;
+  newDisplayName?: string;
+}): Promise<SplitPersonResponse> {
+  const detectionIds = Array.from(new Set(input.detectionIds.map((id) => id.trim()).filter(Boolean)));
+  if (detectionIds.length === 0) {
+    throw new Error('At least one confirmed face must be selected to split.');
+  }
+
+  const sourcePerson = await findPersonById(input.sourcePersonId);
+  if (!sourcePerson) {
+    throw new Error(`Source person not found: ${input.sourcePersonId}`);
+  }
+
+  if (input.targetPersonId && input.newDisplayName) {
+    throw new Error('Choose either an existing target person or a new display name, not both.');
+  }
+
+  let targetPerson: Person | null = null;
+  let createdTargetPerson = false;
+
+  if (typeof input.targetPersonId === 'string' && input.targetPersonId.trim().length > 0) {
+    if (input.targetPersonId === input.sourcePersonId) {
+      throw new Error('Source and target person must be different.');
+    }
+    targetPerson = await findPersonById(input.targetPersonId.trim());
+    if (!targetPerson) {
+      throw new Error(`Target person not found: ${input.targetPersonId}`);
+    }
+  } else if (typeof input.newDisplayName === 'string' && input.newDisplayName.trim().length > 0) {
+    targetPerson = await createPerson({ displayName: input.newDisplayName.trim() });
+    createdTargetPerson = true;
+  } else {
+    throw new Error('Choose an existing target person or provide a new person name.');
+  }
+
+  const detections = await Promise.all(detectionIds.map((id) => findFaceDetectionById(id)));
+  const selectedDetections = detections.filter((item): item is FaceDetection => Boolean(item));
+
+  if (selectedDetections.length !== detectionIds.length) {
+    throw new Error('One or more selected face detections were not found.');
+  }
+
+  const invalidDetection = selectedDetections.find(
+    (detection) => detection.matchStatus !== 'confirmed' || detection.matchedPersonId !== sourcePerson.id
+  );
+  if (invalidDetection) {
+    throw new Error('Selected faces must all be confirmed detections currently assigned to the source person.');
+  }
+
+  const sourceExamples = await listActivePersonFaceExamplesByPersonId(sourcePerson.id);
+  const sourceExamplesByDetectionId = new Map(sourceExamples.map((example) => [example.faceDetectionId, example]));
+  const affectedAssetIds = new Set<string>();
+  let movedExampleCount = 0;
+
+  for (const detection of selectedDetections) {
+    affectedAssetIds.add(detection.mediaAssetId);
+    const sourceExample = sourceExamplesByDetectionId.get(detection.id) ?? null;
+
+    if (sourceExample) {
+      const targetExisting = await findActivePersonFaceExampleByPersonAndDetection({
+        personId: targetPerson.id,
+        faceDetectionId: detection.id
+      });
+
+      if (!targetExisting) {
+        await enrollPersonFromDetection({
+          personId: targetPerson.id,
+          detectionId: detection.id
+        });
+        movedExampleCount += 1;
+      }
+
+      await removeActiveExampleRecord(sourceExample);
+    }
+
+    await reviewFaceDetection(detection.id, {
+      action: 'assign',
+      personId: targetPerson.id,
+      reviewer: 'split',
+      notes: `Split from ${sourcePerson.displayName} to ${targetPerson.displayName}.`
+    });
+  }
+
+  const refreshedSource = await findPersonById(sourcePerson.id);
+  const refreshedTarget = await findPersonById(targetPerson.id);
+  if (!refreshedSource || !refreshedTarget) {
+    throw new Error('Failed to reload people after split.');
+  }
+
+  return {
+    sourcePerson: refreshedSource,
+    targetPerson: refreshedTarget,
+    movedConfirmedDetectionsCount: selectedDetections.length,
+    movedExampleCount,
+    affectedAssetCount: affectedAssetIds.size,
+    createdTargetPerson
   };
 }
 

@@ -9,6 +9,7 @@ import {
   processPeopleAsset,
   removePersonExample,
   reviewFaceDetection,
+  splitPerson,
   updatePerson
 } from '../../api/peoplePipelineApi';
 import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
@@ -153,6 +154,27 @@ const warningBadgeStyle: CSSProperties = {
   color: '#805a00'
 };
 
+const overlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  display: 'grid',
+  placeItems: 'center',
+  padding: '24px',
+  zIndex: 1000
+};
+
+const dialogStyle: CSSProperties = {
+  width: 'min(640px, 100%)',
+  backgroundColor: '#fff',
+  border: '1px solid #d7dce2',
+  borderRadius: '16px',
+  padding: '18px',
+  boxShadow: '0 20px 40px rgba(15, 23, 42, 0.18)',
+  display: 'grid',
+  gap: '12px'
+};
+
 function formatSeenAt(value: string | null | undefined): string {
   if (!value) {
     return 'Unknown';
@@ -178,10 +200,16 @@ export function PersonDetailPage() {
   const [displayNameDraft, setDisplayNameDraft] = useState('');
   const [mergeTargetPersonId, setMergeTargetPersonId] = useState('');
   const [confirmedFaceAssignments, setConfirmedFaceAssignments] = useState<Record<string, string>>({});
+  const [selectedConfirmedDetectionIds, setSelectedConfirmedDetectionIds] = useState<string[]>([]);
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [splitMode, setSplitMode] = useState<'existing' | 'new'>('existing');
+  const [splitTargetPersonId, setSplitTargetPersonId] = useState('');
+  const [splitNewDisplayName, setSplitNewDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -201,6 +229,10 @@ export function PersonDetailPage() {
       setDisplayNameDraft(response.person.displayName);
       setPeopleOptions(peopleResponse.items);
       setMergeTargetPersonId('');
+      setSelectedConfirmedDetectionIds([]);
+      setSplitDialogOpen(false);
+      setSplitTargetPersonId('');
+      setSplitNewDisplayName('');
       setConfirmedFaceAssignments(
         Object.fromEntries(
           response.confirmedFaces.map((face) => [face.detection.id, ''])
@@ -378,6 +410,58 @@ export function PersonDetailPage() {
     }
   }
 
+  function toggleConfirmedFaceSelection(detectionId: string): void {
+    setSelectedConfirmedDetectionIds((current) =>
+      current.includes(detectionId)
+        ? current.filter((id) => id !== detectionId)
+        : [...current, detectionId]
+    );
+  }
+
+  function openSplitDialog(): void {
+    setSplitMode('existing');
+    setSplitTargetPersonId('');
+    setSplitNewDisplayName('');
+    setSplitDialogOpen(true);
+  }
+
+  async function handleSplitSelectedFaces(): Promise<void> {
+    if (!detail || selectedConfirmedDetectionIds.length === 0) {
+      return;
+    }
+
+    if (splitMode === 'existing' && splitTargetPersonId.trim().length === 0) {
+      setActionErrorMessage('Choose an existing destination person for the split.');
+      return;
+    }
+
+    if (splitMode === 'new' && splitNewDisplayName.trim().length === 0) {
+      setActionErrorMessage('Provide a display name for the new person.');
+      return;
+    }
+
+    setSplitting(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const response = await splitPerson(detail.person.id, {
+        detectionIds: selectedConfirmedDetectionIds,
+        ...(splitMode === 'existing'
+          ? { targetPersonId: splitTargetPersonId.trim() }
+          : { newDisplayName: splitNewDisplayName.trim() })
+      });
+      await loadDetail();
+      setNoticeMessage(
+        `Moved ${response.movedConfirmedDetectionsCount} confirmed face${response.movedConfirmedDetectionsCount === 1 ? '' : 's'} and ${response.movedExampleCount} example face${response.movedExampleCount === 1 ? '' : 's'} from ${response.sourcePerson.displayName} to ${response.targetPerson.displayName}.`
+      );
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to split selected faces');
+    } finally {
+      setSplitting(false);
+      setSplitDialogOpen(false);
+    }
+  }
+
   async function handleReprocessRelatedAssets(): Promise<void> {
     if (!detail || detail.assets.length === 0) {
       return;
@@ -411,6 +495,11 @@ export function PersonDetailPage() {
         ? `Enrolled: ${detail.exampleCount} examples (thin set)`
         : `Enrolled: ${detail.exampleCount} examples`
     : '—';
+
+  const selectedConfirmedFaces = detail
+    ? detail.confirmedFaces.filter((face) => selectedConfirmedDetectionIds.includes(face.detection.id))
+    : [];
+  const selectedExampleFaceCount = selectedConfirmedFaces.filter((face) => Boolean(face.exampleId)).length;
 
   return (
     <div style={pageStyle}>
@@ -626,6 +715,38 @@ export function PersonDetailPage() {
             <p style={{ margin: '0 0 12px', color: '#5b6673' }}>
               These are confirmed detections currently assigned to {detail.person.displayName}. Reassigning or removing one updates the detection and the derived <code>mediaAsset.people</code> state for that asset. Example faces remain a separate opt-in concept.
             </p>
+            {detail.confirmedFaces.length > 0 ? (
+              <div style={{ ...panelStyle, padding: '12px', marginBottom: '12px', backgroundColor: '#f6fafb', borderColor: '#bfd6e0', boxShadow: 'none' }}>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
+                    {selectedConfirmedDetectionIds.length} selected for split
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      style={selectedConfirmedDetectionIds.length === 0 ? disabledButtonStyle : buttonStyle}
+                      disabled={selectedConfirmedDetectionIds.length === 0}
+                      onClick={() => openSplitDialog()}
+                    >
+                      Split Selected Faces
+                    </button>
+                    <button
+                      type="button"
+                      style={buttonStyle}
+                      onClick={() =>
+                        setSelectedConfirmedDetectionIds(
+                          selectedConfirmedDetectionIds.length === detail.confirmedFaces.length
+                            ? []
+                            : detail.confirmedFaces.map((face) => face.detection.id)
+                        )
+                      }
+                    >
+                      {selectedConfirmedDetectionIds.length === detail.confirmedFaces.length ? 'Clear Selection' : 'Select All'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {detail.confirmedFaces.length === 0 ? (
               <p style={{ margin: 0, color: '#5b6673' }}>No confirmed face detections are currently available for maintenance.</p>
             ) : (
@@ -639,6 +760,15 @@ export function PersonDetailPage() {
                         style={previewImageStyle}
                       />
                     </div>
+                    <label style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', fontSize: '12px', fontWeight: 700, color: '#163246' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedConfirmedDetectionIds.includes(face.detection.id)}
+                        onChange={() => toggleConfirmedFaceSelection(face.detection.id)}
+                        disabled={saving || splitting}
+                      />
+                      Select for split
+                    </label>
                     <div style={{ fontSize: '13px', fontWeight: 700 }}>{face.asset.filename}</div>
                     <div style={{ fontSize: '12px', color: '#5b6673' }}>{face.asset.originalArchivePath}</div>
                     <div style={badgeRowStyle}>
@@ -742,6 +872,107 @@ export function PersonDetailPage() {
             )}
           </section>
         </>
+      ) : null}
+
+      {splitDialogOpen && detail ? (
+        <div style={overlayStyle}>
+          <section style={dialogStyle}>
+            <h2 style={{ margin: 0, fontSize: '24px' }}>Split Selected Faces</h2>
+            <p style={{ margin: 0, color: '#5b6673' }}>
+              Move {selectedConfirmedDetectionIds.length} confirmed face{selectedConfirmedDetectionIds.length === 1 ? '' : 's'} out of {detail.person.displayName}. This updates confirmed detections and recomputes derived <code>mediaAsset.people</code> for affected assets.
+            </p>
+            {selectedExampleFaceCount > 0 ? (
+              <p style={{ margin: 0, color: '#805a00' }}>
+                {selectedExampleFaceCount} selected face{selectedExampleFaceCount === 1 ? '' : 's'} are also example faces and will move to the destination person.
+              </p>
+            ) : null}
+            <div>
+              <span style={labelStyle}>Destination</span>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="radio"
+                    name="split-destination"
+                    checked={splitMode === 'existing'}
+                    onChange={() => setSplitMode('existing')}
+                    disabled={splitting}
+                  />
+                  Existing person
+                </label>
+                <label style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="radio"
+                    name="split-destination"
+                    checked={splitMode === 'new'}
+                    onChange={() => setSplitMode('new')}
+                    disabled={splitting}
+                  />
+                  New person
+                </label>
+              </div>
+            </div>
+            {splitMode === 'existing' ? (
+              <div>
+                <span style={labelStyle}>Move To Existing Person</span>
+                <select
+                  value={splitTargetPersonId}
+                  onChange={(event) => setSplitTargetPersonId(event.target.value)}
+                  style={{ ...inputStyle, width: '100%' }}
+                  disabled={splitting}
+                >
+                  <option value="">Choose destination person</option>
+                  {peopleOptions
+                    .filter((person) => person.id !== detail.person.id)
+                    .map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.displayName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <span style={labelStyle}>New Person Name</span>
+                <input
+                  type="text"
+                  value={splitNewDisplayName}
+                  onChange={(event) => setSplitNewDisplayName(event.target.value)}
+                  style={{ ...inputStyle, width: '100%' }}
+                  placeholder="Display name"
+                  disabled={splitting}
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={splitting ? disabledButtonStyle : buttonStyle}
+                disabled={splitting}
+                onClick={() => setSplitDialogOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={
+                  splitting ||
+                    (splitMode === 'existing' && splitTargetPersonId.trim().length === 0) ||
+                    (splitMode === 'new' && splitNewDisplayName.trim().length === 0)
+                    ? disabledButtonStyle
+                    : primaryButtonStyle
+                }
+                disabled={
+                  splitting ||
+                  (splitMode === 'existing' && splitTargetPersonId.trim().length === 0) ||
+                  (splitMode === 'new' && splitNewDisplayName.trim().length === 0)
+                }
+                onClick={() => void handleSplitSelectedFaces()}
+              >
+                {splitting ? 'Moving...' : splitMode === 'existing' ? 'Move to Existing Person' : 'Create Person and Move Faces'}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </div>
   );
