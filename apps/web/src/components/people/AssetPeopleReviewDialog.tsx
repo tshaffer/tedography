@@ -123,6 +123,75 @@ const previewImageStyle: CSSProperties = {
   backgroundColor: '#dbe2ea'
 };
 
+const currentCardStyle: CSSProperties = {
+  ...cardStyle,
+  borderColor: '#0f5f73',
+  boxShadow: '0 0 0 2px rgba(15, 95, 115, 0.16), 0 8px 18px rgba(15, 23, 42, 0.06)'
+};
+
+const sourcePreviewLayoutStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.2fr) minmax(280px, 0.8fr)',
+  gap: '16px',
+  alignItems: 'start'
+};
+
+const sourcePreviewFigureStyle: CSSProperties = {
+  ...previewBoxStyle,
+  position: 'relative',
+  overflow: 'hidden'
+};
+
+const sourcePreviewImageStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  height: 'auto',
+  maxHeight: '56vh',
+  objectFit: 'contain',
+  backgroundColor: '#dbe2ea'
+};
+
+const overlaySurfaceStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none'
+};
+
+const overlayBoxBaseStyle: CSSProperties = {
+  position: 'absolute',
+  borderRadius: '8px',
+  border: '2px solid #0f5f73',
+  backgroundColor: 'rgba(15, 95, 115, 0.08)',
+  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.35) inset',
+  pointerEvents: 'auto',
+  cursor: 'pointer'
+};
+
+const overlayLabelStyle: CSSProperties = {
+  position: 'absolute',
+  top: '0',
+  left: '0',
+  transform: 'translateY(calc(-100% - 4px))',
+  maxWidth: '100%',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#fff',
+  backgroundColor: 'rgba(15, 23, 42, 0.88)',
+  borderRadius: '999px',
+  padding: '2px 8px'
+};
+
+const overlayLegendStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  fontSize: '12px',
+  color: '#556677'
+};
+
 const actionsSectionStyle: CSSProperties = {
   display: 'grid',
   gap: '10px'
@@ -188,6 +257,8 @@ type DraftState = {
   newPersonName: string;
   ignoredReason: FaceDetectionIgnoredReason;
 };
+
+const showFaceBoxesStorageKey = 'tedography.people.assetReviewDialog.showFaceBoxes';
 
 function formatDateTime(value?: string | null): string {
   if (!value) {
@@ -259,6 +330,46 @@ function getConfirmActionHint(suggestedPersonName: string, assignedPersonName: s
   return null;
 }
 
+function getDetectionOverlayLabel(
+  status: FaceDetectionMatchStatus,
+  suggestedPersonName: string,
+  matchedPersonName: string
+): string {
+  switch (status) {
+    case 'confirmed':
+      return matchedPersonName ? `Confirmed: ${matchedPersonName}` : 'Confirmed';
+    case 'autoMatched':
+      return suggestedPersonName ? `Auto: ${suggestedPersonName}` : 'Auto Matched';
+    case 'suggested':
+      return suggestedPersonName ? `Suggested: ${suggestedPersonName}` : 'Suggested';
+    case 'rejected':
+      return 'Rejected';
+    case 'ignored':
+      return 'Ignored';
+    default:
+      return 'Unmatched';
+  }
+}
+
+function getDetectionOverlayPalette(status: FaceDetectionMatchStatus, isSelected: boolean): CSSProperties {
+  const paletteByStatus: Record<FaceDetectionMatchStatus, { border: string; background: string }> = {
+    confirmed: { border: '#1d8348', background: 'rgba(29, 131, 72, 0.18)' },
+    suggested: { border: '#0f5f73', background: 'rgba(15, 95, 115, 0.14)' },
+    autoMatched: { border: '#6d28d9', background: 'rgba(109, 40, 217, 0.14)' },
+    unmatched: { border: '#475569', background: 'rgba(71, 85, 105, 0.12)' },
+    rejected: { border: '#b45309', background: 'rgba(180, 83, 9, 0.14)' },
+    ignored: { border: '#64748b', background: 'rgba(100, 116, 139, 0.12)' }
+  };
+
+  const palette = paletteByStatus[status];
+  return {
+    borderColor: palette.border,
+    backgroundColor: palette.background,
+    zIndex: isSelected ? 2 : 1,
+    boxShadow: isSelected ? `0 0 0 2px ${palette.border}, 0 0 0 4px rgba(255, 255, 255, 0.6)` : undefined
+  };
+}
+
 export function AssetPeopleReviewDialog({
   open,
   asset,
@@ -273,6 +384,14 @@ export function AssetPeopleReviewDialog({
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [selectedDetectionId, setSelectedDetectionId] = useState<string | null>(null);
+  const [showFaceBoxes, setShowFaceBoxes] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showFaceBoxesStorageKey) === 'true';
+  });
 
   useEffect(() => {
     if (!open) {
@@ -318,6 +437,29 @@ export function AssetPeopleReviewDialog({
     setAssetState(initialState);
     void loadDialogData();
   }, [open, asset?.id, initialState?.assetId]);
+
+  useEffect(() => {
+    if (!open || !assetState) {
+      return;
+    }
+
+    if (
+      selectedDetectionId &&
+      assetState.detections.some((detection) => detection.id === selectedDetectionId)
+    ) {
+      return;
+    }
+
+    setSelectedDetectionId(assetState.detections[0]?.id ?? null);
+  }, [assetState, open, selectedDetectionId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(showFaceBoxesStorageKey, showFaceBoxes ? 'true' : 'false');
+  }, [showFaceBoxes]);
 
   function getDraft(detectionId: string): DraftState {
     return (
@@ -435,6 +577,11 @@ export function AssetPeopleReviewDialog({
     [assetState?.detections]
   );
 
+  const selectedDetection = useMemo(
+    () => assetState?.detections.find((detection) => detection.id === selectedDetectionId) ?? null,
+    [assetState?.detections, selectedDetectionId]
+  );
+
   if (!open || !asset) {
     return null;
   }
@@ -488,6 +635,92 @@ export function AssetPeopleReviewDialog({
             <span style={badgeStyle}>Confirmed: {(assetState?.people ?? []).length}</span>
           </div>
 
+          {assetState ? (
+            <div style={sourcePreviewLayoutStyle}>
+              <div>
+                <div style={{ ...inlineRowStyle, justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700 }}>Source asset context</div>
+                  <label style={{ ...inlineRowStyle, gap: '6px', fontSize: '13px', color: '#163246' }}>
+                    <input
+                      type="checkbox"
+                      checked={showFaceBoxes}
+                      onChange={(event) => setShowFaceBoxes(event.target.checked)}
+                    />
+                    Show Face Boxes
+                  </label>
+                </div>
+                <div style={sourcePreviewFigureStyle}>
+                  <img
+                    src={getThumbnailMediaUrl(asset.id)}
+                    alt={`${asset.filename} source thumbnail`}
+                    style={sourcePreviewImageStyle}
+                  />
+                  {showFaceBoxes ? (
+                    <div style={overlaySurfaceStyle}>
+                      {assetState.detections.map((detection) => {
+                        const suggestedPersonName = detection.autoMatchCandidatePersonId
+                          ? peopleById.get(detection.autoMatchCandidatePersonId) ?? ''
+                          : '';
+                        const matchedPersonName = detection.matchedPersonId
+                          ? peopleById.get(detection.matchedPersonId) ?? ''
+                          : '';
+                        const isSelected = detection.id === selectedDetection?.id;
+
+                        return (
+                          <button
+                            key={detection.id}
+                            type="button"
+                            onClick={() => setSelectedDetectionId(detection.id)}
+                            style={{
+                              ...overlayBoxBaseStyle,
+                              ...getDetectionOverlayPalette(detection.matchStatus, isSelected),
+                              left: `${detection.boundingBox.left * 100}%`,
+                              top: `${detection.boundingBox.top * 100}%`,
+                              width: `${detection.boundingBox.width * 100}%`,
+                              height: `${detection.boundingBox.height * 100}%`
+                            }}
+                            title={`${getDetectionOverlayLabel(
+                              detection.matchStatus,
+                              suggestedPersonName,
+                              matchedPersonName
+                            )} • Face #${detection.faceIndex}`}
+                          >
+                            <span style={overlayLabelStyle}>
+                              {getDetectionOverlayLabel(detection.matchStatus, suggestedPersonName, matchedPersonName)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                <div style={{ fontSize: '13px', color: '#475569' }}>
+                  Face boxes are optional and use the same detection statuses as the review controls below.
+                </div>
+                <div style={overlayLegendStyle}>
+                  <span>Confirmed = green</span>
+                  <span>Suggested = teal</span>
+                  <span>Auto Matched = purple</span>
+                  <span>Unmatched = slate</span>
+                  <span>Rejected = amber</span>
+                  <span>Ignored = gray</span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#475569' }}>
+                  {selectedDetection
+                    ? `Selected face #${selectedDetection.faceIndex} is highlighted on the image and in the review list.`
+                    : 'Select a face below to highlight its box on the asset image.'}
+                </div>
+                {!showFaceBoxes && assetState.detections.length > 0 ? (
+                  <div style={{ fontSize: '13px', color: '#5b6673' }}>
+                    Turn on <strong>Show Face Boxes</strong> to see where each reviewed face appears in the photo.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           {errorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{errorMessage}</p> : null}
           {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
         </section>
@@ -514,9 +747,14 @@ export function AssetPeopleReviewDialog({
               typeof detection.autoMatchCandidatePersonId === 'string' ||
               typeof detection.matchedPersonId === 'string';
             const enrollPersonId = detection.matchedPersonId ?? detection.autoMatchCandidatePersonId ?? '';
+            const isSelected = selectedDetection?.id === detection.id;
 
             return (
-              <section key={detection.id} style={cardStyle}>
+              <section
+                key={detection.id}
+                style={isSelected ? currentCardStyle : cardStyle}
+                onClick={() => setSelectedDetectionId(detection.id)}
+              >
                 <div>
                   <div style={{ display: 'grid', gap: '10px' }}>
                     <div>
@@ -553,6 +791,7 @@ export function AssetPeopleReviewDialog({
                 <div>
                   <div style={badgeRowStyle}>
                     <span style={badgeStyle}>Status: {detection.matchStatus}</span>
+                    {isSelected ? <span style={badgeStyle}>Selected</span> : null}
                     <span style={badgeStyle}>Face #{detection.faceIndex}</span>
                     <span style={badgeStyle}>Detection: {detection.id}</span>
                   </div>

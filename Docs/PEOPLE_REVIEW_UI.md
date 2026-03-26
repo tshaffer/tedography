@@ -212,6 +212,37 @@ For the current Practical Validation UI phase, the intended loop is:
 6. Close the dialog and confirm the `Library` inspector now reflects the same confirmed people
 7. Use `Open Full People Review` when you want the standalone queue-based workflow instead of the in-context asset modal
 
+## Optional Face Boxes
+
+The asset-scoped review dialog now includes an opt-in:
+
+- `Show Face Boxes`
+
+Behavior:
+
+- off by default
+- when enabled, the source asset preview shows face boxes for all detections on that asset
+- the box labels reuse the same review semantics as the rest of the people UI:
+  - `Confirmed`
+  - `Suggested`
+  - `Auto Matched`
+  - `Unmatched`
+  - `Rejected`
+  - `Ignored`
+
+The overlay is intended for trust and debugging:
+
+- it helps answer which face a review card refers to
+- it helps verify that the detector found the right people in a group shot
+- it makes the currently selected review item easier to locate on the source asset
+
+The selected face card and the selected face box stay linked:
+
+- clicking a face card highlights that face on the image
+- clicking a face box selects the matching face card
+
+This overlay is intentionally scoped to the Library asset review dialog for now. It is not shown by default in normal browsing.
+
 ## Modal Vs Full Page
 
 Use the in-context asset review dialog when:
