@@ -19,6 +19,11 @@ function parseDate(value?: string | null): Date | null {
   return parsed;
 }
 
+function getTimestamp(value?: string | null): number {
+  const parsed = parseDate(value);
+  return parsed ? parsed.getTime() : Number.NaN;
+}
+
 function getLocalDayKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -35,38 +40,45 @@ function formatLocalDayLabel(date: Date): string {
 }
 
 export function sortVisibleAssetsForTimeline(assets: MediaAsset[]): MediaAsset[] {
-  return [...assets].sort((left, right) => {
-    const leftCapture = parseDate(left.captureDateTime);
-    const rightCapture = parseDate(right.captureDateTime);
+  return assets
+    .map((asset) => ({
+      asset,
+      captureTimestamp: getTimestamp(asset.captureDateTime),
+      importedTimestamp: getTimestamp(asset.importedAt)
+    }))
+    .sort((left, right) => {
+      const leftHasCapture = Number.isFinite(left.captureTimestamp);
+      const rightHasCapture = Number.isFinite(right.captureTimestamp);
 
-    if (leftCapture && rightCapture) {
-      return rightCapture.getTime() - leftCapture.getTime();
-    }
+      if (leftHasCapture && rightHasCapture) {
+        return right.captureTimestamp - left.captureTimestamp;
+      }
 
-    if (leftCapture && !rightCapture) {
-      return -1;
-    }
+      if (leftHasCapture && !rightHasCapture) {
+        return -1;
+      }
 
-    if (!leftCapture && rightCapture) {
-      return 1;
-    }
+      if (!leftHasCapture && rightHasCapture) {
+        return 1;
+      }
 
-    const leftImportedAt = parseDate(left.importedAt);
-    const rightImportedAt = parseDate(right.importedAt);
-    if (leftImportedAt && rightImportedAt) {
-      return rightImportedAt.getTime() - leftImportedAt.getTime();
-    }
+      const leftHasImported = Number.isFinite(left.importedTimestamp);
+      const rightHasImported = Number.isFinite(right.importedTimestamp);
+      if (leftHasImported && rightHasImported) {
+        return right.importedTimestamp - left.importedTimestamp;
+      }
 
-    if (leftImportedAt && !rightImportedAt) {
-      return -1;
-    }
+      if (leftHasImported && !rightHasImported) {
+        return -1;
+      }
 
-    if (!leftImportedAt && rightImportedAt) {
-      return 1;
-    }
+      if (!leftHasImported && rightHasImported) {
+        return 1;
+      }
 
-    return left.filename.localeCompare(right.filename);
-  });
+      return left.asset.filename.localeCompare(right.asset.filename);
+    })
+    .map((entry) => entry.asset);
 }
 
 export function groupAssetsByDate(assets: MediaAsset[]): AssetDateGroup[] {

@@ -9,7 +9,6 @@ import {
 import { randomUUID } from 'node:crypto';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
-import { summarizeFaceDetectionsByAssetIds } from './faceDetectionRepository.js';
 
 export async function syncMediaAssetIndexes(): Promise<void> {
   await MediaAssetModel.syncIndexes();
@@ -33,35 +32,91 @@ export async function getAllAssets(): Promise<MediaAsset[]> {
 }
 
 export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
-  const assets = await MediaAssetModel.find(
-    {},
-    {
-      _id: 0,
-      id: 1,
-      filename: 1,
-      mediaType: 1,
-      photoState: 1,
-      captureDateTime: 1,
-      width: 1,
-      height: 1,
-      importedAt: 1,
-      originalFileFormat: 1,
-      displayFileFormat: 1,
-      albumIds: 1,
-      people: 1
-    }
-  )
-    .sort({ id: 1 })
-    .lean<MediaAsset[]>();
-  const normalizedAssets = normalizeMediaAssets(assets);
-  const summariesByAssetId = await summarizeFaceDetectionsByAssetIds(normalizedAssets.map((asset) => asset.id));
+  const assets = (await MediaAssetModel.collection
+    .find(
+      {},
+      {
+        projection: {
+          _id: 0,
+          id: 1,
+          filename: 1,
+          mediaType: 1,
+          photoState: 1,
+          captureDateTime: 1,
+          width: 1,
+          height: 1,
+          importedAt: 1,
+          originalFileFormat: 1,
+          displayFileFormat: 1,
+          albumIds: 1,
+          people: 1
+        }
+      }
+    )
+    .toArray()) as unknown as MediaAsset[];
 
-  return normalizedAssets.map((asset) => ({
+  return normalizeMediaAssets(assets).map((asset) => ({
     ...asset,
-    detectionsCount: summariesByAssetId[asset.id]?.detectionsCount ?? 0,
-    reviewableDetectionsCount: summariesByAssetId[asset.id]?.reviewableDetectionsCount ?? 0,
-    confirmedDetectionsCount: summariesByAssetId[asset.id]?.confirmedDetectionsCount ?? 0
+    detectionsCount: 0,
+    reviewableDetectionsCount: 0,
+    confirmedDetectionsCount: 0
   }));
+}
+
+export async function getAssetPageForLibrary(input?: {
+  limit?: number;
+  offset?: number;
+  albumIds?: string[];
+}): Promise<{
+  items: MediaAsset[];
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}> {
+  const offset = Math.max(0, Math.floor(input?.offset ?? 0));
+  const limit = Math.max(1, Math.min(5000, Math.floor(input?.limit ?? 1000)));
+  const albumIds = [...new Set((input?.albumIds ?? []).map((albumId) => albumId.trim()).filter(Boolean))];
+  const query = albumIds.length > 0 ? { albumIds: { $in: albumIds } } : {};
+  const documents = (await MediaAssetModel.collection
+    .find(
+      query,
+      {
+        projection: {
+          _id: 0,
+          id: 1,
+          filename: 1,
+          mediaType: 1,
+          photoState: 1,
+          captureDateTime: 1,
+          width: 1,
+          height: 1,
+          importedAt: 1,
+          originalFileFormat: 1,
+          displayFileFormat: 1,
+          albumIds: 1,
+          people: 1
+        }
+      }
+    )
+    .sort({ id: 1 })
+    .skip(offset)
+    .limit(limit + 1)
+    .toArray()) as unknown as MediaAsset[];
+
+  const hasMore = documents.length > limit;
+  const items = documents.slice(0, limit);
+
+  return {
+    items: normalizeMediaAssets(items).map((asset) => ({
+      ...asset,
+      detectionsCount: 0,
+      reviewableDetectionsCount: 0,
+      confirmedDetectionsCount: 0
+    })),
+    offset,
+    limit,
+    hasMore
+  };
 }
 
 export async function findById(id: string): Promise<MediaAsset | null> {

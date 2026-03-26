@@ -33,6 +33,11 @@ function parseDate(value?: string | null): Date | null {
   return parsed;
 }
 
+const monthFormatter = new Intl.DateTimeFormat(undefined, {
+  year: 'numeric',
+  month: 'long'
+});
+
 function getLocalMonthKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -40,10 +45,7 @@ function getLocalMonthKey(date: Date): string {
 }
 
 function formatLocalMonthLabel(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'long'
-  }).format(date);
+  return monthFormatter.format(date);
 }
 
 export function groupAssetsByCaptureMonth(assets: MediaAsset[]): TimelineMonthGroup[] {

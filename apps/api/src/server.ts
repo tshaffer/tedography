@@ -8,7 +8,7 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
-import { findById, getAllAssetsForLibrary, updatePhotoState } from './repositories/assetRepository.js';
+import { findById, getAssetPageForLibrary, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
@@ -38,9 +38,26 @@ export function createServer(): Express {
   });
 
   app.get('/api/assets', async (_req, res) => {
+    const startedAt = Date.now();
     try {
-      const assets = await getAllAssetsForLibrary();
-      res.json(assets);
+      const rawOffset = typeof _req.query.offset === 'string' ? Number(_req.query.offset) : 0;
+      const rawLimit = typeof _req.query.limit === 'string' ? Number(_req.query.limit) : 1000;
+      const albumIds =
+        typeof _req.query.albumIds === 'string'
+          ? _req.query.albumIds
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean)
+          : [];
+      const response = await getAssetPageForLibrary({
+        offset: Number.isFinite(rawOffset) ? rawOffset : 0,
+        limit: Number.isFinite(rawLimit) ? rawLimit : 1000,
+        albumIds
+      });
+      log.info(
+        `GET /api/assets loaded ${response.items.length} assets at offset ${response.offset} in ${Date.now() - startedAt}ms before JSON response${albumIds.length > 0 ? ` (album scoped: ${albumIds.length})` : ''}`
+      );
+      res.json(response);
     } catch (error) {
       log.error('Failed to read assets', error);
       res.status(500).json({ error: 'Failed to load assets' });

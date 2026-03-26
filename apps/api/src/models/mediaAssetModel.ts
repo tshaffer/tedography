@@ -75,6 +75,7 @@ const mediaAssetSchema = new Schema<MediaAsset>(
 
 mediaAssetSchema.index({ originalStorageRootId: 1, originalArchivePath: 1 }, { unique: true });
 mediaAssetSchema.index({ originalContentHash: 1 });
+mediaAssetSchema.index({ albumIds: 1 });
 
 export const MediaAssetModel: Model<MediaAsset> =
   (mongoose.models.MediaAsset as Model<MediaAsset> | undefined) ??

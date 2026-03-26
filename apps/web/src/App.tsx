@@ -104,10 +104,26 @@ type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 type SearchPeopleMatchMode = 'Any' | 'All';
 
+type AssetsBootstrapScope =
+  | { kind: 'all' }
+  | { kind: 'albums'; albumIds: string[] };
+
+type CachedBootstrapAssets = {
+  items: MediaAsset[];
+  scope: AssetsBootstrapScope;
+};
+
 type AppBootstrapCache = {
-  assets: MediaAsset[] | null;
+  assets: CachedBootstrapAssets | null;
   albumTreeNodes: AlbumTreeNode[] | null;
   duplicateResolutionVisibilityByAssetId: Map<string, DuplicateResolutionVisibilitySummary> | null;
+};
+
+type AssetPageResponse = {
+  items: MediaAsset[];
+  offset: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 const appBootstrapCache: AppBootstrapCache = {
@@ -115,6 +131,31 @@ const appBootstrapCache: AppBootstrapCache = {
   albumTreeNodes: null,
   duplicateResolutionVisibilityByAssetId: null
 };
+
+const initialAssetsPageSize = 1000;
+const backgroundAssetsPageSize = 4000;
+
+function buildAssetsPageRequestPath(scope: AssetsBootstrapScope, offset: number, limit: number): string {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit)
+  });
+
+  if (scope.kind === 'albums' && scope.albumIds.length > 0) {
+    params.set('albumIds', scope.albumIds.join(','));
+  }
+
+  return `/api/assets?${params.toString()}`;
+}
+
+function logBootstrapTiming(label: string, startedAt: number): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const elapsedMs = performance.now() - startedAt;
+  console.info(`[tedography bootstrap] ${label}: ${elapsedMs.toFixed(1)}ms`);
+}
 
 function readSessionStorageJson<T>(key: string): T | null {
   if (typeof window === 'undefined') {
@@ -145,8 +186,47 @@ function writeSessionStorageJson(key: string, value: unknown): void {
   }
 }
 
-function readCachedBootstrapAssets(): MediaAsset[] | null {
-  return readSessionStorageJson<MediaAsset[]>(assetsBootstrapStorageKey);
+function normalizeAssetsBootstrapScope(scope: AssetsBootstrapScope): AssetsBootstrapScope {
+  if (scope.kind !== 'albums') {
+    return { kind: 'all' };
+  }
+
+  return {
+    kind: 'albums',
+    albumIds: [...new Set(scope.albumIds.map((albumId) => albumId.trim()).filter(Boolean))].sort((left, right) =>
+      left.localeCompare(right)
+    )
+  };
+}
+
+function getAssetsBootstrapScopeKey(scope: AssetsBootstrapScope): string {
+  return scope.kind === 'albums' ? `albums:${scope.albumIds.join(',')}` : 'all';
+}
+
+function readCachedBootstrapAssets(): CachedBootstrapAssets | null {
+  const cached = readSessionStorageJson<CachedBootstrapAssets | MediaAsset[]>(assetsBootstrapStorageKey);
+  if (Array.isArray(cached)) {
+    return {
+      items: cached,
+      scope: { kind: 'all' }
+    };
+  }
+
+  if (
+    cached &&
+    Array.isArray(cached.items) &&
+    cached.scope &&
+    typeof cached.scope === 'object' &&
+    (cached.scope.kind === 'all' ||
+      (cached.scope.kind === 'albums' && Array.isArray(cached.scope.albumIds)))
+  ) {
+    return {
+      items: cached.items,
+      scope: normalizeAssetsBootstrapScope(cached.scope)
+    };
+  }
+
+  return null;
 }
 
 function readCachedBootstrapAlbumTreeNodes(): AlbumTreeNode[] | null {
@@ -2528,7 +2608,7 @@ export default function App() {
     const cached = appBootstrapCache.assets ?? readCachedBootstrapAssets();
     if (cached) {
       appBootstrapCache.assets = cached;
-      return cached;
+      return cached.items;
     }
 
     return [];
@@ -2732,6 +2812,7 @@ export default function App() {
   const [selectedAssetPeopleStatus, setSelectedAssetPeopleStatus] = useState<ListAssetFaceDetectionsResponse | null>(null);
   const [selectedAssetPeopleStatusLoading, setSelectedAssetPeopleStatusLoading] = useState(false);
   const [selectedAssetPeopleStatusError, setSelectedAssetPeopleStatusError] = useState<string | null>(null);
+  const assetsLoadGenerationRef = useRef(0);
   const [selectionAnchorAssetId, setSelectionAnchorAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<ViewerMode>('Grid');
   const [immersiveOpen, setImmersiveOpen] = useState(false);
@@ -3100,7 +3181,10 @@ export default function App() {
 
   useEffect(() => {
     if (assets.length > 0) {
-      writeSessionStorageJson(assetsBootstrapStorageKey, assets);
+      writeSessionStorageJson(assetsBootstrapStorageKey, {
+        items: assets,
+        scope: appBootstrapCache.assets?.scope ?? { kind: 'all' }
+      } satisfies CachedBootstrapAssets);
     }
   }, [assets]);
 
@@ -3119,7 +3203,26 @@ export default function App() {
     }
   }, [duplicateResolutionVisibilityByAssetId]);
 
-  async function loadAssets(options?: { showLoading?: boolean }): Promise<void> {
+  const preferredStartupAssetsScope = useMemo<AssetsBootstrapScope>(() => {
+    if (primaryArea !== 'Library' || libraryBrowseMode !== 'Albums' || checkedAlbumIds.length === 0) {
+      return { kind: 'all' };
+    }
+
+    return normalizeAssetsBootstrapScope({
+      kind: 'albums',
+      albumIds: checkedAlbumIds
+    });
+  }, [checkedAlbumIds, libraryBrowseMode, primaryArea]);
+
+  async function loadAssets(options?: { showLoading?: boolean; scope?: AssetsBootstrapScope }): Promise<void> {
+    const startedAt = typeof window !== 'undefined' ? performance.now() : 0;
+    const generation = assetsLoadGenerationRef.current + 1;
+    assetsLoadGenerationRef.current = generation;
+    const scope = normalizeAssetsBootstrapScope(options?.scope ?? preferredStartupAssetsScope);
+    const scopeKey = getAssetsBootstrapScopeKey(scope);
+    const cachedAssets = appBootstrapCache.assets;
+    const cachedAssetsForScope =
+      cachedAssets && getAssetsBootstrapScopeKey(cachedAssets.scope) === scopeKey ? cachedAssets.items : null;
     if (options?.showLoading ?? true) {
       setAssetsLoading(true);
     }
@@ -3127,14 +3230,74 @@ export default function App() {
     setAssetsError(null);
 
     try {
-      const response = await fetch('/api/assets');
+      const response = await fetch(buildAssetsPageRequestPath(scope, 0, initialAssetsPageSize));
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
       }
+      logBootstrapTiming('assets fetch response', startedAt);
 
-      const data = (await response.json()) as MediaAsset[];
-      setAssets(data);
-      appBootstrapCache.assets = data;
+      const data = (await response.json()) as AssetPageResponse;
+      logBootstrapTiming(`assets json parsed (${data.items.length} assets in first page)`, startedAt);
+      if (generation !== assetsLoadGenerationRef.current) {
+        return;
+      }
+
+      const shouldPreserveCachedAssets =
+        Array.isArray(cachedAssetsForScope) && cachedAssetsForScope.length > data.items.length;
+      const initialAssets = shouldPreserveCachedAssets ? cachedAssetsForScope : data.items;
+
+      setAssets(initialAssets);
+      appBootstrapCache.assets = {
+        items: initialAssets,
+        scope
+      };
+      if (typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+          logBootstrapTiming('assets scheduled into React state', startedAt);
+        });
+      }
+
+      if (data.hasMore) {
+        void (async () => {
+          let combined = initialAssets;
+          let nextOffset = shouldPreserveCachedAssets
+            ? initialAssets.length
+            : data.offset + data.items.length;
+          let hasMore = data.hasMore;
+
+          while (hasMore && generation === assetsLoadGenerationRef.current) {
+            const pageResponse = await fetch(buildAssetsPageRequestPath(scope, nextOffset, backgroundAssetsPageSize));
+            if (!pageResponse.ok) {
+              throw new Error(`Request failed with status ${pageResponse.status}`);
+            }
+
+            const page = (await pageResponse.json()) as AssetPageResponse;
+            if (generation !== assetsLoadGenerationRef.current) {
+              return;
+            }
+
+            combined = [...combined, ...page.items];
+            nextOffset = page.offset + page.items.length;
+            hasMore = page.hasMore;
+
+            setAssets(combined);
+            appBootstrapCache.assets = {
+              items: combined,
+              scope
+            };
+          }
+        })().catch((error: unknown) => {
+          if (generation !== assetsLoadGenerationRef.current) {
+            return;
+          }
+
+          if (error instanceof Error) {
+            setAssetsError(error.message);
+          } else {
+            setAssetsError('Unknown error');
+          }
+        });
+      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         setAssetsError(error.message);
@@ -3246,12 +3409,12 @@ export default function App() {
   }
 
   useEffect(() => {
-    const hasCachedAssets = Array.isArray(appBootstrapCache.assets);
+    const hasCachedAssets = Array.isArray(appBootstrapCache.assets?.items);
     const hasCachedAlbumTree = Array.isArray(appBootstrapCache.albumTreeNodes);
     const hasCachedDuplicateVisibility = appBootstrapCache.duplicateResolutionVisibilityByAssetId instanceof Map;
 
     if (hasCachedAssets && appBootstrapCache.assets) {
-      setAssets(appBootstrapCache.assets);
+      setAssets(appBootstrapCache.assets.items);
       setAssetsLoading(false);
       void loadAssets({ showLoading: false });
     } else {
@@ -3273,6 +3436,21 @@ export default function App() {
       void loadDuplicateResolutionVisibility();
     }
   }, []);
+
+  useEffect(() => {
+    const currentScope = appBootstrapCache.assets?.scope ?? { kind: 'all' };
+    if (currentScope.kind !== 'albums') {
+      return;
+    }
+
+    const currentScopeKey = getAssetsBootstrapScopeKey(currentScope);
+    const preferredScopeKey = getAssetsBootstrapScopeKey(preferredStartupAssetsScope);
+    if (currentScopeKey === preferredScopeKey) {
+      return;
+    }
+
+    void loadAssets({ showLoading: false, scope: preferredStartupAssetsScope });
+  }, [preferredStartupAssetsScope]);
 
   useEffect(() => {
     if (!selectedAssetId) {
@@ -3701,6 +3879,16 @@ export default function App() {
     searchResults,
     sortedAssetsAfterAdditionalFilters
   ]);
+
+  useEffect(() => {
+    if (assetsLoading || assets.length === 0) {
+      return;
+    }
+
+    console.info(
+      `[tedography bootstrap] post-load render with ${assets.length} assets, ${visibleAssets.length} visible assets, area=${primaryArea}`
+    );
+  }, [assets.length, assetsLoading, primaryArea, visibleAssets.length]);
 
   const timelineMonthGroups = useMemo(
     () =>
