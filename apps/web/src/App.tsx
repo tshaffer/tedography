@@ -136,6 +136,7 @@ type AssetPageResponse = {
 
 type ScopedPeopleReviewAssetIdsState = {
   assetIds: string[];
+  scopeType: string;
   scopeLabel: string;
   scopeSourceLabel: string;
 };
@@ -160,6 +161,50 @@ function buildAssetsPageRequestPath(scope: AssetsBootstrapScope, offset: number,
   }
 
   return `/api/assets?${params.toString()}`;
+}
+
+function formatScopedDateLabel(from: string, to: string): string {
+  const fromLabel = from.trim();
+  const toLabel = to.trim();
+  if (fromLabel && toLabel) {
+    return `${fromLabel} → ${toLabel}`;
+  }
+
+  if (fromLabel) {
+    return `${fromLabel} onward`;
+  }
+
+  if (toLabel) {
+    return `through ${toLabel}`;
+  }
+
+  return 'Current date-filtered results';
+}
+
+function summarizeScopeLabels(labels: string[], fallbackLabel: string): string {
+  if (labels.length === 0) {
+    return fallbackLabel;
+  }
+
+  const firstLabel = labels[0];
+  if (!firstLabel) {
+    return fallbackLabel;
+  }
+
+  if (labels.length === 1) {
+    return firstLabel;
+  }
+
+  const secondLabel = labels[1];
+  if (!secondLabel) {
+    return firstLabel;
+  }
+
+  if (labels.length === 2) {
+    return `${firstLabel} + ${secondLabel}`;
+  }
+
+  return `${firstLabel} + ${secondLabel} + ${labels.length - 2} more`;
 }
 
 function logBootstrapTiming(label: string, startedAt: number): void {
@@ -4199,8 +4244,17 @@ export default function App() {
   const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
+  const checkedAlbumScopeAssetIds = useMemo(
+    () => Array.from(new Set(checkedAlbumSections.flatMap((section) => section.assets.map((asset) => asset.id)))),
+    [checkedAlbumSections]
+  );
+  const checkedAlbumScopeLabel = useMemo(
+    () => summarizeScopeLabels(checkedAlbumSections.map((section) => section.albumLabel), 'Checked albums'),
+    [checkedAlbumSections]
+  );
   const currentScopedPeopleScope = useMemo<{
-    source: 'librarySelection' | 'searchResults';
+    source: 'librarySelection' | 'albumScope' | 'searchDateRange' | 'searchResults';
+    scopeType: string;
     scopeLabel: string;
     scopeSourceLabel: string;
     assetIds: string[];
@@ -4208,6 +4262,7 @@ export default function App() {
     if (isLibraryArea && selectedAssetIds.length > 0) {
       return {
         source: 'librarySelection',
+        scopeType: 'Library selection',
         scopeLabel:
           selectedAssetIds.length === 1
             ? 'Run or review people work for the current Library selection.'
@@ -4217,9 +4272,31 @@ export default function App() {
       };
     }
 
+    if (isLibraryArea && libraryBrowseMode === 'Albums' && checkedAlbumScopeAssetIds.length > 0) {
+      return {
+        source: 'albumScope',
+        scopeType: 'Album',
+        scopeLabel: `Album scope: ${checkedAlbumScopeLabel}`,
+        scopeSourceLabel: `Album: ${checkedAlbumScopeLabel}`,
+        assetIds: checkedAlbumScopeAssetIds
+      };
+    }
+
+    if (isSearchArea && (searchCaptureDateFrom.trim().length > 0 || searchCaptureDateTo.trim().length > 0) && visibleAssets.length > 0) {
+      const dateLabel = formatScopedDateLabel(searchCaptureDateFrom, searchCaptureDateTo);
+      return {
+        source: 'searchDateRange',
+        scopeType: 'Date range',
+        scopeLabel: `Date range scope: ${dateLabel}`,
+        scopeSourceLabel: `Date range: ${dateLabel}`,
+        assetIds: visibleAssets.map((asset) => asset.id)
+      };
+    }
+
     if (isSearchArea && visibleAssets.length > 0) {
       return {
         source: 'searchResults',
+        scopeType: 'Search results',
         scopeLabel:
           visibleAssets.length === 1
             ? 'Run or review people work for the current Search result.'
@@ -4230,7 +4307,17 @@ export default function App() {
     }
 
     return null;
-  }, [isLibraryArea, isSearchArea, selectedAssetIds, visibleAssets]);
+  }, [
+    checkedAlbumScopeAssetIds,
+    checkedAlbumScopeLabel,
+    isLibraryArea,
+    isSearchArea,
+    libraryBrowseMode,
+    searchCaptureDateFrom,
+    searchCaptureDateTo,
+    selectedAssetIds,
+    visibleAssets
+  ]);
 
   useEffect(() => {
     if (!scopedPeopleDialogOpen || !currentScopedPeopleScope) {
@@ -4714,6 +4801,14 @@ export default function App() {
     }
 
     const assetIds = currentScopedPeopleScope.assetIds;
+    if (assetIds.length > 300) {
+      const confirmed = window.confirm(
+        `${force ? 'Reprocess' : 'Run'} people recognition for ${assetIds.length} assets in ${currentScopedPeopleScope.scopeSourceLabel}?`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     setScopedPeopleBusyAction(force ? 'reprocess' : 'process');
     setScopedPeopleError(null);
     setScopedPeopleNotice(null);
@@ -4790,6 +4885,7 @@ export default function App() {
 
     writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
       assetIds: currentScopedPeopleScope.assetIds,
+      scopeType: currentScopedPeopleScope.scopeType,
       scopeLabel: currentScopedPeopleScope.scopeLabel,
       scopeSourceLabel: currentScopedPeopleScope.scopeSourceLabel
     } satisfies ScopedPeopleReviewAssetIdsState);
@@ -7463,6 +7559,7 @@ export default function App() {
       />
       <ScopedPeopleMaintenanceDialog
         open={scopedPeopleDialogOpen}
+        scopeType={currentScopedPeopleScope?.scopeType ?? 'No scope'}
         scopeLabel={currentScopedPeopleScope?.scopeLabel ?? 'No scoped people source'}
         scopeSourceLabel={currentScopedPeopleScope?.scopeSourceLabel ?? 'No scope'}
         assetCount={currentScopedPeopleScope?.assetIds.length ?? 0}

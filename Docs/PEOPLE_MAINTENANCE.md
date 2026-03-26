@@ -11,6 +11,11 @@ Supported scope sources in this first version:
 - current Library selection
 - current Search results
 
+Scoped maintenance now also supports these v2 scope sources where the current UI context defines them cleanly:
+
+- checked album scope in `Library` albums mode
+- explicit Search date-range scope when `From` and/or `To` filters are active
+
 Use the `People Scope` action from the main toolbar when:
 
 - you have selected one or more assets in `Library`
@@ -22,6 +27,19 @@ The scoped people dialog provides:
 - `Run People Recognition`
 - `Reprocess People Recognition`
 - `Review Faces In Scope`
+
+The dialog now also shows clearer scope metadata:
+
+- scope type
+- scope label
+- asset count
+
+Examples:
+
+- `Library selection`
+- `Album: Italy 2024`
+- `Date range: 2024-06-01 → 2024-06-30`
+- `Current Search results`
 
 Scoped summary counts include:
 
@@ -38,6 +56,9 @@ Semantics:
 - processing/reprocessing does not itself confirm anyone
 
 `Review Faces In Scope` opens the standalone People Review page with that saved asset set as the current scope.
+The People Review banner now echoes the saved scope metadata so it is obvious what subset you are reviewing.
+
+For larger scopes, the dialog shows a warning and asks for confirmation before processing or reprocessing when the scope is large enough to take noticeably longer.
 
 ## Merge Duplicate People
 
@@ -145,10 +166,25 @@ For scoped maintenance / backfill:
 5. Click `Review Faces In Scope`
 6. Work through the resulting People Review queue
 
+For album scope:
+
+1. Switch `Library` to `Albums`
+2. Check one or more albums
+3. Click `People Scope`
+4. Confirm the dialog shows `Album` scope metadata
+
+For date-range scope:
+
+1. Switch to `Search`
+2. Set `From` and/or `To`
+3. Click `People Scope`
+4. Confirm the dialog shows `Date range` scope metadata
+
 ## Current Limitations
 
 - merge is careful but still intentionally narrow
 - there is no merge preview dashboard or full audit trail yet
-- scoped maintenance is limited to current Library selection and current Search results
+- scoped maintenance supports Library selection, checked album scope, Search date-range scope, and generic current Search results
+- folder/import-batch scope is still deferred because there is not yet a clean first-class reusable scope model for it in the current UI
 - scoped processing still iterates existing per-asset processing calls rather than a dedicated batch job
 - there is no archive-wide reprocess tool in this phase

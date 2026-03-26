@@ -222,6 +222,7 @@ const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAsse
 
 type ScopedPeopleReviewAssetIdsState = {
   assetIds: string[];
+  scopeType: string;
   scopeLabel: string;
   scopeSourceLabel: string;
 };
@@ -244,6 +245,7 @@ function readScopedPeopleReviewAssetIdsState(): ScopedPeopleReviewAssetIdsState 
 
     return {
       assetIds: parsed.assetIds.map((value) => String(value).trim()).filter(Boolean),
+      scopeType: typeof parsed.scopeType === 'string' ? parsed.scopeType : 'Scoped assets',
       scopeLabel: typeof parsed.scopeLabel === 'string' ? parsed.scopeLabel : 'Scoped asset set',
       scopeSourceLabel: typeof parsed.scopeSourceLabel === 'string' ? parsed.scopeSourceLabel : 'Scoped assets'
     };
@@ -902,10 +904,10 @@ export function PeopleReviewPage() {
             }}
           >
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
-              Filtered to scoped asset set ({scopedAssetIdsState.assetIds.length} assets)
+              {scopedAssetIdsState.scopeType} scope ({scopedAssetIdsState.assetIds.length} assets)
             </div>
             <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
-              {scopedAssetIdsState.scopeLabel}. This queue is limited to the saved scope from {scopedAssetIdsState.scopeSourceLabel.toLowerCase()}.
+              {scopedAssetIdsState.scopeLabel}. This queue is limited to the saved scope: {scopedAssetIdsState.scopeSourceLabel}.
             </div>
             <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <Link

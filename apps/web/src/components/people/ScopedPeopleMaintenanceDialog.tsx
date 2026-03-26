@@ -3,6 +3,7 @@ import type { PeopleScopedAssetSummaryResponse } from '../../api/peoplePipelineA
 
 interface ScopedPeopleMaintenanceDialogProps {
   open: boolean;
+  scopeType: string;
   scopeLabel: string;
   scopeSourceLabel: string;
   assetCount: number;
@@ -120,6 +121,7 @@ const summaryLabelStyle: CSSProperties = {
 
 export function ScopedPeopleMaintenanceDialog({
   open,
+  scopeType,
   scopeLabel,
   scopeSourceLabel,
   assetCount,
@@ -156,6 +158,7 @@ export function ScopedPeopleMaintenanceDialog({
           </div>
 
           <div style={badgeRowStyle}>
+            <span style={badgeStyle}>Scope Type: {scopeType}</span>
             <span style={badgeStyle}>Scope: {scopeSourceLabel}</span>
             <span style={badgeStyle}>{assetCount} assets</span>
           </div>
