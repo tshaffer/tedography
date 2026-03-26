@@ -29,6 +29,13 @@ export async function listActivePersonFaceExamplesByPersonId(personId: string): 
   return items.map(normalizePersonFaceExample);
 }
 
+export async function listActivePersonFaceExamplesByDetectionId(faceDetectionId: string): Promise<PersonFaceExample[]> {
+  const items = await PersonFaceExampleModel.find({ faceDetectionId, status: 'active' }, { _id: 0 })
+    .sort({ createdAt: -1, id: -1 })
+    .lean<PersonFaceExample[]>();
+  return items.map(normalizePersonFaceExample);
+}
+
 export async function countActivePersonFaceExamplesByPersonIds(personIds: string[]): Promise<Record<string, number>> {
   if (personIds.length === 0) {
     return {};

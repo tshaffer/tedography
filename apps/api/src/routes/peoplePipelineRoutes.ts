@@ -4,6 +4,7 @@ import type { FaceDetectionMatchStatus, ImportApiErrorResponse } from '@tedograp
 import type {
   CreatePersonRequest,
   EnrollPersonFromDetectionRequest,
+  MergePersonRequest,
   UpdatePersonRequest,
   PeopleReviewQueueSort,
   ProcessPeopleAssetRequest,
@@ -19,6 +20,7 @@ import {
   getPeoplePipelineSummary,
   listAssetFaceDetections,
   listPeopleReviewQueue,
+  mergePersonIntoTarget,
   removePersonFaceExample,
   processPeoplePipelineForAsset,
   reviewFaceDetection
@@ -209,6 +211,27 @@ peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req,
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to enroll person from detection';
     log.error('Failed to enroll person from detection', error);
+    res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.post('/people/:personId/merge', async (req, res) => {
+  const body = req.body as Partial<MergePersonRequest> | undefined;
+  if (typeof body?.targetPersonId !== 'string' || body.targetPersonId.trim().length === 0) {
+    res.status(400).json({ error: 'targetPersonId is required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    res.json(
+      await mergePersonIntoTarget({
+        sourcePersonId: req.params.personId,
+        targetPersonId: body.targetPersonId.trim()
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to merge person';
+    log.error('Failed to merge person', error);
     res.status(400).json({ error: message } satisfies ImportApiErrorResponse);
   }
 });

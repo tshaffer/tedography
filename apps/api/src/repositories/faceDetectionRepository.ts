@@ -117,14 +117,21 @@ export async function countFaceDetectionsByStatus(input?: {
   return counts;
 }
 
-export async function listConfirmedFaceDetectionsByPersonId(personId: string, limit = 12): Promise<FaceDetection[]> {
-  const detections = await FaceDetectionModel.find(
+export async function listConfirmedFaceDetectionsByPersonId(
+  personId: string,
+  limit?: number
+): Promise<FaceDetection[]> {
+  const query = FaceDetectionModel.find(
     { matchedPersonId: personId, matchStatus: 'confirmed' },
     { _id: 0 }
   )
-    .sort({ updatedAt: -1, createdAt: -1, mediaAssetId: 1, faceIndex: 1, id: 1 })
-    .limit(limit)
-    .lean<FaceDetection[]>();
+    .sort({ updatedAt: -1, createdAt: -1, mediaAssetId: 1, faceIndex: 1, id: 1 });
+
+  if (typeof limit === 'number') {
+    query.limit(limit);
+  }
+
+  const detections = await query.lean<FaceDetection[]>();
   return detections.map(normalizeFaceDetection);
 }
 

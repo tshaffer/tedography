@@ -63,6 +63,23 @@ export interface PersonExampleFaceItem
   asset: Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime'>;
 }
 
+export interface PersonConfirmedFaceItem {
+  detection: Pick<
+    FaceDetection,
+    | 'id'
+    | 'faceIndex'
+    | 'previewPath'
+    | 'cropPath'
+    | 'matchStatus'
+    | 'matchedPersonId'
+    | 'autoMatchCandidatePersonId'
+    | 'updatedAt'
+    | 'createdAt'
+  >;
+  asset: Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime' | 'originalArchivePath'>;
+  exampleId?: string | null;
+}
+
 export interface GetPersonDetailResponse {
   person: Person;
   assetCount: number;
@@ -72,6 +89,7 @@ export interface GetPersonDetailResponse {
   exampleCount: number;
   assets: PersonDetailAssetItem[];
   exampleFaces: PersonExampleFaceItem[];
+  confirmedFaces: PersonConfirmedFaceItem[];
 }
 
 export interface UpdatePersonRequest {
@@ -213,4 +231,16 @@ export interface EnrollPersonFromDetectionResponse {
 
 export interface RemovePersonExampleResponse {
   item: PersonFaceExample;
+}
+
+export interface MergePersonRequest {
+  targetPersonId: string;
+}
+
+export interface MergePersonResponse {
+  sourcePerson: Person;
+  targetPerson: Person;
+  movedConfirmedDetectionsCount: number;
+  movedExampleCount: number;
+  affectedAssetCount: number;
 }

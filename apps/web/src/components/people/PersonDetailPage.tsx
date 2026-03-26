@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import type { GetPersonDetailResponse } from '@tedography/shared';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { GetPersonDetailResponse, ListPeopleResponse } from '@tedography/shared';
 import {
+  enrollPersonFromDetection,
   getPersonDetail,
+  listPeople,
+  mergePerson,
   processPeopleAsset,
   removePersonExample,
+  reviewFaceDetection,
   updatePerson
 } from '../../api/peoplePipelineApi';
 import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
@@ -113,6 +117,12 @@ const gridStyle: CSSProperties = {
   gap: '16px'
 };
 
+const compactGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+  gap: '12px'
+};
+
 const assetCardStyle: CSSProperties = {
   ...panelStyle,
   marginBottom: 0,
@@ -162,11 +172,16 @@ function formatAssetCount(count: number): string {
 
 export function PersonDetailPage() {
   const { personId = '' } = useParams();
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<GetPersonDetailResponse | null>(null);
+  const [peopleOptions, setPeopleOptions] = useState<ListPeopleResponse['items']>([]);
   const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [mergeTargetPersonId, setMergeTargetPersonId] = useState('');
+  const [confirmedFaceAssignments, setConfirmedFaceAssignments] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [merging, setMerging] = useState(false);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -181,9 +196,16 @@ export function PersonDetailPage() {
     setLoading(true);
     setLoadErrorMessage(null);
     try {
-      const response = await getPersonDetail(personId);
+      const [response, peopleResponse] = await Promise.all([getPersonDetail(personId), listPeople()]);
       setDetail(response);
       setDisplayNameDraft(response.person.displayName);
+      setPeopleOptions(peopleResponse.items);
+      setMergeTargetPersonId('');
+      setConfirmedFaceAssignments(
+        Object.fromEntries(
+          response.confirmedFaces.map((face) => [face.detection.id, ''])
+        )
+      );
     } catch (error) {
       setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load person detail');
       setDetail(null);
@@ -270,6 +292,89 @@ export function PersonDetailPage() {
       setActionErrorMessage(error instanceof Error ? error.message : 'Failed to remove example face');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAddConfirmedFaceAsExample(detectionId: string): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      await enrollPersonFromDetection(detail.person.id, { detectionId });
+      await loadDetail();
+      setNoticeMessage('Added confirmed face to the example set.');
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to add example face');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemoveConfirmedFace(detectionId: string): Promise<void> {
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      await reviewFaceDetection(detectionId, { action: 'reject' });
+      await loadDetail();
+      setNoticeMessage('Removed confirmed face from this person.');
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to remove confirmed face');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReassignConfirmedFace(detectionId: string): Promise<void> {
+    const targetPersonId = confirmedFaceAssignments[detectionId]?.trim() ?? '';
+    if (!targetPersonId) {
+      setActionErrorMessage('Choose a target person before reassigning this confirmed face.');
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      await reviewFaceDetection(detectionId, { action: 'assign', personId: targetPersonId });
+      await loadDetail();
+      setNoticeMessage('Reassigned confirmed face to a different person.');
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to reassign confirmed face');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleMergePerson(): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    if (!mergeTargetPersonId.trim()) {
+      setActionErrorMessage('Choose a target person before merging.');
+      return;
+    }
+
+    setMerging(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const response = await mergePerson(detail.person.id, {
+        targetPersonId: mergeTargetPersonId.trim()
+      });
+      setNoticeMessage(
+        `Merged ${response.sourcePerson.displayName} into ${response.targetPerson.displayName}. Moved ${response.movedConfirmedDetectionsCount} confirmed faces and ${response.movedExampleCount} example faces across ${response.affectedAssetCount} assets.`
+      );
+      navigate(`/people/${encodeURIComponent(response.targetPerson.id)}`);
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to merge person');
+    } finally {
+      setMerging(false);
     }
   }
 
@@ -409,6 +514,38 @@ export function PersonDetailPage() {
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 320px) auto', gap: '10px', alignItems: 'end', marginTop: '12px' }}>
+                <div>
+                  <span style={labelStyle}>Merge Into Person</span>
+                  <select
+                    value={mergeTargetPersonId}
+                    onChange={(event) => setMergeTargetPersonId(event.target.value)}
+                    style={{ ...inputStyle, width: '100%' }}
+                    disabled={saving || merging}
+                  >
+                    <option value="">Choose surviving person</option>
+                    {peopleOptions
+                      .filter((person) => person.id !== detail.person.id)
+                      .map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.displayName}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  style={merging || mergeTargetPersonId.trim().length === 0 ? disabledButtonStyle : buttonStyle}
+                  disabled={merging || mergeTargetPersonId.trim().length === 0}
+                  onClick={() => void handleMergePerson()}
+                >
+                  {merging ? 'Merging...' : 'Merge Person'}
+                </button>
+              </div>
+              <p style={{ margin: '10px 0 0', color: '#5b6673', fontSize: '12px' }}>
+                Merge moves confirmed detections and example faces to the surviving person, then hides and archives this source person.
+              </p>
+
               {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
               {actionErrorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{actionErrorMessage}</p> : null}
             </div>
@@ -477,6 +614,91 @@ export function PersonDetailPage() {
                       onClick={() => void handleRemoveExample(face.id)}
                     >
                       Remove Example
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section style={panelStyle}>
+            <h2 style={{ marginTop: 0, fontSize: '22px' }}>Confirmed Faces</h2>
+            <p style={{ margin: '0 0 12px', color: '#5b6673' }}>
+              These are confirmed detections currently assigned to {detail.person.displayName}. Reassigning or removing one updates the detection and the derived <code>mediaAsset.people</code> state for that asset. Example faces remain a separate opt-in concept.
+            </p>
+            {detail.confirmedFaces.length === 0 ? (
+              <p style={{ margin: 0, color: '#5b6673' }}>No confirmed face detections are currently available for maintenance.</p>
+            ) : (
+              <div style={compactGridStyle}>
+                {detail.confirmedFaces.map((face) => (
+                  <article key={face.detection.id} style={assetCardStyle}>
+                    <div style={previewFrameStyle}>
+                      <img
+                        src={getFaceDetectionPreviewUrl(face.detection.id)}
+                        alt={`${detail.person.displayName} confirmed face`}
+                        style={previewImageStyle}
+                      />
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{face.asset.filename}</div>
+                    <div style={{ fontSize: '12px', color: '#5b6673' }}>{face.asset.originalArchivePath}</div>
+                    <div style={badgeRowStyle}>
+                      <span style={badgeStyle}>Face #{face.detection.faceIndex}</span>
+                      {face.exampleId ? <span style={badgeStyle}>Example</span> : null}
+                    </div>
+                    {!face.exampleId ? (
+                      <button
+                        type="button"
+                        style={saving ? disabledButtonStyle : buttonStyle}
+                        disabled={saving}
+                        onClick={() => void handleAddConfirmedFaceAsExample(face.detection.id)}
+                      >
+                        Add as Example
+                      </button>
+                    ) : null}
+                    <div>
+                      <span style={labelStyle}>Reassign to</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+                        <select
+                          value={confirmedFaceAssignments[face.detection.id] ?? ''}
+                          onChange={(event) =>
+                            setConfirmedFaceAssignments((current) => ({
+                              ...current,
+                              [face.detection.id]: event.target.value
+                            }))
+                          }
+                          style={{ ...inputStyle, width: '100%' }}
+                          disabled={saving}
+                        >
+                          <option value="">Choose target person</option>
+                          {peopleOptions
+                            .filter((person) => person.id !== detail.person.id)
+                            .map((person) => (
+                              <option key={person.id} value={person.id}>
+                                {person.displayName}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          type="button"
+                          style={
+                            saving || !(confirmedFaceAssignments[face.detection.id] ?? '').trim()
+                              ? disabledButtonStyle
+                              : buttonStyle
+                          }
+                          disabled={saving || !(confirmedFaceAssignments[face.detection.id] ?? '').trim()}
+                          onClick={() => void handleReassignConfirmedFace(face.detection.id)}
+                        >
+                          Reassign
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={saving ? disabledButtonStyle : buttonStyle}
+                      disabled={saving}
+                      onClick={() => void handleRemoveConfirmedFace(face.detection.id)}
+                    >
+                      Remove from Person
                     </button>
                   </article>
                 ))}

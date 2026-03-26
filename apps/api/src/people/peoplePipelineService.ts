@@ -9,6 +9,7 @@ import type {
 import { MediaType } from '@tedography/domain';
 import type {
   EnrollPersonFromDetectionResponse,
+  MergePersonResponse,
   ListAssetFaceDetectionsResponse,
   RemovePersonExampleResponse,
   PeoplePipelineSummaryResponse,
@@ -24,6 +25,7 @@ import { findById, findByIds, updateMediaAssetPeople } from '../repositories/ass
 import {
   countFaceDetectionsByStatus,
   findFaceDetectionById,
+  listConfirmedFaceDetectionsByPersonId,
   listFaceDetections,
   listFaceDetectionsByAssetId,
   replaceFaceDetectionsForAsset,
@@ -36,11 +38,13 @@ import {
   replaceFaceMatchReviewsForAsset,
   upsertFaceMatchReview
 } from '../repositories/faceMatchReviewRepository.js';
-import { createPerson, findPeopleByIds, findPersonById, listPeople } from '../repositories/personRepository.js';
+import { createPerson, findPeopleByIds, findPersonById, listPeople, updatePerson } from '../repositories/personRepository.js';
 import {
   createPersonFaceExample,
   findActivePersonFaceExampleByPersonAndDetection,
   findPersonFaceExampleById,
+  listActivePersonFaceExamplesByDetectionId,
+  listActivePersonFaceExamplesByPersonId,
   markPersonFaceExampleRemoved
 } from '../repositories/personFaceExampleRepository.js';
 import {
@@ -682,6 +686,51 @@ export async function enrollPersonFromDetection(input: {
   };
 }
 
+async function removeActiveExampleRecord(example: {
+  id: string;
+  personId: string;
+  engineExampleId?: string | null;
+  subjectKey?: string | null;
+  status: string;
+}): Promise<void> {
+  if (example.status === 'removed') {
+    return;
+  }
+
+  const engine = getPeopleRecognitionEngine();
+  const person = await findPersonById(example.personId);
+
+  if (
+    person &&
+    example.engineExampleId &&
+    engine.supportsEnrollmentExampleRemoval &&
+    engine.removeEnrolledFaceExample
+  ) {
+    await engine.removeEnrolledFaceExample({
+      person,
+      exampleId: example.engineExampleId,
+      subjectKey: example.subjectKey ?? null
+    });
+  }
+
+  const removed = await markPersonFaceExampleRemoved(example.id);
+  if (!removed) {
+    throw new Error(`Failed to remove example: ${example.id}`);
+  }
+}
+
+async function removeExamplesForDetectionPersonMismatch(input: {
+  detectionId: string;
+  nextMatchedPersonId: string | null;
+}): Promise<void> {
+  const activeExamples = await listActivePersonFaceExamplesByDetectionId(input.detectionId);
+  const staleExamples = activeExamples.filter((example) => example.personId !== input.nextMatchedPersonId);
+
+  for (const example of staleExamples) {
+    await removeActiveExampleRecord(example);
+  }
+}
+
 export async function removePersonFaceExample(input: {
   personId: string;
   exampleId: string;
@@ -718,6 +767,123 @@ export async function removePersonFaceExample(input: {
   }
 
   return { item };
+}
+
+export async function mergePersonIntoTarget(input: {
+  sourcePersonId: string;
+  targetPersonId: string;
+}): Promise<MergePersonResponse> {
+  if (input.sourcePersonId === input.targetPersonId) {
+    throw new Error('Source and target person must be different.');
+  }
+
+  const [sourcePerson, targetPerson] = await Promise.all([
+    findPersonById(input.sourcePersonId),
+    findPersonById(input.targetPersonId)
+  ]);
+
+  if (!sourcePerson) {
+    throw new Error(`Source person not found: ${input.sourcePersonId}`);
+  }
+
+  if (!targetPerson) {
+    throw new Error(`Target person not found: ${input.targetPersonId}`);
+  }
+
+  const [sourceDetections, sourceExamples] = await Promise.all([
+    listConfirmedFaceDetectionsByPersonId(sourcePerson.id),
+    listActivePersonFaceExamplesByPersonId(sourcePerson.id)
+  ]);
+
+  const exampleByDetectionId = new Map(sourceExamples.map((example) => [example.faceDetectionId, example]));
+  let movedExampleCount = 0;
+
+  for (const example of sourceExamples) {
+    const targetExisting = await findActivePersonFaceExampleByPersonAndDetection({
+      personId: targetPerson.id,
+      faceDetectionId: example.faceDetectionId
+    });
+
+    if (!targetExisting) {
+      await enrollPersonFromDetection({
+        personId: targetPerson.id,
+        detectionId: example.faceDetectionId
+      });
+      movedExampleCount += 1;
+    }
+
+    await removeActiveExampleRecord(example);
+  }
+
+  const affectedAssetIds = new Set<string>();
+  let movedConfirmedDetectionsCount = 0;
+
+  for (const detection of sourceDetections) {
+    affectedAssetIds.add(detection.mediaAssetId);
+    if (exampleByDetectionId.has(detection.id)) {
+      const updated = await updateFaceDetection({
+        id: detection.id,
+        cropPath: detection.cropPath ?? null,
+        previewPath: detection.previewPath ?? null,
+        matchedPersonId: targetPerson.id,
+        matchConfidence: detection.matchConfidence ?? null,
+        matchStatus: 'confirmed',
+        autoMatchCandidatePersonId: detection.autoMatchCandidatePersonId ?? null,
+        autoMatchCandidateConfidence: detection.autoMatchCandidateConfidence ?? null,
+        ignoredReason: detection.ignoredReason ?? null
+      });
+
+      if (!updated) {
+        throw new Error(`Failed to update face detection during merge: ${detection.id}`);
+      }
+
+      await upsertFaceMatchReview({
+        faceDetectionId: detection.id,
+        mediaAssetId: detection.mediaAssetId,
+        suggestedPersonId: detection.autoMatchCandidatePersonId ?? null,
+        suggestedConfidence: detection.autoMatchCandidateConfidence ?? null,
+        finalPersonId: targetPerson.id,
+        decision: determineConfirmedReviewDecision(detection, targetPerson.id),
+        reviewer: 'merge',
+        notes: `Merged from ${sourcePerson.displayName} into ${targetPerson.displayName}.`,
+        ignoredReason: null
+      });
+    } else {
+      await reviewFaceDetection(detection.id, {
+        action: 'assign',
+        personId: targetPerson.id,
+        reviewer: 'merge',
+        notes: `Merged from ${sourcePerson.displayName} into ${targetPerson.displayName}.`
+      });
+    }
+
+    movedConfirmedDetectionsCount += 1;
+  }
+
+  for (const assetId of affectedAssetIds) {
+    await recomputeMediaAssetPeople(assetId);
+  }
+
+  await updatePerson({
+    id: sourcePerson.id,
+    isHidden: true,
+    isArchived: true
+  });
+
+  const refreshedSource = await findPersonById(sourcePerson.id);
+  const refreshedTarget = await findPersonById(targetPerson.id);
+
+  if (!refreshedSource || !refreshedTarget) {
+    throw new Error('Failed to reload people after merge.');
+  }
+
+  return {
+    sourcePerson: refreshedSource,
+    targetPerson: refreshedTarget,
+    movedConfirmedDetectionsCount,
+    movedExampleCount,
+    affectedAssetCount: affectedAssetIds.size
+  };
 }
 
 function determineConfirmedReviewDecision(
@@ -806,6 +972,11 @@ export async function reviewFaceDetection(
     reviewer: request.reviewer?.trim() || null,
     notes: request.notes?.trim() || null,
     ignoredReason
+  });
+
+  await removeExamplesForDetectionPersonMismatch({
+    detectionId: detection.id,
+    nextMatchedPersonId: nextStatus === 'confirmed' ? finalPerson?.id ?? null : null
   });
 
   const people = await recomputeMediaAssetPeople(detection.mediaAssetId);

@@ -1,6 +1,7 @@
 import type { GetPersonDetailResponse } from '@tedography/shared';
 import { findByIds, listAssetsByConfirmedPersonId } from '../repositories/assetRepository.js';
 import {
+  listConfirmedFaceDetectionsByPersonId,
   summarizeFaceDetectionsByAssetIds
 } from '../repositories/faceDetectionRepository.js';
 import { findPersonById } from '../repositories/personRepository.js';
@@ -23,9 +24,10 @@ export async function getPersonDetail(personId: string): Promise<GetPersonDetail
   }
 
   const assets = await listAssetsByConfirmedPersonId(personId);
-  const [faceSummariesByAssetId, examples] = await Promise.all([
+  const [faceSummariesByAssetId, examples, confirmedDetections] = await Promise.all([
     summarizeFaceDetectionsByAssetIds(assets.map((asset) => asset.id)),
     listActivePersonFaceExamplesByPersonId(personId),
+    listConfirmedFaceDetectionsByPersonId(personId, 24),
   ]);
 
   const assetsWithSummary = assets.map((asset) => ({
@@ -44,6 +46,10 @@ export async function getPersonDetail(personId: string): Promise<GetPersonDetail
   const reviewableAssetCount = sortedAssets.filter((asset) => asset.reviewableDetectionsCount > 0).length;
   const exampleAssetsById = new Map((await findByIds(Array.from(new Set(examples.map((item) => item.mediaAssetId))))).map((asset) => [asset.id, asset]));
   const exampleDetectionsById = new Map((await Promise.all(examples.map((item) => findFaceDetectionById(item.faceDetectionId)))).flatMap((detection) => (detection ? [[detection.id, detection] as const] : [])));
+  const confirmedDetectionAssetsById = new Map(
+    (await findByIds(Array.from(new Set(confirmedDetections.map((item) => item.mediaAssetId))))).map((asset) => [asset.id, asset])
+  );
+  const activeExamplesByDetectionId = new Map(examples.map((example) => [example.faceDetectionId, example]));
 
   return {
     person,
@@ -53,6 +59,38 @@ export async function getPersonDetail(personId: string): Promise<GetPersonDetail
     reviewableAssetCount,
     exampleCount: examples.length,
     assets: sortedAssets,
+    confirmedFaces: confirmedDetections.flatMap((detection) => {
+      const asset = confirmedDetectionAssetsById.get(detection.mediaAssetId);
+      if (!asset) {
+        return [];
+      }
+
+      const example = activeExamplesByDetectionId.get(detection.id);
+      return [
+        {
+          detection: {
+            id: detection.id,
+            faceIndex: detection.faceIndex,
+            ...(detection.previewPath !== undefined ? { previewPath: detection.previewPath } : {}),
+            ...(detection.cropPath !== undefined ? { cropPath: detection.cropPath } : {}),
+            matchStatus: detection.matchStatus,
+            ...(detection.matchedPersonId !== undefined ? { matchedPersonId: detection.matchedPersonId } : {}),
+            ...(detection.autoMatchCandidatePersonId !== undefined
+              ? { autoMatchCandidatePersonId: detection.autoMatchCandidatePersonId }
+              : {}),
+            ...(detection.updatedAt !== undefined ? { updatedAt: detection.updatedAt } : {}),
+            ...(detection.createdAt !== undefined ? { createdAt: detection.createdAt } : {})
+          },
+          asset: {
+            id: asset.id,
+            filename: asset.filename,
+            captureDateTime: asset.captureDateTime ?? null,
+            originalArchivePath: asset.originalArchivePath
+          },
+          ...(example ? { exampleId: example.id } : {})
+        }
+      ];
+    }),
     exampleFaces: examples.flatMap((example) => {
       const asset = exampleAssetsById.get(example.mediaAssetId);
       const detection = exampleDetectionsById.get(example.faceDetectionId);

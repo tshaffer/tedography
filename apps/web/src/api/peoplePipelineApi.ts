@@ -8,6 +8,8 @@ import type {
   ListPeopleBrowseResponse,
   ListPeopleResponse,
   ListPeoplePipelineRecentAssetsResponse,
+  MergePersonRequest,
+  MergePersonResponse,
   RemovePersonExampleResponse,
   PeoplePipelineSummaryResponse,
   PeopleReviewQueueSort,
@@ -72,6 +74,22 @@ export async function removePersonExample(
     `/api/people-pipeline/people/${encodeURIComponent(personId)}/examples/${encodeURIComponent(exampleId)}`,
     {
       method: 'DELETE'
+    }
+  );
+}
+
+export async function mergePerson(
+  personId: string,
+  request: MergePersonRequest
+): Promise<MergePersonResponse> {
+  return fetchJson<MergePersonResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}/merge`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
     }
   );
 }
