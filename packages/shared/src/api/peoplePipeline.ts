@@ -133,6 +133,18 @@ export interface ListPeopleReviewQueueResponse {
   counts: Record<FaceDetectionMatchStatus, number>;
 }
 
+export interface AssetIdsScopeRequest {
+  assetIds: string[];
+}
+
+export interface PeopleScopedAssetSummaryResponse {
+  totalAssets: number;
+  assetsWithConfirmedPeople: number;
+  assetsWithoutConfirmedPeople: number;
+  assetsWithReviewableFaces: number;
+  totalReviewableDetections: number;
+}
+
 export type PeopleReviewQueueSort =
   | 'newest'
   | 'highestConfidence'

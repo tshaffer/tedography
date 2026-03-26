@@ -218,6 +218,39 @@ const ignoredReasonOptions: FaceDetectionIgnoredReason[] = [
   'non-person-face',
   'other'
 ];
+const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
+
+type ScopedPeopleReviewAssetIdsState = {
+  assetIds: string[];
+  scopeLabel: string;
+  scopeSourceLabel: string;
+};
+
+function readScopedPeopleReviewAssetIdsState(): ScopedPeopleReviewAssetIdsState | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(scopedPeopleReviewAssetIdsStorageKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<ScopedPeopleReviewAssetIdsState> | null;
+    if (!parsed || !Array.isArray(parsed.assetIds)) {
+      return null;
+    }
+
+    return {
+      assetIds: parsed.assetIds.map((value) => String(value).trim()).filter(Boolean),
+      scopeLabel: typeof parsed.scopeLabel === 'string' ? parsed.scopeLabel : 'Scoped asset set',
+      scopeSourceLabel: typeof parsed.scopeSourceLabel === 'string' ? parsed.scopeSourceLabel : 'Scoped assets'
+    };
+  } catch {
+    return null;
+  }
+}
 
 function getDefaultStatusesForAssetScope(assetId: string): FaceDetectionMatchStatus[] {
   return assetId.trim().length > 0 ? [...defaultStatuses, 'confirmed'] : defaultStatuses;
@@ -364,6 +397,9 @@ export function PeopleReviewPage() {
   );
   const [assetIdFilter, setAssetIdFilter] = useState(() => searchParams.get('assetId')?.trim() ?? '');
   const [personIdFilter, setPersonIdFilter] = useState(() => searchParams.get('personId')?.trim() ?? '');
+  const [scopedAssetIdsState, setScopedAssetIdsState] = useState<ScopedPeopleReviewAssetIdsState | null>(() =>
+    searchParams.get('scopeAssetIds') === 'active' ? readScopedPeopleReviewAssetIdsState() : null
+  );
   const [sortBy, setSortBy] = useState<PeopleReviewQueueSort>('newest');
   const [draftByDetectionId, setDraftByDetectionId] = useState<Record<string, ReviewDraftState>>({});
   const [busyDetectionId, setBusyDetectionId] = useState<string | null>(null);
@@ -404,6 +440,9 @@ export function PeopleReviewPage() {
         listPeopleReviewQueue({
           statuses: selectedStatuses,
           ...(assetIdFilter.trim() ? { assetId: assetIdFilter.trim() } : {}),
+          ...(scopedAssetIdsState?.assetIds && scopedAssetIdsState.assetIds.length > 0
+            ? { assetIds: scopedAssetIdsState.assetIds }
+            : {}),
           ...(personIdFilter.trim() ? { personId: personIdFilter.trim() } : {}),
           limit: 200,
           sort: sortBy
@@ -426,7 +465,7 @@ export function PeopleReviewPage() {
 
   useEffect(() => {
     void loadPageData();
-  }, [selectedStatuses, assetIdFilter, personIdFilter, sortBy]);
+  }, [selectedStatuses, assetIdFilter, personIdFilter, scopedAssetIdsState, sortBy]);
 
   useEffect(() => {
     try {
@@ -439,8 +478,10 @@ export function PeopleReviewPage() {
   useEffect(() => {
     const queryAssetId = searchParams.get('assetId')?.trim() ?? '';
     const queryPersonId = searchParams.get('personId')?.trim() ?? '';
+    const queryScopeAssetIds = searchParams.get('scopeAssetIds');
     setAssetIdFilter(queryAssetId);
     setPersonIdFilter(queryPersonId);
+    setScopedAssetIdsState(queryScopeAssetIds === 'active' ? readScopedPeopleReviewAssetIdsState() : null);
     setSelectedStatuses((current) => {
       const defaultForScope = getDefaultStatusesForAssetScope(queryAssetId);
       const currentSet = new Set(current);
@@ -849,7 +890,41 @@ export function PeopleReviewPage() {
           </div>
         ) : null}
 
-        {!trimmedAssetIdFilter && trimmedPersonIdFilter ? (
+        {!trimmedAssetIdFilter && scopedAssetIdsState && scopedAssetIdsState.assetIds.length > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginBottom: '14px',
+              padding: '10px 12px',
+              backgroundColor: '#eef7fb',
+              borderColor: '#bfd6e0',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
+              Filtered to scoped asset set ({scopedAssetIdsState.assetIds.length} assets)
+            </div>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
+              {scopedAssetIdsState.scopeLabel}. This queue is limited to the saved scope from {scopedAssetIdsState.scopeSourceLabel.toLowerCase()}.
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <Link
+                to="/"
+                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+              >
+                Back to Library
+              </Link>
+              <Link
+                to="/people/review"
+                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+              >
+                Clear Scoped Filter
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {!trimmedAssetIdFilter && !scopedAssetIdsState && trimmedPersonIdFilter ? (
           <div
             style={{
               ...panelStyle,

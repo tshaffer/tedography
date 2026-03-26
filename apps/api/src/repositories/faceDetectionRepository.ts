@@ -53,6 +53,7 @@ export async function listFaceDetectionsByAssetId(mediaAssetId: string): Promise
 
 export async function listFaceDetections(input?: {
   mediaAssetId?: string;
+  mediaAssetIds?: string[];
   personId?: string;
   statuses?: FaceDetection['matchStatus'][];
   limit?: number;
@@ -60,6 +61,8 @@ export async function listFaceDetections(input?: {
   const query: Record<string, unknown> = {};
   if (input?.mediaAssetId) {
     query.mediaAssetId = input.mediaAssetId;
+  } else if (input?.mediaAssetIds && input.mediaAssetIds.length > 0) {
+    query.mediaAssetId = { $in: input.mediaAssetIds };
   }
 
   if (input?.personId) {
@@ -82,11 +85,14 @@ export async function listFaceDetections(input?: {
 
 export async function countFaceDetectionsByStatus(input?: {
   mediaAssetId?: string;
+  mediaAssetIds?: string[];
   personId?: string;
 }): Promise<Record<FaceDetection['matchStatus'], number>> {
   const query: Record<string, unknown> = {};
   if (input?.mediaAssetId) {
     query.mediaAssetId = input.mediaAssetId;
+  } else if (input?.mediaAssetIds && input.mediaAssetIds.length > 0) {
+    query.mediaAssetId = { $in: input.mediaAssetIds };
   }
 
   if (input?.personId) {

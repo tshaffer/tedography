@@ -30,7 +30,13 @@ import {
 } from './api/albumTreeApi';
 import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
-import { getPeoplePipelineAssetState, listPeople, processPeopleAsset } from './api/peoplePipelineApi';
+import {
+  getPeoplePipelineAssetState,
+  getPeopleScopedAssetSummary,
+  listPeople,
+  processPeopleAsset,
+  type PeopleScopedAssetSummaryResponse
+} from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
@@ -47,6 +53,7 @@ import {
 } from './components/import/ImportAssetsDialog';
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
+import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleMaintenanceDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import { prefetchImage } from './utilities/imagePrefetch';
 import {
@@ -94,6 +101,7 @@ const showSuppressedDuplicatesStorageKey = 'tedography.showSuppressedDuplicates'
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
 const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
 const duplicateVisibilityBootstrapStorageKey = 'tedography.bootstrap.duplicateVisibility';
+const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
 
 type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
@@ -124,6 +132,12 @@ type AssetPageResponse = {
   offset: number;
   limit: number;
   hasMore: boolean;
+};
+
+type ScopedPeopleReviewAssetIdsState = {
+  assetIds: string[];
+  scopeLabel: string;
+  scopeSourceLabel: string;
 };
 
 const appBootstrapCache: AppBootstrapCache = {
@@ -2646,6 +2660,12 @@ export default function App() {
     message: string;
     reviewAssetId?: string;
   } | null>(null);
+  const [scopedPeopleDialogOpen, setScopedPeopleDialogOpen] = useState(false);
+  const [scopedPeopleSummary, setScopedPeopleSummary] = useState<PeopleScopedAssetSummaryResponse | null>(null);
+  const [scopedPeopleSummaryLoading, setScopedPeopleSummaryLoading] = useState(false);
+  const [scopedPeopleBusyAction, setScopedPeopleBusyAction] = useState<null | 'process' | 'reprocess'>(null);
+  const [scopedPeopleError, setScopedPeopleError] = useState<string | null>(null);
+  const [scopedPeopleNotice, setScopedPeopleNotice] = useState<string | null>(null);
   const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
   const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
   const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
@@ -4179,6 +4199,47 @@ export default function App() {
   const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
+  const currentScopedPeopleScope = useMemo<{
+    source: 'librarySelection' | 'searchResults';
+    scopeLabel: string;
+    scopeSourceLabel: string;
+    assetIds: string[];
+  } | null>(() => {
+    if (isLibraryArea && selectedAssetIds.length > 0) {
+      return {
+        source: 'librarySelection',
+        scopeLabel:
+          selectedAssetIds.length === 1
+            ? 'Run or review people work for the current Library selection.'
+            : `Run or review people work for ${selectedAssetIds.length} selected Library assets.`,
+        scopeSourceLabel: 'Library selection',
+        assetIds: selectedAssetIds
+      };
+    }
+
+    if (isSearchArea && visibleAssets.length > 0) {
+      return {
+        source: 'searchResults',
+        scopeLabel:
+          visibleAssets.length === 1
+            ? 'Run or review people work for the current Search result.'
+            : `Run or review people work for ${visibleAssets.length} current Search results.`,
+        scopeSourceLabel: 'Current Search results',
+        assetIds: visibleAssets.map((asset) => asset.id)
+      };
+    }
+
+    return null;
+  }, [isLibraryArea, isSearchArea, selectedAssetIds, visibleAssets]);
+
+  useEffect(() => {
+    if (!scopedPeopleDialogOpen || !currentScopedPeopleScope) {
+      return;
+    }
+
+    void loadScopedPeopleSummary(currentScopedPeopleScope.assetIds);
+  }, [currentScopedPeopleScope, scopedPeopleDialogOpen]);
+
   const mainPaneDescription = isReviewArea
     ? reviewBrowseMode === 'Albums'
       ? 'Review: album-scoped curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
@@ -4617,6 +4678,123 @@ export default function App() {
     } finally {
       setPeopleRecognitionBusy(false);
     }
+  }
+
+  async function loadScopedPeopleSummary(assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) {
+      setScopedPeopleSummary(null);
+      return;
+    }
+
+    setScopedPeopleSummaryLoading(true);
+    setScopedPeopleError(null);
+    try {
+      const summary = await getPeopleScopedAssetSummary({ assetIds });
+      setScopedPeopleSummary(summary);
+    } catch (error) {
+      setScopedPeopleError(error instanceof Error ? error.message : 'Failed to load scoped people summary');
+    } finally {
+      setScopedPeopleSummaryLoading(false);
+    }
+  }
+
+  function handleOpenScopedPeopleDialog(): void {
+    if (!currentScopedPeopleScope || currentScopedPeopleScope.assetIds.length === 0) {
+      return;
+    }
+
+    setScopedPeopleDialogOpen(true);
+    setScopedPeopleNotice(null);
+    void loadScopedPeopleSummary(currentScopedPeopleScope.assetIds);
+  }
+
+  async function runPeopleRecognitionForAssetScope(force: boolean): Promise<void> {
+    if (!currentScopedPeopleScope || currentScopedPeopleScope.assetIds.length === 0 || scopedPeopleBusyAction) {
+      return;
+    }
+
+    const assetIds = currentScopedPeopleScope.assetIds;
+    setScopedPeopleBusyAction(force ? 'reprocess' : 'process');
+    setScopedPeopleError(null);
+    setScopedPeopleNotice(null);
+
+    try {
+      const results = await Promise.allSettled(
+        assetIds.map(async (assetId) => {
+          const response = await processPeopleAsset(assetId, force ? { force: true } : undefined);
+          return { assetId, response };
+        })
+      );
+
+      const succeeded = results.filter(
+        (result): result is PromiseFulfilledResult<{ assetId: string; response: Awaited<ReturnType<typeof processPeopleAsset>> }> =>
+          result.status === 'fulfilled'
+      );
+      const failed = results.filter((result) => result.status === 'rejected');
+
+      if (succeeded.length > 0) {
+        const updatesById = new Map(
+          succeeded.map(({ value }) => [
+            value.assetId,
+            {
+              people: value.response.people,
+              detectionsCount: value.response.detections.length,
+              reviewableDetectionsCount: value.response.detections.filter(
+                (detection) =>
+                  detection.matchStatus === 'unmatched' ||
+                  detection.matchStatus === 'suggested' ||
+                  detection.matchStatus === 'autoMatched'
+              ).length,
+              confirmedDetectionsCount: value.response.detections.filter(
+                (detection) => detection.matchStatus === 'confirmed'
+              ).length
+            }
+          ])
+        );
+
+        setAssets((previous) =>
+          previous.map((asset) => {
+            const update = updatesById.get(asset.id);
+            return update
+              ? {
+                  ...asset,
+                  ...update
+                }
+              : asset;
+          })
+        );
+      }
+
+      await loadScopedPeopleSummary(assetIds);
+
+      const skipped = succeeded.filter(({ value }) => value.response.processed === false).length;
+      const processed = succeeded.filter(({ value }) => value.response.processed === true).length;
+      const failureCount = failed.length;
+
+      setScopedPeopleNotice(
+        `${force ? 'Reprocessed' : 'Processed'} ${processed} asset${processed === 1 ? '' : 's'}${
+          skipped > 0 ? `, skipped ${skipped}` : ''
+        }${failureCount > 0 ? `, failed ${failureCount}` : ''}.`
+      );
+    } catch (error) {
+      setScopedPeopleError(error instanceof Error ? error.message : 'Failed to run scoped people recognition');
+    } finally {
+      setScopedPeopleBusyAction(null);
+    }
+  }
+
+  function handleOpenScopedPeopleReview(): void {
+    if (!currentScopedPeopleScope || currentScopedPeopleScope.assetIds.length === 0) {
+      return;
+    }
+
+    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
+      assetIds: currentScopedPeopleScope.assetIds,
+      scopeLabel: currentScopedPeopleScope.scopeLabel,
+      scopeSourceLabel: currentScopedPeopleScope.scopeSourceLabel
+    } satisfies ScopedPeopleReviewAssetIdsState);
+    setScopedPeopleDialogOpen(false);
+    void navigate('/people/review?scopeAssetIds=active');
   }
 
   function handleOpenAssetPeopleReviewDialog(): void {
@@ -6900,6 +7078,23 @@ export default function App() {
                 {peopleRecognitionBusy ? 'Running People...' : 'Run People Recognition'}
               </button>
             ) : null}
+            {(isLibraryArea || isSearchArea) ? (
+              <button
+                type="button"
+                style={currentScopedPeopleScope ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={handleOpenScopedPeopleDialog}
+                disabled={!currentScopedPeopleScope}
+                title={
+                  currentScopedPeopleScope
+                    ? `Open scoped people tools for ${currentScopedPeopleScope.scopeSourceLabel.toLowerCase()}`
+                    : isLibraryArea
+                      ? 'Select one or more assets to use scoped people tools'
+                      : 'Adjust Search until there are results to use scoped people tools'
+                }
+              >
+                People Scope
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -7265,6 +7460,21 @@ export default function App() {
             ? loadSelectedAssetPeopleStatus(selectedAssetId)
             : undefined
         }
+      />
+      <ScopedPeopleMaintenanceDialog
+        open={scopedPeopleDialogOpen}
+        scopeLabel={currentScopedPeopleScope?.scopeLabel ?? 'No scoped people source'}
+        scopeSourceLabel={currentScopedPeopleScope?.scopeSourceLabel ?? 'No scope'}
+        assetCount={currentScopedPeopleScope?.assetIds.length ?? 0}
+        summary={scopedPeopleSummary}
+        summaryLoading={scopedPeopleSummaryLoading}
+        busyAction={scopedPeopleBusyAction}
+        errorMessage={scopedPeopleError}
+        noticeMessage={scopedPeopleNotice}
+        onClose={() => setScopedPeopleDialogOpen(false)}
+        onRunRecognition={() => void runPeopleRecognitionForAssetScope(false)}
+        onReprocessRecognition={() => void runPeopleRecognitionForAssetScope(true)}
+        onOpenReview={handleOpenScopedPeopleReview}
       />
     </div>
   );

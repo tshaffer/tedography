@@ -29,6 +29,7 @@ import {
   listConfirmedFaceDetectionsByPersonId,
   listFaceDetections,
   listFaceDetectionsByAssetId,
+  summarizeFaceDetectionsByAssetIds,
   replaceFaceDetectionsForAsset,
   updateFaceDetection
 } from '../repositories/faceDetectionRepository.js';
@@ -489,12 +490,17 @@ export async function listAssetFaceDetections(assetId: string): Promise<ListAsse
 export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetection['matchStatus'][];
   assetId?: string;
+  assetIds?: string[];
   personId?: string;
   limit?: number;
   sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
+  const assetIds =
+    input?.assetIds && input.assetIds.length > 0
+      ? [...new Set(input.assetIds.map((assetId) => assetId.trim()).filter(Boolean))]
+      : [];
   const detections = await listFaceDetections({
-    ...(input?.assetId ? { mediaAssetId: input.assetId } : {}),
+    ...(input?.assetId ? { mediaAssetId: input.assetId } : assetIds.length > 0 ? { mediaAssetIds: assetIds } : {}),
     ...(input?.personId ? { personId: input.personId } : {}),
     ...(input?.statuses ? { statuses: input.statuses } : {}),
     ...(input?.limit !== undefined ? { limit: input.limit } : {})
@@ -505,6 +511,8 @@ export async function listPeopleReviewQueue(input?: {
     countFaceDetectionsByStatus(
       input?.assetId
         ? { mediaAssetId: input.assetId, ...(input?.personId ? { personId: input.personId } : {}) }
+        : assetIds.length > 0
+          ? { mediaAssetIds: assetIds, ...(input?.personId ? { personId: input.personId } : {}) }
         : input?.personId
           ? { personId: input.personId }
           : undefined
@@ -551,6 +559,60 @@ export async function listPeopleReviewQueue(input?: {
   });
 
   return { items: sortPeopleReviewItems(items, input?.sort ?? 'newest'), counts };
+}
+
+export async function getPeopleScopedAssetSummary(input: {
+  assetIds: string[];
+}): Promise<{
+  totalAssets: number;
+  assetsWithConfirmedPeople: number;
+  assetsWithoutConfirmedPeople: number;
+  assetsWithReviewableFaces: number;
+  totalReviewableDetections: number;
+}> {
+  const assetIds = [...new Set(input.assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (assetIds.length === 0) {
+    return {
+      totalAssets: 0,
+      assetsWithConfirmedPeople: 0,
+      assetsWithoutConfirmedPeople: 0,
+      assetsWithReviewableFaces: 0,
+      totalReviewableDetections: 0
+    };
+  }
+
+  const [assets, summariesByAssetId] = await Promise.all([
+    findByIds(assetIds),
+    summarizeFaceDetectionsByAssetIds(assetIds)
+  ]);
+
+  let assetsWithConfirmedPeople = 0;
+  let assetsWithoutConfirmedPeople = 0;
+  let assetsWithReviewableFaces = 0;
+  let totalReviewableDetections = 0;
+
+  for (const asset of assets) {
+    if ((asset.people ?? []).length > 0) {
+      assetsWithConfirmedPeople += 1;
+    } else {
+      assetsWithoutConfirmedPeople += 1;
+    }
+
+    const summary = summariesByAssetId[asset.id];
+    const reviewableDetectionsCount = summary?.reviewableDetectionsCount ?? 0;
+    if (reviewableDetectionsCount > 0) {
+      assetsWithReviewableFaces += 1;
+      totalReviewableDetections += reviewableDetectionsCount;
+    }
+  }
+
+  return {
+    totalAssets: assets.length,
+    assetsWithConfirmedPeople,
+    assetsWithoutConfirmedPeople,
+    assetsWithReviewableFaces,
+    totalReviewableDetections
+  };
 }
 
 export async function getPeoplePipelineSummary(): Promise<PeoplePipelineSummaryResponse> {

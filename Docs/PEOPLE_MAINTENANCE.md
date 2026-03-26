@@ -2,6 +2,43 @@
 
 Tedography now includes a narrow Phase 9 maintenance slice focused on keeping person data correct over time.
 
+## Scoped People Maintenance / Backfill v1
+
+Tedography now also supports a small scoped people-maintenance workflow so you can work through a subset of the archive instead of the whole library.
+
+Supported scope sources in this first version:
+
+- current Library selection
+- current Search results
+
+Use the `People Scope` action from the main toolbar when:
+
+- you have selected one or more assets in `Library`
+- or you are viewing a filtered result set in `Search`
+
+The scoped people dialog provides:
+
+- a compact people-status summary for the current scope
+- `Run People Recognition`
+- `Reprocess People Recognition`
+- `Review Faces In Scope`
+
+Scoped summary counts include:
+
+- total assets in scope
+- assets with confirmed people
+- assets without confirmed people
+- assets with reviewable faces
+- total reviewable detections
+
+Semantics:
+
+- confirmed people are based on derived `mediaAsset.people`
+- reviewable faces are unresolved detections and stay separate until reviewed
+- processing/reprocessing does not itself confirm anyone
+
+`Review Faces In Scope` opens the standalone People Review page with that saved asset set as the current scope.
+
 ## Merge Duplicate People
 
 Use `Merge Person` on a person detail page when two person records represent the same real person.
@@ -99,9 +136,19 @@ This is intentionally scoped:
 7. Use `Reprocess Related Assets`
 8. Re-open People Review or Search to inspect the updated state
 
+For scoped maintenance / backfill:
+
+1. In `Library`, select a manageable asset subset, or switch to `Search` and apply filters until the result set is the scope you want
+2. Click `People Scope`
+3. Inspect the scoped people summary
+4. Click `Run People Recognition` or `Reprocess People Recognition`
+5. Click `Review Faces In Scope`
+6. Work through the resulting People Review queue
+
 ## Current Limitations
 
 - merge is careful but still intentionally narrow
 - there is no merge preview dashboard or full audit trail yet
-- there is no split workflow yet
+- scoped maintenance is limited to current Library selection and current Search results
+- scoped processing still iterates existing per-asset processing calls rather than a dedicated batch job
 - there is no archive-wide reprocess tool in this phase

@@ -24,6 +24,18 @@ import type {
 } from '@tedography/shared';
 import type { FaceDetectionMatchStatus } from '@tedography/domain';
 
+type AssetIdsScopeRequest = {
+  assetIds: string[];
+};
+
+export interface PeopleScopedAssetSummaryResponse {
+  totalAssets: number;
+  assetsWithConfirmedPeople: number;
+  assetsWithoutConfirmedPeople: number;
+  assetsWithReviewableFaces: number;
+  totalReviewableDetections: number;
+}
+
 type ApiErrorPayload = {
   error?: string;
 };
@@ -127,10 +139,27 @@ export async function createPerson(
 export async function listPeopleReviewQueue(input?: {
   statuses?: FaceDetectionMatchStatus[];
   assetId?: string;
+  assetIds?: string[];
   personId?: string;
   limit?: number;
   sort?: PeopleReviewQueueSort;
 }): Promise<ListPeopleReviewQueueResponse> {
+  if (input?.assetIds && input.assetIds.length > 0) {
+    return fetchJson<ListPeopleReviewQueueResponse>('/api/people-pipeline/review/scoped', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        assetIds: input.assetIds,
+        ...(input.statuses ? { statuses: input.statuses } : {}),
+        ...(input.personId ? { personId: input.personId } : {}),
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
+        ...(input.sort ? { sort: input.sort } : {})
+      })
+    });
+  }
+
   const query = new URLSearchParams();
 
   if (input?.statuses && input.statuses.length > 0) {
@@ -157,6 +186,18 @@ export async function listPeopleReviewQueue(input?: {
   return fetchJson<ListPeopleReviewQueueResponse>(
     `/api/people-pipeline/review${search.length > 0 ? `?${search}` : ''}`
   );
+}
+
+export async function getPeopleScopedAssetSummary(
+  request: AssetIdsScopeRequest
+): Promise<PeopleScopedAssetSummaryResponse> {
+  return fetchJson<PeopleScopedAssetSummaryResponse>('/api/people-pipeline/scopes/asset-summary', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
 }
 
 export async function getPeoplePipelineSummary(): Promise<PeoplePipelineSummaryResponse> {

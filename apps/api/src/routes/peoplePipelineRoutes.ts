@@ -19,6 +19,7 @@ import { summarizeFaceDetectionsByAssetIds } from '../repositories/faceDetection
 import {
   enrollPersonFromDetection,
   getPeoplePipelineSummary,
+  getPeopleScopedAssetSummary,
   listAssetFaceDetections,
   listPeopleReviewQueue,
   mergePersonIntoTarget,
@@ -32,6 +33,10 @@ import { getPersonDetail } from '../people/personDetailService.js';
 import { log } from '../logger.js';
 
 export const peoplePipelineRoutes: Router = Router();
+
+type AssetIdsScopeRequest = {
+  assetIds: string[];
+};
 
 const validDetectionStatuses: FaceDetectionMatchStatus[] = [
   'unmatched',
@@ -106,6 +111,70 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
   } catch (error) {
     log.error('Failed to list people review queue', error);
     res.status(500).json({ error: 'Failed to list people review queue' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.post('/review/scoped', async (req, res) => {
+  const body = req.body as Partial<AssetIdsScopeRequest & {
+    statuses?: FaceDetectionMatchStatus[];
+    personId?: string;
+    limit?: number;
+    sort?: PeopleReviewQueueSort;
+  }> | undefined;
+
+  const assetIds = Array.isArray(body?.assetIds)
+    ? body.assetIds.map((value: unknown) => String(value).trim()).filter(Boolean)
+    : [];
+
+  if (assetIds.length === 0) {
+    res.status(400).json({ error: 'assetIds is required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  const statuses = Array.isArray(body?.statuses)
+    ? body.statuses.filter(
+        (value: unknown): value is FaceDetectionMatchStatus =>
+          typeof value === 'string' && validDetectionStatuses.includes(value as FaceDetectionMatchStatus)
+      )
+    : (['suggested', 'autoMatched', 'unmatched'] satisfies FaceDetectionMatchStatus[]);
+
+  const limit =
+    typeof body?.limit === 'number' && Number.isFinite(body.limit)
+      ? Math.max(1, Math.min(500, body.limit))
+      : undefined;
+
+  try {
+    res.json(
+      await listPeopleReviewQueue({
+        assetIds,
+        statuses,
+        ...(typeof body?.personId === 'string' && body.personId.trim().length > 0 ? { personId: body.personId.trim() } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+        ...(body?.sort ? { sort: body.sort } : {})
+      })
+    );
+  } catch (error) {
+    log.error('Failed to list scoped people review queue', error);
+    res.status(500).json({ error: 'Failed to list scoped people review queue' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.post('/scopes/asset-summary', async (req, res) => {
+  const body = req.body as Partial<AssetIdsScopeRequest> | undefined;
+  const assetIds = Array.isArray(body?.assetIds)
+    ? body.assetIds.map((value: unknown) => String(value).trim()).filter(Boolean)
+    : [];
+
+  if (assetIds.length === 0) {
+    res.status(400).json({ error: 'assetIds is required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    res.json(await getPeopleScopedAssetSummary({ assetIds }));
+  } catch (error) {
+    log.error('Failed to load scoped people asset summary', error);
+    res.status(500).json({ error: 'Failed to load scoped people asset summary' } satisfies ImportApiErrorResponse);
   }
 });
 
