@@ -23,6 +23,7 @@ import {
   listDerivedDuplicateGroups,
   updateDerivedDuplicateGroupResolution
 } from './duplicateGroupService.js';
+import { log } from '../logger.js';
 
 const pairKeySeparator = '__';
 
@@ -231,6 +232,14 @@ async function syncDuplicateGroupResolutionForReviewDecision(
   pair: DuplicateCandidatePairDocument,
   decision: DuplicateCandidateReviewDecision
 ): Promise<void> {
+  if (
+    decision !== 'confirmed_duplicate_keep_left' &&
+    decision !== 'confirmed_duplicate_keep_right' &&
+    decision !== 'confirmed_duplicate_keep_both'
+  ) {
+    return;
+  }
+
   const groupsResponse = await listDerivedDuplicateGroups({
     assetId: pair.assetIdA
   });
@@ -264,6 +273,20 @@ async function syncDuplicateGroupResolutionForReviewDecision(
   }
 }
 
+function scheduleDuplicateGroupResolutionSync(
+  pair: DuplicateCandidatePairDocument,
+  decision: DuplicateCandidateReviewDecision
+): void {
+  setImmediate(() => {
+    void syncDuplicateGroupResolutionForReviewDecision(pair, decision).catch((error) => {
+      log.error(
+        `Failed to synchronize duplicate group resolution for pair ${pair.assetIdA} / ${pair.assetIdB}`,
+        error
+      );
+    });
+  });
+}
+
 export async function reviewDuplicateCandidatePair(
   pairKey: string,
   decision: DuplicateCandidateReviewDecision
@@ -282,7 +305,7 @@ export async function reviewDuplicateCandidatePair(
     return null;
   }
 
-  await syncDuplicateGroupResolutionForReviewDecision(pair, decision);
+  scheduleDuplicateGroupResolutionSync(pair, decision);
 
   const assets = await findByIds([pair.assetIdA, pair.assetIdB]);
   return {

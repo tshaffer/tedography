@@ -835,18 +835,10 @@ export function DuplicateReviewPage(): ReactElement {
         setSummary
       });
 
-      setBusyPairKey(null);
-
-      void (async () => {
-        try {
-          await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });
-        } catch (updateError) {
-          setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
-          await loadQueueAndSummary(nextCandidatePairKey);
-        }
-      })();
+      await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
+      await loadQueueAndSummary(nextCandidatePairKey);
     } finally {
       setBusyPairKey(null);
     }
