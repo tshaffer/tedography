@@ -15,13 +15,18 @@ import {
   getDuplicateCandidatePairSummary,
   findDuplicateCandidatePair,
   listDuplicateCandidatePairs,
+  listConfirmedDuplicatePairs,
   updateDuplicateCandidatePairReview,
   type FindDuplicateCandidatePairInput
 } from '../repositories/duplicateCandidatePairRepository.js';
-import { findDuplicateGroupResolutionByKey } from '../repositories/duplicateGroupResolutionRepository.js';
 import {
-  listDerivedDuplicateGroups,
-  updateDerivedDuplicateGroupResolution
+  findDuplicateGroupResolutionByKey,
+  upsertDuplicateGroupResolution
+} from '../repositories/duplicateGroupResolutionRepository.js';
+import {
+  buildDuplicateGroupKey,
+  deriveDuplicateGroups,
+  selectProposedCanonicalAsset
 } from './duplicateGroupService.js';
 import { log } from '../logger.js';
 
@@ -240,10 +245,8 @@ async function syncDuplicateGroupResolutionForReviewDecision(
     return;
   }
 
-  const groupsResponse = await listDerivedDuplicateGroups({
-    assetId: pair.assetIdA
-  });
-  const group = groupsResponse.groups.find(
+  const confirmedPairs = await listConfirmedDuplicatePairs(pair.assetIdA);
+  const group = deriveDuplicateGroups(confirmedPairs).find(
     (candidate) =>
       candidate.assetIds.includes(pair.assetIdA) &&
       candidate.assetIds.includes(pair.assetIdB)
@@ -253,20 +256,30 @@ async function syncDuplicateGroupResolutionForReviewDecision(
     return;
   }
 
+  const assets = await findByIds(group.assetIds);
+  const proposedCanonical = selectProposedCanonicalAsset(assets);
+  const groupKey = buildDuplicateGroupKey(group.assetIds);
   const keeperAssetId = getKeeperAssetIdForDecision({ decision, pair });
   if (keeperAssetId) {
-    await updateDerivedDuplicateGroupResolution(group.groupKey, {
-      canonicalAssetId: keeperAssetId,
+    await upsertDuplicateGroupResolution({
+      groupKey,
+      assetIds: group.assetIds,
+      proposedCanonicalAssetId: proposedCanonical.canonicalAssetId,
+      manualCanonicalAssetId:
+        keeperAssetId === proposedCanonical.canonicalAssetId ? null : keeperAssetId,
       resolutionStatus: 'confirmed'
     });
     return;
   }
 
   if (decision === 'confirmed_duplicate_keep_both') {
-    const existingResolution = await findDuplicateGroupResolutionByKey(group.groupKey);
+    const existingResolution = await findDuplicateGroupResolutionByKey(groupKey);
     if (existingResolution) {
-      await updateDerivedDuplicateGroupResolution(group.groupKey, {
-        canonicalAssetId: group.proposedCanonicalAssetId,
+      await upsertDuplicateGroupResolution({
+        groupKey,
+        assetIds: group.assetIds,
+        proposedCanonicalAssetId: proposedCanonical.canonicalAssetId,
+        manualCanonicalAssetId: null,
         resolutionStatus: 'proposed'
       });
     }
