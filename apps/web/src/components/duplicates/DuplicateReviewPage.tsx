@@ -27,6 +27,7 @@ import {
   getDuplicateReviewImmersiveSideForKey,
   getInitialDuplicateReviewImmersiveSide
 } from './duplicateReviewImmersive';
+import { applyOptimisticDuplicateVisibilityUpdate } from './duplicateVisibilityRefresh';
 import {
   defaultDuplicateReviewFilters,
   duplicateReviewPresets,
@@ -833,6 +834,12 @@ export function DuplicateReviewPage(): ReactElement {
         setQueueState,
         setTotalMatching,
         setSummary
+      });
+
+      applyOptimisticDuplicateVisibilityUpdate({
+        assetIdA: currentPair.assetIdA,
+        assetIdB: currentPair.assetIdB,
+        decision
       });
 
       await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });

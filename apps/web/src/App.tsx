@@ -48,6 +48,11 @@ import {
   type DuplicateResolutionVisibilitySummary
 } from './components/duplicates/duplicateResolutionVisibility';
 import {
+  applyDuplicateVisibilityOverrides,
+  clearDuplicateVisibilityRefreshRequest,
+  hasPendingDuplicateVisibilityRefreshRequest
+} from './components/duplicates/duplicateVisibilityRefresh';
+import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
 } from './components/import/ImportAssetsDialog';
@@ -2936,10 +2941,10 @@ export default function App() {
       const cached = appBootstrapCache.duplicateResolutionVisibilityByAssetId ?? readCachedBootstrapDuplicateVisibility();
       if (cached) {
         appBootstrapCache.duplicateResolutionVisibilityByAssetId = cached;
-        return cached;
+        return applyDuplicateVisibilityOverrides(cached);
       }
 
-      return new Map<string, DuplicateResolutionVisibilitySummary>();
+      return applyDuplicateVisibilityOverrides(new Map<string, DuplicateResolutionVisibilitySummary>());
     });
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
@@ -3259,15 +3264,6 @@ export default function App() {
     }
   }, [albumTreeNodes]);
 
-  useEffect(() => {
-    if (duplicateResolutionVisibilityByAssetId.size > 0) {
-      writeSessionStorageJson(
-        duplicateVisibilityBootstrapStorageKey,
-        Array.from(duplicateResolutionVisibilityByAssetId.entries())
-      );
-    }
-  }, [duplicateResolutionVisibilityByAssetId]);
-
   const preferredStartupAssetsScope = useMemo<AssetsBootstrapScope>(() => {
     if (primaryArea !== 'Library' || libraryBrowseMode !== 'Albums' || checkedAlbumIds.length === 0) {
       return { kind: 'all' };
@@ -3442,12 +3438,18 @@ export default function App() {
     try {
       const response = await listDuplicateGroups();
       const nextMap = buildDuplicateResolutionVisibilityMap(response.groups);
-      setDuplicateResolutionVisibilityByAssetId(nextMap);
+      const mergedMap = applyDuplicateVisibilityOverrides(nextMap);
+      setDuplicateResolutionVisibilityByAssetId(mergedMap);
       appBootstrapCache.duplicateResolutionVisibilityByAssetId = nextMap;
+      writeSessionStorageJson(
+        duplicateVisibilityBootstrapStorageKey,
+        Array.from(nextMap.entries())
+      );
     } catch {
       const emptyMap = new Map<string, DuplicateResolutionVisibilitySummary>();
-      setDuplicateResolutionVisibilityByAssetId(emptyMap);
+      setDuplicateResolutionVisibilityByAssetId(applyDuplicateVisibilityOverrides(emptyMap));
       appBootstrapCache.duplicateResolutionVisibilityByAssetId = emptyMap;
+      writeSessionStorageJson(duplicateVisibilityBootstrapStorageKey, []);
     }
   }
 
@@ -3500,6 +3502,28 @@ export default function App() {
     } else {
       void loadDuplicateResolutionVisibility();
     }
+  }, []);
+
+  useEffect(() => {
+    if (!hasPendingDuplicateVisibilityRefreshRequest()) {
+      return;
+    }
+
+    const retryDelaysMs = [1500, 5000, 15000, 45000];
+    const timeoutIds = retryDelaysMs.map((delay, index) =>
+      window.setTimeout(() => {
+        void loadDuplicateResolutionVisibility();
+        if (index === retryDelaysMs.length - 1) {
+          clearDuplicateVisibilityRefreshRequest();
+        }
+      }, delay)
+    );
+
+    return () => {
+      for (const timeoutId of timeoutIds) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   useEffect(() => {
