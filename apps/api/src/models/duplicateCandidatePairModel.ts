@@ -80,6 +80,17 @@ duplicateCandidatePairSchema.index(
 );
 duplicateCandidatePairSchema.index({ generationVersion: 1, classification: 1 });
 duplicateCandidatePairSchema.index({ generationVersion: 1, status: 1 });
+duplicateCandidatePairSchema.index(
+  { classification: 1, status: 1, outcome: 1, score: -1, assetIdA: 1, assetIdB: 1 },
+  {
+    name: 'provisional_duplicate_group_query_v1',
+    partialFilterExpression: {
+      classification: { $in: ['very_likely_duplicate', 'possible_duplicate'] },
+      status: { $in: ['unreviewed', 'reviewed'] },
+      outcome: { $in: [null, 'confirmed_duplicate', 'ignored'] }
+    }
+  }
+);
 
 export const DuplicateCandidatePairModel: Model<DuplicateCandidatePairDocument> =
   (mongoose.models.DuplicateCandidatePair as Model<DuplicateCandidatePairDocument> | undefined) ??

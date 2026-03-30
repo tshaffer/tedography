@@ -14,6 +14,7 @@ import {
 import { getDisplayMediaUrl } from '../../utilities/mediaUrls';
 
 type DuplicateGroupDisplayMode = 'grid' | 'focus';
+const provisionalGroupPageSize = 50;
 
 const pageStyle: CSSProperties = {
   minHeight: '100vh',
@@ -381,12 +382,15 @@ function renderMemberCard(input: {
 
 export function DuplicateGroupReviewPage(): ReactElement {
   const [groups, setGroups] = useState<ProvisionalDuplicateGroupListItem[]>([]);
+  const [totalGroupCount, setTotalGroupCount] = useState(0);
+  const [groupsHasMore, setGroupsHasMore] = useState(false);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<ProvisionalDuplicateGroupListItem | null>(null);
   const [displayMode, setDisplayMode] = useState<DuplicateGroupDisplayMode>('grid');
   const [focusedAssetId, setFocusedAssetId] = useState<string | null>(null);
   const [draftDecisions, setDraftDecisions] = useState<Record<string, DuplicateProvisionalGroupMemberDecision>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingMoreGroups, setLoadingMoreGroups] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,19 +404,20 @@ export function DuplicateGroupReviewPage(): ReactElement {
       setError(null);
 
       try {
-        const response = await listProvisionalDuplicateGroups();
+        const response = await listProvisionalDuplicateGroups({
+          limit: provisionalGroupPageSize,
+          offset: 0
+        });
         if (cancelled) {
           return;
         }
 
         setGroups(response.groups);
-        setSelectedGroupKey((current) => {
-          if (current && response.groups.some((group) => group.groupKey === current)) {
-            return current;
-          }
-
-          return response.groups[0]?.groupKey ?? null;
-        });
+        setTotalGroupCount(response.totalGroups);
+        setGroupsHasMore(response.hasMore);
+        setSelectedGroupKey((current) =>
+          current && response.groups.some((group) => group.groupKey === current) ? current : null
+        );
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Failed to load provisional duplicate groups');
@@ -434,6 +439,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
     if (!selectedGroupKey) {
       setSelectedGroup(null);
       setDraftDecisions({});
+      setFocusedAssetId(null);
       return;
     }
 
@@ -510,13 +516,42 @@ export function DuplicateGroupReviewPage(): ReactElement {
   }, [focusedMember, selectedGroup]);
 
   async function refreshGroups(preferredGroupKey?: string | null): Promise<void> {
-    const response = await listProvisionalDuplicateGroups();
+    const reloadLimit = Math.max(groups.length, provisionalGroupPageSize);
+    const response = await listProvisionalDuplicateGroups({
+      limit: reloadLimit,
+      offset: 0
+    });
     setGroups(response.groups);
+    setTotalGroupCount(response.totalGroups);
+    setGroupsHasMore(response.hasMore);
     const nextGroupKey =
       (preferredGroupKey && response.groups.some((group) => group.groupKey === preferredGroupKey)
         ? preferredGroupKey
-        : null) ?? response.groups[0]?.groupKey ?? null;
+        : null) ?? null;
     setSelectedGroupKey(nextGroupKey);
+  }
+
+  async function handleLoadMoreGroups(): Promise<void> {
+    setLoadingMoreGroups(true);
+    setError(null);
+
+    try {
+      const response = await listProvisionalDuplicateGroups({
+        limit: provisionalGroupPageSize,
+        offset: groups.length
+      });
+
+      setGroups((current) => {
+        const seen = new Set(current.map((group) => group.groupKey));
+        return current.concat(response.groups.filter((group) => !seen.has(group.groupKey)));
+      });
+      setTotalGroupCount(response.totalGroups);
+      setGroupsHasMore(response.hasMore);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load more provisional duplicate groups');
+    } finally {
+      setLoadingMoreGroups(false);
+    }
   }
 
   function updateDecision(assetId: string, nextDecision: DuplicateProvisionalGroupMemberDecision): void {
@@ -633,7 +668,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
         <aside style={panelStyle}>
           <h2 style={{ marginTop: 0 }}>Provisional Groups</h2>
           <div style={{ color: '#64748b', fontSize: '14px', marginBottom: '12px' }}>
-            {loading ? 'Loading groups...' : `${groups.length} groups`}
+            {loading ? 'Loading groups...' : `${groups.length} loaded${totalGroupCount > 0 ? ` of ${totalGroupCount}` : ''}`}
           </div>
           <div style={sidebarListStyle}>
             {groups.map((group) => {
@@ -659,12 +694,30 @@ export function DuplicateGroupReviewPage(): ReactElement {
                 </button>
               );
             })}
+            {groupsHasMore ? (
+              <button
+                type="button"
+                style={loadingMoreGroups ? disabledButtonStyle : actionButtonStyle}
+                disabled={loadingMoreGroups}
+                onClick={() => {
+                  void handleLoadMoreGroups();
+                }}
+              >
+                {loadingMoreGroups ? 'Loading More…' : 'Load More Groups'}
+              </button>
+            ) : null}
           </div>
         </aside>
 
         <section style={panelStyle}>
           {!selectedGroup ? (
-            <div>{loading ? 'Loading selected group...' : 'No provisional duplicate groups found.'}</div>
+            <div>
+              {loading
+                ? 'Loading selected group...'
+                : groups.length === 0
+                  ? 'No provisional duplicate groups found.'
+                  : 'Select a provisional group to load its detail.'}
+            </div>
           ) : (
             <>
               <div style={metadataGridStyle}>

@@ -154,6 +154,8 @@ export async function listDuplicateGroups(input?: {
 export async function listProvisionalDuplicateGroups(input?: {
   assetId?: string;
   minScore?: number;
+  limit?: number;
+  offset?: number;
 }): Promise<ListProvisionalDuplicateGroupsResponse> {
   const query = new URLSearchParams();
 
@@ -163,6 +165,14 @@ export async function listProvisionalDuplicateGroups(input?: {
 
   if (input?.minScore !== undefined) {
     query.set('minScore', String(input.minScore));
+  }
+
+  if (input?.limit !== undefined) {
+    query.set('limit', String(input.limit));
+  }
+
+  if (input?.offset !== undefined) {
+    query.set('offset', String(input.offset));
   }
 
   const search = query.toString();

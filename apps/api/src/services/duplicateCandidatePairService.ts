@@ -26,6 +26,7 @@ import {
 import {
   buildDuplicateGroupKey,
   deriveDuplicateGroups,
+  invalidateProvisionalDuplicateGroupCache,
   selectProposedCanonicalAsset
 } from './duplicateGroupService.js';
 import { log } from '../logger.js';
@@ -318,6 +319,7 @@ export async function reviewDuplicateCandidatePair(
     return null;
   }
 
+  invalidateProvisionalDuplicateGroupCache();
   scheduleDuplicateGroupResolutionSync(pair, decision);
 
   const assets = await findByIds([pair.assetIdA, pair.assetIdB]);

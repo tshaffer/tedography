@@ -154,6 +154,9 @@ export interface ListProvisionalDuplicateGroupsResponse {
   groups: ProvisionalDuplicateGroupListItem[];
   totalGroups: number;
   totalAssets: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
 }
 
 export interface GetProvisionalDuplicateGroupResponse {

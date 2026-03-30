@@ -356,6 +356,8 @@ duplicateCandidatePairRoutes.get('/groups', async (req, res) => {
 duplicateCandidatePairRoutes.get('/provisional-groups', async (req, res) => {
   const assetId = parseOptionalString(req.query.assetId);
   const minScore = parseOptionalNumber(req.query.minScore);
+  const limit = parseOptionalInteger(req.query.limit);
+  const offset = parseOptionalInteger(req.query.offset);
 
   if (assetId === null) {
     const errorResponse: ImportApiErrorResponse = { error: 'assetId must be a string' };
@@ -369,10 +371,18 @@ duplicateCandidatePairRoutes.get('/provisional-groups', async (req, res) => {
     return;
   }
 
+  if (limit === null || offset === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'limit and offset must be integers' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
   try {
     const response = await listProvisionalDuplicateGroups({
       ...(assetId ? { assetId } : {}),
-      ...(minScore !== undefined ? { minScore } : {})
+      ...(minScore !== undefined ? { minScore } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+      ...(offset !== undefined ? { offset } : {})
     });
     res.json(response);
   } catch (error) {

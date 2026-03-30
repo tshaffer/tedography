@@ -34,6 +34,11 @@ interface DerivedDuplicateGroup {
   pairKeys: string[];
 }
 
+interface ProvisionalDuplicateGroupCacheEntry {
+  groups: DerivedDuplicateGroup[];
+  cachedAt: number;
+}
+
 export interface ListDerivedDuplicateGroupsOptions {
   assetId?: string;
   resolutionStatus?: 'proposed' | 'confirmed';
@@ -46,6 +51,8 @@ export interface ListDerivedDuplicateGroupsOptions {
 export interface ListProvisionalDuplicateGroupsOptions {
   assetId?: string;
   minScore?: number;
+  limit?: number;
+  offset?: number;
 }
 
 interface CanonicalCandidateScore {
@@ -55,6 +62,15 @@ interface CanonicalCandidateScore {
   metadataFieldCount: number;
   photoStateRank: number;
   fileSizeBytes: number;
+}
+
+const provisionalDuplicateGroupCacheTtlMs = 5 * 60 * 1000;
+const provisionalDuplicateGroupCache = new Map<string, ProvisionalDuplicateGroupCacheEntry>();
+
+function buildProvisionalDuplicateGroupCacheKey(
+  options: Pick<ListProvisionalDuplicateGroupsOptions, 'assetId' | 'minScore'>
+): string {
+  return `${options.assetId ?? ''}::${typeof options.minScore === 'number' ? options.minScore : ''}`;
 }
 
 export function resolveSelectedCanonicalAssetId(input: {
@@ -457,11 +473,22 @@ async function loadDerivedGroups(assetId?: string): Promise<DerivedDuplicateGrou
 async function loadProvisionalGroups(
   options: ListProvisionalDuplicateGroupsOptions = {}
 ): Promise<DerivedDuplicateGroup[]> {
+  const cacheKey = buildProvisionalDuplicateGroupCacheKey(options);
+  const cached = provisionalDuplicateGroupCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt <= provisionalDuplicateGroupCacheTtlMs) {
+    return cached.groups;
+  }
+
   const candidatePairs = await listProvisionalDuplicateCandidatePairs({
     ...(options.assetId ? { assetId: options.assetId } : {}),
     ...(typeof options.minScore === 'number' ? { minScore: options.minScore } : {})
   });
-  return deriveDuplicateGroups(candidatePairs);
+  const groups = deriveDuplicateGroups(candidatePairs);
+  provisionalDuplicateGroupCache.set(cacheKey, {
+    groups,
+    cachedAt: Date.now()
+  });
+  return groups;
 }
 
 function determineProvisionalGroupReviewStatus(input: {
@@ -478,6 +505,38 @@ function determineProvisionalGroupReviewStatus(input: {
   }
 
   return 'unresolved';
+}
+
+function getProvisionalGroupReviewStatusRank(status: DuplicateProvisionalGroupReviewStatus): number {
+  if (status === 'unresolved') {
+    return 0;
+  }
+
+  if (status === 'needs_rereview') {
+    return 1;
+  }
+
+  return 2;
+}
+
+function sortProvisionalDuplicateGroupListItems(
+  groups: ProvisionalDuplicateGroupListItem[]
+): ProvisionalDuplicateGroupListItem[] {
+  return [...groups].sort((left, right) => {
+    const statusRankDifference =
+      getProvisionalGroupReviewStatusRank(left.reviewStatus) -
+      getProvisionalGroupReviewStatusRank(right.reviewStatus);
+
+    if (statusRankDifference !== 0) {
+      return statusRankDifference;
+    }
+
+    if (right.assetCount !== left.assetCount) {
+      return right.assetCount - left.assetCount;
+    }
+
+    return left.groupKey.localeCompare(right.groupKey);
+  });
 }
 
 async function buildProvisionalDuplicateGroupListItem(
@@ -770,17 +829,29 @@ export async function listProvisionalDuplicateGroups(
 ): Promise<ListProvisionalDuplicateGroupsResponse> {
   const groups = await loadProvisionalGroups(options);
   const confirmedResolutions = await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' });
-  const builtGroups = groups.map((group) =>
-    buildLightweightProvisionalDuplicateGroupListItem(group, confirmedResolutions)
+  const normalizedOffset =
+    typeof options.offset === 'number' && Number.isInteger(options.offset) && options.offset > 0
+      ? options.offset
+      : 0;
+  const normalizedLimit =
+    typeof options.limit === 'number' && Number.isInteger(options.limit) && options.limit > 0
+      ? options.limit
+      : 50;
+  const sortedGroups = sortProvisionalDuplicateGroupListItems(
+    groups.map((group) => buildLightweightProvisionalDuplicateGroupListItem(group, confirmedResolutions))
   );
+  const builtGroups = sortedGroups.slice(normalizedOffset, normalizedOffset + normalizedLimit);
   const assetIds = Array.from(
     new Set(builtGroups.flatMap((group: ProvisionalDuplicateGroupListItem) => group.assetIds))
   );
 
   return {
     groups: builtGroups,
-    totalGroups: builtGroups.length,
-    totalAssets: assetIds.length
+    totalGroups: sortedGroups.length,
+    totalAssets: assetIds.length,
+    limit: normalizedLimit,
+    offset: normalizedOffset,
+    hasMore: normalizedOffset + builtGroups.length < sortedGroups.length
   };
 }
 
@@ -805,6 +876,10 @@ export async function getProvisionalDuplicateGroup(
       confirmedResolutions
     )
   };
+}
+
+export function invalidateProvisionalDuplicateGroupCache(): void {
+  provisionalDuplicateGroupCache.clear();
 }
 
 export async function resolveProvisionalDuplicateGroup(
@@ -870,6 +945,7 @@ export async function resolveProvisionalDuplicateGroup(
   );
 
   await deleteDuplicateGroupResolutionsByOverlappingAssetIds(assetIds);
+  invalidateProvisionalDuplicateGroupCache();
 
   if (includedAssetIds.length >= 2) {
     const includedAssets = await findByIds(includedAssetIds);
@@ -904,6 +980,7 @@ export async function reopenProvisionalDuplicateGroup(
   }
 
   await deleteDuplicateGroupResolutionByKey(groupKey);
+  invalidateProvisionalDuplicateGroupCache();
 
   return {
     reopenedGroupKey: groupKey

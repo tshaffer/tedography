@@ -60,6 +60,17 @@ export interface ListProvisionalDuplicateCandidatePairsInput {
   minScore?: number;
 }
 
+const provisionalDuplicateCandidateStatusFilter: DuplicateCandidatePairDocument['status'][] = [
+  'unreviewed',
+  'reviewed'
+];
+
+const provisionalDuplicateCandidateOutcomeFilter: Array<'confirmed_duplicate' | 'ignored' | null> = [
+  null,
+  'confirmed_duplicate',
+  'ignored'
+];
+
 export function buildDuplicateCandidatePairFilter(
   input: Omit<ListDuplicateCandidatePairsInput, 'limit' | 'offset'>
 ): Record<string, unknown> {
@@ -323,8 +334,8 @@ export async function listProvisionalDuplicateCandidatePairs(
 ): Promise<DuplicateCandidatePairDocument[]> {
   const filter: Record<string, unknown> = {
     classification: { $in: ['very_likely_duplicate', 'possible_duplicate'] },
-    status: { $ne: 'ignored' },
-    outcome: { $ne: 'not_duplicate' }
+    status: { $in: provisionalDuplicateCandidateStatusFilter },
+    outcome: { $in: provisionalDuplicateCandidateOutcomeFilter }
   };
 
   if (input.assetId) {
@@ -369,8 +380,8 @@ export async function listProvisionalDuplicateCandidatePairsForAssetIds(
   return DuplicateCandidatePairModel.find(
     {
       classification: { $in: ['very_likely_duplicate', 'possible_duplicate'] },
-      status: { $ne: 'ignored' },
-      outcome: { $ne: 'not_duplicate' },
+      status: { $in: provisionalDuplicateCandidateStatusFilter },
+      outcome: { $in: provisionalDuplicateCandidateOutcomeFilter },
       assetIdA: { $in: assetIds },
       assetIdB: { $in: assetIds }
     },
