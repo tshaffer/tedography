@@ -508,11 +508,11 @@ function determineProvisionalGroupReviewStatus(input: {
 }
 
 function getProvisionalGroupReviewStatusRank(status: DuplicateProvisionalGroupReviewStatus): number {
-  if (status === 'unresolved') {
+  if (status === 'needs_rereview') {
     return 0;
   }
 
-  if (status === 'needs_rereview') {
+  if (status === 'unresolved') {
     return 1;
   }
 
