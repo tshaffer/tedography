@@ -54,3 +54,19 @@ export async function listDuplicateGroupResolutions(input?: {
   return DuplicateGroupResolutionModel.find(filter, { _id: 0 })
     .lean<DuplicateGroupResolutionDocument[]>();
 }
+
+export async function deleteDuplicateGroupResolutionByKey(groupKey: string): Promise<void> {
+  await DuplicateGroupResolutionModel.deleteOne({ groupKey });
+}
+
+export async function deleteDuplicateGroupResolutionsByOverlappingAssetIds(
+  assetIds: string[]
+): Promise<void> {
+  if (assetIds.length === 0) {
+    return;
+  }
+
+  await DuplicateGroupResolutionModel.deleteMany({
+    assetIds: { $in: assetIds }
+  });
+}

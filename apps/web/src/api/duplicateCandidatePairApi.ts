@@ -10,6 +10,9 @@ import type {
   ListDuplicateGroupsResponse,
   ListProvisionalDuplicateGroupsResponse,
   ListDuplicateCandidatePairsResponse,
+  ReopenProvisionalDuplicateGroupResponse,
+  ResolveProvisionalDuplicateGroupRequest,
+  ResolveProvisionalDuplicateGroupResponse,
   UpdateDuplicateCandidatePairReviewRequest,
   UpdateDuplicateCandidatePairReviewResponse
 } from '@tedography/shared';
@@ -173,6 +176,33 @@ export async function getProvisionalDuplicateGroup(
 ): Promise<GetProvisionalDuplicateGroupResponse> {
   return fetchJson<GetProvisionalDuplicateGroupResponse>(
     `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}`
+  );
+}
+
+export async function resolveProvisionalDuplicateGroup(
+  groupKey: string,
+  request: ResolveProvisionalDuplicateGroupRequest
+): Promise<ResolveProvisionalDuplicateGroupResponse> {
+  return fetchJson<ResolveProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/resolve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function reopenProvisionalDuplicateGroup(
+  groupKey: string
+): Promise<ReopenProvisionalDuplicateGroupResponse> {
+  return fetchJson<ReopenProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/reopen`,
+    {
+      method: 'POST'
+    }
   );
 }
 

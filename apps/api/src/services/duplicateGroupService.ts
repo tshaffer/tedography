@@ -3,22 +3,30 @@ import type {
   DuplicateGroupListItem,
   DuplicateGroupListSummary,
   DuplicateProvisionalGroupReviewStatus,
+  DuplicateProvisionalGroupMemberDecision,
   ProvisionalDuplicateGroupListItem,
   GetProvisionalDuplicateGroupResponse,
   ListDuplicateGroupsResponse,
-  ListProvisionalDuplicateGroupsResponse
+  ListProvisionalDuplicateGroupsResponse,
+  ResolveProvisionalDuplicateGroupRequest,
+  ResolveProvisionalDuplicateGroupResponse,
+  ReopenProvisionalDuplicateGroupResponse
 } from '@tedography/shared';
 import { findByIds } from '../repositories/assetRepository.js';
 import {
+  deleteDuplicateGroupResolutionByKey,
+  deleteDuplicateGroupResolutionsByOverlappingAssetIds,
   findDuplicateGroupResolutionByKey,
   listDuplicateGroupResolutions,
   upsertDuplicateGroupResolution
 } from '../repositories/duplicateGroupResolutionRepository.js';
 import {
+  listDuplicateCandidatePairsForAssetIds,
   listConfirmedDuplicatePairs,
   listReviewedDuplicateCandidatePairsForAssets,
   listProvisionalDuplicateCandidatePairsForAssetIds,
-  listProvisionalDuplicateCandidatePairs
+  listProvisionalDuplicateCandidatePairs,
+  updateDuplicateCandidatePairReviewByAssetIds
 } from '../repositories/duplicateCandidatePairRepository.js';
 
 interface DerivedDuplicateGroup {
@@ -592,6 +600,70 @@ function parseProvisionalGroupKey(groupKey: string): string[] {
   return [...new Set(groupKey.split('__').map((assetId) => assetId.trim()).filter(Boolean))].sort(compareAssetIds);
 }
 
+function normalizeDecisionAssetIds(assetIds: string[]): string[] {
+  return [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))].sort(compareAssetIds);
+}
+
+function buildDecisionByAssetId(input: {
+  assetIds: string[];
+  keeperAssetId: string;
+  duplicateAssetIds: string[];
+  excludedAssetIds: string[];
+}): Map<string, DuplicateProvisionalGroupMemberDecision> {
+  const decisions = new Map<string, DuplicateProvisionalGroupMemberDecision>();
+
+  for (const assetId of input.assetIds) {
+    decisions.set(assetId, 'unclassified');
+  }
+
+  decisions.set(input.keeperAssetId, 'keeper');
+
+  for (const assetId of input.duplicateAssetIds) {
+    decisions.set(assetId, 'duplicate');
+  }
+
+  for (const assetId of input.excludedAssetIds) {
+    decisions.set(assetId, 'not_in_group');
+  }
+
+  return decisions;
+}
+
+function validateResolveProvisionalDuplicateGroupInput(input: {
+  assetIds: string[];
+  keeperAssetId: string;
+  duplicateAssetIds: string[];
+  excludedAssetIds: string[];
+}): void {
+  if (!input.assetIds.includes(input.keeperAssetId)) {
+    throw new Error(`Keeper asset ${input.keeperAssetId} is not part of provisional group.`);
+  }
+
+  const duplicateAssetIds = normalizeDecisionAssetIds(input.duplicateAssetIds);
+  const excludedAssetIds = normalizeDecisionAssetIds(input.excludedAssetIds);
+  const allClassifiedAssetIds = new Set<string>([input.keeperAssetId, ...duplicateAssetIds, ...excludedAssetIds]);
+
+  if (allClassifiedAssetIds.size !== input.assetIds.length) {
+    throw new Error('Every asset in the provisional duplicate group must be explicitly classified.');
+  }
+
+  for (const assetId of duplicateAssetIds) {
+    if (!input.assetIds.includes(assetId)) {
+      throw new Error(`Duplicate asset ${assetId} is not part of provisional group.`);
+    }
+  }
+
+  for (const assetId of excludedAssetIds) {
+    if (!input.assetIds.includes(assetId)) {
+      throw new Error(`Excluded asset ${assetId} is not part of provisional group.`);
+    }
+  }
+
+  if (duplicateAssetIds.includes(input.keeperAssetId) || excludedAssetIds.includes(input.keeperAssetId)) {
+    throw new Error('Keeper asset cannot also be classified as duplicate or not in group.');
+  }
+}
+
 export function filterDuplicateGroupListItems(
   groups: DuplicateGroupListItem[],
   options: Omit<ListDerivedDuplicateGroupsOptions, 'assetId' | 'sort'>
@@ -732,6 +804,109 @@ export async function getProvisionalDuplicateGroup(
       },
       confirmedResolutions
     )
+  };
+}
+
+export async function resolveProvisionalDuplicateGroup(
+  groupKey: string,
+  input: ResolveProvisionalDuplicateGroupRequest
+): Promise<ResolveProvisionalDuplicateGroupResponse | null> {
+  const assetIds = parseProvisionalGroupKey(groupKey);
+  if (assetIds.length === 0) {
+    return null;
+  }
+
+  const duplicateAssetIds = normalizeDecisionAssetIds(input.duplicateAssetIds);
+  const excludedAssetIds = normalizeDecisionAssetIds(input.excludedAssetIds);
+
+  validateResolveProvisionalDuplicateGroupInput({
+    assetIds,
+    keeperAssetId: input.keeperAssetId,
+    duplicateAssetIds,
+    excludedAssetIds
+  });
+
+  const decisionByAssetId = buildDecisionByAssetId({
+    assetIds,
+    keeperAssetId: input.keeperAssetId,
+    duplicateAssetIds,
+    excludedAssetIds
+  });
+  const includedAssetIds = normalizeDecisionAssetIds([input.keeperAssetId, ...duplicateAssetIds]);
+  const candidatePairs = await listDuplicateCandidatePairsForAssetIds(assetIds);
+
+  await Promise.all(
+    candidatePairs.map(async (pair) => {
+      const decisionA = decisionByAssetId.get(pair.assetIdA) ?? 'unclassified';
+      const decisionB = decisionByAssetId.get(pair.assetIdB) ?? 'unclassified';
+
+      if (
+        (decisionA === 'keeper' || decisionA === 'duplicate') &&
+        (decisionB === 'keeper' || decisionB === 'duplicate')
+      ) {
+        await updateDuplicateCandidatePairReviewByAssetIds({
+          assetIdA: pair.assetIdA,
+          assetIdB: pair.assetIdB,
+          status: 'reviewed',
+          outcome: 'confirmed_duplicate'
+        });
+        return;
+      }
+
+      const isIncludedA = decisionA === 'keeper' || decisionA === 'duplicate';
+      const isIncludedB = decisionB === 'keeper' || decisionB === 'duplicate';
+      const isExcludedA = decisionA === 'not_in_group';
+      const isExcludedB = decisionB === 'not_in_group';
+
+      if ((isIncludedA && isExcludedB) || (isIncludedB && isExcludedA)) {
+        await updateDuplicateCandidatePairReviewByAssetIds({
+          assetIdA: pair.assetIdA,
+          assetIdB: pair.assetIdB,
+          status: 'reviewed',
+          outcome: 'not_duplicate'
+        });
+      }
+    })
+  );
+
+  await deleteDuplicateGroupResolutionsByOverlappingAssetIds(assetIds);
+
+  if (includedAssetIds.length >= 2) {
+    const includedAssets = await findByIds(includedAssetIds);
+    const proposedCanonical = selectProposedCanonicalAsset(includedAssets);
+    const resolvedGroupKey = buildDuplicateGroupKey(includedAssetIds);
+
+    await upsertDuplicateGroupResolution({
+      groupKey: resolvedGroupKey,
+      assetIds: includedAssetIds,
+      proposedCanonicalAssetId: proposedCanonical.canonicalAssetId,
+      manualCanonicalAssetId:
+        input.keeperAssetId === proposedCanonical.canonicalAssetId ? null : input.keeperAssetId,
+      resolutionStatus: 'confirmed'
+    });
+
+    return {
+      resolvedGroupKey
+    };
+  }
+
+  return {
+    resolvedGroupKey: null
+  };
+}
+
+export async function reopenProvisionalDuplicateGroup(
+  groupKey: string
+): Promise<ReopenProvisionalDuplicateGroupResponse | null> {
+  const assetIds = parseProvisionalGroupKey(groupKey);
+  if (assetIds.length === 0) {
+    return null;
+  }
+
+  await deleteDuplicateGroupResolutionByKey(groupKey);
+
+  return {
+    reopenedGroupKey: groupKey
   };
 }
 

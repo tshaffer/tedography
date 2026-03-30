@@ -159,3 +159,17 @@ export interface ListProvisionalDuplicateGroupsResponse {
 export interface GetProvisionalDuplicateGroupResponse {
   group: ProvisionalDuplicateGroupListItem;
 }
+
+export interface ResolveProvisionalDuplicateGroupRequest {
+  keeperAssetId: string;
+  duplicateAssetIds: string[];
+  excludedAssetIds: string[];
+}
+
+export interface ResolveProvisionalDuplicateGroupResponse {
+  resolvedGroupKey: string | null;
+}
+
+export interface ReopenProvisionalDuplicateGroupResponse {
+  reopenedGroupKey: string;
+}

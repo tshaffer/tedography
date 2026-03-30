@@ -379,3 +379,48 @@ export async function listProvisionalDuplicateCandidatePairsForAssetIds(
     .sort({ score: -1, updatedAt: -1, assetIdA: 1, assetIdB: 1 })
     .lean<DuplicateCandidatePairDocument[]>();
 }
+
+export async function listDuplicateCandidatePairsForAssetIds(
+  assetIds: string[]
+): Promise<DuplicateCandidatePairDocument[]> {
+  if (assetIds.length === 0) {
+    return [];
+  }
+
+  return DuplicateCandidatePairModel.find(
+    {
+      assetIdA: { $in: assetIds },
+      assetIdB: { $in: assetIds }
+    },
+    { _id: 0 }
+  )
+    .sort({ score: -1, updatedAt: -1, assetIdA: 1, assetIdB: 1 })
+    .lean<DuplicateCandidatePairDocument[]>();
+}
+
+export async function updateDuplicateCandidatePairReviewByAssetIds(input: {
+  assetIdA: string;
+  assetIdB: string;
+  status: DuplicateCandidatePairDocument['status'];
+  outcome?: DuplicateCandidatePairDocument['outcome'];
+}): Promise<DuplicateCandidatePairDocument | null> {
+  return DuplicateCandidatePairModel.findOneAndUpdate(
+    {
+      $or: [
+        { assetIdA: input.assetIdA, assetIdB: input.assetIdB },
+        { assetIdA: input.assetIdB, assetIdB: input.assetIdA }
+      ]
+    },
+    {
+      $set: {
+        status: input.status,
+        outcome: input.outcome ?? null
+      }
+    },
+    {
+      new: true,
+      projection: { _id: 0 },
+      runValidators: true
+    }
+  ).lean<DuplicateCandidatePairDocument | null>();
+}
