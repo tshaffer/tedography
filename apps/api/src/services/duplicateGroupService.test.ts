@@ -2,14 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 import {
+  determineProvisionalGroupReviewStatus,
   deriveDuplicateGroups,
   filterDuplicateGroupListItems,
   resolveSelectedCanonicalAssetId,
   sortDuplicateGroupListItems,
+  suppressConfirmedDuplicateAssetsFromPreviewGroups,
   summarizeDuplicateGroups,
   selectProposedCanonicalAsset
 } from './duplicateGroupService.js';
 import type { DuplicateGroupListItem } from '@tedography/shared';
+import type { DuplicateGroupResolutionDocument } from '../repositories/duplicateGroupResolutionRepository.js';
 
 test('deriveDuplicateGroups returns connected components from confirmed duplicate links', () => {
   const groups = deriveDuplicateGroups([
@@ -26,6 +29,35 @@ test('deriveDuplicateGroups returns connected components from confirmed duplicat
     {
       assetIds: ['D', 'E'],
       pairKeys: ['D__E']
+    }
+  ]);
+});
+
+test('preview suppresses previously confirmed duplicate assets when the keeper is also present', () => {
+  const suppressed = suppressConfirmedDuplicateAssetsFromPreviewGroups(
+    [
+      {
+        assetIds: ['asset-a', 'asset-b', 'asset-c'],
+        pairKeys: ['asset-a__asset-b', 'asset-a__asset-c', 'asset-b__asset-c']
+      }
+    ],
+    [
+      {
+        groupKey: 'asset-a__asset-b',
+        assetIds: ['asset-a', 'asset-b'],
+        proposedCanonicalAssetId: 'asset-a',
+        manualCanonicalAssetId: null,
+        resolutionStatus: 'confirmed',
+        confirmedAt: new Date(),
+        rereviewRequiredAt: null
+      } satisfies DuplicateGroupResolutionDocument
+    ]
+  );
+
+  assert.deepEqual(suppressed, [
+    {
+      assetIds: ['asset-a', 'asset-c'],
+      pairKeys: ['asset-a__asset-c']
     }
   ]);
 });
@@ -184,4 +216,43 @@ test('summarizeDuplicateGroups reports progress and bulk-confirm-ready counts', 
     exactPairGroupCount: 2,
     readyToConfirmCount: 1
   });
+});
+
+test('exact confirmed provisional groups stay resolved even when they overlap another confirmed group', () => {
+  assert.equal(
+    determineProvisionalGroupReviewStatus({
+      assetIds: ['asset-a', 'asset-b'],
+      exactResolutionStatus: 'confirmed',
+      exactResolutionNeedsRereview: false,
+      coveredByConfirmedResolution: false,
+      overlappingConfirmedResolutionCount: 1
+    }),
+    'resolved'
+  );
+});
+
+test('exact confirmed provisional groups still need rereview when the exact resolution is flagged', () => {
+  assert.equal(
+    determineProvisionalGroupReviewStatus({
+      assetIds: ['asset-a', 'asset-b'],
+      exactResolutionStatus: 'confirmed',
+      exactResolutionNeedsRereview: true,
+      coveredByConfirmedResolution: false,
+      overlappingConfirmedResolutionCount: 0
+    }),
+    'needs_rereview'
+  );
+});
+
+test('provisional subgroups covered by a confirmed group stay resolved', () => {
+  assert.equal(
+    determineProvisionalGroupReviewStatus({
+      assetIds: ['asset-a', 'asset-b'],
+      exactResolutionStatus: null,
+      exactResolutionNeedsRereview: false,
+      coveredByConfirmedResolution: true,
+      overlappingConfirmedResolutionCount: 1
+    }),
+    'resolved'
+  );
 });

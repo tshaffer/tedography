@@ -52,7 +52,7 @@ export async function upsertImageAnalysis(
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: 'after',
       projection: { _id: 0 }
     }
   ).lean<ImageAnalysisDocument | null>();

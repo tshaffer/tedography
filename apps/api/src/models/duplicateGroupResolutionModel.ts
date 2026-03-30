@@ -9,6 +9,7 @@ export interface DuplicateGroupResolutionDocument {
   manualCanonicalAssetId?: string | null;
   resolutionStatus: (typeof duplicateGroupResolutionStatuses)[number];
   confirmedAt?: Date | null;
+  rereviewRequiredAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -25,7 +26,8 @@ const duplicateGroupResolutionSchema = new Schema<DuplicateGroupResolutionDocume
       enum: duplicateGroupResolutionStatuses,
       default: 'proposed'
     },
-    confirmedAt: { type: Date, required: false, default: null }
+    confirmedAt: { type: Date, required: false, default: null },
+    rereviewRequiredAt: { type: Date, required: false, default: null }
   },
   {
     collection: 'duplicateGroupResolutions',

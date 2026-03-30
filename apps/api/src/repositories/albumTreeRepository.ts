@@ -172,7 +172,7 @@ export async function renameAlbumTreeNode(
         updatedAt: new Date().toISOString()
       }
     },
-    { new: true, projection: { _id: 0 }, runValidators: true }
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<AlbumTreeNode | null>();
 }
 

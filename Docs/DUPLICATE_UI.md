@@ -2,205 +2,22 @@
 
 This document describes the duplicate-related user interface currently implemented in Tedography.
 
-It covers:
+It is usage-focused. It explains what the duplicate screens do, how they relate to each other, and what the visible duplicate states mean.
 
-- pair review
-- duplicate group review and canonical selection
-- duplicate action planning
-- controlled execution of approved action plans
-- how confirmed duplicate resolutions affect the main app
+## 1. Main Duplicate Surfaces
 
-It does not describe backend internals except where they affect visible UI behavior.
+Tedography currently has two main duplicate review surfaces:
 
-## 1. Entry Points
+1. `Duplicate Group Review`
+   Route: `/duplicates/groups`
+2. `Duplicate Pair Review`
+   Route: `/duplicates/review`
 
-There are four main UI surfaces related to duplicates:
+The group workflow is now the primary workflow for resolving duplicate sets.
 
-1. Main app browsing and asset inspection at `/`
-2. Duplicate pair review at `/duplicates/review`
-3. Duplicate group review and canonical resolution at `/duplicates/groups`
-4. Duplicate action planning at `/duplicates/plans`
+The pair workflow remains available for lower-level cleanup and legacy review.
 
-## 2. Main App Duplicate UI
-
-Phase 6 made confirmed duplicate resolutions visible in the normal browsing experience.
-
-### 2.1 Default Visibility Behavior
-
-In the main app:
-
-- canonical assets from confirmed duplicate groups remain visible by default
-- non-canonical members of confirmed duplicate groups are suppressed by default
-- unresolved or merely proposed groups do not suppress assets
-
-This behavior is non-destructive. Suppressed assets still exist and can be revealed again.
-
-### 2.2 Reveal Control
-
-In the main toolbar, under `View Options`, there is a checkbox:
-
-- `Show suppressed duplicates`
-
-Behavior:
-
-- unchecked: hide confirmed non-canonical duplicates
-- checked: show them again
-
-This preference is persisted in local storage.
-
-### 2.3 Grid / Thumbnail Indicators
-
-When an asset belongs to a confirmed duplicate group, the asset card can show:
-
-- `Keeper` for the selected canonical asset
-- `Duplicate` for a revealed non-canonical member
-
-These are badges on the asset card in the main browsing UI.
-
-### 2.4 Asset Inspector / Details
-
-When a selected asset belongs to a confirmed duplicate group, the inspector shows duplicate context:
-
-- duplicate role
-- duplicate group key
-- link or action to open the duplicate group page
-
-In the asset details panel there is an `Open Duplicate Group` action.
-
-## 3. Duplicate Pair Review UI
-
-Route:
-
-- `/duplicates/review`
-
-Purpose:
-
-- review candidate pairs one pair at a time
-- decide whether a pair is actually a duplicate pair
-- inspect scoring context and image metadata
-
-Important:
-
-- this page does not choose which asset to keep
-- it only records the human judgment for the pair
-
-### 3.1 Pair Review Filters
-
-The pair review page includes a `Queue Filters` section with:
-
-- `Status`
-  - `unreviewed`
-  - `reviewed`
-  - `ignored`
-  - `all`
-- `Classification`
-  - `very_likely_duplicate`
-  - `possible_duplicate`
-  - `similar_image`
-  - `all`
-- `Outcome`
-  - `none`
-  - `confirmed_duplicate`
-  - `not_duplicate`
-  - `ignored`
-  - `all`
-- `Asset ID`
-- `High confidence only (score >= 0.90)`
-
-Actions:
-
-- `Apply Filters`
-- `Reset Filters`
-- `Refresh Queue`
-
-The applied pair-review filters are persisted in local storage.
-
-### 3.2 Pair Review Summary / Progress
-
-The page shows summary cards such as:
-
-- matching pairs
-- unreviewed
-- reviewed
-- confirmed duplicate
-- remaining loaded
-- high confidence
-- no outcome
-
-The current pair header also shows position:
-
-- `Position X of Y`
-
-If only the first chunk is loaded, it indicates that as well.
-
-### 3.3 Pair Comparison Area
-
-The current pair view shows:
-
-- Asset A image
-- Asset B image
-- filename
-- asset id
-- original archive path
-- capture time if available
-- dimensions if available
-
-It also shows pair-level metadata:
-
-- score
-- classification
-- status
-- outcome
-- analysis version
-- generation version
-
-And scoring/debug signals:
-
-- `dHashDistance`
-- `pHashDistance`
-- `dimensionsSimilarity`
-- `aspectRatioDelta`
-- `sourceUpdatedTimeDeltaMs`
-
-### 3.4 Pair Review Actions
-
-Primary actions:
-
-- `Duplicate`
-- `Not Duplicate`
-- `Ignore`
-- `Previous`
-- `Next`
-
-Bulk action:
-
-- `Bulk Ignore Loaded (N)`
-
-`Bulk Ignore Loaded` applies to the currently loaded filtered queue, not to hidden/unloaded results.
-
-### 3.5 Pair Review Keyboard Shortcuts
-
-Supported shortcuts:
-
-- `D` = Duplicate
-- `N` = Not Duplicate
-- `I` = Ignore
-- `Right Arrow` or `J` = Next
-- `Left Arrow` or `K` = Previous
-
-### 3.6 Derived Duplicate Groups Preview
-
-The pair review page also includes a lightweight derived-groups section.
-
-It can show:
-
-- number of duplicate groups
-- total assets across those groups
-- a short preview of a few groups
-
-This is primarily a bridge into the group review flow.
-
-## 4. Duplicate Group Review UI
+## 2. Duplicate Group Review
 
 Route:
 
@@ -208,412 +25,288 @@ Route:
 
 Purpose:
 
-- review connected duplicate groups derived from confirmed duplicate pair outcomes
-- inspect the proposed canonical asset
-- override the canonical choice if needed
-- confirm the resolution
+- review duplicates as groups rather than only as pairs
+- choose one keeper for a provisional group
+- mark the remaining assets as duplicates or excluded from that group
+- revisit already-resolved groups when new candidate evidence appears
 
-This is where the user chooses the keeper.
+### 2.1 Provisional Groups
 
-## 5. Group Filters / Queue Slicing
+The left sidebar shows provisional duplicate groups.
 
-The duplicate groups page includes `Group Filters`.
+Each group is derived from current duplicate-candidate relationships.
 
-Controls:
+The list is ordered by review priority:
 
-- `Resolution Status`
-  - `all`
-  - `proposed`
-  - `confirmed`
-- `Group Size`
-  - `all`
-  - `exactly 2 members`
-  - `3+ members`
-- `Sort`
-  - `unresolved first`
-  - `smallest first`
-  - `largest first`
-- `Asset ID`
-- `Only show groups ready for bulk confirm`
+1. `Needs Re-review`
+2. `Unresolved`
+3. `Resolved`
 
-Actions:
+Within each status bucket, larger groups appear first.
 
-- `Apply Filters`
-- `Reset Filters`
-- `Refresh`
+### 2.2 Group Statuses
 
-The applied group filters are persisted in local storage.
+Each provisional group is shown in one of three states:
 
-## 6. Group Summary / Progress
+- `Unresolved`
+  - no confirmed group resolution exists yet
+- `Resolved`
+  - the current group has a confirmed duplicate resolution
+- `Needs Re-review`
+  - a confirmed group exists, but new candidate connectivity or later low-level review means the group should be revisited
 
-The groups page shows summary cards for the current filtered queue, including:
+`Needs Re-review` is now backed by persisted backend state, not only by frontend inference.
 
-- filtered groups
-- proposed
-- confirmed
-- ready to confirm
-- exactly 2 assets
+### 2.3 Page Summary
 
-Within the group detail area, the current group also shows:
+Near the top of the page, Tedography shows counts for:
 
-- resolution status
-- current position in the filtered queue
+- `Needs Re-review`
+- `Unresolved`
+- `Resolved`
 
-Example:
+These counts reflect the whole current provisional-group queue, not only the currently loaded sidebar items.
 
-- `Status: proposed, Position 4 of 18`
+### 2.4 Group Detail Summary
 
-## 7. Group List Sidebar
+When a group is selected, the detail pane shows:
 
-The left sidebar lists the currently filtered groups.
-
-Each list item shows:
-
-- group key
+- review status
 - asset count
-- resolution status
-- selected canonical filename or asset id
-- `Ready to bulk confirm` when applicable
+- candidate pair link count
+- current canonical asset if one is already resolved
 
-Selecting a group opens its detail panel on the right.
+It also shows a `Resolution Rules` summary:
 
-## 8. Group Detail View
+- keeper chosen
+- duplicates
+- not in group
+- unclassified
 
-For the selected group, the detail pane shows:
+### 2.5 Resolution Controls
 
-- group key
-- asset count
-- confirmed pair-link count
-- proposed canonical asset id
-- canonical reason summary
-- selected canonical asset id
-- list of non-canonical members
+Each asset in the group can be marked as:
 
-Each group member card shows:
+- `Keeper`
+- `Duplicate`
+- `Not In Group`
+
+Rules:
+
+- exactly one asset must be the keeper
+- every other shown asset must be explicitly classified
+- the group cannot be saved until all assets are classified
+
+### 2.6 Meaning Of `Not In Group`
+
+`Not In Group` means:
+
+- this asset is excluded from the current duplicate-set resolution
+
+It does **not** mean:
+
+- the asset is globally settled
+- the asset is not a duplicate of anything else in the archive
+
+An excluded asset may still appear later in another provisional group if candidate relationships elsewhere justify it.
+
+### 2.7 Grid Mode
+
+Grid Mode shows the whole provisional group at once.
+
+Each card shows:
 
 - image preview
 - filename
 - asset id
-- original path
-- capture time
-- dimensions
-- original format
-- display storage type
-- photo state
-- file size
-- radio button for `Use as canonical`
+- current decision in the group
+- historical hint counts, when loaded
+- action buttons for `Keeper`, `Duplicate`, and `Not In Group`
+- compare-set toggle
 
-Per-member labels:
+Grid Mode is best for:
 
-- `Proposed canonical`
-- `Manual override`
+- quick classification of the whole set
+- choosing the keeper while seeing all members together
 
-## 9. Group Actions
+### 2.8 Focus Mode
 
-Per-group actions:
+Focus Mode shows one asset large at a time with a candidate list on the right.
 
-- `Save Canonical Selection`
-- `Confirm Resolution`
-- `Reset To Proposed`
-- `Previous Group`
-- `Next Group`
+It uses the same working state as Grid Mode. Switching modes does not reset the current decisions.
 
-Behavior:
+Focus Mode supports:
 
-- `Save Canonical Selection`
-  - saves the selected canonical choice
-  - leaves the group in `proposed` status
-  - does not activate suppression in the main app
-- `Confirm Resolution`
-  - saves the selected canonical choice
-  - marks the group `confirmed`
-  - activates canonical/suppressed behavior in the main app
-- `Reset To Proposed`
-  - clears a manual override
-  - restores the proposed canonical choice
-  - sets status back to `proposed`
+- large image inspection
+- up/down arrow navigation
+- wraparound navigation at the ends
+- compare subset workflow
 
-## 10. Bulk Group Action
+### 2.9 Compare Subset In Focus Mode
 
-The groups page includes:
+When comparing a few candidates within a larger group, you can build a temporary compare subset.
 
-- `Bulk Confirm Proposals (N)`
+You can:
 
-This acts on the explicit currently filtered set of groups that are:
+- add assets to `Compare`
+- remove them from `Compare`
+- switch Focus Mode between:
+  - `View All`
+  - `Compare Set`
 
-- still `proposed`
-- still using the proposed canonical asset
+When `Compare Set` is active:
 
-It does not override manual selections.
+- the right-hand candidate list narrows to that subset
+- up/down arrow navigation moves only within that subset
 
-This is intended as the main throughput improvement for large duplicate-resolution backlogs.
+This compare subset is temporary UI state for the current review session. It does not change duplicate resolution semantics by itself.
 
-## 11. Group Keyboard Shortcuts
+### 2.10 Historical Hints
 
-Supported shortcuts on the groups page:
+Historical hints are optional and loaded on demand with:
 
-- `S` = Save Canonical Selection
-- `C` = Confirm Resolution
-- `R` = Reset To Proposed
-- `Right Arrow` or `J` = Next Group
-- `Left Arrow` or `K` = Previous Group
+- `Load Historical Hints`
 
-Shortcuts do not fire while typing into inputs.
+When loaded, an asset can show best-effort counts for how often it has historically appeared as:
 
-## 12. Duplicate Action Planning And Execution UI
+- keeper
+- duplicate
+- not duplicate
+
+These counts are informational only. They do not automatically choose the final keeper.
+
+Older pair-review history is not perfectly directional in all cases, so these are best-effort hints for legacy data.
+
+### 2.11 Save And Reopen
+
+Main actions:
+
+- `Save Group Resolution`
+- `Reopen Group`
+
+Saving a group resolution:
+
+- confirms one keeper and zero or more duplicates
+- removes excluded assets from the resolved duplicate set
+- updates Library duplicate visibility
+
+Reopening a group:
+
+- clears the current confirmed group resolution for that exact group
+- returns it to active review
+
+## 3. Duplicate Pair Review
 
 Route:
 
-- `/duplicates/plans`
+- `/duplicates/review`
 
 Purpose:
 
-- generate planning-only archive actions for confirmed duplicate groups
-- inspect proposed actions before any execution exists
-- review plans as `approved`, `rejected`, or `needs_manual_review`
-- export a dry-run JSON manifest
-- execute approved plans in a controlled way
-- inspect execution history and retry failed items
+- inspect and review candidate pairs one pair at a time
+- do lower-level cleanup work
+- preserve continuity with older pair-oriented review workflow
 
-Important:
+The pair-review page remains useful, but it is no longer the authoritative place to finalize duplicate sets once a group has been resolved in `/duplicates/groups`.
 
-- this page now includes a real operation path
-- the real operation is limited to quarantine moves for approved secondary duplicates
-- it still does not permanently delete files
-- it still does not perform metadata merge/reconciliation
+### 3.1 Pair Review Actions
 
-### 12.1 Planning Eligibility
+The pair workflow supports decisions such as:
 
-The action-planning UI works only from sufficiently settled duplicate groups.
+- keep left
+- keep right
+- keep both
+- not duplicate
+- uncertain
+- ignore
 
-In practice:
+### 3.2 Pair Review Coexistence Guardrails
 
-- confirmed duplicate groups can produce plans
-- unresolved or merely proposed groups do not produce plans
-- ambiguous confirmed groups are blocked into manual review rather than receiving an executable-looking plan
+If a pair-review action touches an already confirmed duplicate group:
 
-### 12.1a Execution Eligibility
+- Tedography still saves the pair review itself
+- but pair review does **not** silently override the confirmed group resolution
+- instead, Tedography marks the affected duplicate group for re-review
+- the pair-review page shows a notice telling you that Duplicate Group Review is now the right place to revisit the conflict
 
-Real execution is only available when the plan is in a safe executable state.
+This prevents low-level pair review from quietly undoing an authoritative group resolution.
 
-In practice, a plan must be:
+## 4. Needs Re-review
 
-- `approved`
-- `eligible_for_future_execution`
-- tied to a currently confirmed duplicate group
-- still aligned with the current canonical asset choice
-- not already successfully executed
+`Needs Re-review` is the key bridge between the two duplicate workflows.
 
-If these conditions are not met, execution is blocked.
+Tedography uses it when:
 
-### 12.2 Plan Filters
+- a previously resolved group is touched by broader candidate connectivity
+- a pair-review action conflicts with an already confirmed group resolution
 
-The page includes filters for:
+When a group is marked `Needs Re-review`:
 
-- `Plan Status`
-  - `all`
-  - `proposed`
-  - `needs_manual_review`
-  - `approved`
-  - `rejected`
-- `Primary Action`
-  - `all`
-  - `PROPOSE_ARCHIVE_SECONDARY`
-  - `NEEDS_MANUAL_REVIEW`
-  - `KEEP_CANONICAL`
-- `Asset ID`
+- the current confirmed result still exists
+- but Tedography is telling you that the group should be revisited in `/duplicates/groups`
 
-Actions:
+Tedography does **not** silently merge the new candidate into the old group result.
 
-- `Apply Filters`
-- `Reset Filters`
-- `Refresh`
+## 5. Library Behavior
 
-### 12.3 Plan Generation / Export / Warning State
+Confirmed duplicate resolution affects the main app Library.
 
-The page includes plan-generation controls:
+### 5.1 Duplicate Visibility
 
-- `Only generate missing plans`
-- `Generate Plans`
-- `Export JSON Manifest`
+In Library:
 
-Behavior:
+- the selected canonical asset is treated as the keeper
+- confirmed non-canonical members are treated as duplicates
 
-- `Generate Plans` derives plans from currently confirmed duplicate groups
-- `Only generate missing plans` avoids regenerating already persisted plan rows
-- `Export JSON Manifest` downloads a dry-run JSON report for the currently filtered plan set
+The duplicate-group workflow now refreshes Library duplicate visibility after:
 
-The page also shows a prominent warning that execution from this screen performs real filesystem moves into quarantine.
+- saving a group resolution
+- reopening a group
 
-### 12.4 Plan Summary / Progress
+The UI also uses optimistic updates so the change can be reflected promptly before a full duplicate-visibility refresh completes.
 
-The page shows summary cards such as:
+### 5.2 Keeper / Duplicate Meaning
 
-- plans
-- proposed
-- needs manual review
-- approved
-- eligible later
+Library badges such as `Keeper` and `Duplicate` are driven by confirmed duplicate-group resolution, not by unresolved candidate relationships alone.
 
-These summarize the currently filtered set of action plans.
+## 6. How Excluded Assets Are Revisited
 
-### 12.5 Plan List Sidebar
+If you exclude assets from a group by marking them `Not In Group`, Tedography does not manually place them into another group for you.
 
-The left sidebar lists filtered plans.
+Instead:
 
-Each row shows:
+1. the current group is saved
+2. provisional candidate groups are re-derived from existing candidate relationships
+3. excluded assets can later appear in other provisional groups if candidate links still connect them elsewhere
 
-- group key
-- plan status
-- primary action type
-- canonical filename or asset id
+If you want Tedography to reconsider regrouping after a series of saves, use:
 
-Selecting a row opens the plan detail panel.
+- `Refresh Groups`
 
-### 12.6 Plan Detail View
+This forces the provisional-group queue to be reloaded from current duplicate-candidate connectivity.
 
-The plan detail view shows:
+## 7. Current Practical Workflow
 
-- group key
-- plan status
-- execution readiness
-- rationale
-- canonical asset
-- secondary assets
-- per-asset action items
-- review note
-- execution history
-- per-item execution result details
+Recommended duplicate workflow in Tedography:
 
-For safe plans, the typical pattern is:
+1. Open `/duplicates/groups`
+2. Work through `Needs Re-review` groups first
+3. Then work through `Unresolved` groups
+4. Use Grid Mode for broad classification
+5. Use Focus Mode and Compare Set for careful visual comparison
+6. Save the authoritative group resolution
+7. Use `/duplicates/review` only for lower-level pair cleanup or edge cases
 
-- canonical asset action: `KEEP_CANONICAL`
-- secondary asset action: `PROPOSE_ARCHIVE_SECONDARY`
+## 8. Current Limitations
 
-For blocked plans, the primary action is:
+Current limitations to keep in mind:
 
-- `NEEDS_MANUAL_REVIEW`
+- historical keeper/duplicate counts are best-effort for older pair-review data
+- excluded assets only regroup if supporting candidate pairs already exist
+- Tedography does not yet provide a large “global duplicate maintenance dashboard”
+- group rereview is supported, but the system still favors explicit user confirmation over automatic regrouping
 
-### 12.7 Plan Review Actions
+## 9. Related Docs
 
-The page supports lightweight review actions:
-
-- `Approve`
-- `Reject`
-- `Mark Needs Manual Review`
-
-Behavior:
-
-- `Approve`
-  - marks the plan as reviewed/approved
-  - is only allowed for plans whose readiness is `eligible_for_future_execution`
-- `Reject`
-  - marks the plan rejected
-- `Mark Needs Manual Review`
-  - explicitly sets the plan status to manual-review state
-
-### 12.7a Plan Execution Actions
-
-The page also supports real execution actions:
-
-- `Execute Quarantine Move`
-- `Retry Failed Items`
-
-Behavior:
-
-- `Execute Quarantine Move`
-  - only enabled for approved plans with execution readiness `eligible_for_future_execution`
-  - shows a confirmation dialog first
-  - performs real filesystem moves for secondary duplicate assets
-  - moves secondaries into a quarantine/staging path instead of deleting them
-- `Retry Failed Items`
-  - only enabled when the most recent execution ended in `failed` or `partially_failed`
-  - retries only the failed or skipped items from that execution
-
-### 12.7b Execution History
-
-For each plan, the page shows execution history entries including:
-
-- execution id
-- execution status
-- succeeded / failed / skipped counts
-- started time
-- completed time
-- per-asset source path
-- per-asset quarantine destination path
-- per-item error details when failures occur
-
-This is intended to make the real operation path auditable and inspectable.
-
-### 12.8 Safety / Explanation Behavior
-
-Plans are intentionally conservative.
-
-Examples of conditions that push a plan into blocked/manual-review behavior:
-
-- missing original archive path on canonical or secondary assets
-- suspicious or incomplete group structure
-- mixed media-type group membership
-
-The UI exposes this through:
-
-- `planStatus`
-- `executionReadiness`
-- human-readable rationale strings
-
-### 12.9 Current Executable Operation
-
-The only real operation currently implemented is:
-
-- move approved secondary duplicate files to quarantine
-
-This is intentionally conservative.
-
-There is currently no:
-
-- permanent deletion
-- archive merge
-- metadata reconciliation
-- automatic restore workflow
-
-## 13. Relationship Between Pair Review, Group Review, Action Planning, And Execution
-
-The intended user flow is:
-
-1. Review pairs in `/duplicates/review`
-2. Mark true duplicates as `Duplicate`
-3. Tedography derives connected duplicate groups from confirmed duplicate pair relationships
-4. Open `/duplicates/groups`
-5. Confirm or override canonical selection
-6. Once a group is confirmed, the main app begins suppressing non-canonical duplicates by default
-7. Open `/duplicates/plans`
-8. Generate planning-only archive actions for confirmed groups
-9. Review, approve, reject, or export those plans
-10. For approved eligible plans, deliberately execute quarantine moves
-11. Review execution history and retry failed items if needed
-
-This keeps duplicate truth, keeper selection, action planning, and real execution as separate stages.
-
-## 14. Current Limitations
-
-As implemented so far:
-
-- pair review and group review are separate flows
-- pair review does not choose a keeper
-- group review works on derived groups, not persisted clusters
-- suppression only applies to confirmed groups
-- bulk pair cleanup is currently limited to `Bulk Ignore Loaded`
-- export is currently JSON only
-- the only real duplicate operation currently implemented is quarantine move
-- there is still no permanent deletion, merge, or archive reconciliation flow
-
-## 15. Short User Summary
-
-If a user asks what duplicate UI currently exists, the short answer is:
-
-- Pair review page to decide whether a pair is duplicate or not
-- Group review page to choose and confirm the keeper
-- Action plans page to generate, approve, export, and execute quarantine plans for confirmed duplicate groups
-- Main app suppression of confirmed non-canonical duplicates
-- Reveal toggle for suppressed duplicates
-- Duplicate badges and duplicate-group links in the main app
+- [`Docs/DUPLICATE_GROUP_UI_SPEC.md`](./DUPLICATE_GROUP_UI_SPEC.md)
+- [`Docs/DUPLICATE_GROUP_UI_IMPLEMENTATION_PLAN.md`](./DUPLICATE_GROUP_UI_IMPLEMENTATION_PLAN.md)

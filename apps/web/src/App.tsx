@@ -6843,7 +6843,7 @@ export default function App() {
           >
             Search
           </button>
-          <Link to="/duplicates/review" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
+          <Link to="/duplicates/groups" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
             Duplicates
           </Link>
           <Link to="/people" style={{ ...compareButtonStyle, textDecoration: 'none' }}>

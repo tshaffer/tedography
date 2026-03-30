@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import type { ImportApiErrorResponse } from '@tedography/domain';
 import type {
+  AcceptProvisionalDuplicateGroupAsFinalResponse,
   DuplicateCandidateClassification,
   DuplicateCandidateOutcomeFilter,
   DuplicateCandidateReviewDecision,
   DuplicateGroupResolutionStatus,
   DuplicateGroupSortMode,
   DuplicateCandidateStatus,
+  ResolveProvisionalDuplicateGroupRequest,
   UpdateDuplicateCandidatePairReviewRequest
 } from '@tedography/shared';
 import {
@@ -16,7 +18,12 @@ import {
   reviewDuplicateCandidatePair
 } from '../services/duplicateCandidatePairService.js';
 import {
+  getProvisionalDuplicateGroup,
   listDerivedDuplicateGroups,
+  listProvisionalDuplicateGroups,
+  acceptProvisionalDuplicateGroupAsFinal,
+  reopenProvisionalDuplicateGroup,
+  resolveProvisionalDuplicateGroup
 } from '../services/duplicateGroupService.js';
 import { log } from '../logger.js';
 
@@ -344,6 +351,224 @@ duplicateCandidatePairRoutes.get('/groups', async (req, res) => {
   } catch (error) {
     log.error('Failed to load duplicate groups', error);
     const errorResponse: ImportApiErrorResponse = { error: 'Failed to load duplicate groups' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.get('/provisional-groups', async (req, res) => {
+  const assetId = parseOptionalString(req.query.assetId);
+  const minScore = parseOptionalNumber(req.query.minScore);
+  const limit = parseOptionalInteger(req.query.limit);
+  const offset = parseOptionalInteger(req.query.offset);
+  const previewOnly = parseOptionalBoolean(req.query.previewOnly);
+
+  if (assetId === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'assetId must be a string' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (minScore === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'minScore must be a number' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (limit === null || offset === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'limit and offset must be integers' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (previewOnly === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'previewOnly must be true or false' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response = await listProvisionalDuplicateGroups({
+      ...(assetId ? { assetId } : {}),
+      ...(minScore !== undefined ? { minScore } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+      ...(offset !== undefined ? { offset } : {}),
+      ...(previewOnly !== undefined ? { previewOnly } : {})
+    });
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to load provisional duplicate groups', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to load provisional duplicate groups' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.get('/provisional-groups/:groupKey', async (req, res) => {
+  const includeHistoricalCounts = parseOptionalBoolean(req.query.includeHistoricalCounts);
+  const minScore = parseOptionalNumber(req.query.minScore);
+  const previewOnly = parseOptionalBoolean(req.query.previewOnly);
+
+  if (includeHistoricalCounts === null) {
+    const errorResponse: ImportApiErrorResponse = {
+      error: 'includeHistoricalCounts must be true or false'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (minScore === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'minScore must be a number' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (previewOnly === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'previewOnly must be true or false' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response = await getProvisionalDuplicateGroup(req.params.groupKey, {
+      includeHistoricalCounts: includeHistoricalCounts ?? false,
+      ...(minScore !== undefined ? { minScore } : {}),
+      ...(previewOnly !== undefined ? { previewOnly } : {})
+    });
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to load provisional duplicate group', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to load provisional duplicate group' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.post('/provisional-groups/:groupKey/accept-current', async (req, res) => {
+  try {
+    const response = await acceptProvisionalDuplicateGroupAsFinal(req.params.groupKey);
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(response satisfies AcceptProvisionalDuplicateGroupAsFinalResponse);
+  } catch (error) {
+    log.error('Failed to accept provisional duplicate group as final', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to accept provisional duplicate group as final' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.post('/provisional-groups/:groupKey/resolve', async (req, res) => {
+  const body = req.body as Partial<ResolveProvisionalDuplicateGroupRequest> | undefined;
+  const keeperAssetId = typeof body?.keeperAssetId === 'string' ? body.keeperAssetId.trim() : '';
+  const rawDuplicateAssetIds = Array.isArray(body?.duplicateAssetIds)
+    ? (body.duplicateAssetIds as unknown[])
+    : null;
+  const rawExcludedAssetIds = Array.isArray(body?.excludedAssetIds)
+    ? (body.excludedAssetIds as unknown[])
+    : null;
+  const allowOverlappingConfirmedGroups =
+    body?.allowOverlappingConfirmedGroups === true;
+  const duplicateAssetIds = rawDuplicateAssetIds?.filter((assetId): assetId is string => typeof assetId === 'string') ?? null;
+  const excludedAssetIds = rawExcludedAssetIds?.filter((assetId): assetId is string => typeof assetId === 'string') ?? null;
+
+  if (!keeperAssetId || duplicateAssetIds === null || excludedAssetIds === null) {
+    const errorResponse: ImportApiErrorResponse = {
+      error: 'keeperAssetId, duplicateAssetIds, and excludedAssetIds are required'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response = await resolveProvisionalDuplicateGroup(req.params.groupKey, {
+      keeperAssetId,
+      duplicateAssetIds,
+      excludedAssetIds,
+      ...(allowOverlappingConfirmedGroups ? { allowOverlappingConfirmedGroups: true } : {})
+    });
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to resolve provisional duplicate group', error);
+    const message = error instanceof Error ? error.message : 'Failed to resolve provisional duplicate group';
+    const errorResponse: ImportApiErrorResponse = { error: message };
+    res.status(400).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.post('/provisional-groups/:groupKey/resolve-larger-as-final', async (req, res) => {
+  const body = req.body as Partial<ResolveProvisionalDuplicateGroupRequest> | undefined;
+  const keeperAssetId = typeof body?.keeperAssetId === 'string' ? body.keeperAssetId.trim() : '';
+  const rawDuplicateAssetIds = Array.isArray(body?.duplicateAssetIds)
+    ? (body.duplicateAssetIds as unknown[])
+    : null;
+  const rawExcludedAssetIds = Array.isArray(body?.excludedAssetIds)
+    ? (body.excludedAssetIds as unknown[])
+    : null;
+  const duplicateAssetIds = rawDuplicateAssetIds?.filter((assetId): assetId is string => typeof assetId === 'string') ?? null;
+  const excludedAssetIds = rawExcludedAssetIds?.filter((assetId): assetId is string => typeof assetId === 'string') ?? null;
+
+  if (!keeperAssetId || duplicateAssetIds === null || excludedAssetIds === null) {
+    const errorResponse: ImportApiErrorResponse = {
+      error: 'keeperAssetId, duplicateAssetIds, and excludedAssetIds are required'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    log.info(
+      `[duplicates] resolve-larger-as-final request group=${req.params.groupKey} keeper=${keeperAssetId} duplicates=${duplicateAssetIds.length} excluded=${excludedAssetIds.length}`
+    );
+    const response = await resolveProvisionalDuplicateGroup(req.params.groupKey, {
+      keeperAssetId,
+      duplicateAssetIds,
+      excludedAssetIds,
+      allowOverlappingConfirmedGroups: true
+    });
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    log.info(
+      `[duplicates] resolve-larger-as-final response group=${req.params.groupKey} resolved=${response.resolvedGroupKey ?? 'none'} noOp=${response.noOp === true ? 'true' : 'false'}`
+    );
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to resolve larger provisional duplicate group as final', error);
+    const message = error instanceof Error ? error.message : 'Failed to resolve larger provisional duplicate group as final';
+    const errorResponse: ImportApiErrorResponse = { error: message };
+    res.status(400).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.post('/provisional-groups/:groupKey/reopen', async (req, res) => {
+  try {
+    const response = await reopenProvisionalDuplicateGroup(req.params.groupKey);
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to reopen provisional duplicate group', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to reopen provisional duplicate group' };
     res.status(500).json(errorResponse);
   }
 });

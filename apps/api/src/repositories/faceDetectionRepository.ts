@@ -230,7 +230,7 @@ export async function updateFaceDetection(input: {
         ignoredReason: input.ignoredReason ?? null
       }
     },
-    { new: true, projection: { _id: 0 }, runValidators: true }
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<FaceDetection | null>();
   return detection ? normalizeFaceDetection(detection) : null;
 }

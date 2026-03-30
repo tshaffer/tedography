@@ -1,13 +1,19 @@
 import type {
+  AcceptProvisionalDuplicateGroupAsFinalResponse,
   DuplicateCandidateClassification,
   DuplicateGroupResolutionStatus,
   DuplicateGroupSortMode,
   DuplicateCandidateOutcomeFilter,
+  GetProvisionalDuplicateGroupResponse,
   DuplicateCandidatePairSummaryResponse,
   DuplicateCandidateStatus,
   GetDuplicateCandidatePairResponse,
   ListDuplicateGroupsResponse,
+  ListProvisionalDuplicateGroupsResponse,
   ListDuplicateCandidatePairsResponse,
+  ReopenProvisionalDuplicateGroupResponse,
+  ResolveProvisionalDuplicateGroupRequest,
+  ResolveProvisionalDuplicateGroupResponse,
   UpdateDuplicateCandidatePairReviewRequest,
   UpdateDuplicateCandidatePairReviewResponse
 } from '@tedography/shared';
@@ -143,6 +149,123 @@ export async function listDuplicateGroups(input?: {
   const search = query.toString();
   return fetchJson<ListDuplicateGroupsResponse>(
     `/api/duplicate-candidate-pairs/groups${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function listProvisionalDuplicateGroups(input?: {
+  assetId?: string;
+  minScore?: number;
+  limit?: number;
+  offset?: number;
+  previewOnly?: boolean;
+}): Promise<ListProvisionalDuplicateGroupsResponse> {
+  const query = new URLSearchParams();
+
+  if (input?.assetId) {
+    query.set('assetId', input.assetId);
+  }
+
+  if (input?.minScore !== undefined) {
+    query.set('minScore', String(input.minScore));
+  }
+
+  if (input?.limit !== undefined) {
+    query.set('limit', String(input.limit));
+  }
+
+  if (input?.offset !== undefined) {
+    query.set('offset', String(input.offset));
+  }
+
+  if (input?.previewOnly) {
+    query.set('previewOnly', 'true');
+  }
+
+  const search = query.toString();
+  return fetchJson<ListProvisionalDuplicateGroupsResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function getProvisionalDuplicateGroup(
+  groupKey: string,
+  options?: {
+    includeHistoricalCounts?: boolean;
+    minScore?: number;
+    previewOnly?: boolean;
+  }
+): Promise<GetProvisionalDuplicateGroupResponse> {
+  const query = new URLSearchParams();
+
+  if (options?.includeHistoricalCounts) {
+    query.set('includeHistoricalCounts', 'true');
+  }
+
+  if (options?.minScore !== undefined) {
+    query.set('minScore', String(options.minScore));
+  }
+
+  if (options?.previewOnly) {
+    query.set('previewOnly', 'true');
+  }
+
+  const search = query.toString();
+  return fetchJson<GetProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function acceptProvisionalDuplicateGroupAsFinal(
+  groupKey: string
+): Promise<AcceptProvisionalDuplicateGroupAsFinalResponse> {
+  return fetchJson<AcceptProvisionalDuplicateGroupAsFinalResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/accept-current`,
+    {
+      method: 'POST'
+    }
+  );
+}
+
+export async function resolveProvisionalDuplicateGroup(
+  groupKey: string,
+  request: ResolveProvisionalDuplicateGroupRequest
+): Promise<ResolveProvisionalDuplicateGroupResponse> {
+  return fetchJson<ResolveProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/resolve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function resolveLargerProvisionalDuplicateGroupAsFinal(
+  groupKey: string,
+  request: ResolveProvisionalDuplicateGroupRequest
+): Promise<ResolveProvisionalDuplicateGroupResponse> {
+  return fetchJson<ResolveProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/resolve-larger-as-final`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(request)
+    }
+  );
+}
+
+export async function reopenProvisionalDuplicateGroup(
+  groupKey: string
+): Promise<ReopenProvisionalDuplicateGroupResponse> {
+  return fetchJson<ReopenProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}/reopen`,
+    {
+      method: 'POST'
+    }
   );
 }
 

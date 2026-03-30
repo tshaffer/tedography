@@ -26,9 +26,15 @@ import {
 import {
   buildDuplicateGroupKey,
   deriveDuplicateGroups,
+  invalidateProvisionalDuplicateGroupCache,
+  listOverlappingConfirmedDuplicateGroupResolutions,
+  markConfirmedDuplicateGroupResolutionsForRereviewInCache,
+  removeConfirmedDuplicateGroupResolutionFromCacheByKey,
+  upsertConfirmedDuplicateGroupResolutionInCache,
   selectProposedCanonicalAsset
 } from './duplicateGroupService.js';
 import { log } from '../logger.js';
+import { markDuplicateGroupResolutionsForRereviewByKeys } from '../repositories/duplicateGroupResolutionRepository.js';
 
 const pairKeySeparator = '__';
 
@@ -233,6 +239,47 @@ function getKeeperAssetIdForDecision(input: {
   return null;
 }
 
+function shouldGuardPairReviewAgainstResolvedGroups(
+  decision: DuplicateCandidateReviewDecision
+): boolean {
+  return (
+    decision === 'confirmed_duplicate' ||
+    decision === 'confirmed_duplicate_keep_both' ||
+    decision === 'confirmed_duplicate_keep_left' ||
+    decision === 'confirmed_duplicate_keep_right' ||
+    decision === 'not_duplicate'
+  );
+}
+
+async function getPairReviewGroupGuardrail(input: {
+  pair: DuplicateCandidatePairDocument;
+  decision: DuplicateCandidateReviewDecision;
+}): Promise<{
+  requiresGroupReview: boolean;
+  affectedGroupKeys: string[];
+  message: string;
+} | null> {
+  if (!shouldGuardPairReviewAgainstResolvedGroups(input.decision)) {
+    return null;
+  }
+
+  const overlappingResolutions = await listOverlappingConfirmedDuplicateGroupResolutions([
+    input.pair.assetIdA,
+    input.pair.assetIdB
+  ]);
+
+  if (overlappingResolutions.length === 0) {
+    return null;
+  }
+
+  return {
+    requiresGroupReview: true,
+    affectedGroupKeys: overlappingResolutions.map((resolution) => resolution.groupKey),
+    message:
+      'This pair touches an already resolved duplicate group. Tedography kept the pair review, but did not let pair review override the group result. Revisit Duplicate Group Review for the affected group.'
+  };
+}
+
 async function syncDuplicateGroupResolutionForReviewDecision(
   pair: DuplicateCandidatePairDocument,
   decision: DuplicateCandidateReviewDecision
@@ -261,7 +308,7 @@ async function syncDuplicateGroupResolutionForReviewDecision(
   const groupKey = buildDuplicateGroupKey(group.assetIds);
   const keeperAssetId = getKeeperAssetIdForDecision({ decision, pair });
   if (keeperAssetId) {
-    await upsertDuplicateGroupResolution({
+    const resolution = await upsertDuplicateGroupResolution({
       groupKey,
       assetIds: group.assetIds,
       proposedCanonicalAssetId: proposedCanonical.canonicalAssetId,
@@ -269,6 +316,7 @@ async function syncDuplicateGroupResolutionForReviewDecision(
         keeperAssetId === proposedCanonical.canonicalAssetId ? null : keeperAssetId,
       resolutionStatus: 'confirmed'
     });
+    upsertConfirmedDuplicateGroupResolutionInCache(resolution);
     return;
   }
 
@@ -282,6 +330,7 @@ async function syncDuplicateGroupResolutionForReviewDecision(
         manualCanonicalAssetId: null,
         resolutionStatus: 'proposed'
       });
+      removeConfirmedDuplicateGroupResolutionFromCacheByKey(groupKey);
     }
   }
 }
@@ -318,10 +367,19 @@ export async function reviewDuplicateCandidatePair(
     return null;
   }
 
-  scheduleDuplicateGroupResolutionSync(pair, decision);
+  const groupReviewGuardrail = await getPairReviewGroupGuardrail({ pair, decision });
+
+  invalidateProvisionalDuplicateGroupCache();
+  if (!groupReviewGuardrail) {
+    scheduleDuplicateGroupResolutionSync(pair, decision);
+  } else {
+    await markDuplicateGroupResolutionsForRereviewByKeys(groupReviewGuardrail.affectedGroupKeys);
+    markConfirmedDuplicateGroupResolutionsForRereviewInCache(groupReviewGuardrail.affectedGroupKeys);
+  }
 
   const assets = await findByIds([pair.assetIdA, pair.assetIdB]);
   return {
-    item: toListItem(pair, buildAssetMap(assets))
+    item: toListItem(pair, buildAssetMap(assets)),
+    ...(groupReviewGuardrail ? { groupReviewGuardrail } : {})
   };
 }

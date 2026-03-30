@@ -29,6 +29,8 @@ export type DuplicateCandidateReviewDecision =
 
 export type DuplicateGroupResolutionStatus = 'proposed' | 'confirmed';
 export type DuplicateGroupSortMode = 'unresolved_first' | 'size_asc' | 'size_desc';
+export type DuplicateProvisionalGroupReviewStatus = 'unresolved' | 'resolved' | 'needs_rereview';
+export type DuplicateProvisionalGroupMemberDecision = 'keeper' | 'duplicate' | 'not_in_group' | 'unclassified';
 
 export interface DuplicateCandidatePairAssetSummary {
   id: string;
@@ -87,6 +89,11 @@ export interface UpdateDuplicateCandidatePairReviewRequest {
 
 export interface UpdateDuplicateCandidatePairReviewResponse {
   item: DuplicateCandidatePairListItem;
+  groupReviewGuardrail?: {
+    requiresGroupReview: boolean;
+    affectedGroupKeys: string[];
+    message: string;
+  };
 }
 
 export interface DuplicateCandidatePairSummaryResponse {
@@ -123,4 +130,79 @@ export interface ListDuplicateGroupsResponse {
   totalGroups: number;
   totalAssets: number;
   summary: DuplicateGroupListSummary;
+}
+
+export interface DuplicateGroupMemberHistoricalCounts {
+  keeperCount: number;
+  duplicateCount: number;
+  notDuplicateCount: number;
+}
+
+export interface ProvisionalDuplicateGroupMember {
+  asset: DuplicateCandidatePairAssetSummary;
+  historicalCounts?: DuplicateGroupMemberHistoricalCounts;
+  currentDecision?: DuplicateProvisionalGroupMemberDecision;
+}
+
+export interface ProvisionalDuplicateGroupRereviewCause {
+  overlappingConfirmedGroups: Array<{
+    groupKey: string;
+    assetCount: number;
+    selectedCanonicalAssetId: string;
+    keeperInCurrentGroup: boolean;
+    insideAssetCount: number;
+    outsideAssetCount: number;
+  }>;
+  externalCandidateLinks: Array<{
+    insideAssetId: string;
+    outsideAssetId: string;
+    outsideAsset?: DuplicateCandidatePairAssetSummary;
+  }>;
+  canAcceptCurrentGroupAsFinal: boolean;
+}
+
+export interface ProvisionalDuplicateGroupListItem {
+  groupKey: string;
+  assetIds: string[];
+  assetCount: number;
+  candidatePairCount: number;
+  reviewStatus: DuplicateProvisionalGroupReviewStatus;
+  selectedCanonicalAssetId?: string | null;
+  resolutionStatus?: DuplicateGroupResolutionStatus | null;
+  rereviewCause?: ProvisionalDuplicateGroupRereviewCause;
+  members: ProvisionalDuplicateGroupMember[];
+}
+
+export interface ListProvisionalDuplicateGroupsResponse {
+  groups: ProvisionalDuplicateGroupListItem[];
+  totalGroups: number;
+  totalAssets: number;
+  summary: Record<DuplicateProvisionalGroupReviewStatus, number>;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export interface GetProvisionalDuplicateGroupResponse {
+  group: ProvisionalDuplicateGroupListItem;
+}
+
+export interface ResolveProvisionalDuplicateGroupRequest {
+  keeperAssetId: string;
+  duplicateAssetIds: string[];
+  excludedAssetIds: string[];
+  allowOverlappingConfirmedGroups?: boolean;
+}
+
+export interface ResolveProvisionalDuplicateGroupResponse {
+  resolvedGroupKey: string | null;
+  noOp?: boolean;
+}
+
+export interface ReopenProvisionalDuplicateGroupResponse {
+  reopenedGroupKey: string;
+}
+
+export interface AcceptProvisionalDuplicateGroupAsFinalResponse {
+  acceptedGroupKey: string;
 }

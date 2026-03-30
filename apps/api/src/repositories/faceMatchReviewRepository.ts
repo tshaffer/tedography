@@ -99,7 +99,7 @@ export async function upsertFaceMatchReview(input: {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: 'after',
       projection: { _id: 0 },
       runValidators: true
     }

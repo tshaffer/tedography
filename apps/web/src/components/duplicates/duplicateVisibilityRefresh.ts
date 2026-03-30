@@ -132,3 +132,38 @@ export function applyOptimisticDuplicateVisibilityUpdate(input: {
   writeDuplicateVisibilityOverrides(overrides);
   requestDuplicateVisibilityRefresh();
 }
+
+export function applyOptimisticDuplicateGroupVisibilityUpdate(input: {
+  groupKey: string;
+  keeperAssetId: string | null;
+  includedAssetIds: string[];
+  clearedAssetIds?: string[];
+}): void {
+  const overrides = readDuplicateVisibilityOverrides();
+  const clearedAssetIds = new Set(input.clearedAssetIds ?? []);
+
+  for (const assetId of input.includedAssetIds) {
+    clearedAssetIds.add(assetId);
+  }
+
+  for (const assetId of clearedAssetIds) {
+    overrides.delete(assetId);
+  }
+
+  if (input.keeperAssetId && input.includedAssetIds.length >= 2) {
+    for (const assetId of input.includedAssetIds) {
+      const role = assetId === input.keeperAssetId ? 'canonical' : 'secondary';
+      overrides.set(assetId, {
+        assetId,
+        groupKey: input.groupKey,
+        selectedCanonicalAssetId: input.keeperAssetId,
+        role,
+        isSuppressedByDefault: role === 'secondary',
+        resolutionStatus: 'confirmed'
+      });
+    }
+  }
+
+  writeDuplicateVisibilityOverrides(overrides);
+  requestDuplicateVisibilityRefresh();
+}

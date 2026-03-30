@@ -605,6 +605,7 @@ export function DuplicateReviewPage(): ReactElement {
   const [queueState, setQueueState] = useState<DuplicateReviewQueueState>({ items: [], currentIndex: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busyPairKey, setBusyPairKey] = useState<string | null>(null);
   const [totalMatching, setTotalMatching] = useState(0);
   const [summary, setSummary] = useState<DuplicateCandidatePairSummaryResponse | null>(null);
@@ -826,6 +827,7 @@ export function DuplicateReviewPage(): ReactElement {
 
     setBusyPairKey(reviewedPairKey);
     setError(null);
+    setNotice(null);
 
     try {
       applyOptimisticDuplicateReviewUpdate({
@@ -842,7 +844,15 @@ export function DuplicateReviewPage(): ReactElement {
         decision
       });
 
-      await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });
+      const response = await updateDuplicateCandidatePairReview(reviewedPairKey, { decision });
+      if (response.groupReviewGuardrail?.requiresGroupReview) {
+        applyOptimisticDuplicateVisibilityUpdate({
+          assetIdA: currentPair.assetIdA,
+          assetIdB: currentPair.assetIdB,
+          decision: 'reviewed_uncertain'
+        });
+        setNotice(response.groupReviewGuardrail.message);
+      }
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Failed to update pair review');
       await loadQueueAndSummary(nextCandidatePairKey);
@@ -1262,6 +1272,9 @@ export function DuplicateReviewPage(): ReactElement {
 
   const loadingSection = loading ? <section style={panelStyle}>Loading duplicate candidate pairs...</section> : null;
   const errorSection = error ? <section style={panelStyle}>Failed to load duplicate review queue: {error}</section> : null;
+  const noticeSection = notice ? (
+    <section style={{ ...panelStyle, backgroundColor: '#fef3c7', color: '#92400e' }}>{notice}</section>
+  ) : null;
   const emptySection = !loading && !error && !currentPair ? (
     <section style={panelStyle}>
       <h2 style={{ marginTop: 0 }}>No pairs match the current filter</h2>
@@ -1315,6 +1328,7 @@ export function DuplicateReviewPage(): ReactElement {
               {summaryCards.length > 0 ? <div style={summaryGridStyle}>{summaryCards}</div> : null}
               {loadingSection}
               {errorSection}
+              {noticeSection}
               {emptySection}
             </div>
           </div>
@@ -1327,6 +1341,9 @@ export function DuplicateReviewPage(): ReactElement {
     <div style={pageStyle}>
       {!loading && !error && currentPair ? renderPairDisplayHero() : null}
       <div style={{ ...headerActionsStyle, marginBottom: '18px' }}>
+        <Link to="/duplicates/groups" style={linkStyle}>
+          Group Review
+        </Link>
         <Link to="/" style={linkStyle}>
           Back to Library
         </Link>
@@ -1338,6 +1355,7 @@ export function DuplicateReviewPage(): ReactElement {
       {summaryCards.length > 0 ? <div style={summaryGridStyle}>{summaryCards}</div> : null}
       {loadingSection}
       {errorSection}
+      {noticeSection}
       {emptySection}
     </div>
   );

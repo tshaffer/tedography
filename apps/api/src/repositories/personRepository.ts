@@ -97,7 +97,7 @@ export async function updatePerson(input: {
   const person = await PersonModel.findOneAndUpdate(
     { id: input.id },
     { $set: update },
-    { new: true, projection: { _id: 0 }, runValidators: true }
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<Person | null>();
   return person ? normalizePerson(person) : null;
 }

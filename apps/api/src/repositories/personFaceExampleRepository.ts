@@ -102,7 +102,7 @@ export async function markPersonFaceExampleRemoved(id: string): Promise<PersonFa
   const item = await PersonFaceExampleModel.findOneAndUpdate(
     { id },
     { $set: { status: 'removed', removedAt } },
-    { new: true, projection: { _id: 0 }, runValidators: true }
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<PersonFaceExample | null>();
   return item ? normalizePersonFaceExample(item) : null;
 }
