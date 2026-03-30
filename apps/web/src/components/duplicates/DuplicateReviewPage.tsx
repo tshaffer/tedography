@@ -1327,6 +1327,9 @@ export function DuplicateReviewPage(): ReactElement {
     <div style={pageStyle}>
       {!loading && !error && currentPair ? renderPairDisplayHero() : null}
       <div style={{ ...headerActionsStyle, marginBottom: '18px' }}>
+        <Link to="/duplicates/groups" style={linkStyle}>
+          Group Review
+        </Link>
         <Link to="/" style={linkStyle}>
           Back to Library
         </Link>

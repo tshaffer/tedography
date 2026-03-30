@@ -339,3 +339,43 @@ export async function listProvisionalDuplicateCandidatePairs(
     .sort({ score: -1, updatedAt: -1, assetIdA: 1, assetIdB: 1 })
     .lean<DuplicateCandidatePairDocument[]>();
 }
+
+export async function listReviewedDuplicateCandidatePairsForAssets(
+  assetIds: string[]
+): Promise<DuplicateCandidatePairDocument[]> {
+  if (assetIds.length === 0) {
+    return [];
+  }
+
+  return DuplicateCandidatePairModel.find(
+    {
+      status: 'reviewed',
+      outcome: { $in: ['confirmed_duplicate', 'not_duplicate'] },
+      $or: [{ assetIdA: { $in: assetIds } }, { assetIdB: { $in: assetIds } }]
+    },
+    { _id: 0 }
+  )
+    .sort({ updatedAt: -1, assetIdA: 1, assetIdB: 1 })
+    .lean<DuplicateCandidatePairDocument[]>();
+}
+
+export async function listProvisionalDuplicateCandidatePairsForAssetIds(
+  assetIds: string[]
+): Promise<DuplicateCandidatePairDocument[]> {
+  if (assetIds.length === 0) {
+    return [];
+  }
+
+  return DuplicateCandidatePairModel.find(
+    {
+      classification: { $in: ['very_likely_duplicate', 'possible_duplicate'] },
+      status: { $ne: 'ignored' },
+      outcome: { $ne: 'not_duplicate' },
+      assetIdA: { $in: assetIds },
+      assetIdB: { $in: assetIds }
+    },
+    { _id: 0 }
+  )
+    .sort({ score: -1, updatedAt: -1, assetIdA: 1, assetIdB: 1 })
+    .lean<DuplicateCandidatePairDocument[]>();
+}

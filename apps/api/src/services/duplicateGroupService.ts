@@ -16,6 +16,8 @@ import {
 } from '../repositories/duplicateGroupResolutionRepository.js';
 import {
   listConfirmedDuplicatePairs,
+  listReviewedDuplicateCandidatePairsForAssets,
+  listProvisionalDuplicateCandidatePairsForAssetIds,
   listProvisionalDuplicateCandidatePairs
 } from '../repositories/duplicateCandidatePairRepository.js';
 
@@ -330,6 +332,81 @@ function toProvisionalGroupMemberAssetSummary(asset: MediaAsset) {
   };
 }
 
+function buildResolvedCanonicalAssetIdByAssetId(
+  resolutions: Awaited<ReturnType<typeof listDuplicateGroupResolutions>>
+): Map<string, string> {
+  const map = new Map<string, string>();
+
+  for (const resolution of resolutions) {
+    const selectedCanonicalAssetId = resolveSelectedCanonicalAssetId({
+      assetIds: resolution.assetIds,
+      proposedCanonicalAssetId: resolution.proposedCanonicalAssetId,
+      ...(resolution.manualCanonicalAssetId !== undefined
+        ? { manualCanonicalAssetId: resolution.manualCanonicalAssetId }
+        : {})
+    });
+
+    for (const assetId of resolution.assetIds) {
+      map.set(assetId, selectedCanonicalAssetId);
+    }
+  }
+
+  return map;
+}
+
+async function buildHistoricalCountsByAssetId(
+  assetIds: string[],
+  confirmedResolutions: Awaited<ReturnType<typeof listDuplicateGroupResolutions>>
+): Promise<
+  Map<
+    string,
+    {
+      keeperCount: number;
+      duplicateCount: number;
+      notDuplicateCount: number;
+    }
+  >
+> {
+  const countsByAssetId = new Map(
+    assetIds.map((assetId) => [
+      assetId,
+      {
+        keeperCount: 0,
+        duplicateCount: 0,
+        notDuplicateCount: 0
+      }
+    ])
+  );
+  const resolvedCanonicalAssetIdByAssetId = buildResolvedCanonicalAssetIdByAssetId(confirmedResolutions);
+  const reviewedPairs = await listReviewedDuplicateCandidatePairsForAssets(assetIds);
+
+  for (const pair of reviewedPairs) {
+    const involvedAssetIds = [pair.assetIdA, pair.assetIdB].filter((assetId) => countsByAssetId.has(assetId));
+
+    if ((pair.outcome ?? null) === 'not_duplicate') {
+      for (const assetId of involvedAssetIds) {
+        countsByAssetId.get(assetId)!.notDuplicateCount += 1;
+      }
+      continue;
+    }
+
+    if ((pair.outcome ?? null) !== 'confirmed_duplicate') {
+      continue;
+    }
+
+    for (const assetId of involvedAssetIds) {
+      const selectedCanonicalAssetId = resolvedCanonicalAssetIdByAssetId.get(assetId);
+      if (selectedCanonicalAssetId && selectedCanonicalAssetId === assetId) {
+        countsByAssetId.get(assetId)!.keeperCount += 1;
+      } else {
+        countsByAssetId.get(assetId)!.duplicateCount += 1;
+      }
+    }
+  }
+
+  return countsByAssetId;
+}
+
 async function buildDuplicateGroupListItem(group: DerivedDuplicateGroup): Promise<DuplicateGroupListItem> {
   const assets = await findByIds(group.assetIds);
   const sortedAssets = [...assets].sort((left, right) => group.assetIds.indexOf(left.id) - group.assetIds.indexOf(right.id));
@@ -399,7 +476,10 @@ async function buildProvisionalDuplicateGroupListItem(
   group: DerivedDuplicateGroup,
   confirmedResolutions: Awaited<ReturnType<typeof listDuplicateGroupResolutions>>
 ): Promise<ProvisionalDuplicateGroupListItem> {
-  const assets = await findByIds(group.assetIds);
+  const [assets, historicalCountsByAssetId] = await Promise.all([
+    findByIds(group.assetIds),
+    buildHistoricalCountsByAssetId(group.assetIds, confirmedResolutions)
+  ]);
 
   const exactGroupKey = buildDuplicateGroupKey(group.assetIds);
   const exactResolution =
@@ -462,12 +542,54 @@ async function buildProvisionalDuplicateGroupListItem(
         }
       }
 
+      const historicalCounts = historicalCountsByAssetId.get(asset.id);
+      if (historicalCounts) {
+        return {
+          asset: toProvisionalGroupMemberAssetSummary(asset),
+          historicalCounts,
+          currentDecision
+        };
+      }
+
       return {
         asset: toProvisionalGroupMemberAssetSummary(asset),
         currentDecision
       };
     })
   };
+}
+
+function buildLightweightProvisionalDuplicateGroupListItem(
+  group: DerivedDuplicateGroup,
+  confirmedResolutions: Awaited<ReturnType<typeof listDuplicateGroupResolutions>>
+): ProvisionalDuplicateGroupListItem {
+  const exactGroupKey = buildDuplicateGroupKey(group.assetIds);
+  const exactResolution =
+    confirmedResolutions.find((resolution) => resolution.groupKey === exactGroupKey) ?? null;
+  const overlappingConfirmedResolutionCount = confirmedResolutions.filter(
+    (resolution) =>
+      resolution.groupKey !== exactGroupKey &&
+      resolution.assetIds.some((assetId) => group.assetIds.includes(assetId))
+  ).length;
+
+  return {
+    groupKey: exactGroupKey,
+    assetIds: group.assetIds,
+    assetCount: group.assetIds.length,
+    candidatePairCount: group.pairKeys.length,
+    reviewStatus: determineProvisionalGroupReviewStatus({
+      assetIds: group.assetIds,
+      exactResolutionStatus: exactResolution?.resolutionStatus ?? null,
+      overlappingConfirmedResolutionCount
+    }),
+    selectedCanonicalAssetId: exactResolution?.manualCanonicalAssetId ?? exactResolution?.proposedCanonicalAssetId ?? null,
+    resolutionStatus: exactResolution?.resolutionStatus ?? null,
+    members: []
+  };
+}
+
+function parseProvisionalGroupKey(groupKey: string): string[] {
+  return [...new Set(groupKey.split('__').map((assetId) => assetId.trim()).filter(Boolean))].sort(compareAssetIds);
 }
 
 export function filterDuplicateGroupListItems(
@@ -576,8 +698,8 @@ export async function listProvisionalDuplicateGroups(
 ): Promise<ListProvisionalDuplicateGroupsResponse> {
   const groups = await loadProvisionalGroups(options);
   const confirmedResolutions = await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' });
-  const builtGroups = await Promise.all(
-    groups.map((group) => buildProvisionalDuplicateGroupListItem(group, confirmedResolutions))
+  const builtGroups = groups.map((group) =>
+    buildLightweightProvisionalDuplicateGroupListItem(group, confirmedResolutions)
   );
   const assetIds = Array.from(
     new Set(builtGroups.flatMap((group: ProvisionalDuplicateGroupListItem) => group.assetIds))
@@ -593,16 +715,22 @@ export async function listProvisionalDuplicateGroups(
 export async function getProvisionalDuplicateGroup(
   groupKey: string
 ): Promise<GetProvisionalDuplicateGroupResponse | null> {
-  const groups = await loadProvisionalGroups();
-  const group = groups.find((candidate) => buildDuplicateGroupKey(candidate.assetIds) === groupKey);
-  if (!group) {
+  const assetIds = parseProvisionalGroupKey(groupKey);
+  if (assetIds.length === 0) {
     return null;
   }
 
+  const confirmedResolutions = await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' });
+  const candidatePairs = await listProvisionalDuplicateCandidatePairsForAssetIds(assetIds);
+  const pairKeys = candidatePairs.map((pair) => [pair.assetIdA, pair.assetIdB].sort(compareAssetIds).join('__'));
+
   return {
     group: await buildProvisionalDuplicateGroupListItem(
-      group,
-      await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' })
+      {
+        assetIds,
+        pairKeys
+      },
+      confirmedResolutions
     )
   };
 }
