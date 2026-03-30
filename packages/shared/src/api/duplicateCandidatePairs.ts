@@ -29,6 +29,8 @@ export type DuplicateCandidateReviewDecision =
 
 export type DuplicateGroupResolutionStatus = 'proposed' | 'confirmed';
 export type DuplicateGroupSortMode = 'unresolved_first' | 'size_asc' | 'size_desc';
+export type DuplicateProvisionalGroupReviewStatus = 'unresolved' | 'resolved' | 'needs_rereview';
+export type DuplicateProvisionalGroupMemberDecision = 'keeper' | 'duplicate' | 'not_in_group' | 'unclassified';
 
 export interface DuplicateCandidatePairAssetSummary {
   id: string;
@@ -123,4 +125,37 @@ export interface ListDuplicateGroupsResponse {
   totalGroups: number;
   totalAssets: number;
   summary: DuplicateGroupListSummary;
+}
+
+export interface DuplicateGroupMemberHistoricalCounts {
+  keeperCount: number;
+  duplicateCount: number;
+  notDuplicateCount: number;
+}
+
+export interface ProvisionalDuplicateGroupMember {
+  asset: DuplicateCandidatePairAssetSummary;
+  historicalCounts?: DuplicateGroupMemberHistoricalCounts;
+  currentDecision?: DuplicateProvisionalGroupMemberDecision;
+}
+
+export interface ProvisionalDuplicateGroupListItem {
+  groupKey: string;
+  assetIds: string[];
+  assetCount: number;
+  candidatePairCount: number;
+  reviewStatus: DuplicateProvisionalGroupReviewStatus;
+  selectedCanonicalAssetId?: string | null;
+  resolutionStatus?: DuplicateGroupResolutionStatus | null;
+  members: ProvisionalDuplicateGroupMember[];
+}
+
+export interface ListProvisionalDuplicateGroupsResponse {
+  groups: ProvisionalDuplicateGroupListItem[];
+  totalGroups: number;
+  totalAssets: number;
+}
+
+export interface GetProvisionalDuplicateGroupResponse {
+  group: ProvisionalDuplicateGroupListItem;
 }

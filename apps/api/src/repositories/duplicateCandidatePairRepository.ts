@@ -55,6 +55,11 @@ export interface DuplicateCandidatePairSummaryInput {
   minScore?: number;
 }
 
+export interface ListProvisionalDuplicateCandidatePairsInput {
+  assetId?: string;
+  minScore?: number;
+}
+
 export function buildDuplicateCandidatePairFilter(
   input: Omit<ListDuplicateCandidatePairsInput, 'limit' | 'offset'>
 ): Record<string, unknown> {
@@ -310,5 +315,27 @@ export async function listConfirmedDuplicatePairs(
 
   return DuplicateCandidatePairModel.find(filter, { _id: 0 })
     .sort({ score: -1, assetIdA: 1, assetIdB: 1 })
+    .lean<DuplicateCandidatePairDocument[]>();
+}
+
+export async function listProvisionalDuplicateCandidatePairs(
+  input: ListProvisionalDuplicateCandidatePairsInput = {}
+): Promise<DuplicateCandidatePairDocument[]> {
+  const filter: Record<string, unknown> = {
+    classification: { $in: ['very_likely_duplicate', 'possible_duplicate'] },
+    status: { $ne: 'ignored' },
+    outcome: { $ne: 'not_duplicate' }
+  };
+
+  if (input.assetId) {
+    filter.$or = [{ assetIdA: input.assetId }, { assetIdB: input.assetId }];
+  }
+
+  if (typeof input.minScore === 'number') {
+    filter.score = { $gte: input.minScore };
+  }
+
+  return DuplicateCandidatePairModel.find(filter, { _id: 0 })
+    .sort({ score: -1, updatedAt: -1, assetIdA: 1, assetIdB: 1 })
     .lean<DuplicateCandidatePairDocument[]>();
 }

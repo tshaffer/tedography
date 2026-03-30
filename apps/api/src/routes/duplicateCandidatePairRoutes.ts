@@ -16,7 +16,9 @@ import {
   reviewDuplicateCandidatePair
 } from '../services/duplicateCandidatePairService.js';
 import {
+  getProvisionalDuplicateGroup,
   listDerivedDuplicateGroups,
+  listProvisionalDuplicateGroups
 } from '../services/duplicateGroupService.js';
 import { log } from '../logger.js';
 
@@ -344,6 +346,52 @@ duplicateCandidatePairRoutes.get('/groups', async (req, res) => {
   } catch (error) {
     log.error('Failed to load duplicate groups', error);
     const errorResponse: ImportApiErrorResponse = { error: 'Failed to load duplicate groups' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.get('/provisional-groups', async (req, res) => {
+  const assetId = parseOptionalString(req.query.assetId);
+  const minScore = parseOptionalNumber(req.query.minScore);
+
+  if (assetId === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'assetId must be a string' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (minScore === null) {
+    const errorResponse: ImportApiErrorResponse = { error: 'minScore must be a number' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const response = await listProvisionalDuplicateGroups({
+      ...(assetId ? { assetId } : {}),
+      ...(minScore !== undefined ? { minScore } : {})
+    });
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to load provisional duplicate groups', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to load provisional duplicate groups' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+duplicateCandidatePairRoutes.get('/provisional-groups/:groupKey', async (req, res) => {
+  try {
+    const response = await getProvisionalDuplicateGroup(req.params.groupKey);
+    if (!response) {
+      const errorResponse: ImportApiErrorResponse = { error: 'Provisional duplicate group not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(response);
+  } catch (error) {
+    log.error('Failed to load provisional duplicate group', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to load provisional duplicate group' };
     res.status(500).json(errorResponse);
   }
 });

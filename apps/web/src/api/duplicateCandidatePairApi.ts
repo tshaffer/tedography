@@ -3,10 +3,12 @@ import type {
   DuplicateGroupResolutionStatus,
   DuplicateGroupSortMode,
   DuplicateCandidateOutcomeFilter,
+  GetProvisionalDuplicateGroupResponse,
   DuplicateCandidatePairSummaryResponse,
   DuplicateCandidateStatus,
   GetDuplicateCandidatePairResponse,
   ListDuplicateGroupsResponse,
+  ListProvisionalDuplicateGroupsResponse,
   ListDuplicateCandidatePairsResponse,
   UpdateDuplicateCandidatePairReviewRequest,
   UpdateDuplicateCandidatePairReviewResponse
@@ -143,6 +145,34 @@ export async function listDuplicateGroups(input?: {
   const search = query.toString();
   return fetchJson<ListDuplicateGroupsResponse>(
     `/api/duplicate-candidate-pairs/groups${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function listProvisionalDuplicateGroups(input?: {
+  assetId?: string;
+  minScore?: number;
+}): Promise<ListProvisionalDuplicateGroupsResponse> {
+  const query = new URLSearchParams();
+
+  if (input?.assetId) {
+    query.set('assetId', input.assetId);
+  }
+
+  if (input?.minScore !== undefined) {
+    query.set('minScore', String(input.minScore));
+  }
+
+  const search = query.toString();
+  return fetchJson<ListProvisionalDuplicateGroupsResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups${search.length > 0 ? `?${search}` : ''}`
+  );
+}
+
+export async function getProvisionalDuplicateGroup(
+  groupKey: string
+): Promise<GetProvisionalDuplicateGroupResponse> {
+  return fetchJson<GetProvisionalDuplicateGroupResponse>(
+    `/api/duplicate-candidate-pairs/provisional-groups/${encodeURIComponent(groupKey)}`
   );
 }
 

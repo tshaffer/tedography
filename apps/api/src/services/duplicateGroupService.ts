@@ -2,14 +2,22 @@ import { PhotoState, type MediaAsset } from '@tedography/domain';
 import type {
   DuplicateGroupListItem,
   DuplicateGroupListSummary,
-  ListDuplicateGroupsResponse
+  DuplicateProvisionalGroupReviewStatus,
+  ProvisionalDuplicateGroupListItem,
+  GetProvisionalDuplicateGroupResponse,
+  ListDuplicateGroupsResponse,
+  ListProvisionalDuplicateGroupsResponse
 } from '@tedography/shared';
 import { findByIds } from '../repositories/assetRepository.js';
 import {
   findDuplicateGroupResolutionByKey,
+  listDuplicateGroupResolutions,
   upsertDuplicateGroupResolution
 } from '../repositories/duplicateGroupResolutionRepository.js';
-import { listConfirmedDuplicatePairs } from '../repositories/duplicateCandidatePairRepository.js';
+import {
+  listConfirmedDuplicatePairs,
+  listProvisionalDuplicateCandidatePairs
+} from '../repositories/duplicateCandidatePairRepository.js';
 
 interface DerivedDuplicateGroup {
   assetIds: string[];
@@ -23,6 +31,11 @@ export interface ListDerivedDuplicateGroupsOptions {
   minAssetCount?: number;
   readyToConfirmOnly?: boolean;
   sort?: 'unresolved_first' | 'size_asc' | 'size_desc';
+}
+
+export interface ListProvisionalDuplicateGroupsOptions {
+  assetId?: string;
+  minScore?: number;
 }
 
 interface CanonicalCandidateScore {
@@ -299,6 +312,24 @@ function toAssetSummary(asset: MediaAsset) {
   };
 }
 
+function toProvisionalGroupMemberAssetSummary(asset: MediaAsset) {
+  return {
+    id: asset.id,
+    filename: asset.filename,
+    mediaType: asset.mediaType,
+    originalArchivePath: asset.originalArchivePath ?? asset.archivePath ?? null,
+    ...(asset.captureDateTime !== undefined ? { captureDateTime: asset.captureDateTime } : {}),
+    ...(asset.width !== undefined ? { width: asset.width } : {}),
+    ...(asset.height !== undefined ? { height: asset.height } : {}),
+    ...(asset.photoState !== undefined ? { photoState: asset.photoState } : {}),
+    ...(asset.originalFileFormat ? { originalFileFormat: asset.originalFileFormat } : {}),
+    ...(asset.originalFileSizeBytes !== undefined
+      ? { originalFileSizeBytes: asset.originalFileSizeBytes }
+      : {}),
+    ...(asset.displayStorageType ? { displayStorageType: asset.displayStorageType } : {})
+  };
+}
+
 async function buildDuplicateGroupListItem(group: DerivedDuplicateGroup): Promise<DuplicateGroupListItem> {
   const assets = await findByIds(group.assetIds);
   const sortedAssets = [...assets].sort((left, right) => group.assetIds.indexOf(left.id) - group.assetIds.indexOf(right.id));
@@ -336,6 +367,107 @@ async function buildDuplicateGroupListItem(group: DerivedDuplicateGroup): Promis
 async function loadDerivedGroups(assetId?: string): Promise<DerivedDuplicateGroup[]> {
   const confirmedPairs = await listConfirmedDuplicatePairs(assetId);
   return deriveDuplicateGroups(confirmedPairs);
+}
+
+async function loadProvisionalGroups(
+  options: ListProvisionalDuplicateGroupsOptions = {}
+): Promise<DerivedDuplicateGroup[]> {
+  const candidatePairs = await listProvisionalDuplicateCandidatePairs({
+    ...(options.assetId ? { assetId: options.assetId } : {}),
+    ...(typeof options.minScore === 'number' ? { minScore: options.minScore } : {})
+  });
+  return deriveDuplicateGroups(candidatePairs);
+}
+
+function determineProvisionalGroupReviewStatus(input: {
+  assetIds: string[];
+  exactResolutionStatus?: 'proposed' | 'confirmed' | null;
+  overlappingConfirmedResolutionCount: number;
+}): DuplicateProvisionalGroupReviewStatus {
+  if (input.exactResolutionStatus === 'confirmed') {
+    return 'resolved';
+  }
+
+  if (input.overlappingConfirmedResolutionCount > 0) {
+    return 'needs_rereview';
+  }
+
+  return 'unresolved';
+}
+
+async function buildProvisionalDuplicateGroupListItem(
+  group: DerivedDuplicateGroup,
+  confirmedResolutions: Awaited<ReturnType<typeof listDuplicateGroupResolutions>>
+): Promise<ProvisionalDuplicateGroupListItem> {
+  const assets = await findByIds(group.assetIds);
+
+  const exactGroupKey = buildDuplicateGroupKey(group.assetIds);
+  const exactResolution =
+    confirmedResolutions.find((resolution) => resolution.groupKey === exactGroupKey) ?? null;
+  const overlappingConfirmedResolutions = confirmedResolutions.filter(
+    (resolution) =>
+      resolution.groupKey !== exactGroupKey &&
+      resolution.assetIds.some((assetId) => group.assetIds.includes(assetId))
+  );
+  const proposedCanonical = selectProposedCanonicalAsset(assets);
+  const selectedCanonicalAssetId = exactResolution
+    ? resolveSelectedCanonicalAssetId({
+        assetIds: group.assetIds,
+        proposedCanonicalAssetId: proposedCanonical.canonicalAssetId,
+        ...(exactResolution.manualCanonicalAssetId !== undefined
+          ? { manualCanonicalAssetId: exactResolution.manualCanonicalAssetId }
+          : {})
+      })
+    : null;
+  const reviewStatus = determineProvisionalGroupReviewStatus({
+    assetIds: group.assetIds,
+    exactResolutionStatus: exactResolution?.resolutionStatus ?? null,
+    overlappingConfirmedResolutionCount: overlappingConfirmedResolutions.length
+  });
+
+  const overlappingResolutionByAssetId = new Map<string, { selectedCanonicalAssetId: string }>();
+  for (const resolution of overlappingConfirmedResolutions) {
+    const resolvedCanonicalAssetId = resolveSelectedCanonicalAssetId({
+      assetIds: resolution.assetIds,
+      proposedCanonicalAssetId: resolution.proposedCanonicalAssetId,
+      ...(resolution.manualCanonicalAssetId !== undefined
+        ? { manualCanonicalAssetId: resolution.manualCanonicalAssetId }
+        : {})
+    });
+
+    for (const assetId of resolution.assetIds) {
+      overlappingResolutionByAssetId.set(assetId, {
+        selectedCanonicalAssetId: resolvedCanonicalAssetId
+      });
+    }
+  }
+
+  return {
+    groupKey: exactGroupKey,
+    assetIds: group.assetIds,
+    assetCount: group.assetIds.length,
+    candidatePairCount: group.pairKeys.length,
+    reviewStatus,
+    selectedCanonicalAssetId,
+    resolutionStatus: exactResolution?.resolutionStatus ?? null,
+    members: assets.map((asset) => {
+      let currentDecision: 'keeper' | 'duplicate' | 'unclassified' = 'unclassified';
+      if (selectedCanonicalAssetId) {
+        currentDecision = asset.id === selectedCanonicalAssetId ? 'keeper' : 'duplicate';
+      } else {
+        const overlappingResolution = overlappingResolutionByAssetId.get(asset.id);
+        if (overlappingResolution) {
+          currentDecision =
+            asset.id === overlappingResolution.selectedCanonicalAssetId ? 'keeper' : 'duplicate';
+        }
+      }
+
+      return {
+        asset: toProvisionalGroupMemberAssetSummary(asset),
+        currentDecision
+      };
+    })
+  };
 }
 
 export function filterDuplicateGroupListItems(
@@ -436,6 +568,42 @@ export async function listDerivedDuplicateGroups(
     totalGroups: groups.length,
     totalAssets: assetIds.length,
     summary: summarizeDuplicateGroups(groups)
+  };
+}
+
+export async function listProvisionalDuplicateGroups(
+  options: ListProvisionalDuplicateGroupsOptions = {}
+): Promise<ListProvisionalDuplicateGroupsResponse> {
+  const groups = await loadProvisionalGroups(options);
+  const confirmedResolutions = await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' });
+  const builtGroups = await Promise.all(
+    groups.map((group) => buildProvisionalDuplicateGroupListItem(group, confirmedResolutions))
+  );
+  const assetIds = Array.from(
+    new Set(builtGroups.flatMap((group: ProvisionalDuplicateGroupListItem) => group.assetIds))
+  );
+
+  return {
+    groups: builtGroups,
+    totalGroups: builtGroups.length,
+    totalAssets: assetIds.length
+  };
+}
+
+export async function getProvisionalDuplicateGroup(
+  groupKey: string
+): Promise<GetProvisionalDuplicateGroupResponse | null> {
+  const groups = await loadProvisionalGroups();
+  const group = groups.find((candidate) => buildDuplicateGroupKey(candidate.assetIds) === groupKey);
+  if (!group) {
+    return null;
+  }
+
+  return {
+    group: await buildProvisionalDuplicateGroupListItem(
+      group,
+      await listDuplicateGroupResolutions({ resolutionStatus: 'confirmed' })
+    )
   };
 }
 

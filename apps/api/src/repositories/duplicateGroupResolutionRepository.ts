@@ -46,3 +46,11 @@ export async function upsertDuplicateGroupResolution(input: {
 
   return resolution;
 }
+
+export async function listDuplicateGroupResolutions(input?: {
+  resolutionStatus?: DuplicateGroupResolutionDocument['resolutionStatus'];
+}): Promise<DuplicateGroupResolutionDocument[]> {
+  const filter = input?.resolutionStatus ? { resolutionStatus: input.resolutionStatus } : {};
+  return DuplicateGroupResolutionModel.find(filter, { _id: 0 })
+    .lean<DuplicateGroupResolutionDocument[]>();
+}
