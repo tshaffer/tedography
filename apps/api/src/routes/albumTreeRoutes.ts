@@ -6,6 +6,7 @@ import {
   removeAssetsFromAlbum
 } from '../repositories/assetRepository.js';
 import {
+  AlbumTreeSiblingLabelConflictError,
   countChildren,
   createAlbumTreeNode,
   deleteAlbumTreeNode,
@@ -156,7 +157,13 @@ albumTreeRoutes.post('/', async (req, res) => {
   try {
     const created = await createAlbumTreeNode({ label, nodeType, parentId });
     res.status(201).json(created);
-  } catch {
+  } catch (error) {
+    if (error instanceof AlbumTreeSiblingLabelConflictError) {
+      const errorResponse: AlbumTreeErrorResponse = { error: error.message };
+      res.status(409).json(errorResponse);
+      return;
+    }
+
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to create album tree node' };
     res.status(500).json(errorResponse);
   }
@@ -179,7 +186,13 @@ albumTreeRoutes.patch('/:id', async (req, res) => {
     }
 
     res.json(updated);
-  } catch {
+  } catch (error) {
+    if (error instanceof AlbumTreeSiblingLabelConflictError) {
+      const errorResponse: AlbumTreeErrorResponse = { error: error.message };
+      res.status(409).json(errorResponse);
+      return;
+    }
+
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to rename node' };
     res.status(500).json(errorResponse);
   }
@@ -240,7 +253,13 @@ albumTreeRoutes.post('/:id/move', async (req, res) => {
     }
 
     res.json(moved);
-  } catch {
+  } catch (error) {
+    if (error instanceof AlbumTreeSiblingLabelConflictError) {
+      const errorResponse: AlbumTreeErrorResponse = { error: error.message };
+      res.status(409).json(errorResponse);
+      return;
+    }
+
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to move node' };
     res.status(500).json(errorResponse);
   }

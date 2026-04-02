@@ -5780,22 +5780,26 @@ export default function App() {
       return;
     }
 
-    const moved = await moveAlbumTreeNode(moveDialogNode.id, { parentId: destinationParentId });
-    const ancestorGroupIds = getAncestorGroupIdsForParentId(destinationParentId, albumNodesById);
+    try {
+      const moved = await moveAlbumTreeNode(moveDialogNode.id, { parentId: destinationParentId });
+      const ancestorGroupIds = getAncestorGroupIdsForParentId(destinationParentId, albumNodesById);
 
-    if (ancestorGroupIds.length > 0) {
-      setExpandedGroupIds((previous) => {
-        const merged = new Set(previous);
-        for (const groupId of ancestorGroupIds) {
-          merged.add(groupId);
-        }
-        return Array.from(merged);
-      });
+      if (ancestorGroupIds.length > 0) {
+        setExpandedGroupIds((previous) => {
+          const merged = new Set(previous);
+          for (const groupId of ancestorGroupIds) {
+            merged.add(groupId);
+          }
+          return Array.from(merged);
+        });
+      }
+
+      setSelectedTreeNodeId(moved.id);
+      setMoveDialogNodeId(null);
+      await loadAlbumTreeNodes({ showLoading: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to move node');
     }
-
-    setSelectedTreeNodeId(moved.id);
-    setMoveDialogNodeId(null);
-    await loadAlbumTreeNodes({ showLoading: false });
   }
 
   async function handleRenameSelectedTreeNode(): Promise<void> {

@@ -11,6 +11,17 @@ export interface CreateAlbumTreeNodeInput {
 export type AlbumTreeNodeReorderDirection = 'up' | 'down';
 const normalizedSortOrderStep = 10;
 
+export class AlbumTreeSiblingLabelConflictError extends Error {
+  constructor(label: string) {
+    super(`A sibling node named "${label}" already exists.`);
+    this.name = 'AlbumTreeSiblingLabelConflictError';
+  }
+}
+
+function normalizeAlbumTreeLabel(label: string): string {
+  return label.trim().toLocaleLowerCase();
+}
+
 function compareAlbumTreeNodeNames(left: AlbumTreeNode, right: AlbumTreeNode): number {
   const labelComparison = left.label.localeCompare(right.label, undefined, {
     numeric: true,
@@ -106,6 +117,25 @@ async function listSiblingNodes(parentId: string | null): Promise<AlbumTreeNode[
   return AlbumTreeNodeModel.find({ parentId }, { _id: 0 }).lean<AlbumTreeNode[]>();
 }
 
+function assertNoSiblingLabelConflict(input: {
+  siblings: AlbumTreeNode[];
+  label: string;
+  nodeType: AlbumTreeNodeType;
+  excludeNodeId?: string;
+}): void {
+  const normalizedLabel = normalizeAlbumTreeLabel(input.label);
+  const conflict = input.siblings.some(
+    (sibling) =>
+      sibling.id !== input.excludeNodeId &&
+      sibling.nodeType === input.nodeType &&
+      normalizeAlbumTreeLabel(sibling.label) === normalizedLabel
+  );
+
+  if (conflict) {
+    throw new AlbumTreeSiblingLabelConflictError(input.label.trim());
+  }
+}
+
 export async function syncAlbumTreeNodeIndexes(): Promise<void> {
   await AlbumTreeNodeModel.syncIndexes();
 }
@@ -128,9 +158,10 @@ export async function createAlbumTreeNode(
   input: CreateAlbumTreeNodeInput
 ): Promise<AlbumTreeNode> {
   const now = new Date().toISOString();
+  const trimmedLabel = input.label.trim();
   const newNode: AlbumTreeNode = {
     id: randomUUID(),
-    label: input.label.trim(),
+    label: trimmedLabel,
     nodeType: input.nodeType,
     parentId: input.parentId,
     sortOrder: 0,
@@ -139,6 +170,11 @@ export async function createAlbumTreeNode(
   };
 
   const siblings = await listSiblingNodes(input.parentId);
+  assertNoSiblingLabelConflict({
+    siblings,
+    label: trimmedLabel,
+    nodeType: input.nodeType
+  });
   const previousNodesById = new Map(siblings.map((node) => [node.id, node]));
   const nextNodes = assignNormalizedSortOrders(insertNodeAtEndOfTypeBucket(siblings, newNode));
   const createdNode = nextNodes.find((node) => node.id === newNode.id) ?? newNode;
@@ -164,11 +200,25 @@ export async function renameAlbumTreeNode(
   nodeId: string,
   label: string
 ): Promise<AlbumTreeNode | null> {
+  const node = await findAlbumTreeNodeById(nodeId);
+  if (!node) {
+    return null;
+  }
+
+  const trimmedLabel = label.trim();
+  const siblings = await listSiblingNodes(node.parentId);
+  assertNoSiblingLabelConflict({
+    siblings,
+    label: trimmedLabel,
+    nodeType: node.nodeType,
+    excludeNodeId: node.id
+  });
+
   return AlbumTreeNodeModel.findOneAndUpdate(
     { id: nodeId },
     {
       $set: {
-        label: label.trim(),
+        label: trimmedLabel,
         updatedAt: new Date().toISOString()
       }
     },
@@ -193,6 +243,12 @@ export async function moveAlbumTreeNode(
     listSiblingNodes(node.parentId),
     listSiblingNodes(parentId)
   ]);
+  assertNoSiblingLabelConflict({
+    siblings: destinationSiblings,
+    label: node.label,
+    nodeType: node.nodeType,
+    excludeNodeId: node.id
+  });
   const now = new Date().toISOString();
 
   const sourceRemainingNodes = sourceSiblings.filter((sibling) => sibling.id !== node.id);
