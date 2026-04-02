@@ -5605,17 +5605,7 @@ export default function App() {
     }
 
     const ancestorGroupIds = getAncestorGroupIdsForAlbumIds(checkedAlbumIds, albumNodesById);
-    if (ancestorGroupIds.length === 0) {
-      return;
-    }
-
-    setExpandedGroupIds((previous) => {
-      const merged = new Set(previous);
-      for (const groupId of ancestorGroupIds) {
-        merged.add(groupId);
-      }
-      return Array.from(merged);
-    });
+    setExpandedGroupIds(ancestorGroupIds);
   }
 
   async function handleCreateAlbumTreeNode(
