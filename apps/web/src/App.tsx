@@ -10,6 +10,16 @@ import {
   type WheelEvent as ReactWheelEvent
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Tooltip from '@mui/material/Tooltip';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import GridViewIcon from '@mui/icons-material/GridView';
+import ImageSearchIcon from '@mui/icons-material/ImageSearch';
+import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import TuneIcon from '@mui/icons-material/Tune';
+import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
+import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
   MediaType,
   type Person,
@@ -335,27 +345,48 @@ const pageStyle: CSSProperties = {
   backgroundColor: '#f3f4f6'
 };
 
+const topBarsStackStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  flex: '0 0 auto'
+};
+
 const topBarStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   flexWrap: 'nowrap',
-  gap: '12px',
-  padding: '8px 10px',
+  gap: '8px',
+  padding: '8px',
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
   backgroundColor: '#fbfbfb',
   position: 'relative',
   zIndex: 20,
-  flex: '0 0 auto',
-  overflowX: 'auto',
+  minWidth: 0,
+  overflowX: 'clip',
   overflowY: 'hidden'
+};
+
+const secondaryBarStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  rowGap: '6px',
+  padding: '6px 8px',
+  border: '1px solid #d6d6d6',
+  borderRadius: '10px',
+  backgroundColor: '#f7f8fa',
+  position: 'relative',
+  zIndex: 15,
+  minWidth: 0
 };
 
 const topBarSectionStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   flexWrap: 'nowrap',
-  gap: '6px'
+  gap: '4px'
 };
 
 const contextMenuStyle: CSSProperties = {
@@ -396,14 +427,21 @@ const primaryAreaControlsStyle: CSSProperties = {
 
 const toolbarGroupStyle: CSSProperties = {
   ...topBarSectionStyle,
-  paddingRight: '12px',
-  marginRight: '2px',
+  paddingRight: '8px',
+  marginRight: '0',
   borderRight: '1px solid #e3e6ea'
 };
 
 const toolbarTrailingGroupStyle: CSSProperties = {
   ...topBarSectionStyle,
   marginLeft: 'auto'
+};
+
+const secondaryBarGroupStyle: CSSProperties = {
+  ...topBarSectionStyle,
+  paddingRight: '8px',
+  marginRight: '0',
+  borderRight: '1px solid #e3e6ea'
 };
 
 const toolbarActionSubgroupStyle: CSSProperties = {
@@ -1010,6 +1048,38 @@ const compareButtonStyle: CSSProperties = {
   padding: '5px 8px'
 };
 
+const toolbarButtonStyle: CSSProperties = {
+  ...compareButtonStyle,
+  padding: '4px 8px',
+  fontSize: '12px',
+  lineHeight: 1.1
+};
+
+const toolbarLinkButtonStyle: CSSProperties = {
+  ...toolbarButtonStyle,
+  textDecoration: 'none'
+};
+
+const toolbarIconButtonStyle: CSSProperties = {
+  ...toolbarButtonStyle,
+  width: '32px',
+  height: '32px',
+  padding: '0',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const toolbarIconContentStyle: CSSProperties = {
+  fontSize: '18px'
+};
+
+const toolbarTitleStyle: CSSProperties = {
+  fontSize: '20px',
+  marginRight: '2px',
+  whiteSpace: 'nowrap'
+};
+
 const compactSecondaryButtonStyle: CSSProperties = {
   ...compareButtonStyle,
   padding: '4px 7px',
@@ -1455,8 +1525,8 @@ const surveyPaneResetButtonStyle: CSSProperties = {
 
 const reviewActions: PhotoState[] = [
   PhotoState.Keep,
-  PhotoState.Pending,
   PhotoState.Discard,
+  PhotoState.Pending,
   PhotoState.New
 ];
 
@@ -2947,6 +3017,8 @@ export default function App() {
       return applyDuplicateVisibilityOverrides(new Map<string, DuplicateResolutionVisibilitySummary>());
     });
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
+  const [thumbnailSizeMenuOpen, setThumbnailSizeMenuOpen] = useState(false);
+  const [toolbarOverflowOpen, setToolbarOverflowOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
       return 'Review';
@@ -3067,6 +3139,8 @@ export default function App() {
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
   const viewOptionsRootRef = useRef<HTMLDivElement | null>(null);
+  const thumbnailSizeRootRef = useRef<HTMLDivElement | null>(null);
+  const toolbarOverflowRootRef = useRef<HTMLDivElement | null>(null);
   const pendingGridRevealAssetIdRef = useRef<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const previousIsTimelineModeRef = useRef(false);
@@ -3074,6 +3148,14 @@ export default function App() {
   const timelineScrollMemoryRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const pendingTimelineZoomAnchorKeyRef = useRef<string | null>(null);
   const [viewOptionsMenuPosition, setViewOptionsMenuPosition] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0
+  });
+  const [thumbnailSizeMenuPosition, setThumbnailSizeMenuPosition] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0
+  });
+  const [toolbarOverflowMenuPosition, setToolbarOverflowMenuPosition] = useState<{ top: number; right: number }>({
     top: 0,
     right: 0
   });
@@ -3133,6 +3215,92 @@ export default function App() {
       window.removeEventListener('mousedown', handleWindowPointerDown);
     };
   }, [viewOptionsOpen]);
+
+  useEffect(() => {
+    if (!thumbnailSizeMenuOpen) {
+      return;
+    }
+
+    function updateThumbnailSizeMenuPosition(): void {
+      const rect = thumbnailSizeRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      setThumbnailSizeMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8)
+      });
+    }
+
+    updateThumbnailSizeMenuPosition();
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setThumbnailSizeMenuOpen(false);
+        return;
+      }
+
+      const menuRoot = document.getElementById('tdg-thumbnail-size-root');
+      if (menuRoot?.contains(event.target)) {
+        return;
+      }
+
+      setThumbnailSizeMenuOpen(false);
+    }
+
+    window.addEventListener('resize', updateThumbnailSizeMenuPosition);
+    window.addEventListener('scroll', updateThumbnailSizeMenuPosition, true);
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateThumbnailSizeMenuPosition);
+      window.removeEventListener('scroll', updateThumbnailSizeMenuPosition, true);
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [thumbnailSizeMenuOpen]);
+
+  useEffect(() => {
+    if (!toolbarOverflowOpen) {
+      return;
+    }
+
+    function updateToolbarOverflowMenuPosition(): void {
+      const rect = toolbarOverflowRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      setToolbarOverflowMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8)
+      });
+    }
+
+    updateToolbarOverflowMenuPosition();
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setToolbarOverflowOpen(false);
+        return;
+      }
+
+      const menuRoot = document.getElementById('tdg-toolbar-overflow-root');
+      if (menuRoot?.contains(event.target)) {
+        return;
+      }
+
+      setToolbarOverflowOpen(false);
+    }
+
+    window.addEventListener('resize', updateToolbarOverflowMenuPosition);
+    window.addEventListener('scroll', updateToolbarOverflowMenuPosition, true);
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateToolbarOverflowMenuPosition);
+      window.removeEventListener('scroll', updateToolbarOverflowMenuPosition, true);
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [toolbarOverflowOpen]);
 
   useEffect(() => {
     window.localStorage.setItem(advanceAfterRatingStorageKey, advanceAfterRating ? 'true' : 'false');
@@ -6816,301 +6984,453 @@ export default function App() {
   return (
     <div style={pageStyle} className="tdg-app">
       <style>{controlStateStyles}</style>
-      <div style={topBarStyle}>
-        <div style={toolbarGroupStyle}>
-          <strong style={{ fontSize: '20px', marginRight: '4px' }}>Tedography</strong>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            data-selected={primaryArea === 'Review' ? 'true' : undefined}
-            onClick={() => setPrimaryArea('Review')}
-          >
-            Review
-          </button>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            data-selected={primaryArea === 'Library' ? 'true' : undefined}
-            onClick={() => setPrimaryArea('Library')}
-          >
-            Library
-          </button>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            data-selected={primaryArea === 'Search' ? 'true' : undefined}
-            onClick={() => setPrimaryArea('Search')}
-          >
-            Search
-          </button>
-          <Link to="/duplicates/groups" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
-            Duplicates
-          </Link>
-          <Link to="/people" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
-            People
-          </Link>
-          <Link to="/people/dev" style={{ ...compareButtonStyle, textDecoration: 'none' }}>
-            People Dev
-          </Link>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            onClick={() => setMaintenanceDialogOpen(true)}
-            title="Open maintenance tools"
-          >
-            Maintenance
-          </button>
-        </div>
-
-        {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
+      <div style={topBarsStackStyle}>
+        <div style={topBarStyle}>
           <div style={toolbarGroupStyle}>
+            <strong style={toolbarTitleStyle}>Tedography</strong>
             <button
               type="button"
-              style={compareButtonStyle}
-              data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
-              onClick={() =>
-                isReviewArea ? handleSetReviewBrowseMode('Flat') : handleSetLibraryBrowseMode('Flat')
-              }
-              title="Flat presentation"
+              style={toolbarButtonStyle}
+              data-selected={primaryArea === 'Review' ? 'true' : undefined}
+              onClick={() => setPrimaryArea('Review')}
             >
-              Flat
+              Review
             </button>
             <button
               type="button"
-              style={compareButtonStyle}
-              data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
-              onClick={() =>
-                isReviewArea
-                  ? handleSetReviewBrowseMode('Timeline')
-                  : handleSetLibraryBrowseMode('Timeline')
-              }
-              title="Timeline presentation"
+              style={toolbarButtonStyle}
+              data-selected={primaryArea === 'Library' ? 'true' : undefined}
+              onClick={() => setPrimaryArea('Library')}
             >
-              Time
+              Library
             </button>
             <button
               type="button"
-              style={compareButtonStyle}
-              data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
-              onClick={() =>
-                isReviewArea ? handleSetReviewBrowseMode('Albums') : handleSetLibraryBrowseMode('Albums')
-              }
-              title="Albums presentation"
+              style={toolbarButtonStyle}
+              data-selected={primaryArea === 'Search' ? 'true' : undefined}
+              onClick={() => setPrimaryArea('Search')}
             >
-              Albums
+              Search
             </button>
+            <Link to="/duplicates/groups" style={toolbarLinkButtonStyle}>
+              Duplicates
+            </Link>
+            <Link to="/people" style={toolbarLinkButtonStyle}>
+              People
+            </Link>
           </div>
-        ) : null}
 
-        <div style={toolbarGroupStyle}>
-          {(isReviewArea || isLibraryArea || isSearchArea) ? (
-            <>
+          {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
+            <div style={toolbarGroupStyle}>
               <button
                 type="button"
-                style={compareButtonStyle}
-                data-selected={viewerMode === 'Grid' ? 'true' : undefined}
-                onClick={() => setViewerMode('Grid')}
-                title="Grid view"
-              >
-                Grid
-              </button>
-              <button
-                type="button"
-                style={compareButtonStyle}
-                data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
-                onClick={() => setViewerMode('Loupe')}
-                disabled={!selectedAsset}
-                title="Loupe view"
-              >
-                Loupe
-              </button>
-              <button
-                type="button"
-                style={compareAssets.length >= 2 ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                data-selected={surveyOpen ? 'true' : undefined}
-                onClick={openSurveyMode}
-                disabled={compareAssets.length < 2}
-                title={
-                  compareAssets.length >= 2
-                    ? 'Survey compare'
-                    : 'Select two or more visible photos to enter Survey'
+                style={toolbarButtonStyle}
+                data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
+                onClick={() =>
+                  isReviewArea ? handleSetReviewBrowseMode('Flat') : handleSetLibraryBrowseMode('Flat')
                 }
+                title="Flat presentation"
               >
-                Survey
+                Flat
               </button>
               <button
                 type="button"
-                style={selectedAsset ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={openImmersive}
-                disabled={!selectedAsset}
-                title={
-                  selectedAsset
-                    ? 'Open the active photo in full screen'
-                    : 'Select a photo to open full screen'
+                style={toolbarButtonStyle}
+                data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
+                onClick={() =>
+                  isReviewArea
+                    ? handleSetReviewBrowseMode('Timeline')
+                    : handleSetLibraryBrowseMode('Timeline')
                 }
+                title="Timeline presentation"
               >
-                Full Screen
+                Time
               </button>
-            </>
-          ) : null}
-          {showsThumbnailSizeControl ? <div style={toolbarActionDividerStyle} aria-hidden="true" /> : null}
-          {showsThumbnailSizeControl ? (
-            <div style={topBarSectionStyle} title="Thumbnail size">
-              {timelineZoomLevels.map((level, index) => (
-                <button
-                  key={level.label}
-                  type="button"
-                  style={compareButtonStyle}
-                  data-selected={timelineZoomLevel === index ? 'true' : undefined}
-                  onClick={() => handleSetTimelineZoomLevel(index)}
-                  title={`Thumbnail size ${level.label}`}
-                >
-                  {level.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                style={toolbarButtonStyle}
+                data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
+                onClick={() =>
+                  isReviewArea ? handleSetReviewBrowseMode('Albums') : handleSetLibraryBrowseMode('Albums')
+                }
+                title="Albums presentation"
+              >
+                Albums
+              </button>
             </div>
           ) : null}
-        </div>
 
-        <div style={toolbarGroupStyle}>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            data-selected={leftPanelVisible ? 'true' : undefined}
-            onClick={() => setLeftPanelVisible((previous) => !previous)}
-            title={leftPanelVisible ? 'Hide left panel' : 'Show left panel'}
-          >
-            {leftPanelVisible ? '◧' : '☰'}
-          </button>
-          {(isReviewArea || isLibraryArea || isSearchArea) ? (
-            <button
-              type="button"
-              style={compareButtonStyle}
-              data-selected={detailsPanelsVisible ? 'true' : undefined}
-              onClick={() => setDetailsPanelsVisible((previous) => !previous)}
-              title={detailsPanelsVisible ? 'Hide inspector' : 'Show inspector'}
-            >
-              {detailsPanelsVisible ? 'ⓘ' : '⌁'}
-            </button>
+          {isReviewArea ? (
+            <div style={toolbarGroupStyle}>
+              <label style={toggleOptionLabelStyle} title="Advance to the next asset after a rating change">
+                <input
+                  type="checkbox"
+                  checked={advanceAfterRating}
+                  onChange={(event) => setAdvanceAfterRating(event.target.checked)}
+                />
+                Auto-advance
+              </label>
+            </div>
           ) : null}
-          <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
-            <button
-              type="button"
-              style={compareButtonStyle}
-              data-selected={viewOptionsOpen ? 'true' : undefined}
-              onClick={() => setViewOptionsOpen((previous) => !previous)}
-              title="Display preferences"
-            >
-              View Options
-            </button>
-            {viewOptionsOpen ? (
-              <div
-                style={{
-                  ...optionsMenuStyle,
-                  position: 'fixed',
-                  top: `${viewOptionsMenuPosition.top}px`,
-                  right: `${viewOptionsMenuPosition.right}px`
-                }}
-              >
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showFilmstrip}
-                    onChange={(event) => setShowFilmstrip(event.target.checked)}
-                  />
-                  Show filmstrip
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showThumbnailPhotoStateBadges}
-                    onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
-                  />
-                  Show thumbnail state
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showSuppressedDuplicates}
-                    onChange={(event) => setShowSuppressedDuplicates(event.target.checked)}
-                  />
-                  Show suppressed duplicates
-                </label>
-                <span style={filterSubsectionTitleStyle}>Album Layout</span>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-results-presentation"
-                    checked={albumResultsPresentation === 'Merged'}
-                    onChange={() => handleSetAlbumResultsPresentation('Merged')}
-                  />
-                  Merged
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-results-presentation"
-                    checked={albumResultsPresentation === 'GroupedByAlbum'}
-                    onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
-                  />
-                  Grouped
-                </label>
-                <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-tree-sort-mode"
-                    checked={albumTreeSortMode === 'Custom'}
-                    onChange={() => setAlbumTreeSortMode('Custom')}
-                  />
-                  Custom
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-tree-sort-mode"
-                    checked={albumTreeSortMode === 'Name'}
-                    onChange={() => setAlbumTreeSortMode('Name')}
-                  />
-                  Name
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-tree-sort-mode"
-                    checked={albumTreeSortMode === 'Month/Name'}
-                    onChange={() => setAlbumTreeSortMode('Month/Name')}
-                  />
-                  Month/Name
-                </label>
+
+          <div style={toolbarGroupStyle}>
+            {showsThumbnailSizeControl ? (
+              <div style={menuAnchorStyle} id="tdg-thumbnail-size-root" ref={thumbnailSizeRootRef}>
+                <Tooltip title="Thumbnail Size">
+                  <span>
+                    <button
+                      type="button"
+                      style={toolbarIconButtonStyle}
+                      data-selected={thumbnailSizeMenuOpen ? 'true' : undefined}
+                      onClick={() => setThumbnailSizeMenuOpen((previous) => !previous)}
+                      aria-label="Thumbnail Size"
+                    >
+                      <PhotoSizeSelectLargeIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                {thumbnailSizeMenuOpen ? (
+                  <div
+                    style={{
+                      ...optionsMenuStyle,
+                      position: 'fixed',
+                      top: `${thumbnailSizeMenuPosition.top}px`,
+                      right: `${thumbnailSizeMenuPosition.right}px`
+                    }}
+                  >
+                    {timelineZoomLevels.map((level, index) => (
+                      <button
+                        key={level.label}
+                        type="button"
+                        style={toolbarButtonStyle}
+                        data-selected={timelineZoomLevel === index ? 'true' : undefined}
+                        onClick={() => {
+                          handleSetTimelineZoomLevel(index);
+                          setThumbnailSizeMenuOpen(false);
+                        }}
+                        title={`Thumbnail size ${level.label}`}
+                      >
+                        {level.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
-          {isReviewArea ? (
-            <label style={toggleOptionLabelStyle} title="Advance to the next asset after a rating change">
-              <input
-                type="checkbox"
-                checked={advanceAfterRating}
-                onChange={(event) => setAdvanceAfterRating(event.target.checked)}
-              />
-              Auto-advance
-            </label>
+
+          {(hasSelectedAssets ||
+            (selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album')) ? (
+            <div style={toolbarGroupStyle}>
+              <button
+                type="button"
+                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={() => void handleAddSelectedToAlbum()}
+                disabled={!hasSelectedAssets}
+                title={
+                  hasSelectedAssets
+                    ? 'Add current selection to album'
+                    : 'Select one or more photos to add them to an album'
+                }
+              >
+                +Album
+              </button>
+              {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
+                <button
+                  type="button"
+                  style={
+                    selectedAssetsInFocusedAlbum.length > 0
+                      ? compareButtonStyle
+                      : disabledToolbarActionButtonStyle
+                  }
+                  onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
+                  disabled={selectedAssetsInFocusedAlbum.length === 0}
+                  title={
+                    selectedAssetIdsForAlbumAction.length === 0
+                      ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                      : selectedAssetsInFocusedAlbum.length > 0
+                        ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                        : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                  }
+                >
+                  {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
+                </button>
+              ) : null}
+            </div>
           ) : null}
+
+          {isLibraryArea || isSearchArea ? (
+            <div style={toolbarGroupStyle}>
+              <button
+                type="button"
+                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={startSlideshow}
+                disabled={!hasSelectedAssets}
+                title={
+                  hasSelectedAssets
+                    ? 'Start slideshow from selected visible assets'
+                    : 'Select one or more photos to start a slideshow'
+                }
+              >
+                Slide
+              </button>
+            </div>
+          ) : null}
+
+          {(isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              {isLibraryArea ? (
+                <button
+                  type="button"
+                  style={hasSelectedAssets && !peopleRecognitionBusy ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                  onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
+                  disabled={!hasSelectedAssets || peopleRecognitionBusy}
+                  title={
+                    !hasSelectedAssets
+                      ? 'Select one or more photos to run people recognition'
+                      : peopleRecognitionBusy
+                        ? 'Running people recognition for the current selection'
+                        : 'Run people recognition for the current selection'
+                  }
+                >
+                  {peopleRecognitionBusy ? 'Running People...' : 'Run People Recognition'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                style={currentScopedPeopleScope ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={handleOpenScopedPeopleDialog}
+                disabled={!currentScopedPeopleScope}
+                title={
+                  currentScopedPeopleScope
+                    ? `Open scoped people tools for ${currentScopedPeopleScope.scopeSourceLabel.toLowerCase()}`
+                    : isLibraryArea
+                      ? 'Select one or more assets to use scoped people tools'
+                      : 'Adjust Search until there are results to use scoped people tools'
+                }
+              >
+                People Scope
+              </button>
+            </div>
+          ) : null}
+
+          {!isReviewArea ? (
+            <div style={toolbarGroupStyle}>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                onClick={() => handleOpenImportDialog()}
+                title="Import assets"
+              >
+                Import
+              </button>
+            </div>
+          ) : null}
+
+          <div style={toolbarGroupStyle}>
+            <Tooltip title={leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}>
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  data-selected={leftPanelVisible ? 'true' : undefined}
+                  onClick={() => setLeftPanelVisible((previous) => !previous)}
+                  aria-label={leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
+                >
+                  <ViewSidebarIcon
+                    fontSize="inherit"
+                    style={{
+                      ...toolbarIconContentStyle,
+                      transform: leftPanelVisible ? 'none' : 'scaleX(-1)'
+                    }}
+                  />
+                </button>
+              </span>
+            </Tooltip>
+            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+              <Tooltip title={detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}>
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    data-selected={detailsPanelsVisible ? 'true' : undefined}
+                    onClick={() => setDetailsPanelsVisible((previous) => !previous)}
+                    aria-label={detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
+                  >
+                    <InfoOutlinedIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            ) : null}
+            <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
+              <Tooltip title="View Options">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    data-selected={viewOptionsOpen ? 'true' : undefined}
+                    onClick={() => setViewOptionsOpen((previous) => !previous)}
+                    aria-label="View Options"
+                  >
+                    <TuneIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              {viewOptionsOpen ? (
+                <div
+                  style={{
+                    ...optionsMenuStyle,
+                    position: 'fixed',
+                    top: `${viewOptionsMenuPosition.top}px`,
+                    right: `${viewOptionsMenuPosition.right}px`
+                  }}
+                >
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={showFilmstrip}
+                      onChange={(event) => setShowFilmstrip(event.target.checked)}
+                    />
+                    Show filmstrip
+                  </label>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={showThumbnailPhotoStateBadges}
+                      onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
+                    />
+                    Show thumbnail state
+                  </label>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={showSuppressedDuplicates}
+                      onChange={(event) => setShowSuppressedDuplicates(event.target.checked)}
+                    />
+                    Show suppressed duplicates
+                  </label>
+                  <span style={filterSubsectionTitleStyle}>Album Layout</span>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="album-results-presentation"
+                      checked={albumResultsPresentation === 'Merged'}
+                      onChange={() => handleSetAlbumResultsPresentation('Merged')}
+                    />
+                    Merged
+                  </label>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="album-results-presentation"
+                      checked={albumResultsPresentation === 'GroupedByAlbum'}
+                      onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
+                    />
+                    Grouped
+                  </label>
+                  <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="album-tree-sort-mode"
+                      checked={albumTreeSortMode === 'Custom'}
+                      onChange={() => setAlbumTreeSortMode('Custom')}
+                    />
+                    Custom
+                  </label>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="album-tree-sort-mode"
+                      checked={albumTreeSortMode === 'Name'}
+                      onChange={() => setAlbumTreeSortMode('Name')}
+                    />
+                    Name
+                  </label>
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="album-tree-sort-mode"
+                      checked={albumTreeSortMode === 'Month/Name'}
+                      onChange={() => setAlbumTreeSortMode('Month/Name')}
+                    />
+                    Month/Name
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={topBarSpacerStyle} />
+
+          <div style={toolbarTrailingGroupStyle}>
+            <div style={menuAnchorStyle} id="tdg-toolbar-overflow-root" ref={toolbarOverflowRootRef}>
+              <Tooltip title="More">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    data-selected={toolbarOverflowOpen ? 'true' : undefined}
+                    onClick={() => setToolbarOverflowOpen((previous) => !previous)}
+                    aria-label="More"
+                  >
+                    <MoreHorizIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              {toolbarOverflowOpen ? (
+                <div
+                  style={{
+                    ...optionsMenuStyle,
+                    position: 'fixed',
+                    top: `${toolbarOverflowMenuPosition.top}px`,
+                    right: `${toolbarOverflowMenuPosition.right}px`
+                  }}
+                >
+                  <Link
+                    to="/people/dev"
+                    style={toolbarLinkButtonStyle}
+                    onClick={() => setToolbarOverflowOpen(false)}
+                  >
+                    People Dev
+                  </Link>
+                  <button
+                    type="button"
+                    style={toolbarButtonStyle}
+                    onClick={() => {
+                      setToolbarOverflowOpen(false);
+                      setMaintenanceDialogOpen(true);
+                    }}
+                    title="Open maintenance tools"
+                  >
+                    Maintenance
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
 
-        {hasSelectedAssets ? (
-          <div style={toolbarGroupStyle}>
-            <div style={selectionChipStyle}>
-              <span>{selectionCount} selected</span>
-            </div>
-            <button type="button" style={compareButtonStyle} onClick={clearSelection} title="Deselect all (Esc)">
-              Clear
-            </button>
+        <div style={secondaryBarStyle}>
+          <div style={secondaryBarGroupStyle}>
+            {hasSelectedAssets ? (
+              <>
+                <div style={selectionChipStyle}>
+                  <span>{selectionCount} selected</span>
+                </div>
+                <button
+                  type="button"
+                  style={compareButtonStyle}
+                  onClick={clearSelection}
+                  title="Deselect all (Esc)"
+                >
+                  Clear
+                </button>
+              </>
+            ) : null}
           </div>
-        ) : null}
 
-        <div style={toolbarGroupStyle}>
-          <div style={toolbarActionSubgroupStyle}>
+          <div style={secondaryBarGroupStyle}>
             {(isReviewArea || isLibraryArea) ? (
               reviewActions.map((state) => (
                 <button
@@ -7130,108 +7450,85 @@ export default function App() {
               ))
             ) : null}
           </div>
-          {(isReviewArea || isLibraryArea) ? <div style={toolbarActionDividerStyle} aria-hidden="true" /> : null}
-          <div style={toolbarActionSubgroupStyle}>
-            <button
-              type="button"
-              style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-              onClick={() => void handleAddSelectedToAlbum()}
-              disabled={!hasSelectedAssets}
-              title={
-                hasSelectedAssets
-                  ? 'Add current selection to album'
-                  : 'Select one or more photos to add them to an album'
-              }
-            >
-              +Album
-            </button>
-            {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
-              <button
-                type="button"
-                style={
-                  selectedAssetsInFocusedAlbum.length > 0
-                    ? compareButtonStyle
-                    : disabledToolbarActionButtonStyle
-                }
-                onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
-                disabled={selectedAssetsInFocusedAlbum.length === 0}
-                title={
-                  selectedAssetIdsForAlbumAction.length === 0
-                    ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                    : selectedAssetsInFocusedAlbum.length > 0
-                      ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                      : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                }
-              >
-                {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
-              </button>
-            ) : null}
-            {isLibraryArea || isSearchArea ? (
-              <button
-                type="button"
-                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={startSlideshow}
-                disabled={!hasSelectedAssets}
-                title={
-                  hasSelectedAssets
-                    ? 'Start slideshow from selected visible assets'
-                    : 'Select one or more photos to start a slideshow'
-                }
-              >
-                Slide
-              </button>
-            ) : null}
-            {isLibraryArea ? (
-              <button
-                type="button"
-                style={hasSelectedAssets && !peopleRecognitionBusy ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
-                disabled={!hasSelectedAssets || peopleRecognitionBusy}
-                title={
-                  !hasSelectedAssets
-                    ? 'Select one or more photos to run people recognition'
-                    : peopleRecognitionBusy
-                      ? 'Running people recognition for the current selection'
-                      : 'Run people recognition for the current selection'
-                }
-              >
-                {peopleRecognitionBusy ? 'Running People...' : 'Run People Recognition'}
-              </button>
-            ) : null}
-            {(isLibraryArea || isSearchArea) ? (
-              <button
-                type="button"
-                style={currentScopedPeopleScope ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={handleOpenScopedPeopleDialog}
-                disabled={!currentScopedPeopleScope}
-                title={
-                  currentScopedPeopleScope
-                    ? `Open scoped people tools for ${currentScopedPeopleScope.scopeSourceLabel.toLowerCase()}`
-                    : isLibraryArea
-                      ? 'Select one or more assets to use scoped people tools'
-                      : 'Adjust Search until there are results to use scoped people tools'
-                }
-              >
-                People Scope
-              </button>
+
+          <div style={secondaryBarGroupStyle}>
+            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+              <>
+                <Tooltip title="Grid">
+                  <span>
+                    <button
+                      type="button"
+                      style={toolbarIconButtonStyle}
+                      data-selected={viewerMode === 'Grid' ? 'true' : undefined}
+                      onClick={() => setViewerMode('Grid')}
+                      aria-label="Grid"
+                    >
+                      <GridViewIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Loupe">
+                  <span>
+                    <button
+                      type="button"
+                      style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                      data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
+                      onClick={() => setViewerMode('Loupe')}
+                      disabled={!selectedAsset}
+                      aria-label="Loupe"
+                    >
+                      <ImageSearchIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    compareAssets.length >= 2
+                      ? 'Survey'
+                      : 'Select two or more visible photos to enter Survey'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        compareAssets.length >= 2
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      data-selected={surveyOpen ? 'true' : undefined}
+                      onClick={openSurveyMode}
+                      disabled={compareAssets.length < 2}
+                      aria-label="Survey"
+                    >
+                      <DashboardCustomizeIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    selectedAsset
+                      ? 'Full Screen'
+                      : 'Select a photo to open full screen'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                      data-selected={immersiveOpen ? 'true' : undefined}
+                      onClick={openImmersive}
+                      disabled={!selectedAsset}
+                      aria-label="Full Screen"
+                    >
+                      <FullscreenIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+              </>
             ) : null}
           </div>
         </div>
-
-        <div style={topBarSpacerStyle} />
-
-        {!isReviewArea ? (
-          <div style={toolbarTrailingGroupStyle}>
-            <button
-              type="button"
-              style={compareButtonStyle}
-              onClick={() => handleOpenImportDialog()}
-              title="Import assets"
-            >
-              Import
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <div style={shellViewportStyle}>
