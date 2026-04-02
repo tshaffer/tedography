@@ -236,6 +236,16 @@ export function AssetDetailsPanel({
           {assetOperationMessage}
         </p>
       ) : null}
+      {duplicateResolutionSummary ? (
+        <div style={{ marginBottom: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Link
+            to={`/duplicates/groups?groupKey=${encodeURIComponent(duplicateResolutionSummary.groupKey)}`}
+            style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+          >
+            Open Duplicate Group Review
+          </Link>
+        </div>
+      ) : null}
       {rows.map((row) => renderRow(row.label, row.value))}
       {peopleStatus ? (
         <section style={subSectionStyle}>

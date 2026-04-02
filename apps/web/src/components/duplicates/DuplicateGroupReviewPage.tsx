@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import type {
   DuplicateProvisionalGroupMemberDecision,
   ProvisionalDuplicateGroupListItem,
@@ -438,6 +438,7 @@ function renderMemberCard(input: {
 }
 
 export function DuplicateGroupReviewPage(): ReactElement {
+  const location = useLocation();
   const [draftMinScore, setDraftMinScore] = useState(() => {
     if (typeof window === 'undefined') {
       return '';
@@ -479,6 +480,28 @@ export function DuplicateGroupReviewPage(): ReactElement {
   const normalizedAppliedMinScore =
     Number.isFinite(parsedAppliedMinScore) && parsedAppliedMinScore > 0 ? parsedAppliedMinScore : undefined;
   const previewOnly = normalizedAppliedMinScore !== undefined;
+  const requestedGroupKey = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const value = params.get('groupKey');
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }, [location.search]);
+
+  function buildSpecificGroupPlaceholder(
+    groupKey: string,
+    selectedCanonicalAssetId: string | null = null
+  ): ProvisionalDuplicateGroupListItem {
+    const assetIds = groupKey.split('__').filter(Boolean);
+    return {
+      groupKey,
+      assetIds,
+      assetCount: assetIds.length,
+      candidatePairCount: 0,
+      reviewStatus: 'resolved',
+      selectedCanonicalAssetId,
+      resolutionStatus: 'confirmed',
+      members: []
+    };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -498,12 +521,19 @@ export function DuplicateGroupReviewPage(): ReactElement {
           return;
         }
 
-        setGroups(response.groups);
+        const nextGroups =
+          requestedGroupKey && !response.groups.some((group) => group.groupKey === requestedGroupKey)
+            ? [buildSpecificGroupPlaceholder(requestedGroupKey), ...response.groups]
+            : response.groups;
+
+        setGroups(nextGroups);
         setTotalGroupCount(response.totalGroups);
         setGroupSummary(response.summary);
         setGroupsHasMore(response.hasMore);
         setSelectedGroupKey((current) =>
-          current && response.groups.some((group) => group.groupKey === current) ? current : null
+          current && nextGroups.some((group) => group.groupKey === current)
+            ? current
+            : requestedGroupKey ?? null
         );
       } catch (loadError) {
         if (!cancelled) {
@@ -520,7 +550,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [normalizedAppliedMinScore, previewOnly]);
+  }, [normalizedAppliedMinScore, previewOnly, requestedGroupKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -924,7 +954,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
   function openSpecificGroup(input: {
     groupKey: string;
     assetCount: number;
-    selectedCanonicalAssetId: string;
+    selectedCanonicalAssetId?: string | null;
   }): void {
     setGroups((current) => {
       if (current.some((group) => group.groupKey === input.groupKey)) {
@@ -933,14 +963,8 @@ export function DuplicateGroupReviewPage(): ReactElement {
 
       return [
         {
-          groupKey: input.groupKey,
-          assetIds: input.groupKey.split('__').filter(Boolean),
+          ...buildSpecificGroupPlaceholder(input.groupKey, input.selectedCanonicalAssetId ?? null),
           assetCount: input.assetCount,
-          candidatePairCount: 0,
-          reviewStatus: 'resolved',
-          selectedCanonicalAssetId: input.selectedCanonicalAssetId,
-          resolutionStatus: 'confirmed',
-          members: []
         },
         ...current
       ];

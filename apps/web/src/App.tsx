@@ -2263,6 +2263,14 @@ function AssetDetailPanel({
           <p>
             <strong>Duplicate Group:</strong> {duplicateResolutionSummary.groupKey}
           </p>
+          <p>
+            <Link
+              to={`/duplicates/groups?groupKey=${encodeURIComponent(duplicateResolutionSummary.groupKey)}`}
+              style={{ ...compareButtonStyle, display: 'inline-block', textDecoration: 'none' }}
+            >
+              Open Duplicate Group Review
+            </Link>
+          </p>
         </>
       ) : null}
       <p>
