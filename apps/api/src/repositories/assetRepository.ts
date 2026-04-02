@@ -45,6 +45,12 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           captureDateTime: 1,
           width: 1,
           height: 1,
+          locationLabel: 1,
+          locationLatitude: 1,
+          locationLongitude: 1,
+          city: 1,
+          state: 1,
+          country: 1,
           importedAt: 1,
           originalFileFormat: 1,
           displayFileFormat: 1,
@@ -90,6 +96,12 @@ export async function getAssetPageForLibrary(input?: {
           captureDateTime: 1,
           width: 1,
           height: 1,
+          locationLabel: 1,
+          locationLatitude: 1,
+          locationLongitude: 1,
+          city: 1,
+          state: 1,
+          country: 1,
           importedAt: 1,
           originalFileFormat: 1,
           displayFileFormat: 1,
@@ -295,6 +307,9 @@ export interface CreateMediaAssetInput {
   locationLabel: string | null;
   locationLatitude: number | null;
   locationLongitude: number | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
   importedAt: Date;
   originalStorageRootId: string;
   originalArchivePath: string;
@@ -330,6 +345,9 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     locationLabel: input.locationLabel,
     locationLatitude: input.locationLatitude,
     locationLongitude: input.locationLongitude,
+    city: input.city,
+    state: input.state,
+    country: input.country,
     importedAt: input.importedAt.toISOString(),
     originalStorageRootId: input.originalStorageRootId,
     originalArchivePath: input.originalArchivePath,
@@ -410,6 +428,9 @@ export interface UpdateMediaAssetSourceDataInput {
   locationLabel: string | null;
   locationLatitude: number | null;
   locationLongitude: number | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
   originalFileSizeBytes: number;
   originalContentHash: string;
   originalFileFormat: string;
@@ -436,6 +457,9 @@ export async function updateMediaAssetSourceData(
     locationLabel: input.locationLabel,
     locationLatitude: input.locationLatitude,
     locationLongitude: input.locationLongitude,
+    city: input.city,
+    state: input.state,
+    country: input.country,
     originalFileSizeBytes: input.originalFileSizeBytes,
     originalContentHash: input.originalContentHash,
     originalFileFormat: input.originalFileFormat,

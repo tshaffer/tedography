@@ -63,6 +63,9 @@ export interface MediaAsset {
   locationLabel?: string | null;
   locationLatitude?: number | null;
   locationLongitude?: number | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
 
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.

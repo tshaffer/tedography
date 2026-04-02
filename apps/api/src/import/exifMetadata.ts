@@ -5,6 +5,33 @@ export interface ExtractedImportMetadata {
   locationLabel: string | null;
   locationLatitude: number | null;
   locationLongitude: number | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+interface ExtractImportMetadataOptions {
+  includeReverseGeocode?: boolean;
+}
+
+type NominatimAddress = {
+  city?: string;
+  town?: string;
+  village?: string;
+  hamlet?: string;
+  suburb?: string;
+  neighbourhood?: string;
+  county?: string;
+  state?: string;
+  state_district?: string;
+  region?: string;
+  country?: string;
+};
+
+export interface ReverseGeocodedLocation {
+  city: string | null;
+  state: string | null;
+  country: string | null;
 }
 
 type ExifDateLike = {
@@ -16,6 +43,10 @@ type ExiftoolRuntime = {
 };
 
 let exiftoolRuntime: ExiftoolRuntime | null | undefined;
+const reverseGeocodeCache = new Map<string, Promise<NominatimAddress | null>>();
+const nominatimDelayMs = 1100;
+let nominatimQueue: Promise<void> = Promise.resolve();
+let lastNominatimRequestAt = 0;
 
 async function getExiftoolRuntime(): Promise<ExiftoolRuntime | null> {
   if (exiftoolRuntime !== undefined) {
@@ -34,6 +65,12 @@ async function getExiftoolRuntime(): Promise<ExiftoolRuntime | null> {
   }
 
   return exiftoolRuntime;
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -176,17 +213,121 @@ function deriveLocationLabel(tags: Record<string, unknown>): string | null {
   return toTrimmedString(tags.GPSPosition);
 }
 
-export async function extractImportMetadata(absolutePath: string): Promise<ExtractedImportMetadata> {
+function pickCity(address: NominatimAddress): string | null {
+  return (
+    address.city ??
+    address.town ??
+    address.village ??
+    address.hamlet ??
+    address.neighbourhood ??
+    address.suburb ??
+    null
+  );
+}
+
+function pickState(address: NominatimAddress): string | null {
+  return address.state ?? address.state_district ?? address.region ?? address.county ?? null;
+}
+
+async function reverseGeocode(latitude: number, longitude: number): Promise<NominatimAddress | null> {
+  const cacheKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+  const cached = reverseGeocodeCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const requestPromise = (async (): Promise<NominatimAddress | null> => {
+    const previousQueue = nominatimQueue;
+    let releaseQueue = (): void => undefined;
+    nominatimQueue = new Promise<void>((resolve) => {
+      releaseQueue = resolve;
+    });
+
+    await previousQueue;
+
+    try {
+      const elapsed = Date.now() - lastNominatimRequestAt;
+      if (lastNominatimRequestAt > 0 && elapsed < nominatimDelayMs) {
+        await sleep(nominatimDelayMs - elapsed);
+      }
+
+      const url = new URL('https://nominatim.openstreetmap.org/reverse');
+      url.searchParams.set('lat', String(latitude));
+      url.searchParams.set('lon', String(longitude));
+      url.searchParams.set('format', 'jsonv2');
+      url.searchParams.set('addressdetails', '1');
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Tedography/1.0 (contact: shaffer.family@gmail.com)',
+          Accept: 'application/json'
+        }
+      });
+
+      lastNominatimRequestAt = Date.now();
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as { address?: NominatimAddress | null };
+      return payload.address ?? null;
+    } catch {
+      lastNominatimRequestAt = Date.now();
+      return null;
+    } finally {
+      releaseQueue();
+    }
+  })();
+
+  reverseGeocodeCache.set(cacheKey, requestPromise);
+  requestPromise.catch(() => {
+    reverseGeocodeCache.delete(cacheKey);
+  });
+  return requestPromise;
+}
+
+export async function reverseGeocodeCoordinates(
+  latitude: number,
+  longitude: number
+): Promise<ReverseGeocodedLocation> {
+  const address = await reverseGeocode(latitude, longitude);
+  if (!address) {
+    return {
+      city: null,
+      state: null,
+      country: null
+    };
+  }
+
+  return {
+    city: pickCity(address),
+    state: pickState(address),
+    country: address.country ?? null
+  };
+}
+
+function emptyExtractedImportMetadata(): ExtractedImportMetadata {
+  return {
+    captureDateTime: null,
+    width: null,
+    height: null,
+    locationLabel: null,
+    locationLatitude: null,
+    locationLongitude: null,
+    city: null,
+    state: null,
+    country: null
+  };
+}
+
+export async function extractImportMetadata(
+  absolutePath: string,
+  options?: ExtractImportMetadataOptions
+): Promise<ExtractedImportMetadata> {
   const runtime = await getExiftoolRuntime();
   if (!runtime) {
-    return {
-      captureDateTime: null,
-      width: null,
-      height: null,
-      locationLabel: null,
-      locationLatitude: null,
-      locationLongitude: null
-    };
+    return emptyExtractedImportMetadata();
   }
 
   try {
@@ -222,6 +363,20 @@ export async function extractImportMetadata(absolutePath: string): Promise<Extra
       parseGpsCoordinate(tags.GPSLongitude);
 
     const locationLabel = deriveLocationLabel(tags);
+    let city: string | null = null;
+    let state: string | null = null;
+    let country: string | null = null;
+
+    if (
+      options?.includeReverseGeocode === true &&
+      locationLatitude !== null &&
+      locationLongitude !== null
+    ) {
+      const reverseGeocodedLocation = await reverseGeocodeCoordinates(locationLatitude, locationLongitude);
+      city = reverseGeocodedLocation.city;
+      state = reverseGeocodedLocation.state;
+      country = reverseGeocodedLocation.country;
+    }
 
     return {
       captureDateTime,
@@ -229,17 +384,13 @@ export async function extractImportMetadata(absolutePath: string): Promise<Extra
       height,
       locationLabel,
       locationLatitude,
-      locationLongitude
+      locationLongitude,
+      city,
+      state,
+      country
     };
   } catch {
     // Missing/invalid metadata should not fail a full scan; return null fields.
-    return {
-      captureDateTime: null,
-      width: null,
-      height: null,
-      locationLabel: null,
-      locationLatitude: null,
-      locationLongitude: null
-    };
+    return emptyExtractedImportMetadata();
   }
 }

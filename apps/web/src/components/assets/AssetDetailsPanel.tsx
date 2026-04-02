@@ -136,16 +136,44 @@ function formatAlbumLabels(albumLabels: string[]): string {
 }
 
 function formatLocation(
+  city?: string | null,
+  state?: string | null,
+  country?: string | null,
   locationLabel?: string | null,
   locationLatitude?: number | null,
   locationLongitude?: number | null
 ): string {
-  if (typeof locationLabel === 'string' && locationLabel.trim().length > 0) {
-    return locationLabel;
+  const humanLocation = [city, state, country]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .filter((value, index, all) => all.indexOf(value) === index)
+    .join(', ');
+
+  const fallbackLabel =
+    typeof locationLabel === 'string' && locationLabel.trim().length > 0 ? locationLabel : null;
+
+  const coordinateLabel =
+    typeof locationLatitude === 'number' && typeof locationLongitude === 'number'
+      ? `${locationLatitude.toFixed(5)}, ${locationLongitude.toFixed(5)}`
+      : null;
+
+  if (humanLocation.length > 0 && coordinateLabel) {
+    return `${humanLocation} (${coordinateLabel})`;
   }
 
-  if (typeof locationLatitude === 'number' && typeof locationLongitude === 'number') {
-    return `${locationLatitude.toFixed(5)}, ${locationLongitude.toFixed(5)}`;
+  if (humanLocation.length > 0) {
+    return humanLocation;
+  }
+
+  if (fallbackLabel && coordinateLabel) {
+    return `${fallbackLabel} (${coordinateLabel})`;
+  }
+
+  if (fallbackLabel) {
+    return fallbackLabel;
+  }
+
+  if (coordinateLabel) {
+    return coordinateLabel;
   }
 
   return '—';
@@ -181,7 +209,14 @@ export function AssetDetailsPanel({
     { label: 'Albums', value: formatAlbumLabels(albumLabels) },
     {
       label: 'Location',
-      value: formatLocation(asset.locationLabel, asset.locationLatitude, asset.locationLongitude)
+      value: formatLocation(
+        asset.city,
+        asset.state,
+        asset.country,
+        asset.locationLabel,
+        asset.locationLatitude,
+        asset.locationLongitude
+      )
     },
     { label: 'Original Format', value: formatValue(asset.originalFileFormat) },
     { label: 'Original Root', value: formatValue(asset.originalStorageRootId) },

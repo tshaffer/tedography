@@ -262,7 +262,7 @@ export async function registerImportedFiles(input: {
         thumbnailFileFormat = 'jpg';
       }
 
-      const metadata = await extractImportMetadata(absolutePath);
+      const metadata = await extractImportMetadata(absolutePath, { includeReverseGeocode: true });
       const importedAt = new Date();
 
       const createdAsset = await createMediaAsset({
@@ -275,6 +275,9 @@ export async function registerImportedFiles(input: {
         locationLabel: metadata.locationLabel,
         locationLatitude: metadata.locationLatitude,
         locationLongitude: metadata.locationLongitude,
+        city: metadata.city,
+        state: metadata.state,
+        country: metadata.country,
         importedAt,
         originalStorageRootId: root.id,
         originalArchivePath: normalizedRelativePath,

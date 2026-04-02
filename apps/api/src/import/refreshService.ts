@@ -253,14 +253,17 @@ async function processAssetRefresh(
 
     const metadata =
       mode === 'reimport'
-        ? await extractImportMetadata(originalAbsolutePath)
+        ? await extractImportMetadata(originalAbsolutePath, { includeReverseGeocode: true })
         : {
             captureDateTime: asset.captureDateTime ? new Date(asset.captureDateTime) : null,
             width: asset.width ?? null,
             height: asset.height ?? null,
             locationLabel: asset.locationLabel ?? null,
             locationLatitude: asset.locationLatitude ?? null,
-            locationLongitude: asset.locationLongitude ?? null
+            locationLongitude: asset.locationLongitude ?? null,
+            city: asset.city ?? null,
+            state: asset.state ?? null,
+            country: asset.country ?? null
           };
 
     const updatedAsset = await updateMediaAssetSourceData({
@@ -273,6 +276,9 @@ async function processAssetRefresh(
       locationLabel: metadata.locationLabel,
       locationLatitude: metadata.locationLatitude,
       locationLongitude: metadata.locationLongitude,
+      city: metadata.city,
+      state: metadata.state,
+      country: metadata.country,
       originalFileSizeBytes: fileStat.size,
       originalContentHash,
       originalFileFormat,

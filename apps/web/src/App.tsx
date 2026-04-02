@@ -5986,6 +5986,8 @@ export default function App() {
 
       setAssetMaintenanceMessage(`Reimported ${selectedAsset.filename}.`);
       await loadAssets({ showLoading: false });
+      const refreshedAsset = await loadAssetDetails(selectedAsset.id);
+      setSelectedAssetDetails(refreshedAsset);
     } catch (error: unknown) {
       setAssetMaintenanceError(true);
       setAssetMaintenanceMessage(error instanceof Error ? error.message : 'Failed to reimport asset');
