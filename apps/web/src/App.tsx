@@ -1085,7 +1085,8 @@ const toolbarButtonStyle: CSSProperties = {
 
 const toolbarLinkButtonStyle: CSSProperties = {
   ...toolbarButtonStyle,
-  textDecoration: 'none'
+  textDecoration: 'none',
+  color: '#0f172a'
 };
 
 const toolbarIconButtonStyle: CSSProperties = {
