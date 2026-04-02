@@ -572,16 +572,44 @@ const albumTreeListStyle: CSSProperties = {
 };
 
 const albumTreeRowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '28px 18px minmax(0, 1fr)',
-  gap: '6px',
+  display: 'flex',
   alignItems: 'center',
   minWidth: 0
 };
 
+const albumTreeChevronButtonStyle: CSSProperties = {
+  width: '20px',
+  minWidth: '20px',
+  height: '20px',
+  padding: 0,
+  borderRadius: '6px',
+  fontSize: '12px',
+  lineHeight: 1,
+  border: '1px solid #d6d6d6',
+  backgroundColor: '#fff',
+  color: '#1f2937',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
 const albumTreeSpacerStyle: CSSProperties = {
-  width: '28px',
-  height: '28px'
+  width: '20px',
+  minWidth: '20px',
+  height: '20px'
+};
+
+const albumTreeCheckboxCellStyle: CSSProperties = {
+  width: '16px',
+  minWidth: '16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const albumTreeCheckboxStyle: CSSProperties = {
+  margin: 0
 };
 
 const filterRowStyle: CSSProperties = {
@@ -1097,11 +1125,14 @@ const disabledToolbarActionButtonStyle: CSSProperties = {
 
 const albumTreeLabelButtonStyle: CSSProperties = {
   ...compareButtonStyle,
-  width: '100%',
+  flex: '1 1 auto',
+  minWidth: 0,
   justifyContent: 'flex-start',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
+  whiteSpace: 'nowrap',
+  paddingLeft: '6px',
+  paddingRight: '6px'
 };
 
 const emptyStateStyle: CSSProperties = {
@@ -6348,7 +6379,10 @@ export default function App() {
             const isExpanded = expandedGroupIds.includes(node.id);
             const isChecked = checkedIds.includes(node.id);
             const isSelected = selectedTreeNodeId === node.id;
-            const depthIndent = `${node.depth * 20}px`;
+            const depthIndent = `${node.depth * 10}px`;
+            const labelText = isGroup
+              ? node.label
+              : `${node.label} (${albumAssetCounts.get(node.id) ?? 0})`;
 
             return (
               <div
@@ -6359,9 +6393,10 @@ export default function App() {
                 {isGroup ? (
                   <button
                     type="button"
-                    style={compareButtonStyle}
+                    style={albumTreeChevronButtonStyle}
                     data-selected={isExpanded ? 'true' : undefined}
                     onClick={() => toggleGroupExpanded(node.id)}
+                    aria-label={isExpanded ? `Collapse ${node.label}` : `Expand ${node.label}`}
                     title={isExpanded ? 'Collapse group' : 'Expand group'}
                   >
                     {isExpanded ? '▾' : '▸'}
@@ -6369,24 +6404,31 @@ export default function App() {
                 ) : (
                   <span style={albumTreeSpacerStyle} />
                 )}
-                {isGroup ? <span style={{ width: '18px', height: '18px' }} /> : null}
-                {!isGroup ? (
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => onToggleChecked(node.id)}
-                    title="Scope to this album"
-                  />
-                ) : null}
+                <span
+                  style={{
+                    ...albumTreeCheckboxCellStyle,
+                    width: isGroup ? '6px' : '22px',
+                    minWidth: isGroup ? '6px' : '22px'
+                  }}
+                >
+                  {!isGroup ? (
+                    <input
+                      type="checkbox"
+                      style={albumTreeCheckboxStyle}
+                      checked={isChecked}
+                      onChange={() => onToggleChecked(node.id)}
+                      title="Scope to this album"
+                    />
+                  ) : null}
+                </span>
                 <button
                   type="button"
                   style={albumTreeLabelButtonStyle}
                   data-selected={isSelected ? 'true' : undefined}
                   onClick={() => setSelectedTreeNodeId(node.id)}
-                  title={node.label}
+                  title={labelText}
                 >
-                  {node.label}
-                  {!isGroup ? ` (${albumAssetCounts.get(node.id) ?? 0})` : ''}
+                  {labelText}
                 </button>
               </div>
             );
