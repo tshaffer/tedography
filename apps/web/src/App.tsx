@@ -6664,7 +6664,7 @@ export default function App() {
                 disabled={!canCreateGroupNode}
                 title="Add top-level group"
               >
-                + Group
+                + Top Group Node
               </button>
             ) : null}
           </div>
