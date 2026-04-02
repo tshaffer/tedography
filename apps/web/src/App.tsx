@@ -5862,7 +5862,7 @@ export default function App() {
       return;
     }
 
-    if (key === 'r') {
+    if (key === 'r' || key === 'delete') {
       await handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
       return;
     }
