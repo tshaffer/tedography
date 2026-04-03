@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import type { AlbumTreeNode } from '@tedography/domain';
 import type {
   DuplicateProvisionalGroupMemberDecision,
   ProvisionalDuplicateGroupListItem,
   ProvisionalDuplicateGroupMember
 } from '@tedography/shared';
+import { listAlbumTreeNodes } from '../../api/albumTreeApi';
 import {
   acceptProvisionalDuplicateGroupAsFinal,
   getProvisionalDuplicateGroup,
@@ -358,6 +360,7 @@ function renderDecisionControls(input: {
 
 function renderMemberCard(input: {
   member: ProvisionalDuplicateGroupMember;
+  albumLabel: string;
   decision: DuplicateProvisionalGroupMemberDecision;
   selected?: boolean;
   disabled?: boolean;
@@ -374,6 +377,7 @@ function renderMemberCard(input: {
 }): ReactElement {
   const {
     member,
+    albumLabel,
     decision,
     selected = false,
     disabled = false,
@@ -403,6 +407,9 @@ function renderMemberCard(input: {
           <span style={badgeStyle}>{getDecisionLabel(decision)}</span>
         </div>
         <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-word' }}>{member.asset.id}</div>
+        <div style={{ fontSize: '12px', color: '#475569', wordBreak: 'break-word' }}>
+          <strong>Albums:</strong> {albumLabel}
+        </div>
         {renderHistoricalCounts(member)}
         {renderDecisionControls({ decision, disabled, onChange: onDecisionChange })}
         {onToggleCompare ? (
@@ -476,6 +483,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [detailReloadToken, setDetailReloadToken] = useState(0);
+  const [albumNodesById, setAlbumNodesById] = useState<Map<string, AlbumTreeNode>>(new Map());
   const parsedAppliedMinScore = Number.parseFloat(appliedMinScore);
   const normalizedAppliedMinScore =
     Number.isFinite(parsedAppliedMinScore) && parsedAppliedMinScore > 0 ? parsedAppliedMinScore : undefined;
@@ -502,6 +510,29 @@ export function DuplicateGroupReviewPage(): ReactElement {
       members: []
     };
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const nodes = await listAlbumTreeNodes();
+        if (cancelled) {
+          return;
+        }
+
+        setAlbumNodesById(new Map(nodes.map((node) => [node.id, node])));
+      } catch {
+        if (!cancelled) {
+          setAlbumNodesById(new Map());
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -649,6 +680,15 @@ export function DuplicateGroupReviewPage(): ReactElement {
 
     return selectedGroup.members.filter((member) => compareAssetIdSet.has(member.asset.id));
   }, [compareAssetIdSet, effectiveFocusScope, selectedGroup]);
+
+  function getAlbumLabelForMember(member: ProvisionalDuplicateGroupMember): string {
+    const albumLabels = (member.asset.albumIds ?? [])
+      .map((albumId) => albumNodesById.get(albumId))
+      .filter((node): node is AlbumTreeNode => node?.nodeType === 'Album')
+      .map((node) => node.label);
+
+    return albumLabels.length > 0 ? albumLabels.join(', ') : 'No Album';
+  }
 
   const focusedMember = useMemo(
     () => focusMembers.find((member) => member.asset.id === focusedAssetId) ?? focusMembers[0] ?? null,
@@ -1630,6 +1670,7 @@ export function DuplicateGroupReviewPage(): ReactElement {
                     <div key={member.asset.id}>
                       {renderMemberCard({
                         member,
+                        albumLabel: getAlbumLabelForMember(member),
                         decision: getDecisionForMember(member),
                         selected: member.asset.id === focusedMember?.asset.id,
                         disabled: saving,
@@ -1659,6 +1700,9 @@ export function DuplicateGroupReviewPage(): ReactElement {
                       </div>
                       <div style={{ marginTop: '10px', color: '#64748b', fontSize: '12px', wordBreak: 'break-word' }}>
                         {focusedMember.asset.id}
+                      </div>
+                      <div style={{ marginTop: '8px', color: '#475569', fontSize: '12px', wordBreak: 'break-word' }}>
+                        <strong>Albums:</strong> {getAlbumLabelForMember(focusedMember)}
                       </div>
                       <div style={{ marginTop: '12px' }}>{renderHistoricalCounts(focusedMember)}</div>
                       <div style={{ marginTop: '12px' }}>

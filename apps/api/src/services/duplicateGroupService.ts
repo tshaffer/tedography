@@ -523,6 +523,7 @@ function toAssetSummary(asset: MediaAsset) {
     filename: asset.filename,
     mediaType: asset.mediaType,
     originalArchivePath: asset.originalArchivePath ?? asset.archivePath ?? null,
+    ...(asset.albumIds !== undefined ? { albumIds: asset.albumIds } : {}),
     ...(asset.captureDateTime !== undefined ? { captureDateTime: asset.captureDateTime } : {}),
     ...(asset.width !== undefined ? { width: asset.width } : {}),
     ...(asset.height !== undefined ? { height: asset.height } : {}),
@@ -541,6 +542,7 @@ function toProvisionalGroupMemberAssetSummary(asset: MediaAsset) {
     filename: asset.filename,
     mediaType: asset.mediaType,
     originalArchivePath: asset.originalArchivePath ?? asset.archivePath ?? null,
+    ...(asset.albumIds !== undefined ? { albumIds: asset.albumIds } : {}),
     ...(asset.captureDateTime !== undefined ? { captureDateTime: asset.captureDateTime } : {}),
     ...(asset.width !== undefined ? { width: asset.width } : {}),
     ...(asset.height !== undefined ? { height: asset.height } : {}),
@@ -695,11 +697,12 @@ async function loadProvisionalGroups(
   }
 
   const listCandidatePairsStartedAt = Date.now();
-  const candidatePairs = await listProvisionalDuplicateCandidatePairs({
+  const rawCandidatePairs = await listProvisionalDuplicateCandidatePairs({
     ...(options.assetId ? { assetId: options.assetId } : {}),
     ...(typeof options.minScore === 'number' ? { minScore: options.minScore } : {}),
     ...(options.previewOnly === true ? { includeSimilarImage: true } : {})
   });
+  const candidatePairs = await filterDuplicatePairsExcludingDiscardAssets(rawCandidatePairs);
   const deriveGroupsStartedAt = Date.now();
   const groups = deriveDuplicateGroups(candidatePairs);
   const loadConfirmedResolutionsStartedAt = Date.now();
@@ -731,6 +734,24 @@ async function loadProvisionalGroups(
       `loadConfirmedResolutionsMs=${Date.now() - loadConfirmedResolutionsStartedAt}`
   );
   return filteredGroups;
+}
+
+async function filterDuplicatePairsExcludingDiscardAssets<T extends { assetIdA: string; assetIdB: string }>(
+  pairs: T[]
+): Promise<T[]> {
+  if (pairs.length === 0) {
+    return [];
+  }
+
+  const assetIds = Array.from(new Set(pairs.flatMap((pair) => [pair.assetIdA, pair.assetIdB])));
+  const assets = await findByIds(assetIds);
+  const allowedAssetIds = new Set(
+    assets.filter((asset) => asset.photoState !== PhotoState.Discard).map((asset) => asset.id)
+  );
+
+  return pairs.filter(
+    (pair) => allowedAssetIds.has(pair.assetIdA) && allowedAssetIds.has(pair.assetIdB)
+  );
 }
 
 export function determineProvisionalGroupReviewStatus(input: {
@@ -1283,8 +1304,16 @@ export async function getProvisionalDuplicateGroup(
   }
 ): Promise<GetProvisionalDuplicateGroupResponse | null> {
   const startedAt = Date.now();
-  const assetIds = parseProvisionalGroupKey(groupKey);
+  const parsedAssetIds = parseProvisionalGroupKey(groupKey);
+  const assetIds = (await findByIds(parsedAssetIds))
+    .filter((asset) => asset.photoState !== PhotoState.Discard)
+    .map((asset) => asset.id)
+    .sort(compareAssetIds);
   if (assetIds.length === 0) {
+    return null;
+  }
+
+  if (assetIds.length < 2) {
     return null;
   }
 

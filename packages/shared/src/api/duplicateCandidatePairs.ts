@@ -37,6 +37,7 @@ export interface DuplicateCandidatePairAssetSummary {
   filename: string;
   mediaType: MediaType;
   originalArchivePath: string | null;
+  albumIds?: string[];
   captureDateTime?: string | null;
   width?: number | null;
   height?: number | null;

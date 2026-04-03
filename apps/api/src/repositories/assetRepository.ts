@@ -167,6 +167,7 @@ export async function findByIdsForDuplicateReview(ids: string[]): Promise<MediaA
           width: 1,
           height: 1,
           photoState: 1,
+          albumIds: 1,
           originalFileFormat: 1,
           originalFileSizeBytes: 1,
           displayStorageType: 1

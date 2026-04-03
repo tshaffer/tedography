@@ -63,6 +63,7 @@ function toAssetSummary(asset: MediaAsset | null): DuplicateCandidatePairAssetSu
         : typeof asset.archivePath === 'string' && asset.archivePath.length > 0
           ? asset.archivePath
           : null,
+    ...(asset.albumIds !== undefined ? { albumIds: asset.albumIds } : {}),
     ...(asset.captureDateTime !== undefined ? { captureDateTime: asset.captureDateTime } : {}),
     ...(asset.width !== undefined ? { width: asset.width } : {}),
     ...(asset.height !== undefined ? { height: asset.height } : {}),
