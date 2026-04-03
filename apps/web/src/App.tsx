@@ -3485,7 +3485,11 @@ export default function App() {
     });
   }, [checkedAlbumIds, libraryBrowseMode, primaryArea]);
 
-  async function loadAssets(options?: { showLoading?: boolean; scope?: AssetsBootstrapScope }): Promise<void> {
+  async function loadAssets(options?: {
+    showLoading?: boolean;
+    scope?: AssetsBootstrapScope;
+    preserveCachedFirstPage?: boolean;
+  }): Promise<void> {
     const startedAt = typeof window !== 'undefined' ? performance.now() : 0;
     const generation = assetsLoadGenerationRef.current + 1;
     assetsLoadGenerationRef.current = generation;
@@ -3514,7 +3518,9 @@ export default function App() {
       }
 
       const shouldPreserveCachedAssets =
-        Array.isArray(cachedAssetsForScope) && cachedAssetsForScope.length > data.items.length;
+        options?.preserveCachedFirstPage !== false &&
+        Array.isArray(cachedAssetsForScope) &&
+        cachedAssetsForScope.length > data.items.length;
       const initialAssets = shouldPreserveCachedAssets ? cachedAssetsForScope : data.items;
 
       setAssets(initialAssets);
@@ -3905,9 +3911,24 @@ export default function App() {
     () => (selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) ?? null : null),
     [albumNodesById, selectedTreeNodeId]
   );
+  const implicitAlbumForMembershipAction = useMemo(
+    () =>
+      ((primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
+        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')) &&
+      checkedAlbumIds.length === 1
+        ? (() => {
+            const candidate = albumNodesById.get(checkedAlbumIds[0] ?? '');
+            return candidate?.nodeType === 'Album' ? candidate : null;
+          })()
+        : null,
+    [albumNodesById, checkedAlbumIds, libraryBrowseMode, primaryArea, reviewBrowseMode]
+  );
   const focusedAlbumForMembershipAction = useMemo(
-    () => (selectedTreeNode?.nodeType === 'Album' ? selectedTreeNode : null),
-    [selectedTreeNode]
+    () =>
+      selectedTreeNode?.nodeType === 'Album'
+        ? selectedTreeNode
+        : implicitAlbumForMembershipAction,
+    [implicitAlbumForMembershipAction, selectedTreeNode]
   );
   const albumTreeCreationParentId = useMemo(
     () => resolveAlbumTreeCreationParentId(selectedTreeNode),
@@ -5854,7 +5875,7 @@ export default function App() {
         setCheckedAlbumIds((previous) => previous.filter((id) => id !== current.id));
       }
       await loadAlbumTreeNodes({ showLoading: false });
-      await loadAssets({ showLoading: false });
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to delete node');
     }
@@ -5889,7 +5910,7 @@ export default function App() {
       await addAssetsToAlbum(targetAlbum.id, {
         assetIds: selectedAssetIdsForAlbumAction
       });
-      await loadAssets({ showLoading: false });
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to add assets to album');
     }
@@ -6003,7 +6024,10 @@ export default function App() {
         `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${movedCount} ${movedCount === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".` +
         (input.keepInSourceAlbum ? ` They remain in "${focusedAlbumForMembershipAction.label}".` : '')
     });
-    await loadAssets({ showLoading: false });
+    await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+    setSelectedAssetIds([]);
+    setSelectedAssetId(null);
+    setSelectionAnchorAssetId(null);
   }
 
   function handleFilmstripSelectAsset(assetId: string): void {
@@ -6163,6 +6187,21 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (
+        viewerMode === 'Grid' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === 'a' &&
+        visibleAssets.length > 0 &&
+        selectedAssetId !== null
+      ) {
+        event.preventDefault();
+        setSelectedAssetIds(visibleAssets.map((asset) => asset.id));
+        setSelectionAnchorAssetId(selectedAssetId);
         return;
       }
 
@@ -7208,8 +7247,7 @@ export default function App() {
             ) : null}
           </div>
 
-          {(hasSelectedAssets ||
-            (selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album')) ? (
+          {(hasSelectedAssets || focusedAlbumForMembershipAction) ? (
             <div style={toolbarGroupStyle}>
               <button
                 type="button"
@@ -7224,7 +7262,7 @@ export default function App() {
               >
                 +Album
               </button>
-              {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
+              {focusedAlbumForMembershipAction ? (
                 <button
                   type="button"
                   style={
@@ -7245,7 +7283,7 @@ export default function App() {
                   Move to Album...
                 </button>
               ) : null}
-              {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
+              {focusedAlbumForMembershipAction ? (
                 <button
                   type="button"
                   style={
