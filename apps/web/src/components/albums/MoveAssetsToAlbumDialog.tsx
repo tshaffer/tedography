@@ -129,6 +129,8 @@ type AlbumTreeNodeWithDepth = AlbumTreeNode & {
   depth: number;
 };
 
+const lastMoveTargetAlbumStorageKey = 'tedography.moveAssetsToAlbum.lastTargetAlbumId';
+
 const checkboxRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -215,13 +217,10 @@ function buildAlbumTreeDisplayList(
   return ordered;
 }
 
-function getInitialExpandedGroupIds(nodes: AlbumTreeNode[], sourceAlbum: AlbumTreeNode | null): string[] {
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const expanded = new Set<string>(
-    nodes.filter((node) => node.nodeType === 'Group' && node.parentId === null).map((node) => node.id)
-  );
+function getAncestorGroupIds(nodesById: Map<string, AlbumTreeNode>, node: AlbumTreeNode | null): string[] {
+  const expanded: string[] = [];
+  let currentParentId = node?.parentId ?? null;
 
-  let currentParentId = sourceAlbum?.parentId ?? null;
   while (currentParentId) {
     const currentNode = nodesById.get(currentParentId);
     if (!currentNode) {
@@ -229,10 +228,21 @@ function getInitialExpandedGroupIds(nodes: AlbumTreeNode[], sourceAlbum: AlbumTr
     }
 
     if (currentNode.nodeType === 'Group') {
-      expanded.add(currentNode.id);
+      expanded.push(currentNode.id);
     }
 
     currentParentId = currentNode.parentId;
+  }
+
+  return expanded;
+}
+
+function getInitialExpandedGroupIds(nodes: AlbumTreeNode[], destinationAlbum: AlbumTreeNode | null): string[] {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const expanded = new Set<string>();
+
+  for (const groupId of getAncestorGroupIds(nodesById, destinationAlbum)) {
+    expanded.add(groupId);
   }
 
   return Array.from(expanded);
@@ -267,12 +277,16 @@ export function MoveAssetsToAlbumDialog({
       return;
     }
 
-    setDestinationAlbumId(destinationAlbums[0]?.id ?? '');
-    setExpandedGroupIds(getInitialExpandedGroupIds(albums, sourceAlbum));
+    const storedDestinationAlbumId = window.localStorage.getItem(lastMoveTargetAlbumStorageKey) ?? '';
+    const initialDestinationAlbum =
+      destinationAlbums.find((album) => album.id === storedDestinationAlbumId) ?? destinationAlbums[0] ?? null;
+
+    setDestinationAlbumId(initialDestinationAlbum?.id ?? '');
+    setExpandedGroupIds(getInitialExpandedGroupIds(albums, initialDestinationAlbum));
     setKeepInSourceAlbum(false);
     setMovePending(false);
     setMoveError(null);
-  }, [albums, destinationAlbums, open, sourceAlbum]);
+  }, [albums, destinationAlbums, open]);
 
   if (!open || !sourceAlbum) {
     return null;
@@ -384,6 +398,7 @@ export function MoveAssetsToAlbumDialog({
                 keepInSourceAlbum
               })
                 .then(() => {
+                  window.localStorage.setItem(lastMoveTargetAlbumStorageKey, destinationAlbumId);
                   onClose();
                 })
                 .catch((error: unknown) => {
