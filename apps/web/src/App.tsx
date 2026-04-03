@@ -48,6 +48,7 @@ import {
   type PeopleScopedAssetSummaryResponse
 } from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
+import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -2806,6 +2807,7 @@ export default function App() {
   const [importDialogInitialAlbumDestination, setImportDialogInitialAlbumDestination] =
     useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
   const [moveDialogNodeId, setMoveDialogNodeId] = useState<string | null>(null);
+  const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
@@ -5964,6 +5966,46 @@ export default function App() {
     }
   }
 
+  async function handleMoveSelectedAssetsToAlbum(input: {
+    destinationAlbumId: string;
+    keepInSourceAlbum: boolean;
+  }): Promise<void> {
+    if (!focusedAlbumForMembershipAction) {
+      throw new Error('Select a source album first.');
+    }
+
+    if (selectedAssetsInFocusedAlbum.length === 0) {
+      throw new Error(`Select one or more assets in "${focusedAlbumForMembershipAction.label}".`);
+    }
+
+    if (input.destinationAlbumId === focusedAlbumForMembershipAction.id) {
+      throw new Error('Destination album must be different from the source album.');
+    }
+
+    setAlbumMembershipNotice(null);
+    setUpdateError(null);
+
+    await addAssetsToAlbum(input.destinationAlbumId, {
+      assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
+    });
+
+    if (!input.keepInSourceAlbum) {
+      await removeAssetsFromAlbum(focusedAlbumForMembershipAction.id, {
+        assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
+      });
+    }
+
+    const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
+    const movedCount = selectedAssetsInFocusedAlbum.length;
+    setAlbumMembershipNotice({
+      kind: 'success',
+      message:
+        `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${movedCount} ${movedCount === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".` +
+        (input.keepInSourceAlbum ? ` They remain in "${focusedAlbumForMembershipAction.label}".` : '')
+    });
+    await loadAssets({ showLoading: false });
+  }
+
   function handleFilmstripSelectAsset(assetId: string): void {
     setSelectedAssetId(assetId);
   }
@@ -7190,6 +7232,27 @@ export default function App() {
                       ? compareButtonStyle
                       : disabledToolbarActionButtonStyle
                   }
+                  onClick={() => setMoveAssetsDialogOpen(true)}
+                  disabled={selectedAssetsInFocusedAlbum.length === 0}
+                  title={
+                    selectedAssetIdsForAlbumAction.length === 0
+                      ? `Select one or more photos to move them out of "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                      : selectedAssetsInFocusedAlbum.length > 0
+                        ? `Move selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}" to another album`
+                        : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                  }
+                >
+                  Move to Album...
+                </button>
+              ) : null}
+              {selectedTreeNodeId && albumNodesById.get(selectedTreeNodeId)?.nodeType === 'Album' ? (
+                <button
+                  type="button"
+                  style={
+                    selectedAssetsInFocusedAlbum.length > 0
+                      ? compareButtonStyle
+                      : disabledToolbarActionButtonStyle
+                  }
                   onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
                   disabled={selectedAssetsInFocusedAlbum.length === 0}
                   title={
@@ -7892,6 +7955,14 @@ export default function App() {
         nodeToMove={moveDialogNode}
         onClose={() => setMoveDialogNodeId(null)}
         onMove={handleMoveTreeNode}
+      />
+      <MoveAssetsToAlbumDialog
+        open={moveAssetsDialogOpen}
+        albums={albumTreeNodes}
+        sourceAlbum={focusedAlbumForMembershipAction}
+        selectedAssetCount={selectedAssetsInFocusedAlbum.length}
+        onClose={() => setMoveAssetsDialogOpen(false)}
+        onMove={handleMoveSelectedAssetsToAlbum}
       />
 
       <ImportAssetsDialog
