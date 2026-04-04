@@ -4889,7 +4889,13 @@ export default function App() {
 
   async function handleSetPhotoState(assetId: string, photoState: PhotoState): Promise<void> {
     const isActiveAssetUpdate = assetId === selectedAssetId;
-    const navigationList = surveyOpen ? compareAssets : visibleAssets;
+    const navigationList = surveyOpen
+      ? compareAssets
+      : immersiveOpen
+        ? immersiveAssets
+        : isLoupeMode
+          ? loupeAssets
+          : visibleAssets;
     const currentIndex = navigationList.findIndex((asset) => asset.id === assetId);
 
     setAssetUpdating(assetId, true);
