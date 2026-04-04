@@ -8106,7 +8106,7 @@ export default function App() {
           setImportDialogInitialAlbumDestination(null);
         }}
         onImportCompleted={() => {
-          void loadAssets({ showLoading: false });
+          void loadAssets({ showLoading: false, preserveCachedFirstPage: false });
           void loadAlbumTreeNodes({ showLoading: false });
         }}
       />
