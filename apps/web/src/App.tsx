@@ -1159,7 +1159,7 @@ const emptyStateTextStyle: CSSProperties = {
 const immersiveOverlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.92)',
+  backgroundColor: '#000',
   display: 'flex',
   flexDirection: 'column',
   padding: 0,
@@ -1206,7 +1206,8 @@ const immersiveImageWrapStyle: CSSProperties = {
   justifyContent: 'center',
   minHeight: 0,
   overflow: 'hidden',
-  padding: 0
+  padding: 0,
+  backgroundColor: '#000'
 };
 
 const immersiveImageStyle: CSSProperties = {
@@ -1226,7 +1227,7 @@ const immersiveBottomHintStyle: CSSProperties = {
 
 const slideshowOverlayStyle: CSSProperties = {
   ...immersiveOverlayStyle,
-  backgroundColor: 'rgba(0, 0, 0, 0.96)'
+  backgroundColor: '#000'
 };
 
 const slideshowTopBarStyle: CSSProperties = {
