@@ -2145,6 +2145,7 @@ function AssetCard({
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const pendingClickTimeoutRef = useRef<number | null>(null);
   const thumbnailImageUrl = getAssetThumbnailImageUrl(asset);
   const displayImageUrl = getAssetDisplayImageUrl(asset);
   const imageUrl = imageFailed ? displayImageUrl : thumbnailImageUrl;
@@ -2166,6 +2167,47 @@ function AssetCard({
     setImageFailed(false);
   }, [thumbnailImageUrl, displayImageUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingClickTimeoutRef.current !== null) {
+        window.clearTimeout(pendingClickTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function handleClick(event: ReactMouseEvent<HTMLElement>): void {
+    if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
+      if (pendingClickTimeoutRef.current !== null) {
+        window.clearTimeout(pendingClickTimeoutRef.current);
+        pendingClickTimeoutRef.current = null;
+      }
+      onCardClick(event, asset.id);
+      return;
+    }
+
+    if (event.detail > 1) {
+      return;
+    }
+
+    if (pendingClickTimeoutRef.current !== null) {
+      window.clearTimeout(pendingClickTimeoutRef.current);
+    }
+
+    pendingClickTimeoutRef.current = window.setTimeout(() => {
+      pendingClickTimeoutRef.current = null;
+      onCardClick(event, asset.id);
+    }, 220);
+  }
+
+  function handleDoubleClick(): void {
+    if (pendingClickTimeoutRef.current !== null) {
+      window.clearTimeout(pendingClickTimeoutRef.current);
+      pendingClickTimeoutRef.current = null;
+    }
+
+    onCardDoubleClick(asset.id);
+  }
+
   return (
     <article
       data-grid-card="true"
@@ -2182,8 +2224,8 @@ function AssetCard({
             ? { ...cardStyle, ...selectedCardStyle }
             : cardStyle
       }
-      onClick={(event) => onCardClick(event, asset.id)}
-      onDoubleClick={() => onCardDoubleClick(asset.id)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={asset.filename}
