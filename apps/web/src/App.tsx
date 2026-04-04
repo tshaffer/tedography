@@ -613,6 +613,12 @@ const albumTreeCheckboxStyle: CSSProperties = {
   margin: 0
 };
 
+const albumTreeShiftedCheckboxStyle: CSSProperties = {
+  ...albumTreeCheckboxStyle,
+  transform: 'translateX(16px)',
+  marginRight: '4px'
+};
+
 const filterRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -6589,14 +6595,14 @@ export default function App() {
                 <span
                   style={{
                     ...albumTreeCheckboxCellStyle,
-                    width: isGroup ? '6px' : '22px',
-                    minWidth: isGroup ? '6px' : '22px'
+                    width: '6px',
+                    minWidth: '6px'
                   }}
                 >
                   {!isGroup ? (
                     <input
                       type="checkbox"
-                      style={albumTreeCheckboxStyle}
+                      style={albumTreeShiftedCheckboxStyle}
                       checked={isChecked}
                       onChange={() => onToggleChecked(node.id)}
                       title="Scope to this album"
@@ -6605,7 +6611,14 @@ export default function App() {
                 </span>
                 <button
                   type="button"
-                  style={albumTreeLabelButtonStyle}
+                  style={
+                    isGroup
+                      ? albumTreeLabelButtonStyle
+                      : {
+                          ...albumTreeLabelButtonStyle,
+                          paddingLeft: '10px'
+                        }
+                  }
                   data-selected={isSelected ? 'true' : undefined}
                   onClick={() => setSelectedTreeNodeId(node.id)}
                   title={labelText}
