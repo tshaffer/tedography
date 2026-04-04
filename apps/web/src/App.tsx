@@ -4401,6 +4401,11 @@ export default function App() {
     [compareAssets, visibleAssets]
   );
 
+  const immersiveAssets = useMemo(
+    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    [compareAssets, visibleAssets]
+  );
+
   const selectedAssetIndex = useMemo(
     () => visibleAssets.findIndex((asset) => asset.id === selectedAssetId),
     [visibleAssets, selectedAssetId]
@@ -4409,6 +4414,11 @@ export default function App() {
   const loupeSelectedAssetIndex = useMemo(
     () => loupeAssets.findIndex((asset) => asset.id === selectedAssetId),
     [loupeAssets, selectedAssetId]
+  );
+
+  const immersiveSelectedAssetIndex = useMemo(
+    () => immersiveAssets.findIndex((asset) => asset.id === selectedAssetId),
+    [immersiveAssets, selectedAssetId]
   );
 
   const slideshowSelectedAssetIndex = useMemo(
@@ -5171,6 +5181,29 @@ export default function App() {
     const nextAsset = list[nextIndex];
     if (nextAsset) {
       setSelectedAssetId(nextAsset.id);
+    }
+  }
+
+  function handleDeselectCurrentImmersiveSelection(): void {
+    if (!immersiveOpen || selectedAssetId === null || compareAssets.length === 0) {
+      return;
+    }
+
+    const currentSelectedAsset = compareAssets.find((asset) => asset.id === selectedAssetId);
+    if (!currentSelectedAsset) {
+      return;
+    }
+
+    const replacementAssetId =
+      getAdjacentReplacementAssetId(compareAssets, selectedAssetId) ??
+      getAdjacentReplacementAssetId(visibleAssets, selectedAssetId);
+    const nextSelectedIds = selectedAssetIds.filter((id) => id !== selectedAssetId);
+
+    setSelectedAssetIds(nextSelectedIds);
+    setSelectedAssetId(replacementAssetId);
+
+    if (selectionAnchorAssetId === selectedAssetId) {
+      setSelectionAnchorAssetId(nextSelectedIds[0] ?? replacementAssetId);
     }
   }
 
@@ -6096,8 +6129,8 @@ export default function App() {
       return;
     }
 
-    const navigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
-    const navigationIndex = isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex;
+    const navigationAssets = immersiveOpen ? immersiveAssets : slideshowAssets;
+    const navigationIndex = immersiveOpen ? immersiveSelectedAssetIndex : slideshowSelectedAssetIndex;
 
     // Guard against stale load events when fast navigation changes the active asset.
     if (!selectedAssetId || loadedAssetId !== selectedAssetId || navigationIndex < 0) {
@@ -6276,7 +6309,17 @@ export default function App() {
       }
 
       if (immersiveOpen) {
-        const immersiveNavigationAssets = isLoupeMode ? loupeAssets : visibleAssets;
+        const immersiveNavigationAssets = immersiveAssets;
+        if (
+          event.key.toLowerCase() === 'u' &&
+          compareAssets.length > 0 &&
+          compareAssets.some((asset) => asset.id === selectedAssetId)
+        ) {
+          event.preventDefault();
+          handleDeselectCurrentImmersiveSelection();
+          return;
+        }
+
         if (event.key === 'ArrowRight') {
           event.preventDefault();
           handleSelectRelativeInList(immersiveNavigationAssets, 1);
@@ -6354,12 +6397,16 @@ export default function App() {
   }, [
     albumTreeContextMenu,
     compareAssets,
+    immersiveAssets,
+    immersiveSelectedAssetIndex,
     loupeAssets,
     visibleAssets,
     isLoupeMode,
     immersiveOpen,
     selectedAsset,
     selectedAssetId,
+    slideshowAssets,
+    slideshowSelectedAssetIndex,
     slideshowActive,
     selectedAssetIds.length,
     surveyOpen,
@@ -7958,17 +8005,16 @@ export default function App() {
       {immersiveOpen && selectedAsset ? (
         <ImmersiveViewer
           asset={selectedAsset}
-          index={isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex}
-          total={isLoupeMode ? loupeAssets.length : visibleAssets.length}
-          hasPrevious={(isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) > 0}
+          index={immersiveSelectedAssetIndex}
+          total={immersiveAssets.length}
+          hasPrevious={immersiveSelectedAssetIndex > 0}
           hasNext={
-            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) >= 0 &&
-            (isLoupeMode ? loupeSelectedAssetIndex : selectedAssetIndex) <
-              (isLoupeMode ? loupeAssets.length : visibleAssets.length) - 1
+            immersiveSelectedAssetIndex >= 0 &&
+            immersiveSelectedAssetIndex < immersiveAssets.length - 1
           }
           onClose={closeImmersive}
-          onPrevious={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, -1)}
-          onNext={() => handleSelectRelativeInList(isLoupeMode ? loupeAssets : visibleAssets, 1)}
+          onPrevious={() => handleSelectRelativeInList(immersiveAssets, -1)}
+          onNext={() => handleSelectRelativeInList(immersiveAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
