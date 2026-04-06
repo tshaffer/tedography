@@ -132,6 +132,10 @@ type AssetsBootstrapScope =
   | { kind: 'all' }
   | { kind: 'albums'; albumIds: string[] };
 
+type AlbumAssetCountStatus = 'known-complete' | 'not-in-current-scope' | 'loading-indeterminate';
+
+type AssetsScopeLoadStatus = 'indeterminate' | 'loading' | 'complete';
+
 type CachedBootstrapAssets = {
   items: MediaAsset[];
   scope: AssetsBootstrapScope;
@@ -1137,11 +1141,85 @@ const albumTreeLabelButtonStyle: CSSProperties = {
   minWidth: 0,
   justifyContent: 'flex-start',
   overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
   paddingLeft: '6px',
   paddingRight: '6px'
 };
+
+const albumTreeLabelContentStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  minWidth: 0,
+  width: '100%'
+};
+
+const albumTreeLabelTextStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+};
+
+const albumTreeCountStatusBadgeBaseStyle: CSSProperties = {
+  flex: '0 0 auto',
+  borderRadius: '999px',
+  padding: '1px 6px',
+  fontSize: '11px',
+  fontWeight: 600,
+  lineHeight: 1.4,
+  border: '1px solid transparent'
+};
+
+function getAlbumAssetCountStatusLabel(status: AlbumAssetCountStatus): string {
+  if (status === 'known-complete') {
+    return 'Exact';
+  }
+
+  if (status === 'not-in-current-scope') {
+    return 'Scope';
+  }
+
+  return 'Load';
+}
+
+function getAlbumAssetCountStatusTitle(status: AlbumAssetCountStatus, albumLabel: string): string {
+  if (status === 'known-complete') {
+    return `Count for "${albumLabel}" is complete for the current loaded asset scope.`;
+  }
+
+  if (status === 'not-in-current-scope') {
+    return `Count for "${albumLabel}" is outside the current asset scope and should not be treated as complete right now.`;
+  }
+
+  return `Count for "${albumLabel}" is still indeterminate because assets for the current scope are still loading or have not been fully confirmed yet.`;
+}
+
+function getAlbumAssetCountStatusBadgeStyle(status: AlbumAssetCountStatus): CSSProperties {
+  if (status === 'known-complete') {
+    return {
+      ...albumTreeCountStatusBadgeBaseStyle,
+      backgroundColor: '#e7f6ec',
+      color: '#166534',
+      borderColor: '#b7dfc3'
+    };
+  }
+
+  if (status === 'not-in-current-scope') {
+    return {
+      ...albumTreeCountStatusBadgeBaseStyle,
+      backgroundColor: '#f3f4f6',
+      color: '#4b5563',
+      borderColor: '#d1d5db'
+    };
+  }
+
+  return {
+    ...albumTreeCountStatusBadgeBaseStyle,
+    backgroundColor: '#fff4db',
+    color: '#92400e',
+    borderColor: '#f5d38c'
+  };
+}
 
 const emptyStateStyle: CSSProperties = {
   border: '1px solid #d6d6d6',
@@ -2847,6 +2925,18 @@ export default function App() {
     return [];
   });
   const [assetsLoading, setAssetsLoading] = useState(() => !(appBootstrapCache.assets ?? readCachedBootstrapAssets()));
+  const [assetsScopeLoadStatus, setAssetsScopeLoadStatus] = useState<AssetsScopeLoadStatus>(() =>
+    appBootstrapCache.assets ?? readCachedBootstrapAssets() ? 'indeterminate' : 'loading'
+  );
+  const [loadedAssetsScope, setLoadedAssetsScope] = useState<AssetsBootstrapScope>(() => {
+    const cached = appBootstrapCache.assets ?? readCachedBootstrapAssets();
+    if (cached) {
+      appBootstrapCache.assets = cached;
+      return cached.scope;
+    }
+
+    return { kind: 'all' };
+  });
   const [albumTreeLoading, setAlbumTreeLoading] = useState(
     () => !(appBootstrapCache.albumTreeNodes ?? readCachedBootstrapAlbumTreeNodes())
   );
@@ -3551,6 +3641,8 @@ export default function App() {
       setAssetsLoading(true);
     }
 
+    setLoadedAssetsScope(scope);
+    setAssetsScopeLoadStatus('loading');
     setAssetsError(null);
 
     try {
@@ -3612,19 +3704,27 @@ export default function App() {
               scope
             };
           }
+
+          if (generation === assetsLoadGenerationRef.current) {
+            setAssetsScopeLoadStatus('complete');
+          }
         })().catch((error: unknown) => {
           if (generation !== assetsLoadGenerationRef.current) {
             return;
           }
 
+          setAssetsScopeLoadStatus('indeterminate');
           if (error instanceof Error) {
             setAssetsError(error.message);
           } else {
             setAssetsError('Unknown error');
           }
         });
+      } else {
+        setAssetsScopeLoadStatus('complete');
       }
     } catch (error: unknown) {
+      setAssetsScopeLoadStatus('indeterminate');
       if (error instanceof Error) {
         setAssetsError(error.message);
         return;
@@ -4002,6 +4102,26 @@ export default function App() {
 
     return counts;
   }, [assets]);
+  const albumAssetCountStatuses = useMemo(() => {
+    const statuses = new Map<string, AlbumAssetCountStatus>();
+
+    for (const album of albumNodes) {
+      if (
+        loadedAssetsScope.kind === 'albums' &&
+        !loadedAssetsScope.albumIds.includes(album.id)
+      ) {
+        statuses.set(album.id, 'not-in-current-scope');
+        continue;
+      }
+
+      statuses.set(
+        album.id,
+        assetsScopeLoadStatus === 'complete' ? 'known-complete' : 'loading-indeterminate'
+      );
+    }
+
+    return statuses;
+  }, [albumNodes, assetsScopeLoadStatus, loadedAssetsScope]);
 
   const areaDefaultPhotoStates = useMemo(
     () => getDefaultPhotoStatesForPrimaryArea(primaryArea),
@@ -6568,9 +6688,15 @@ export default function App() {
             const isChecked = checkedIds.includes(node.id);
             const isSelected = selectedTreeNodeId === node.id;
             const depthIndent = `${node.depth * 10}px`;
+            const countStatus = !isGroup
+              ? albumAssetCountStatuses.get(node.id) ?? 'loading-indeterminate'
+              : null;
             const labelText = isGroup
               ? node.label
               : `${node.label} (${albumAssetCounts.get(node.id) ?? 0})`;
+            const titleText = !isGroup && countStatus
+              ? `${labelText} • ${getAlbumAssetCountStatusTitle(countStatus, node.label)}`
+              : labelText;
 
             return (
               <div
@@ -6621,9 +6747,19 @@ export default function App() {
                   }
                   data-selected={isSelected ? 'true' : undefined}
                   onClick={() => setSelectedTreeNodeId(node.id)}
-                  title={labelText}
+                  title={titleText}
                 >
-                  {labelText}
+                  <span style={albumTreeLabelContentStyle}>
+                    <span style={albumTreeLabelTextStyle}>{labelText}</span>
+                    {!isGroup && countStatus ? (
+                      <span
+                        style={getAlbumAssetCountStatusBadgeStyle(countStatus)}
+                        aria-label={getAlbumAssetCountStatusTitle(countStatus, node.label)}
+                      >
+                        {getAlbumAssetCountStatusLabel(countStatus)}
+                      </span>
+                    ) : null}
+                  </span>
                 </button>
               </div>
             );
