@@ -1172,14 +1172,14 @@ const albumTreeCountStatusBadgeBaseStyle: CSSProperties = {
 
 function getAlbumAssetCountStatusLabel(status: AlbumAssetCountStatus): string {
   if (status === 'known-complete') {
-    return 'Exact';
+    return '=';
   }
 
   if (status === 'not-in-current-scope') {
-    return 'Scope';
+    return '◌';
   }
 
-  return 'Load';
+  return '~';
 }
 
 function getAlbumAssetCountStatusTitle(status: AlbumAssetCountStatus, albumLabel: string): string {
