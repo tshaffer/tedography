@@ -2,6 +2,7 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import { PhotoState, normalizePhotoState } from '@tedography/domain';
 import type { RefreshOperationResponse } from '@tedography/domain';
+import type { FindSimilarAssetsResponse } from '@tedography/shared';
 import { log } from './logger.js';
 import {
   rebuildDerivedFilesForAsset,
@@ -14,6 +15,7 @@ import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRou
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
+import { findSimilarAssets } from './services/similarAssetService.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -132,6 +134,36 @@ export function createServer(): Express {
 
       log.error('Failed to rebuild asset derived files', error);
       res.status(500).json({ error: 'Failed to rebuild asset derived files' });
+    }
+  });
+
+  app.get('/api/assets/:id/similar', async (req, res) => {
+    const rawLimit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    const limit = rawLimit !== undefined && Number.isFinite(rawLimit) ? rawLimit : undefined;
+    const photoState =
+      typeof req.query.photoState === 'string' ? normalizePhotoState(req.query.photoState) : null;
+
+    if (typeof req.query.photoState === 'string' && !photoState) {
+      res.status(400).json({ error: 'photoState must be one of New, Pending, Keep, Discard' });
+      return;
+    }
+
+    try {
+      const response = await findSimilarAssets({
+        assetId: req.params.id,
+        ...(limit !== undefined ? { limit } : {}),
+        ...(photoState ? { photoState } : {})
+      });
+
+      if (!response) {
+        res.status(404).json({ error: 'Asset not found or is not a photo' });
+        return;
+      }
+
+      res.json(response satisfies FindSimilarAssetsResponse);
+    } catch (error) {
+      log.error('Failed to load similar assets', error);
+      res.status(500).json({ error: 'Failed to load similar assets' });
     }
   });
 

@@ -1,4 +1,5 @@
-import type { RefreshOperationResponse } from '@tedography/domain';
+import type { PhotoState, RefreshOperationResponse } from '@tedography/domain';
+import type { FindSimilarAssetsResponse } from '@tedography/shared';
 
 type ApiErrorPayload = {
   error?: string;
@@ -28,5 +29,27 @@ export async function rebuildAssetDerivedFiles(
     {
       method: 'POST'
     }
+  );
+}
+
+export async function findSimilarAssets(
+  assetId: string,
+  input?: {
+    limit?: number;
+    photoState?: PhotoState;
+  }
+): Promise<FindSimilarAssetsResponse> {
+  const params = new URLSearchParams();
+  if (input?.limit !== undefined) {
+    params.set('limit', String(input.limit));
+  }
+
+  if (input?.photoState) {
+    params.set('photoState', input.photoState);
+  }
+
+  const search = params.toString();
+  return fetchJson<FindSimilarAssetsResponse>(
+    `/api/assets/${encodeURIComponent(assetId)}/similar${search.length > 0 ? `?${search}` : ''}`
   );
 }
