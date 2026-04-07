@@ -261,9 +261,24 @@ function validateDestination(
   nodeToMove: AlbumTreeNode,
   destinationId: MoveDestinationId,
   nodesById: Map<string, AlbumTreeNode>,
+  nodesByParentId: Map<string | null, AlbumTreeNode[]>,
   groupDescendantIds: Set<string>
 ): DestinationValidation {
+  const hasSiblingLabelConflict = (parentId: string | null): boolean => {
+    const normalizedLabel = nodeToMove.label.trim().toLocaleLowerCase();
+    return (nodesByParentId.get(parentId) ?? []).some(
+      (sibling) =>
+        sibling.id !== nodeToMove.id &&
+        sibling.nodeType === nodeToMove.nodeType &&
+        sibling.label.trim().toLocaleLowerCase() === normalizedLabel
+    );
+  };
+
   if (destinationId === ROOT_DESTINATION) {
+    if (hasSiblingLabelConflict(null)) {
+      return { isSelectable: false, reason: 'Sibling with same name exists' };
+    }
+
     return nodeToMove.parentId === null
       ? { isSelectable: false, reason: 'Already top level' }
       : { isSelectable: true, reason: null };
@@ -292,6 +307,10 @@ function validateDestination(
     }
   }
 
+  if (hasSiblingLabelConflict(destinationNode.id)) {
+    return { isSelectable: false, reason: 'Sibling with same name exists' };
+  }
+
   return { isSelectable: true, reason: null };
 }
 
@@ -308,6 +327,15 @@ export function MoveAlbumTreeNodeDialog({
   const [moveError, setMoveError] = useState<string | null>(null);
 
   const nodesById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const nodesByParentId = useMemo(() => {
+    const byParent = new Map<string | null, AlbumTreeNode[]>();
+    for (const node of nodes) {
+      const siblings = byParent.get(node.parentId) ?? [];
+      siblings.push(node);
+      byParent.set(node.parentId, siblings);
+    }
+    return byParent;
+  }, [nodes]);
   const groupDescendantIds = useMemo(
     () => (nodeToMove?.nodeType === 'Group' ? getDescendantNodeIds(nodes, nodeToMove.id) : new Set<string>()),
     [nodeToMove, nodes]
@@ -332,7 +360,13 @@ export function MoveAlbumTreeNodeDialog({
     return null;
   }
 
-  const currentValidation = validateDestination(nodeToMove, selectedDestinationId, nodesById, groupDescendantIds);
+  const currentValidation = validateDestination(
+    nodeToMove,
+    selectedDestinationId,
+    nodesById,
+    nodesByParentId,
+    groupDescendantIds
+  );
   const moveTitle = nodeToMove.nodeType === 'Album' ? 'Move Album' : 'Move Group';
 
   return (
@@ -354,12 +388,26 @@ export function MoveAlbumTreeNodeDialog({
                 style={{
                   ...destinationRowStyle,
                   ...(selectedDestinationId === ROOT_DESTINATION ? selectedDestinationRowStyle : {}),
-                  ...(!validateDestination(nodeToMove, ROOT_DESTINATION, nodesById, groupDescendantIds).isSelectable
+                  ...(!validateDestination(
+                    nodeToMove,
+                    ROOT_DESTINATION,
+                    nodesById,
+                    nodesByParentId,
+                    groupDescendantIds
+                  ).isSelectable
                     ? disabledDestinationRowStyle
                     : {})
                 }}
                 onClick={() => {
-                  if (validateDestination(nodeToMove, ROOT_DESTINATION, nodesById, groupDescendantIds).isSelectable) {
+                  if (
+                    validateDestination(
+                      nodeToMove,
+                      ROOT_DESTINATION,
+                      nodesById,
+                      nodesByParentId,
+                      groupDescendantIds
+                    ).isSelectable
+                  ) {
                     setSelectedDestinationId(ROOT_DESTINATION);
                   }
                 }}
@@ -372,7 +420,13 @@ export function MoveAlbumTreeNodeDialog({
             {displayNodes.map((node) => {
               const isGroup = node.nodeType === 'Group';
               const isExpanded = expandedGroupIds.includes(node.id);
-              const validation = validateDestination(nodeToMove, node.id, nodesById, groupDescendantIds);
+              const validation = validateDestination(
+                nodeToMove,
+                node.id,
+                nodesById,
+                nodesByParentId,
+                groupDescendantIds
+              );
               const isSelected = selectedDestinationId === node.id;
 
               return (

@@ -38,7 +38,7 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
-import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
+import { findSimilarAssets as findSimilarAssetsForAsset, rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
 import { listDuplicateGroups } from './api/duplicateCandidatePairApi';
 import {
   getPeoplePipelineAssetState,
@@ -52,6 +52,7 @@ import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDi
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
+import { SimilarAssetsDialog } from './components/assets/SimilarAssetsDialog';
 import {
   buildDuplicateResolutionVisibilityMap,
   filterAssetsByDuplicateSuppression,
@@ -79,7 +80,7 @@ import {
   type TimelineNavigationYear
 } from './utilities/libraryTimeline';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
-import type { ListAssetFaceDetectionsResponse } from '@tedography/shared';
+import type { FindSimilarAssetsResponse, ListAssetFaceDetectionsResponse } from '@tedography/shared';
 
 const photoStateFilterOptions: PhotoState[] = [
   PhotoState.New,
@@ -2948,6 +2949,10 @@ export default function App() {
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
+  const [similarAssetsDialogOpen, setSimilarAssetsDialogOpen] = useState(false);
+  const [similarAssetsLoading, setSimilarAssetsLoading] = useState(false);
+  const [similarAssetsResult, setSimilarAssetsResult] = useState<FindSimilarAssetsResponse | null>(null);
+  const [similarAssetsError, setSimilarAssetsError] = useState<string | null>(null);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -6010,6 +6015,8 @@ export default function App() {
       return;
     }
 
+    setUpdateError(null);
+
     try {
       const moved = await moveAlbumTreeNode(moveDialogNode.id, { parentId: destinationParentId });
       const ancestorGroupIds = getAncestorGroupIdsForParentId(destinationParentId, albumNodesById);
@@ -6028,7 +6035,9 @@ export default function App() {
       setMoveDialogNodeId(null);
       await loadAlbumTreeNodes({ showLoading: false });
     } catch (error: unknown) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to move node');
+      const message = error instanceof Error ? error.message : 'Failed to move node';
+      setUpdateError(message);
+      throw error instanceof Error ? error : new Error(message);
     }
   }
 
@@ -6294,6 +6303,28 @@ export default function App() {
       );
     } finally {
       setAssetMaintenanceBusy(null);
+    }
+  }
+
+  async function handleFindSimilarAssets(input: {
+    limit: number;
+    photoState?: PhotoState;
+  }): Promise<void> {
+    if (!selectedAsset) {
+      return;
+    }
+
+    setSimilarAssetsLoading(true);
+    setSimilarAssetsError(null);
+
+    try {
+      const response = await findSimilarAssetsForAsset(selectedAsset.id, input);
+      setSimilarAssetsResult(response);
+    } catch (error: unknown) {
+      setSimilarAssetsResult(null);
+      setSimilarAssetsError(error instanceof Error ? error.message : 'Failed to find similar photos');
+    } finally {
+      setSimilarAssetsLoading(false);
     }
   }
 
@@ -7793,6 +7824,24 @@ export default function App() {
                   >
                     Maintenance
                   </button>
+                  <button
+                    type="button"
+                    style={selectedAsset ? toolbarButtonStyle : { ...toolbarButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    disabled={!selectedAsset}
+                    onClick={() => {
+                      setToolbarOverflowOpen(false);
+                      setSimilarAssetsResult(null);
+                      setSimilarAssetsError(null);
+                      setSimilarAssetsDialogOpen(true);
+                    }}
+                    title={
+                      selectedAsset
+                        ? 'Find similar photos for the selected asset'
+                        : 'Select a photo to find similar photos'
+                    }
+                  >
+                    Similar Photos
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -8272,6 +8321,21 @@ export default function App() {
             ? loadSelectedAssetPeopleStatus(selectedAssetId)
             : undefined
         }
+      />
+      <SimilarAssetsDialog
+        open={similarAssetsDialogOpen}
+        assetId={selectedAsset?.id ?? null}
+        assetFilename={selectedAsset?.filename ?? null}
+        loading={similarAssetsLoading}
+        result={similarAssetsResult}
+        errorMessage={similarAssetsError}
+        onClose={() => {
+          setSimilarAssetsDialogOpen(false);
+          setSimilarAssetsLoading(false);
+        }}
+        onRun={(input) => {
+          void handleFindSimilarAssets(input);
+        }}
       />
       <ScopedPeopleMaintenanceDialog
         open={scopedPeopleDialogOpen}
