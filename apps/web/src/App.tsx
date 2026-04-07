@@ -606,8 +606,8 @@ const albumTreeSpacerStyle: CSSProperties = {
 };
 
 const albumTreeCheckboxCellStyle: CSSProperties = {
-  width: '16px',
-  minWidth: '16px',
+  width: '24px',
+  minWidth: '24px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center'
@@ -619,8 +619,7 @@ const albumTreeCheckboxStyle: CSSProperties = {
 
 const albumTreeShiftedCheckboxStyle: CSSProperties = {
   ...albumTreeCheckboxStyle,
-  transform: 'translateX(16px)',
-  marginRight: '4px'
+  transform: 'none'
 };
 
 const filterRowStyle: CSSProperties = {
@@ -6719,11 +6718,7 @@ export default function App() {
                   <span style={albumTreeSpacerStyle} />
                 )}
                 <span
-                  style={{
-                    ...albumTreeCheckboxCellStyle,
-                    width: '6px',
-                    minWidth: '6px'
-                  }}
+                  style={albumTreeCheckboxCellStyle}
                 >
                   {!isGroup ? (
                     <input
