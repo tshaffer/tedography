@@ -69,6 +69,10 @@ const assetCardStyle: CSSProperties = {
   alignContent: 'start'
 };
 
+const imageWrapStyle: CSSProperties = {
+  position: 'relative'
+};
+
 const selectedAssetCardStyle: CSSProperties = {
   boxShadow: 'inset 0 0 0 2px #f04438',
   borderColor: '#f04438',
@@ -81,6 +85,21 @@ const imageStyle: CSSProperties = {
   objectFit: 'contain',
   borderRadius: '8px',
   backgroundColor: '#f7f7f7'
+};
+
+const duplicateThumbnailBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  top: '10px',
+  right: '10px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '4px 9px',
+  borderRadius: '999px',
+  backgroundColor: 'rgba(124, 58, 237, 0.92)',
+  color: '#fff',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.01em'
 };
 
 const infoGridStyle: CSSProperties = {
@@ -298,60 +317,6 @@ export function UnknownCaptureReviewPage() {
           </div>
 
           <section style={panelStyle}>
-            <h2 style={{ marginTop: 0 }}>Review Assets In Group</h2>
-            <div style={assetGridStyle}>
-              {currentGroup.assets.map((item) => {
-                const selected = selectedDiscardIds.includes(item.asset.id);
-                return (
-                  <article
-                    key={item.asset.id}
-                    style={{
-                      ...assetCardStyle,
-                      ...(selected ? selectedAssetCardStyle : {})
-                    }}
-                  >
-                    <img
-                      src={getDisplayMediaUrl(item.asset.id)}
-                      alt={item.asset.filename}
-                      style={imageStyle}
-                    />
-                    <div style={badgeRowStyle}>
-                      <span style={badgeStyle}>{item.asset.photoState}</span>
-                      <span style={badgeStyle}>{formatDimensions(item.asset.width, item.asset.height)}</span>
-                      <span style={badgeStyle}>{item.basenameMatchedSidecarCount} basename matches</span>
-                      <span style={badgeStyle}>{item.verifiedMatchCount} verified matches</span>
-                      {item.possibleUnconfirmedDuplicate ? (
-                        <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
-                      ) : null}
-                      {item.confirmedSuppressedDuplicate ? (
-                        <span style={badgeStyle}>Suppressed Duplicate</span>
-                      ) : null}
-                    </div>
-                    <div style={infoGridStyle}>
-                      <span style={labelStyle}>Filename</span>
-                      <span>{item.asset.filename}</span>
-                      <span style={labelStyle}>Captured</span>
-                      <span>{item.asset.captureDateTime ?? 'Unknown'}</span>
-                      <span style={labelStyle}>Path</span>
-                      <span>{item.asset.originalArchivePath}</span>
-                      <span style={labelStyle}>Asset ID</span>
-                      <span>{item.asset.id}</span>
-                    </div>
-                    <button
-                      type="button"
-                      style={selected ? dangerButtonStyle : primaryButtonStyle}
-                      onClick={() => toggleSelectedDiscard(item.asset.id)}
-                      disabled={busy}
-                    >
-                      {selected ? 'Selected To Discard' : 'Select To Discard'}
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-
-          <section style={panelStyle}>
             <h2 style={{ marginTop: 0 }}>All Matching Tedography Assets</h2>
             <div style={assetGridStyle}>
               {currentGroup.relatedTedographyAssets.map((item) => {
@@ -365,11 +330,16 @@ export function UnknownCaptureReviewPage() {
                       ...(selected ? selectedAssetCardStyle : {})
                     }}
                   >
-                    <img
-                      src={getDisplayMediaUrl(item.asset.id)}
-                      alt={item.asset.filename}
-                      style={imageStyle}
-                    />
+                    <div style={imageWrapStyle}>
+                      <img
+                        src={getDisplayMediaUrl(item.asset.id)}
+                        alt={item.asset.filename}
+                        style={imageStyle}
+                      />
+                      {item.confirmedSuppressedDuplicate ? (
+                        <span style={duplicateThumbnailBadgeStyle}>Duplicate</span>
+                      ) : null}
+                    </div>
                     <div style={badgeRowStyle}>
                       <span style={badgeStyle}>{item.asset.photoState}</span>
                       <span style={badgeStyle}>{formatDimensions(item.asset.width, item.asset.height)}</span>
