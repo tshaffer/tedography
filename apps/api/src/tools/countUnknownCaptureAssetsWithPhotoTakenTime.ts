@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
+import { extractMetadata, shutdownMetadataExtractor } from '@tedography/media-metadata';
 import { connectToMongo } from '../db.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
 
@@ -59,6 +60,9 @@ type ParsedArgs = {
 
 type SidecarInfo = {
   path: string;
+  mediaPath: string | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
   hasPhotoTakenTime: boolean;
   hasStructuredPhotoTakenTime: boolean;
   hasExactUnknownCapturePhotoTakenTime: boolean;
@@ -73,6 +77,9 @@ type SidecarIndex = {
     withPhotoTakenTimeCount: number;
     withoutPhotoTakenTimeCount: number;
     withExactUnknownCapturePhotoTakenTimeCount: number;
+    matchedMediaFileCount: number;
+    missingMediaFileCount: number;
+    unreadableMediaMetadataCount: number;
   };
 };
 
@@ -81,6 +88,8 @@ type MediaAssetDoc = {
   filename?: string;
   originalArchivePath?: string;
   captureDateTime?: string | null;
+  width?: number | null;
+  height?: number | null;
 };
 
 type MultipleMatchedSidecarRecord = {
@@ -88,6 +97,9 @@ type MultipleMatchedSidecarRecord = {
   candidateSidecars: string[];
   matchedSidecars: Array<{
     path: string;
+    mediaPath: string | null;
+    mediaWidth: number | null;
+    mediaHeight: number | null;
     hasPhotoTakenTime: boolean;
     hasStructuredPhotoTakenTime: boolean;
     photoTakenTime?: unknown;
@@ -231,7 +243,37 @@ function walk(dirPath: string, visitor: (fullPath: string) => void): void {
   }
 }
 
-function buildSidecarIndex(runsRoot: string): SidecarIndex {
+function getSidecarMediaPath(sidecarPath: string): string | null {
+  const lower = sidecarPath.toLowerCase();
+
+  if (lower.endsWith('.supplemental-metadata.json')) {
+    const candidate = sidecarPath.slice(0, -'.supplemental-metadata.json'.length);
+    return fs.existsSync(candidate) ? candidate : null;
+  }
+
+  if (lower.endsWith('.json')) {
+    const candidate = sidecarPath.slice(0, -'.json'.length);
+    return fs.existsSync(candidate) ? candidate : null;
+  }
+
+  return null;
+}
+
+function dimensionsMatchAsset(
+  asset: Pick<MediaAssetDoc, 'width' | 'height'>,
+  sidecar: Pick<SidecarInfo, 'mediaWidth' | 'mediaHeight'>
+): boolean {
+  return (
+    typeof asset.width === 'number' &&
+    typeof asset.height === 'number' &&
+    typeof sidecar.mediaWidth === 'number' &&
+    typeof sidecar.mediaHeight === 'number' &&
+    asset.width === sidecar.mediaWidth &&
+    asset.height === sidecar.mediaHeight
+  );
+}
+
+async function buildSidecarIndex(runsRoot: string): Promise<SidecarIndex> {
   const byBaseName = new Map<string, SidecarInfo[]>();
 
   let matchedSidecarCount = 0;
@@ -239,13 +281,22 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
   let withPhotoTakenTimeCount = 0;
   let withoutPhotoTakenTimeCount = 0;
   let withExactUnknownCapturePhotoTakenTimeCount = 0;
-
+  let matchedMediaFileCount = 0;
+  let missingMediaFileCount = 0;
+  let unreadableMediaMetadataCount = 0;
+  const sidecarPaths: string[] = [];
   walk(runsRoot, (fullPath) => {
     const baseName = path.basename(fullPath);
 
     if (!isTakeoutSidecarFilename(baseName)) {
       return;
     }
+
+    sidecarPaths.push(fullPath);
+  });
+
+  for (const fullPath of sidecarPaths) {
+    const baseName = path.basename(fullPath);
 
     matchedSidecarCount += 1;
 
@@ -254,7 +305,7 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
       parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as unknown;
     } catch {
       unreadableJsonCount += 1;
-      return;
+      continue;
     }
 
     const hasPhotoTakenTime =
@@ -276,16 +327,38 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
       withExactUnknownCapturePhotoTakenTimeCount += 1;
     }
 
+    const mediaPath = getSidecarMediaPath(fullPath);
+    let mediaWidth: number | null = null;
+    let mediaHeight: number | null = null;
+    if (mediaPath) {
+      matchedMediaFileCount += 1;
+      const metadata = await extractMetadata(mediaPath);
+      if (typeof metadata.width === 'number') {
+        mediaWidth = metadata.width;
+      }
+      if (typeof metadata.height === 'number') {
+        mediaHeight = metadata.height;
+      }
+      if (mediaWidth === null || mediaHeight === null) {
+        unreadableMediaMetadataCount += 1;
+      }
+    } else {
+      missingMediaFileCount += 1;
+    }
+
     const sidecars = byBaseName.get(baseName) ?? [];
     sidecars.push({
       path: fullPath,
+      mediaPath,
+      mediaWidth,
+      mediaHeight,
       hasPhotoTakenTime,
       hasStructuredPhotoTakenTime,
       hasExactUnknownCapturePhotoTakenTime,
       photoTakenTime
     });
     byBaseName.set(baseName, sidecars);
-  });
+  }
 
   return {
     byBaseName,
@@ -294,7 +367,10 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
       unreadableJsonCount,
       withPhotoTakenTimeCount,
       withoutPhotoTakenTimeCount,
-      withExactUnknownCapturePhotoTakenTimeCount
+      withExactUnknownCapturePhotoTakenTimeCount,
+      matchedMediaFileCount,
+      missingMediaFileCount,
+      unreadableMediaMetadataCount
     }
   };
 }
@@ -346,7 +422,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`Scanning Takeout sidecars under: ${args.runsRoot}`);
-  const sidecarIndex = buildSidecarIndex(args.runsRoot);
+  const sidecarIndex = await buildSidecarIndex(args.runsRoot);
 
   console.log('');
   console.log('Sidecar scan summary:');
@@ -361,6 +437,15 @@ async function main(): Promise<void> {
   );
   console.log(
     `  readable matched sidecars WITHOUT photoTakenTime:  ${sidecarIndex.stats.withoutPhotoTakenTimeCount}`
+  );
+  console.log(
+    `  matched adjacent media files:                      ${sidecarIndex.stats.matchedMediaFileCount}`
+  );
+  console.log(
+    `  sidecars missing adjacent media file:              ${sidecarIndex.stats.missingMediaFileCount}`
+  );
+  console.log(
+    `  adjacent media files with unreadable dimensions:   ${sidecarIndex.stats.unreadableMediaMetadataCount}`
   );
   console.log(
     `  unreadable matched sidecars:                       ${sidecarIndex.stats.unreadableJsonCount}`
@@ -378,16 +463,19 @@ async function main(): Promise<void> {
       _id: 1,
       filename: 1,
       originalArchivePath: 1,
-      captureDateTime: 1
+      captureDateTime: 1,
+      width: 1,
+      height: 1
     }
   ).lean()) as MediaAssetDoc[];
 
   let unknownCaptureAssetCount = 0;
-  let assetsWithMatchedSidecar = 0;
-  let assetsWithMatchedSidecarAndPhotoTakenTime = 0;
-  let assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime = 0;
-  let assetsWithMatchedSidecarButNoPhotoTakenTime = 0;
-  let assetsWithoutMatchedSidecar = 0;
+  let assetsWithRawMatchedSidecar = 0;
+  let assetsWithVerifiedMatchedSidecar = 0;
+  let assetsWithVerifiedMatchedSidecarAndPhotoTakenTime = 0;
+  let assetsWithVerifiedMatchedSidecarAndExactUnknownCapturePhotoTakenTime = 0;
+  let assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime = 0;
+  let assetsWithoutVerifiedMatchedSidecar = 0;
   let assetsWithMultipleMatchedSidecars = 0;
 
   const sampleWithPhotoTakenTime: Array<{
@@ -417,8 +505,14 @@ async function main(): Promise<void> {
       }
     }
 
-    if (matches.length === 0) {
-      assetsWithoutMatchedSidecar += 1;
+    if (matches.length > 0) {
+      assetsWithRawMatchedSidecar += 1;
+    }
+
+    const verifiedMatches = matches.filter((match) => dimensionsMatchAsset(doc, match));
+
+    if (verifiedMatches.length === 0) {
+      assetsWithoutVerifiedMatchedSidecar += 1;
 
       if (sampleWithoutSidecar.length < args.sampleLimit) {
         sampleWithoutSidecar.push({
@@ -429,7 +523,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    assetsWithMatchedSidecar += 1;
+    assetsWithVerifiedMatchedSidecar += 1;
 
     if (matches.length > 1) {
       assetsWithMultipleMatchedSidecars += 1;
@@ -438,6 +532,9 @@ async function main(): Promise<void> {
         candidateSidecars: candidateBaseNames,
         matchedSidecars: matches.map((match) => ({
           path: match.path,
+          mediaPath: match.mediaPath,
+          mediaWidth: match.mediaWidth,
+          mediaHeight: match.mediaHeight,
           hasPhotoTakenTime: match.hasPhotoTakenTime,
           hasStructuredPhotoTakenTime: match.hasStructuredPhotoTakenTime,
           ...(match.hasPhotoTakenTime ? { photoTakenTime: match.photoTakenTime } : {})
@@ -445,17 +542,17 @@ async function main(): Promise<void> {
       });
     }
 
-    if (matches.some((match) => match.hasStructuredPhotoTakenTime)) {
-      assetsWithMatchedSidecarAndPhotoTakenTime += 1;
+    if (verifiedMatches.some((match) => match.hasStructuredPhotoTakenTime)) {
+      assetsWithVerifiedMatchedSidecarAndPhotoTakenTime += 1;
 
-      if (matches.some((match) => match.hasExactUnknownCapturePhotoTakenTime)) {
-        assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime += 1;
+      if (verifiedMatches.some((match) => match.hasExactUnknownCapturePhotoTakenTime)) {
+        assetsWithVerifiedMatchedSidecarAndExactUnknownCapturePhotoTakenTime += 1;
       }
 
       if (sampleWithPhotoTakenTime.length < args.sampleLimit) {
         sampleWithPhotoTakenTime.push({
           asset: getAssetLabel(doc),
-          matchedSidecars: matches
+          matchedSidecars: verifiedMatches
             .filter((match) => match.hasStructuredPhotoTakenTime)
             .slice(0, 5)
             .map((match) => ({
@@ -467,12 +564,12 @@ async function main(): Promise<void> {
       continue;
     }
 
-    assetsWithMatchedSidecarButNoPhotoTakenTime += 1;
+    assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime += 1;
 
     if (sampleWithSidecarButNoPhotoTakenTime.length < args.sampleLimit) {
       sampleWithSidecarButNoPhotoTakenTime.push({
         asset: getAssetLabel(doc),
-        matchedSidecars: matches.slice(0, 5).map((match) => match.path)
+        matchedSidecars: verifiedMatches.slice(0, 5).map((match) => match.path)
       });
     }
   }
@@ -480,17 +577,18 @@ async function main(): Promise<void> {
   console.log('');
   console.log('Unknown-capture asset summary:');
   console.log(`  assets with unknown captureDateTime:               ${unknownCaptureAssetCount}`);
-  console.log(`  of those, assets with any matched sidecar:        ${assetsWithMatchedSidecar}`);
+  console.log(`  of those, assets with any basename-matched sidecar:${assetsWithRawMatchedSidecar}`);
+  console.log(`  of those, assets with dimension-verified sidecar: ${assetsWithVerifiedMatchedSidecar}`);
   console.log(
-    `  of those, matched sidecar has photoTakenTime:     ${assetsWithMatchedSidecarAndPhotoTakenTime}`
+    `  of those, verified sidecar has photoTakenTime:    ${assetsWithVerifiedMatchedSidecarAndPhotoTakenTime}`
   );
   console.log(
-    `  of those, matched sidecar has exact unknown value:${assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime}`
+    `  of those, verified sidecar has exact unknown value:${assetsWithVerifiedMatchedSidecarAndExactUnknownCapturePhotoTakenTime}`
   );
   console.log(
-    `  of those, matched sidecar lacks photoTakenTime:   ${assetsWithMatchedSidecarButNoPhotoTakenTime}`
+    `  of those, verified sidecar lacks photoTakenTime:  ${assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime}`
   );
-  console.log(`  of those, no matched sidecar found:               ${assetsWithoutMatchedSidecar}`);
+  console.log(`  of those, no dimension-verified sidecar found:    ${assetsWithoutVerifiedMatchedSidecar}`);
   console.log(`  assets with multiple matched sidecars:            ${assetsWithMultipleMatchedSidecars}`);
 
   writeMultipleMatchesOutput(args.multipleMatchesOutput, multipleMatchedSidecarRecords);
@@ -526,6 +624,7 @@ async function main(): Promise<void> {
   }
 
   await mongoose.disconnect();
+  await shutdownMetadataExtractor();
 }
 
 main().catch((error) => {
