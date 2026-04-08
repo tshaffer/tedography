@@ -206,9 +206,18 @@ export function UnknownCaptureReviewPage() {
             group.key === currentGroup.key
               ? {
                   ...group,
-                  assets: group.assets.filter((item) => !selectedDiscardIds.includes(item.asset.id))
+                  assets: group.assets.filter((item) => !selectedDiscardIds.includes(item.asset.id)),
+                  relatedTedographyAssets: group.relatedTedographyAssets.filter(
+                    (item) => !selectedDiscardIds.includes(item.asset.id)
+                  )
                 }
-              : group
+              : {
+                  ...group,
+                  assets: group.assets.filter((item) => !selectedDiscardIds.includes(item.asset.id)),
+                  relatedTedographyAssets: group.relatedTedographyAssets.filter(
+                    (item) => !selectedDiscardIds.includes(item.asset.id)
+                  )
+                }
           )
           .filter((group) => group.assets.length > 0);
 
@@ -283,12 +292,13 @@ export function UnknownCaptureReviewPage() {
             <span>
               Group {currentGroupIndex + 1} / {groups.length}
             </span>
-            <span>{currentGroup.assets.length} assets in group</span>
+            <span>{currentGroup.assets.length} review assets in group</span>
+            <span>{currentGroup.relatedTedographyAssets.length} Tedography assets matched</span>
             <span>{currentGroup.verifiedMatchCount} verified external matches</span>
           </div>
 
           <section style={panelStyle}>
-            <h2 style={{ marginTop: 0 }}>Assets In Group</h2>
+            <h2 style={{ marginTop: 0 }}>Review Assets In Group</h2>
             <div style={assetGridStyle}>
               {currentGroup.assets.map((item) => {
                 const selected = selectedDiscardIds.includes(item.asset.id);
@@ -310,6 +320,57 @@ export function UnknownCaptureReviewPage() {
                       <span style={badgeStyle}>{formatDimensions(item.asset.width, item.asset.height)}</span>
                       <span style={badgeStyle}>{item.basenameMatchedSidecarCount} basename matches</span>
                       <span style={badgeStyle}>{item.verifiedMatchCount} verified matches</span>
+                      {item.possibleUnconfirmedDuplicate ? (
+                        <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
+                      ) : null}
+                    </div>
+                    <div style={infoGridStyle}>
+                      <span style={labelStyle}>Filename</span>
+                      <span>{item.asset.filename}</span>
+                      <span style={labelStyle}>Captured</span>
+                      <span>{item.asset.captureDateTime ?? 'Unknown'}</span>
+                      <span style={labelStyle}>Path</span>
+                      <span>{item.asset.originalArchivePath}</span>
+                      <span style={labelStyle}>Asset ID</span>
+                      <span>{item.asset.id}</span>
+                    </div>
+                    <button
+                      type="button"
+                      style={selected ? dangerButtonStyle : primaryButtonStyle}
+                      onClick={() => toggleSelectedDiscard(item.asset.id)}
+                      disabled={busy}
+                    >
+                      {selected ? 'Selected To Discard' : 'Select To Discard'}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section style={panelStyle}>
+            <h2 style={{ marginTop: 0 }}>All Matching Tedography Assets</h2>
+            <div style={assetGridStyle}>
+              {currentGroup.relatedTedographyAssets.map((item) => {
+                const selected = selectedDiscardIds.includes(item.asset.id);
+                const isReviewAsset = currentGroup.assets.some((reviewItem) => reviewItem.asset.id === item.asset.id);
+                return (
+                  <article
+                    key={`related:${item.asset.id}`}
+                    style={{
+                      ...assetCardStyle,
+                      ...(selected ? selectedAssetCardStyle : {})
+                    }}
+                  >
+                    <img
+                      src={getDisplayMediaUrl(item.asset.id)}
+                      alt={item.asset.filename}
+                      style={imageStyle}
+                    />
+                    <div style={badgeRowStyle}>
+                      <span style={badgeStyle}>{item.asset.photoState}</span>
+                      <span style={badgeStyle}>{formatDimensions(item.asset.width, item.asset.height)}</span>
+                      {isReviewAsset ? <span style={badgeStyle}>In Review Set</span> : null}
                       {item.possibleUnconfirmedDuplicate ? (
                         <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
                       ) : null}

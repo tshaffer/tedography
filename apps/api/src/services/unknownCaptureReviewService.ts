@@ -56,6 +56,7 @@ interface UnknownCaptureReviewGroup {
   verifiedMatchCount: number;
   sharedVerifiedMatches: UnknownCaptureReviewMatch[];
   assets: UnknownCaptureReviewAsset[];
+  relatedTedographyAssets: UnknownCaptureReviewAsset[];
 }
 
 interface ListUnknownCaptureReviewGroupsResponse {
@@ -304,7 +305,7 @@ export async function listUnknownCaptureReviewItems(input?: {
     queryParts.push({ id: { $nin: Array.from(confirmedSuppressedDuplicateAssetIds) } });
   }
 
-  const assets = (await MediaAssetModel.find(
+  const reviewAssets = (await MediaAssetModel.find(
     { $and: queryParts },
     {
       _id: 0,
@@ -321,10 +322,65 @@ export async function listUnknownCaptureReviewItems(input?: {
     .sort({ originalArchivePath: 1, filename: 1, id: 1 })
     .lean()) as AssetRecord[];
 
+  const allAssets = (await MediaAssetModel.find(
+    confirmedSuppressedDuplicateAssetIds.size > 0
+      ? { id: { $nin: Array.from(confirmedSuppressedDuplicateAssetIds) } }
+      : {},
+    {
+      _id: 0,
+      id: 1,
+      filename: 1,
+      mediaType: 1,
+      photoState: 1,
+      captureDateTime: 1,
+      width: 1,
+      height: 1,
+      originalArchivePath: 1
+    }
+  )
+    .sort({ originalArchivePath: 1, filename: 1, id: 1 })
+    .lean()) as AssetRecord[];
+
   const groupsByKey = new Map<string, UnknownCaptureReviewGroup>();
+  const allAssetsByGroupKey = new Map<string, UnknownCaptureReviewAsset[]>();
   let assetCount = 0;
 
-  for (const asset of assets) {
+  for (const asset of allAssets) {
+    const basenameMatches = getCandidateSidecarBaseNames(asset).flatMap(
+      (baseName) => sidecarIndex.get(baseName) ?? []
+    );
+
+    if (basenameMatches.length === 0) {
+      continue;
+    }
+
+    const matches = basenameMatches.map((match) => ({
+      ...match,
+      verifiedDimensions: dimensionsMatchAsset(asset, match)
+    }));
+    const verifiedMatchCount = matches.filter((match) => match.verifiedDimensions).length;
+    if (verifiedMatchCount === 0) {
+      continue;
+    }
+
+    const sharedVerifiedMatches = matches.filter((match) => match.verifiedDimensions);
+    const key = sharedVerifiedMatches
+      .map(buildVerifiedMatchKey)
+      .sort((left, right) => left.localeCompare(right))
+      .join('||');
+
+    const assetEntry: UnknownCaptureReviewAsset = {
+      asset,
+      basenameMatchedSidecarCount: matches.length,
+      verifiedMatchCount,
+      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id)
+    };
+    const entries = allAssetsByGroupKey.get(key) ?? [];
+    entries.push(assetEntry);
+    allAssetsByGroupKey.set(key, entries);
+  }
+
+  for (const asset of reviewAssets) {
     const basenameMatches = getCandidateSidecarBaseNames(asset).flatMap(
       (baseName) => sidecarIndex.get(baseName) ?? []
     );
@@ -363,7 +419,8 @@ export async function listUnknownCaptureReviewItems(input?: {
         key,
         verifiedMatchCount,
         sharedVerifiedMatches,
-        assets: [assetEntry]
+        assets: [assetEntry],
+        relatedTedographyAssets: allAssetsByGroupKey.get(key) ?? [assetEntry]
       });
     }
 
@@ -383,6 +440,13 @@ export async function listUnknownCaptureReviewItems(input?: {
     .map((group) => ({
       ...group,
       assets: [...group.assets].sort((left, right) => {
+        const pathComparison = left.asset.originalArchivePath.localeCompare(right.asset.originalArchivePath);
+        if (pathComparison !== 0) {
+          return pathComparison;
+        }
+        return left.asset.id.localeCompare(right.asset.id);
+      }),
+      relatedTedographyAssets: [...group.relatedTedographyAssets].sort((left, right) => {
         const pathComparison = left.asset.originalArchivePath.localeCompare(right.asset.originalArchivePath);
         if (pathComparison !== 0) {
           return pathComparison;

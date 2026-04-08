@@ -26,6 +26,7 @@ export interface UnknownCaptureReviewGroup {
   verifiedMatchCount: number;
   sharedVerifiedMatches: UnknownCaptureReviewMatch[];
   assets: UnknownCaptureReviewAsset[];
+  relatedTedographyAssets: UnknownCaptureReviewAsset[];
 }
 
 export interface ListUnknownCaptureReviewGroupsResponse {
