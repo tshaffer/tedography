@@ -323,6 +323,9 @@ export function UnknownCaptureReviewPage() {
                       {item.possibleUnconfirmedDuplicate ? (
                         <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
                       ) : null}
+                      {item.confirmedSuppressedDuplicate ? (
+                        <span style={badgeStyle}>Suppressed Duplicate</span>
+                      ) : null}
                     </div>
                     <div style={infoGridStyle}>
                       <span style={labelStyle}>Filename</span>
@@ -373,6 +376,9 @@ export function UnknownCaptureReviewPage() {
                       {isReviewAsset ? <span style={badgeStyle}>In Review Set</span> : null}
                       {item.possibleUnconfirmedDuplicate ? (
                         <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
+                      ) : null}
+                      {item.confirmedSuppressedDuplicate ? (
+                        <span style={badgeStyle}>Suppressed Duplicate</span>
                       ) : null}
                     </div>
                     <div style={infoGridStyle}>

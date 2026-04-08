@@ -49,6 +49,7 @@ interface UnknownCaptureReviewAsset {
   basenameMatchedSidecarCount: number;
   verifiedMatchCount: number;
   possibleUnconfirmedDuplicate: boolean;
+  confirmedSuppressedDuplicate: boolean;
 }
 
 interface UnknownCaptureReviewGroup {
@@ -323,9 +324,7 @@ export async function listUnknownCaptureReviewItems(input?: {
     .lean()) as AssetRecord[];
 
   const allAssets = (await MediaAssetModel.find(
-    confirmedSuppressedDuplicateAssetIds.size > 0
-      ? { id: { $nin: Array.from(confirmedSuppressedDuplicateAssetIds) } }
-      : {},
+    {},
     {
       _id: 0,
       id: 1,
@@ -373,7 +372,8 @@ export async function listUnknownCaptureReviewItems(input?: {
       asset,
       basenameMatchedSidecarCount: matches.length,
       verifiedMatchCount,
-      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id)
+      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id),
+      confirmedSuppressedDuplicate: confirmedSuppressedDuplicateAssetIds.has(asset.id)
     };
     const entries = allAssetsByGroupKey.get(key) ?? [];
     entries.push(assetEntry);
@@ -409,7 +409,8 @@ export async function listUnknownCaptureReviewItems(input?: {
       asset,
       basenameMatchedSidecarCount: matches.length,
       verifiedMatchCount,
-      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id)
+      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id),
+      confirmedSuppressedDuplicate: confirmedSuppressedDuplicateAssetIds.has(asset.id)
     };
 
     if (existing) {

@@ -19,6 +19,7 @@ export interface UnknownCaptureReviewAsset {
   basenameMatchedSidecarCount: number;
   verifiedMatchCount: number;
   possibleUnconfirmedDuplicate: boolean;
+  confirmedSuppressedDuplicate: boolean;
 }
 
 export interface UnknownCaptureReviewGroup {
