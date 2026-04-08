@@ -323,62 +323,7 @@ export async function listUnknownCaptureReviewItems(input?: {
     .sort({ originalArchivePath: 1, filename: 1, id: 1 })
     .lean()) as AssetRecord[];
 
-  const allAssets = (await MediaAssetModel.find(
-    {},
-    {
-      _id: 0,
-      id: 1,
-      filename: 1,
-      mediaType: 1,
-      photoState: 1,
-      captureDateTime: 1,
-      width: 1,
-      height: 1,
-      originalArchivePath: 1
-    }
-  )
-    .sort({ originalArchivePath: 1, filename: 1, id: 1 })
-    .lean()) as AssetRecord[];
-
   const groupsByKey = new Map<string, UnknownCaptureReviewGroup>();
-  const allAssetsByGroupKey = new Map<string, UnknownCaptureReviewAsset[]>();
-  let assetCount = 0;
-
-  for (const asset of allAssets) {
-    const basenameMatches = getCandidateSidecarBaseNames(asset).flatMap(
-      (baseName) => sidecarIndex.get(baseName) ?? []
-    );
-
-    if (basenameMatches.length === 0) {
-      continue;
-    }
-
-    const matches = basenameMatches.map((match) => ({
-      ...match,
-      verifiedDimensions: dimensionsMatchAsset(asset, match)
-    }));
-    const verifiedMatchCount = matches.filter((match) => match.verifiedDimensions).length;
-    if (verifiedMatchCount === 0) {
-      continue;
-    }
-
-    const sharedVerifiedMatches = matches.filter((match) => match.verifiedDimensions);
-    const key = sharedVerifiedMatches
-      .map(buildVerifiedMatchKey)
-      .sort((left, right) => left.localeCompare(right))
-      .join('||');
-
-    const assetEntry: UnknownCaptureReviewAsset = {
-      asset,
-      basenameMatchedSidecarCount: matches.length,
-      verifiedMatchCount,
-      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id),
-      confirmedSuppressedDuplicate: confirmedSuppressedDuplicateAssetIds.has(asset.id)
-    };
-    const entries = allAssetsByGroupKey.get(key) ?? [];
-    entries.push(assetEntry);
-    allAssetsByGroupKey.set(key, entries);
-  }
 
   for (const asset of reviewAssets) {
     const basenameMatches = getCandidateSidecarBaseNames(asset).flatMap(
@@ -415,20 +360,20 @@ export async function listUnknownCaptureReviewItems(input?: {
 
     if (existing) {
       existing.assets.push(assetEntry);
+      existing.relatedTedographyAssets.push(assetEntry);
     } else {
       groupsByKey.set(key, {
         key,
         verifiedMatchCount,
         sharedVerifiedMatches,
         assets: [assetEntry],
-        relatedTedographyAssets: allAssetsByGroupKey.get(key) ?? [assetEntry]
+        relatedTedographyAssets: [assetEntry]
       });
     }
-
-    assetCount += 1;
   }
 
   const groups = Array.from(groupsByKey.values())
+    .filter((group) => group.assets.length > 1)
     .sort((left, right) => {
       if (left.assets.length !== right.assets.length) {
         return right.assets.length - left.assets.length;
@@ -455,6 +400,8 @@ export async function listUnknownCaptureReviewItems(input?: {
         return left.asset.id.localeCompare(right.asset.id);
       })
     }));
+
+  const assetCount = groups.reduce((total, group) => total + group.assets.length, 0);
 
   return {
     runsRoot,
