@@ -17,9 +17,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PhotoState } from '@tedography/domain';
 import mongoose from 'mongoose';
 import { extractMetadata, shutdownMetadataExtractor } from '@tedography/media-metadata';
 import { connectToMongo } from '../db.js';
+import { DuplicateGroupResolutionModel } from '../models/duplicateGroupResolutionModel.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
 
 const DEFAULT_RUNS_ROOT = '/Volumes/ShMedia/PHOTO_ARCHIVE/RUNS';
@@ -85,11 +87,13 @@ type SidecarIndex = {
 
 type MediaAssetDoc = {
   _id: unknown;
+  id?: string;
   filename?: string;
   originalArchivePath?: string;
   captureDateTime?: string | null;
   width?: number | null;
   height?: number | null;
+  photoState?: string | null;
 };
 
 type MultipleMatchedSidecarRecord = {
@@ -391,7 +395,33 @@ function getCandidateSidecarBaseNames(doc: MediaAssetDoc): string[] {
 }
 
 function getAssetLabel(doc: MediaAssetDoc): string {
-  return doc.originalArchivePath || doc.filename || String(doc._id);
+  return doc.originalArchivePath || doc.filename || doc.id || String(doc._id);
+}
+
+function getConfirmedSuppressedDuplicateAssetIds(
+  resolutions: Array<{
+    assetIds: string[];
+    proposedCanonicalAssetId: string;
+    manualCanonicalAssetId?: string | null;
+  }>
+): Set<string> {
+  const suppressedAssetIds = new Set<string>();
+
+  for (const resolution of resolutions) {
+    const selectedCanonicalAssetId =
+      resolution.manualCanonicalAssetId &&
+      resolution.assetIds.includes(resolution.manualCanonicalAssetId)
+        ? resolution.manualCanonicalAssetId
+        : resolution.proposedCanonicalAssetId;
+
+    for (const assetId of resolution.assetIds) {
+      if (assetId !== selectedCanonicalAssetId) {
+        suppressedAssetIds.add(assetId);
+      }
+    }
+  }
+
+  return suppressedAssetIds;
 }
 
 function writeMultipleMatchesOutput(
@@ -455,17 +485,38 @@ async function main(): Promise<void> {
   console.log('Connecting through Tedography Mongoose...');
   await connectToMongo();
 
+  const confirmedSuppressedDuplicateAssetIds = getConfirmedSuppressedDuplicateAssetIds(
+    (await DuplicateGroupResolutionModel.find(
+      { resolutionStatus: 'confirmed' },
+      { _id: 0, assetIds: 1, proposedCanonicalAssetId: 1, manualCanonicalAssetId: 1 }
+    ).lean()) as Array<{
+      assetIds: string[];
+      proposedCanonicalAssetId: string;
+      manualCanonicalAssetId?: string | null;
+    }>
+  );
+
   const docs = (await MediaAssetModel.find(
     {
-      $or: [{ captureDateTime: { $exists: false } }, { captureDateTime: null }, { captureDateTime: '' }]
+      $and: [
+        {
+          $or: [{ captureDateTime: { $exists: false } }, { captureDateTime: null }, { captureDateTime: '' }]
+        },
+        { photoState: { $ne: PhotoState.Discard } },
+        confirmedSuppressedDuplicateAssetIds.size > 0
+          ? { id: { $nin: Array.from(confirmedSuppressedDuplicateAssetIds) } }
+          : {}
+      ]
     },
     {
       _id: 1,
+      id: 1,
       filename: 1,
       originalArchivePath: 1,
       captureDateTime: 1,
       width: 1,
-      height: 1
+      height: 1,
+      photoState: 1
     }
   ).lean()) as MediaAssetDoc[];
 
