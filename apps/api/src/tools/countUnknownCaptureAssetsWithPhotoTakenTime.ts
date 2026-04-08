@@ -28,6 +28,9 @@ const DEFAULT_RUNS_ROOT = '/Volumes/ShMedia/PHOTO_ARCHIVE/RUNS';
 const DEFAULT_MULTIPLE_MATCHES_OUTPUT = fileURLToPath(
   new URL('../../../scripts/output/countUnknownCaptureAssetsWithPhotoTakenTime__multiple_matches.json', import.meta.url)
 );
+const DEFAULT_SAFE_CANDIDATES_OUTPUT = fileURLToPath(
+  new URL('../../../scripts/output/countUnknownCaptureAssetsWithPhotoTakenTime__safe_candidates.json', import.meta.url)
+);
 const UNKNOWN_CAPTURE_PHOTO_TAKEN_TIMESTAMP = '-63104400';
 const UNKNOWN_CAPTURE_PHOTO_TAKEN_FORMATTED = 'Jan 1, 1968, 3:00:00 PM UTC';
 
@@ -58,6 +61,8 @@ type ParsedArgs = {
   sampleLimit: number;
   verbose: boolean;
   multipleMatchesOutput: string;
+  safeCandidatesOutput: string;
+  apply: boolean;
 };
 
 type SidecarInfo = {
@@ -101,6 +106,7 @@ type MultipleMatchedSidecarRecord = {
   assetId?: string;
   isPossibleUnconfirmedDuplicate: boolean;
   candidateSidecars: string[];
+  verifiedMatchedSidecarCount: number;
   matchedSidecars: Array<{
     path: string;
     mediaPath: string | null;
@@ -112,12 +118,32 @@ type MultipleMatchedSidecarRecord = {
   }>;
 };
 
+type SafeMetadataUpdateCandidate = {
+  assetId: string;
+  asset: string;
+  filename?: string;
+  originalArchivePath?: string;
+  basenameMatchedSidecarCount: number;
+  verifiedMatchCount: number;
+  sidecarPath: string;
+  mediaPath: string | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
+  photoTakenTime: {
+    timestamp: string;
+    formatted: string;
+  };
+  captureDateTimeIso: string;
+};
+
 function parseArgs(argv: string[]): ParsedArgs {
   const args: ParsedArgs = {
     runsRoot: DEFAULT_RUNS_ROOT,
     sampleLimit: 20,
     verbose: false,
-    multipleMatchesOutput: DEFAULT_MULTIPLE_MATCHES_OUTPUT
+    multipleMatchesOutput: DEFAULT_MULTIPLE_MATCHES_OUTPUT,
+    safeCandidatesOutput: DEFAULT_SAFE_CANDIDATES_OUTPUT,
+    apply: false
   };
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -158,6 +184,21 @@ function parseArgs(argv: string[]): ParsedArgs {
       continue;
     }
 
+    if (arg === '--safe-candidates-output') {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error('Missing value for --safe-candidates-output');
+      }
+      args.safeCandidatesOutput = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--apply') {
+      args.apply = true;
+      continue;
+    }
+
     if (arg === '--help' || arg === '-h') {
       printHelpAndExit(0);
     }
@@ -182,6 +223,9 @@ Options:
   --sample-limit <n>    Default: 20
   --multiple-matches-output <path>
                         Default: ${DEFAULT_MULTIPLE_MATCHES_OUTPUT}
+  --safe-candidates-output <path>
+                        Default: ${DEFAULT_SAFE_CANDIDATES_OUTPUT}
+  --apply               Write safe-candidate captureDateTime values into MongoDB
   --verbose             Print sample matches
   --help, -h
 `);
@@ -293,6 +337,7 @@ async function buildSidecarIndex(runsRoot: string): Promise<SidecarIndex> {
   const sidecarPaths: string[] = [];
   walk(runsRoot, (fullPath) => {
     const baseName = path.basename(fullPath);
+    const normalizedBaseName = baseName.toLocaleLowerCase();
 
     if (!isTakeoutSidecarFilename(baseName)) {
       return;
@@ -303,6 +348,7 @@ async function buildSidecarIndex(runsRoot: string): Promise<SidecarIndex> {
 
   for (const fullPath of sidecarPaths) {
     const baseName = path.basename(fullPath);
+    const normalizedBaseName = baseName.toLocaleLowerCase();
 
     matchedSidecarCount += 1;
 
@@ -352,7 +398,7 @@ async function buildSidecarIndex(runsRoot: string): Promise<SidecarIndex> {
       missingMediaFileCount += 1;
     }
 
-    const sidecars = byBaseName.get(baseName) ?? [];
+    const sidecars = byBaseName.get(normalizedBaseName) ?? [];
     sidecars.push({
       path: fullPath,
       mediaPath,
@@ -363,7 +409,7 @@ async function buildSidecarIndex(runsRoot: string): Promise<SidecarIndex> {
       hasExactUnknownCapturePhotoTakenTime,
       photoTakenTime
     });
-    byBaseName.set(baseName, sidecars);
+    byBaseName.set(normalizedBaseName, sidecars);
   }
 
   return {
@@ -389,8 +435,8 @@ function getCandidateSidecarBaseNames(doc: MediaAssetDoc): string[] {
   ].filter((value): value is string => typeof value === 'string' && value.length > 0);
 
   for (const fileName of filenameCandidates) {
-    baseNames.add(`${fileName}.supplemental-metadata.json`);
-    baseNames.add(`${fileName}.json`);
+    baseNames.add(`${fileName}.supplemental-metadata.json`.toLocaleLowerCase());
+    baseNames.add(`${fileName}.json`.toLocaleLowerCase());
   }
 
   return Array.from(baseNames);
@@ -398,6 +444,27 @@ function getCandidateSidecarBaseNames(doc: MediaAssetDoc): string[] {
 
 function getAssetLabel(doc: MediaAssetDoc): string {
   return doc.originalArchivePath || doc.filename || doc.id || String(doc._id);
+}
+
+function parseStructuredPhotoTakenTime(
+  value: unknown
+): { timestamp: string; formatted: string } | null {
+  if (!hasStructuredPhotoTakenTimeValue(value)) {
+    return null;
+  }
+
+  const timestamp = (value as { timestamp: string }).timestamp;
+  const formatted = (value as { formatted: string }).formatted;
+  return { timestamp, formatted };
+}
+
+function toCaptureDateTimeIso(photoTakenTime: { timestamp: string; formatted: string }): string | null {
+  const timestampSeconds = Number(photoTakenTime.timestamp);
+  if (!Number.isFinite(timestampSeconds)) {
+    return null;
+  }
+
+  return new Date(timestampSeconds * 1000).toISOString();
 }
 
 function getConfirmedSuppressedDuplicateAssetIds(
@@ -454,6 +521,26 @@ function writeMultipleMatchesOutput(
         generatedAt: new Date().toISOString(),
         recordCount: records.length,
         records
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+}
+
+function writeSafeCandidatesOutput(
+  outputPath: string,
+  candidates: SafeMetadataUpdateCandidate[]
+): void {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(
+    outputPath,
+    `${JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        candidateCount: candidates.length,
+        candidates
       },
       null,
       2
@@ -564,6 +651,8 @@ async function main(): Promise<void> {
   let assetsWithoutVerifiedMatchedSidecar = 0;
   let assetsWithMultipleMatchedSidecars = 0;
   let assetsWithMultipleMatchedSidecarsThatArePossibleUnconfirmedDuplicates = 0;
+  let safeMetadataUpdateCandidateCount = 0;
+  let appliedSafeMetadataUpdateCount = 0;
 
   const sampleWithPhotoTakenTime: Array<{
     asset: string;
@@ -578,6 +667,7 @@ async function main(): Promise<void> {
     matchedSidecars: string[];
   }> = [];
   const multipleMatchedSidecarRecords: MultipleMatchedSidecarRecord[] = [];
+  const safeMetadataUpdateCandidates: SafeMetadataUpdateCandidate[] = [];
 
   for (const doc of docs) {
     unknownCaptureAssetCount += 1;
@@ -622,7 +712,7 @@ async function main(): Promise<void> {
       assetsWithMultipleVerifiedMatchedSidecars += 1;
     }
 
-    if (matches.length > 1) {
+    if (verifiedMatches.length > 1) {
       assetsWithMultipleMatchedSidecars += 1;
       const isPossibleUnconfirmedDuplicate =
         typeof doc.id === 'string' && possibleUnconfirmedDuplicateAssetIds.has(doc.id);
@@ -634,6 +724,7 @@ async function main(): Promise<void> {
         ...(doc.id ? { assetId: doc.id } : {}),
         isPossibleUnconfirmedDuplicate,
         candidateSidecars: candidateBaseNames,
+        verifiedMatchedSidecarCount: verifiedMatches.length,
         matchedSidecars: matches.map((match) => ({
           path: match.path,
           mediaPath: match.mediaPath,
@@ -665,16 +756,64 @@ async function main(): Promise<void> {
             }))
         });
       }
-      continue;
     }
 
-    assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime += 1;
+    if (
+      verifiedMatches.length === 1 &&
+      verifiedMatches[0]?.hasStructuredPhotoTakenTime === true &&
+      verifiedMatches[0].hasExactUnknownCapturePhotoTakenTime !== true &&
+      typeof doc.id === 'string'
+    ) {
+      const parsedPhotoTakenTime = parseStructuredPhotoTakenTime(verifiedMatches[0].photoTakenTime);
+      const captureDateTimeIso = parsedPhotoTakenTime ? toCaptureDateTimeIso(parsedPhotoTakenTime) : null;
 
-    if (sampleWithSidecarButNoPhotoTakenTime.length < args.sampleLimit) {
-      sampleWithSidecarButNoPhotoTakenTime.push({
-        asset: getAssetLabel(doc),
-        matchedSidecars: verifiedMatches.slice(0, 5).map((match) => match.path)
-      });
+      if (parsedPhotoTakenTime && captureDateTimeIso) {
+        safeMetadataUpdateCandidateCount += 1;
+        safeMetadataUpdateCandidates.push({
+          assetId: doc.id,
+          asset: getAssetLabel(doc),
+          ...(doc.filename ? { filename: doc.filename } : {}),
+          ...(doc.originalArchivePath ? { originalArchivePath: doc.originalArchivePath } : {}),
+          basenameMatchedSidecarCount: matches.length,
+          verifiedMatchCount: verifiedMatches.length,
+          sidecarPath: verifiedMatches[0].path,
+          mediaPath: verifiedMatches[0].mediaPath,
+          mediaWidth: verifiedMatches[0].mediaWidth,
+          mediaHeight: verifiedMatches[0].mediaHeight,
+          photoTakenTime: parsedPhotoTakenTime,
+          captureDateTimeIso
+        });
+      }
+    }
+
+    if (!verifiedMatches.some((match) => match.hasStructuredPhotoTakenTime)) {
+      assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime += 1;
+
+      if (sampleWithSidecarButNoPhotoTakenTime.length < args.sampleLimit) {
+        sampleWithSidecarButNoPhotoTakenTime.push({
+          asset: getAssetLabel(doc),
+          matchedSidecars: verifiedMatches.slice(0, 5).map((match) => match.path)
+        });
+      }
+    }
+  }
+
+  if (args.apply) {
+    for (const candidate of safeMetadataUpdateCandidates) {
+      const updated = await MediaAssetModel.updateOne(
+        {
+          id: candidate.assetId,
+          $or: [{ captureDateTime: { $exists: false } }, { captureDateTime: null }, { captureDateTime: '' }]
+        },
+        {
+          $set: {
+            captureDateTime: candidate.captureDateTimeIso
+          }
+        }
+      );
+      if (updated.modifiedCount > 0) {
+        appliedSafeMetadataUpdateCount += 1;
+      }
     }
   }
 
@@ -701,9 +840,15 @@ async function main(): Promise<void> {
   console.log(
     `  of those, possible but unconfirmed duplicates:    ${assetsWithMultipleMatchedSidecarsThatArePossibleUnconfirmedDuplicates}`
   );
+  console.log(`  safe metadata update candidates:                  ${safeMetadataUpdateCandidateCount}`);
+  if (args.apply) {
+    console.log(`  applied safe metadata updates:                    ${appliedSafeMetadataUpdateCount}`);
+  }
 
   writeMultipleMatchesOutput(args.multipleMatchesOutput, multipleMatchedSidecarRecords);
   console.log(`  multiple-match details written to:                ${args.multipleMatchesOutput}`);
+  writeSafeCandidatesOutput(args.safeCandidatesOutput, safeMetadataUpdateCandidates);
+  console.log(`  safe-candidate details written to:                ${args.safeCandidatesOutput}`);
 
   if (args.verbose) {
     console.log('');
