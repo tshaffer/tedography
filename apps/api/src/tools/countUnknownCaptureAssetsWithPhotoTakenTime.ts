@@ -98,6 +98,8 @@ type MediaAssetDoc = {
 
 type MultipleMatchedSidecarRecord = {
   asset: string;
+  assetId?: string;
+  isPossibleUnconfirmedDuplicate: boolean;
   candidateSidecars: string[];
   matchedSidecars: Array<{
     path: string;
@@ -424,6 +426,22 @@ function getConfirmedSuppressedDuplicateAssetIds(
   return suppressedAssetIds;
 }
 
+function getAssetIdsInDuplicateGroups(
+  resolutions: Array<{
+    assetIds: string[];
+  }>
+): Set<string> {
+  const assetIds = new Set<string>();
+
+  for (const resolution of resolutions) {
+    for (const assetId of resolution.assetIds) {
+      assetIds.add(assetId);
+    }
+  }
+
+  return assetIds;
+}
+
 function writeMultipleMatchesOutput(
   outputPath: string,
   records: MultipleMatchedSidecarRecord[]
@@ -485,15 +503,28 @@ async function main(): Promise<void> {
   console.log('Connecting through Tedography Mongoose...');
   await connectToMongo();
 
+  const confirmedResolutions = (await DuplicateGroupResolutionModel.find(
+    { resolutionStatus: 'confirmed' },
+    { _id: 0, assetIds: 1, proposedCanonicalAssetId: 1, manualCanonicalAssetId: 1 }
+  ).lean()) as Array<{
+    assetIds: string[];
+    proposedCanonicalAssetId: string;
+    manualCanonicalAssetId?: string | null;
+  }>;
+  const proposedResolutions = (await DuplicateGroupResolutionModel.find(
+    { resolutionStatus: 'proposed' },
+    { _id: 0, assetIds: 1 }
+  ).lean()) as Array<{
+    assetIds: string[];
+  }>;
+
   const confirmedSuppressedDuplicateAssetIds = getConfirmedSuppressedDuplicateAssetIds(
-    (await DuplicateGroupResolutionModel.find(
-      { resolutionStatus: 'confirmed' },
-      { _id: 0, assetIds: 1, proposedCanonicalAssetId: 1, manualCanonicalAssetId: 1 }
-    ).lean()) as Array<{
-      assetIds: string[];
-      proposedCanonicalAssetId: string;
-      manualCanonicalAssetId?: string | null;
-    }>
+    confirmedResolutions
+  );
+  const confirmedDuplicateAssetIds = getAssetIdsInDuplicateGroups(confirmedResolutions);
+  const proposedDuplicateAssetIds = getAssetIdsInDuplicateGroups(proposedResolutions);
+  const possibleUnconfirmedDuplicateAssetIds = new Set(
+    Array.from(proposedDuplicateAssetIds).filter((assetId) => !confirmedDuplicateAssetIds.has(assetId))
   );
 
   const docs = (await MediaAssetModel.find(
@@ -522,12 +553,17 @@ async function main(): Promise<void> {
 
   let unknownCaptureAssetCount = 0;
   let assetsWithRawMatchedSidecar = 0;
+  let assetsWithExactlyOneRawMatchedSidecar = 0;
+  let assetsWithMultipleRawMatchedSidecars = 0;
   let assetsWithVerifiedMatchedSidecar = 0;
+  let assetsWithExactlyOneVerifiedMatchedSidecar = 0;
+  let assetsWithMultipleVerifiedMatchedSidecars = 0;
   let assetsWithVerifiedMatchedSidecarAndPhotoTakenTime = 0;
   let assetsWithVerifiedMatchedSidecarAndExactUnknownCapturePhotoTakenTime = 0;
   let assetsWithVerifiedMatchedSidecarButNoPhotoTakenTime = 0;
   let assetsWithoutVerifiedMatchedSidecar = 0;
   let assetsWithMultipleMatchedSidecars = 0;
+  let assetsWithMultipleMatchedSidecarsThatArePossibleUnconfirmedDuplicates = 0;
 
   const sampleWithPhotoTakenTime: Array<{
     asset: string;
@@ -558,6 +594,11 @@ async function main(): Promise<void> {
 
     if (matches.length > 0) {
       assetsWithRawMatchedSidecar += 1;
+      if (matches.length === 1) {
+        assetsWithExactlyOneRawMatchedSidecar += 1;
+      } else {
+        assetsWithMultipleRawMatchedSidecars += 1;
+      }
     }
 
     const verifiedMatches = matches.filter((match) => dimensionsMatchAsset(doc, match));
@@ -575,11 +616,23 @@ async function main(): Promise<void> {
     }
 
     assetsWithVerifiedMatchedSidecar += 1;
+    if (verifiedMatches.length === 1) {
+      assetsWithExactlyOneVerifiedMatchedSidecar += 1;
+    } else {
+      assetsWithMultipleVerifiedMatchedSidecars += 1;
+    }
 
     if (matches.length > 1) {
       assetsWithMultipleMatchedSidecars += 1;
+      const isPossibleUnconfirmedDuplicate =
+        typeof doc.id === 'string' && possibleUnconfirmedDuplicateAssetIds.has(doc.id);
+      if (isPossibleUnconfirmedDuplicate) {
+        assetsWithMultipleMatchedSidecarsThatArePossibleUnconfirmedDuplicates += 1;
+      }
       multipleMatchedSidecarRecords.push({
         asset: getAssetLabel(doc),
+        ...(doc.id ? { assetId: doc.id } : {}),
+        isPossibleUnconfirmedDuplicate,
         candidateSidecars: candidateBaseNames,
         matchedSidecars: matches.map((match) => ({
           path: match.path,
@@ -629,7 +682,11 @@ async function main(): Promise<void> {
   console.log('Unknown-capture asset summary:');
   console.log(`  assets with unknown captureDateTime:               ${unknownCaptureAssetCount}`);
   console.log(`  of those, assets with any basename-matched sidecar:${assetsWithRawMatchedSidecar}`);
+  console.log(`  of those, exactly one basename-matched sidecar:   ${assetsWithExactlyOneRawMatchedSidecar}`);
+  console.log(`  of those, multiple basename-matched sidecars:     ${assetsWithMultipleRawMatchedSidecars}`);
   console.log(`  of those, assets with dimension-verified sidecar: ${assetsWithVerifiedMatchedSidecar}`);
+  console.log(`  of those, exactly one verified sidecar:           ${assetsWithExactlyOneVerifiedMatchedSidecar}`);
+  console.log(`  of those, multiple verified sidecars:             ${assetsWithMultipleVerifiedMatchedSidecars}`);
   console.log(
     `  of those, verified sidecar has photoTakenTime:    ${assetsWithVerifiedMatchedSidecarAndPhotoTakenTime}`
   );
@@ -641,6 +698,9 @@ async function main(): Promise<void> {
   );
   console.log(`  of those, no dimension-verified sidecar found:    ${assetsWithoutVerifiedMatchedSidecar}`);
   console.log(`  assets with multiple matched sidecars:            ${assetsWithMultipleMatchedSidecars}`);
+  console.log(
+    `  of those, possible but unconfirmed duplicates:    ${assetsWithMultipleMatchedSidecarsThatArePossibleUnconfirmedDuplicates}`
+  );
 
   writeMultipleMatchesOutput(args.multipleMatchesOutput, multipleMatchedSidecarRecords);
   console.log(`  multiple-match details written to:                ${args.multipleMatchesOutput}`);
