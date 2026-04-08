@@ -10,6 +10,7 @@ import { PeopleBrowsePage } from './components/people/PeopleBrowsePage';
 import { PeopleDevPage } from './components/people/PeopleDevPage';
 import { PersonDetailPage } from './components/people/PersonDetailPage';
 import { PeopleReviewPage } from './components/people/PeopleReviewPage';
+import { UnknownCaptureReviewPage } from './components/tools/UnknownCaptureReviewPage';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <Provider store={store}>
@@ -23,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/people/:personId" element={<PersonDetailPage />} />
         <Route path="/people/dev" element={<PeopleDevPage />} />
         <Route path="/people/review" element={<PeopleReviewPage />} />
+        <Route path="/tools/unknown-capture-review" element={<UnknownCaptureReviewPage />} />
       </Routes>
     </BrowserRouter>
   </Provider>

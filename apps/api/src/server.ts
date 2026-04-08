@@ -14,6 +14,7 @@ import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRou
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
+import { listUnknownCaptureReviewItems } from './services/unknownCaptureReviewService.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -76,6 +77,19 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to read asset details', error);
       res.status(500).json({ error: 'Failed to load asset details' });
+    }
+  });
+
+  app.get('/api/tools/unknown-capture-review', async (req, res) => {
+    try {
+      const runsRoot = typeof req.query.runsRoot === 'string' ? req.query.runsRoot : undefined;
+      const response = await listUnknownCaptureReviewItems(
+        runsRoot ? { runsRoot } : undefined
+      );
+      res.json(response);
+    } catch (error) {
+      log.error('Failed to load unknown capture review items', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load review items' });
     }
   });
 

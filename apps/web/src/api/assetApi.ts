@@ -1,4 +1,5 @@
-import type { RefreshOperationResponse } from '@tedography/domain';
+import type { PhotoState, RefreshOperationResponse } from '@tedography/domain';
+import type { ListUnknownCaptureReviewItemsResponse } from '@tedography/shared';
 
 type ApiErrorPayload = {
   error?: string;
@@ -29,4 +30,24 @@ export async function rebuildAssetDerivedFiles(
       method: 'POST'
     }
   );
+}
+
+export async function updateAssetPhotoState(assetId: string, photoState: PhotoState) {
+  return fetchJson(`/api/assets/${encodeURIComponent(assetId)}/photoState`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoState })
+  });
+}
+
+export async function listUnknownCaptureReviewItems(
+  runsRoot?: string
+): Promise<ListUnknownCaptureReviewItemsResponse> {
+  const query = new URLSearchParams();
+  if (runsRoot && runsRoot.trim().length > 0) {
+    query.set('runsRoot', runsRoot.trim());
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return fetchJson<ListUnknownCaptureReviewItemsResponse>(`/api/tools/unknown-capture-review${suffix}`);
 }
