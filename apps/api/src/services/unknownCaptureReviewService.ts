@@ -41,7 +41,7 @@ interface UnknownCaptureReviewMatch {
   photoTakenTime?: unknown;
 }
 
-interface UnknownCaptureReviewItem {
+interface UnknownCaptureReviewAsset {
   asset: Pick<
     MediaAsset,
     'id' | 'filename' | 'mediaType' | 'photoState' | 'captureDateTime' | 'width' | 'height' | 'originalArchivePath'
@@ -49,13 +49,20 @@ interface UnknownCaptureReviewItem {
   basenameMatchedSidecarCount: number;
   verifiedMatchCount: number;
   possibleUnconfirmedDuplicate: boolean;
-  matches: UnknownCaptureReviewMatch[];
 }
 
-interface ListUnknownCaptureReviewItemsResponse {
+interface UnknownCaptureReviewGroup {
+  key: string;
+  verifiedMatchCount: number;
+  sharedVerifiedMatches: UnknownCaptureReviewMatch[];
+  assets: UnknownCaptureReviewAsset[];
+}
+
+interface ListUnknownCaptureReviewGroupsResponse {
   runsRoot: string;
-  itemCount: number;
-  items: UnknownCaptureReviewItem[];
+  assetCount: number;
+  groupCount: number;
+  groups: UnknownCaptureReviewGroup[];
 }
 
 type SidecarCandidate = UnknownCaptureReviewMatch;
@@ -253,9 +260,13 @@ function getAssetIdsInDuplicateGroups(resolutions: Array<{ assetIds: string[] }>
   return ids;
 }
 
+function buildVerifiedMatchKey(match: UnknownCaptureReviewMatch): string {
+  return `${match.sidecarPath}|${match.mediaPath ?? ''}|${match.mediaWidth ?? ''}|${match.mediaHeight ?? ''}`;
+}
+
 export async function listUnknownCaptureReviewItems(input?: {
   runsRoot?: string;
-}): Promise<ListUnknownCaptureReviewItemsResponse> {
+}): Promise<ListUnknownCaptureReviewGroupsResponse> {
   const runsRoot = input?.runsRoot?.trim() || DEFAULT_RUNS_ROOT;
   if (!fs.existsSync(runsRoot)) {
     throw new Error(`Runs root does not exist: ${runsRoot}`);
@@ -310,7 +321,8 @@ export async function listUnknownCaptureReviewItems(input?: {
     .sort({ originalArchivePath: 1, filename: 1, id: 1 })
     .lean()) as AssetRecord[];
 
-  const items: UnknownCaptureReviewItem[] = [];
+  const groupsByKey = new Map<string, UnknownCaptureReviewGroup>();
+  let assetCount = 0;
 
   for (const asset of assets) {
     const basenameMatches = getCandidateSidecarBaseNames(asset).flatMap(
@@ -330,18 +342,59 @@ export async function listUnknownCaptureReviewItems(input?: {
       continue;
     }
 
-    items.push({
+    const sharedVerifiedMatches = matches.filter((match) => match.verifiedDimensions);
+    const key = sharedVerifiedMatches
+      .map(buildVerifiedMatchKey)
+      .sort((left, right) => left.localeCompare(right))
+      .join('||');
+
+    const existing = groupsByKey.get(key);
+    const assetEntry: UnknownCaptureReviewAsset = {
       asset,
       basenameMatchedSidecarCount: matches.length,
       verifiedMatchCount,
-      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id),
-      matches
-    });
+      possibleUnconfirmedDuplicate: possibleUnconfirmedDuplicateAssetIds.has(asset.id)
+    };
+
+    if (existing) {
+      existing.assets.push(assetEntry);
+    } else {
+      groupsByKey.set(key, {
+        key,
+        verifiedMatchCount,
+        sharedVerifiedMatches,
+        assets: [assetEntry]
+      });
+    }
+
+    assetCount += 1;
   }
+
+  const groups = Array.from(groupsByKey.values())
+    .sort((left, right) => {
+      if (left.assets.length !== right.assets.length) {
+        return right.assets.length - left.assets.length;
+      }
+
+      const leftPath = left.assets[0]?.asset.originalArchivePath ?? left.assets[0]?.asset.filename ?? left.key;
+      const rightPath = right.assets[0]?.asset.originalArchivePath ?? right.assets[0]?.asset.filename ?? right.key;
+      return leftPath.localeCompare(rightPath);
+    })
+    .map((group) => ({
+      ...group,
+      assets: [...group.assets].sort((left, right) => {
+        const pathComparison = left.asset.originalArchivePath.localeCompare(right.asset.originalArchivePath);
+        if (pathComparison !== 0) {
+          return pathComparison;
+        }
+        return left.asset.id.localeCompare(right.asset.id);
+      })
+    }));
 
   return {
     runsRoot,
-    itemCount: items.length,
-    items
+    assetCount,
+    groupCount: groups.length,
+    groups
   };
 }

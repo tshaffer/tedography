@@ -11,7 +11,7 @@ export interface UnknownCaptureReviewMatch {
   photoTakenTime?: unknown;
 }
 
-export interface UnknownCaptureReviewItem {
+export interface UnknownCaptureReviewAsset {
   asset: Pick<
     MediaAsset,
     'id' | 'filename' | 'mediaType' | 'photoState' | 'captureDateTime' | 'width' | 'height' | 'originalArchivePath'
@@ -19,11 +19,18 @@ export interface UnknownCaptureReviewItem {
   basenameMatchedSidecarCount: number;
   verifiedMatchCount: number;
   possibleUnconfirmedDuplicate: boolean;
-  matches: UnknownCaptureReviewMatch[];
 }
 
-export interface ListUnknownCaptureReviewItemsResponse {
+export interface UnknownCaptureReviewGroup {
+  key: string;
+  verifiedMatchCount: number;
+  sharedVerifiedMatches: UnknownCaptureReviewMatch[];
+  assets: UnknownCaptureReviewAsset[];
+}
+
+export interface ListUnknownCaptureReviewGroupsResponse {
   runsRoot: string;
-  itemCount: number;
-  items: UnknownCaptureReviewItem[];
+  assetCount: number;
+  groupCount: number;
+  groups: UnknownCaptureReviewGroup[];
 }

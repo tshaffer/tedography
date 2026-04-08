@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { PhotoState } from '@tedography/domain';
-import type { ListUnknownCaptureReviewItemsResponse } from '@tedography/shared';
+import type { ListUnknownCaptureReviewGroupsResponse } from '@tedography/shared';
 import { listUnknownCaptureReviewItems, updateAssetPhotoState } from '../../api/assetApi';
-import { getDisplayMediaUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getDisplayMediaUrl } from '../../utilities/mediaUrls';
 
 const pageStyle: CSSProperties = {
   padding: '20px',
@@ -34,17 +34,17 @@ const primaryButtonStyle: CSSProperties = {
   color: '#fff'
 };
 
+const dangerButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  backgroundColor: '#b42318',
+  borderColor: '#b42318',
+  color: '#fff'
+};
+
 const disabledButtonStyle: CSSProperties = {
   ...buttonStyle,
   opacity: 0.55,
   cursor: 'not-allowed'
-};
-
-const layoutStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(360px, 1.2fr) minmax(340px, 0.8fr)',
-  gap: '16px',
-  alignItems: 'start'
 };
 
 const panelStyle: CSSProperties = {
@@ -54,9 +54,30 @@ const panelStyle: CSSProperties = {
   padding: '14px'
 };
 
+const assetGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+  gap: '14px'
+};
+
+const assetCardStyle: CSSProperties = {
+  border: '1px solid #e4e4e4',
+  borderRadius: '10px',
+  padding: '12px',
+  display: 'grid',
+  gap: '10px',
+  alignContent: 'start'
+};
+
+const selectedAssetCardStyle: CSSProperties = {
+  boxShadow: 'inset 0 0 0 2px #f04438',
+  borderColor: '#f04438',
+  backgroundColor: '#fff7f6'
+};
+
 const imageStyle: CSSProperties = {
   width: '100%',
-  maxHeight: '70vh',
+  height: '240px',
   objectFit: 'contain',
   borderRadius: '8px',
   backgroundColor: '#f7f7f7'
@@ -64,22 +85,14 @@ const imageStyle: CSSProperties = {
 
 const infoGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '140px 1fr',
-  gap: '8px',
+  gridTemplateColumns: '110px 1fr',
+  gap: '6px',
   fontSize: '13px'
 };
 
 const labelStyle: CSSProperties = {
   color: '#666',
   fontWeight: 600
-};
-
-const matchCardStyle: CSSProperties = {
-  border: '1px solid #e3e3e3',
-  borderRadius: '8px',
-  padding: '10px',
-  display: 'grid',
-  gap: '8px'
 };
 
 const badgeRowStyle: CSSProperties = {
@@ -99,22 +112,28 @@ const badgeStyle: CSSProperties = {
   color: '#444'
 };
 
+const matchCardStyle: CSSProperties = {
+  border: '1px solid #e3e3e3',
+  borderRadius: '8px',
+  padding: '10px',
+  display: 'grid',
+  gap: '8px'
+};
+
 function formatDimensions(width: number | null | undefined, height: number | null | undefined): string {
   return typeof width === 'number' && typeof height === 'number' ? `${width} × ${height}` : '—';
 }
 
 function formatPhotoTakenTime(value: unknown): string {
-  if (!value) {
-    return '—';
-  }
-  return JSON.stringify(value);
+  return value ? JSON.stringify(value) : '—';
 }
 
 export function UnknownCaptureReviewPage() {
-  const [data, setData] = useState<ListUnknownCaptureReviewItemsResponse | null>(null);
+  const [data, setData] = useState<ListUnknownCaptureReviewGroupsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentGroupIndex, setCurrentGroupIndex] = useState(0);
+  const [selectedDiscardIds, setSelectedDiscardIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -128,7 +147,8 @@ export function UnknownCaptureReviewPage() {
         const response = await listUnknownCaptureReviewItems();
         if (!cancelled) {
           setData(response);
-          setCurrentIndex(0);
+          setCurrentGroupIndex(0);
+          setSelectedDiscardIds([]);
         }
       } catch (error) {
         if (!cancelled) {
@@ -147,41 +167,61 @@ export function UnknownCaptureReviewPage() {
     };
   }, []);
 
-  const items = data?.items ?? [];
-  const currentItem = items[currentIndex] ?? null;
+  const groups = data?.groups ?? [];
+  const currentGroup = groups[currentGroupIndex] ?? null;
+
+  useEffect(() => {
+    setSelectedDiscardIds([]);
+    setNotice(null);
+  }, [currentGroupIndex]);
 
   const summary = useMemo(() => {
-    const possibleUnconfirmed = items.filter((item) => item.possibleUnconfirmedDuplicate).length;
-    const ambiguousVerified = items.filter((item) => item.verifiedMatchCount > 1).length;
-    return { possibleUnconfirmed, ambiguousVerified };
-  }, [items]);
+    const assetCount = data?.assetCount ?? 0;
+    const groupCount = data?.groupCount ?? 0;
+    const ambiguousGroups = groups.filter((group) => group.assets.length > 1).length;
+    return { assetCount, groupCount, ambiguousGroups };
+  }, [data, groups]);
 
-  async function handleDiscard(): Promise<void> {
-    if (!currentItem) {
+  function moveToNextGroup(): void {
+    setCurrentGroupIndex((previous) => Math.min(previous + 1, Math.max(0, groups.length - 1)));
+  }
+
+  async function handleDiscardSelected(): Promise<void> {
+    if (!currentGroup || selectedDiscardIds.length === 0) {
       return;
     }
 
     setBusy(true);
+    setErrorMessage(null);
     setNotice(null);
     try {
-      await updateAssetPhotoState(currentItem.asset.id, PhotoState.Discard);
+      await Promise.all(selectedDiscardIds.map((assetId) => updateAssetPhotoState(assetId, PhotoState.Discard)));
       setData((previous) => {
         if (!previous) {
           return previous;
         }
 
-        const nextItems = previous.items.filter((item) => item.asset.id !== currentItem.asset.id);
+        const nextGroups = previous.groups
+          .map((group) =>
+            group.key === currentGroup.key
+              ? {
+                  ...group,
+                  assets: group.assets.filter((item) => !selectedDiscardIds.includes(item.asset.id))
+                }
+              : group
+          )
+          .filter((group) => group.assets.length > 0);
+
         return {
           ...previous,
-          itemCount: nextItems.length,
-          items: nextItems
+          assetCount: nextGroups.reduce((total, group) => total + group.assets.length, 0),
+          groupCount: nextGroups.length,
+          groups: nextGroups
         };
       });
-      setCurrentIndex((previous) => {
-        const nextLength = Math.max(0, items.length - 1);
-        return Math.min(previous, Math.max(0, nextLength - 1));
-      });
-      setNotice(`Discarded ${currentItem.asset.filename}`);
+      setNotice(`Discarded ${selectedDiscardIds.length} asset${selectedDiscardIds.length === 1 ? '' : 's'}.`);
+      setCurrentGroupIndex((previous) => Math.min(previous, Math.max(0, groups.length - 2)));
+      setSelectedDiscardIds([]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to update photo state');
     } finally {
@@ -189,9 +229,10 @@ export function UnknownCaptureReviewPage() {
     }
   }
 
-  function handleKeepAsIs(): void {
-    setNotice(null);
-    setCurrentIndex((previous) => Math.min(previous + 1, Math.max(0, items.length - 1)));
+  function toggleSelectedDiscard(assetId: string): void {
+    setSelectedDiscardIds((previous) =>
+      previous.includes(assetId) ? previous.filter((id) => id !== assetId) : [...previous, assetId]
+    );
   }
 
   return (
@@ -199,90 +240,111 @@ export function UnknownCaptureReviewPage() {
       <div style={toolbarStyle}>
         <Link to="/">Back to Library</Link>
         <strong>Unknown Capture Review</strong>
-        {data ? <span>{data.itemCount} items</span> : null}
-        {data ? <span>{summary.ambiguousVerified} with multiple verified matches</span> : null}
-        {data ? <span>{summary.possibleUnconfirmed} possible unconfirmed duplicates</span> : null}
+        {data ? <span>{summary.groupCount} groups</span> : null}
+        {data ? <span>{summary.assetCount} assets</span> : null}
+        {data ? <span>{summary.ambiguousGroups} multi-asset groups</span> : null}
       </div>
 
       {loading ? <p>Loading review items...</p> : null}
       {errorMessage ? <p style={{ color: '#b00020' }}>{errorMessage}</p> : null}
       {notice ? <p style={{ color: '#0f5132' }}>{notice}</p> : null}
 
-      {!loading && !currentItem ? <p>No review items found.</p> : null}
+      {!loading && !currentGroup ? <p>No review groups found.</p> : null}
 
-      {currentItem ? (
+      {currentGroup ? (
         <>
           <div style={toolbarStyle}>
             <button
               type="button"
-              style={currentIndex > 0 ? buttonStyle : disabledButtonStyle}
-              onClick={() => setCurrentIndex((previous) => Math.max(0, previous - 1))}
-              disabled={currentIndex === 0 || busy}
+              style={currentGroupIndex > 0 && !busy ? buttonStyle : disabledButtonStyle}
+              onClick={() => setCurrentGroupIndex((previous) => Math.max(0, previous - 1))}
+              disabled={currentGroupIndex === 0 || busy}
             >
-              Previous
+              Previous Group
             </button>
             <button
               type="button"
-              style={!busy ? buttonStyle : disabledButtonStyle}
-              onClick={handleKeepAsIs}
-              disabled={busy || currentIndex >= items.length - 1}
+              style={!busy && currentGroupIndex < groups.length - 1 ? buttonStyle : disabledButtonStyle}
+              onClick={moveToNextGroup}
+              disabled={busy || currentGroupIndex >= groups.length - 1}
             >
-              Keep As-Is / Next
+              Keep Group / Next
             </button>
             <button
               type="button"
-              style={!busy ? primaryButtonStyle : disabledButtonStyle}
+              style={selectedDiscardIds.length > 0 && !busy ? dangerButtonStyle : disabledButtonStyle}
               onClick={() => {
-                void handleDiscard();
+                void handleDiscardSelected();
               }}
-              disabled={busy}
+              disabled={busy || selectedDiscardIds.length === 0}
             >
-              {busy ? 'Discarding...' : 'Discard'}
+              {busy ? 'Discarding...' : `Discard Selected (${selectedDiscardIds.length})`}
             </button>
             <span>
-              Item {currentIndex + 1} / {items.length}
+              Group {currentGroupIndex + 1} / {groups.length}
             </span>
-          </div>
-
-          <div style={layoutStyle}>
-            <section style={panelStyle}>
-              <img
-                src={getDisplayMediaUrl(currentItem.asset.id)}
-                alt={currentItem.asset.filename}
-                style={imageStyle}
-              />
-            </section>
-
-            <section style={panelStyle}>
-              <h2 style={{ marginTop: 0, marginBottom: '12px' }}>{currentItem.asset.filename}</h2>
-              <div style={infoGridStyle}>
-                <span style={labelStyle}>Asset ID</span>
-                <span>{currentItem.asset.id}</span>
-                <span style={labelStyle}>Photo State</span>
-                <span>{currentItem.asset.photoState}</span>
-                <span style={labelStyle}>Captured</span>
-                <span>{currentItem.asset.captureDateTime ?? 'Unknown'}</span>
-                <span style={labelStyle}>Dimensions</span>
-                <span>{formatDimensions(currentItem.asset.width, currentItem.asset.height)}</span>
-                <span style={labelStyle}>Archive Path</span>
-                <span>{currentItem.asset.originalArchivePath}</span>
-                <span style={labelStyle}>Basename Matches</span>
-                <span>{currentItem.basenameMatchedSidecarCount}</span>
-                <span style={labelStyle}>Verified Matches</span>
-                <span>{currentItem.verifiedMatchCount}</span>
-                <span style={labelStyle}>Possible Unconfirmed Duplicate</span>
-                <span>{currentItem.possibleUnconfirmedDuplicate ? 'Yes' : 'No'}</span>
-              </div>
-            </section>
+            <span>{currentGroup.assets.length} assets in group</span>
+            <span>{currentGroup.verifiedMatchCount} verified external matches</span>
           </div>
 
           <section style={panelStyle}>
-            <h3 style={{ marginTop: 0 }}>Matched Sidecars</h3>
+            <h2 style={{ marginTop: 0 }}>Assets In Group</h2>
+            <div style={assetGridStyle}>
+              {currentGroup.assets.map((item) => {
+                const selected = selectedDiscardIds.includes(item.asset.id);
+                return (
+                  <article
+                    key={item.asset.id}
+                    style={{
+                      ...assetCardStyle,
+                      ...(selected ? selectedAssetCardStyle : {})
+                    }}
+                  >
+                    <img
+                      src={getDisplayMediaUrl(item.asset.id)}
+                      alt={item.asset.filename}
+                      style={imageStyle}
+                    />
+                    <div style={badgeRowStyle}>
+                      <span style={badgeStyle}>{item.asset.photoState}</span>
+                      <span style={badgeStyle}>{formatDimensions(item.asset.width, item.asset.height)}</span>
+                      <span style={badgeStyle}>{item.basenameMatchedSidecarCount} basename matches</span>
+                      <span style={badgeStyle}>{item.verifiedMatchCount} verified matches</span>
+                      {item.possibleUnconfirmedDuplicate ? (
+                        <span style={badgeStyle}>Possible Unconfirmed Duplicate</span>
+                      ) : null}
+                    </div>
+                    <div style={infoGridStyle}>
+                      <span style={labelStyle}>Filename</span>
+                      <span>{item.asset.filename}</span>
+                      <span style={labelStyle}>Captured</span>
+                      <span>{item.asset.captureDateTime ?? 'Unknown'}</span>
+                      <span style={labelStyle}>Path</span>
+                      <span>{item.asset.originalArchivePath}</span>
+                      <span style={labelStyle}>Asset ID</span>
+                      <span>{item.asset.id}</span>
+                    </div>
+                    <button
+                      type="button"
+                      style={selected ? dangerButtonStyle : primaryButtonStyle}
+                      onClick={() => toggleSelectedDiscard(item.asset.id)}
+                      disabled={busy}
+                    >
+                      {selected ? 'Selected To Discard' : 'Select To Discard'}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section style={panelStyle}>
+            <h2 style={{ marginTop: 0 }}>Shared Verified Matches</h2>
             <div style={{ display: 'grid', gap: '10px' }}>
-              {currentItem.matches.map((match) => (
-                <article key={`${currentItem.asset.id}:${match.sidecarPath}`} style={matchCardStyle}>
+              {currentGroup.sharedVerifiedMatches.map((match) => (
+                <article key={match.sidecarPath} style={matchCardStyle}>
                   <div style={badgeRowStyle}>
-                    <span style={badgeStyle}>{match.verifiedDimensions ? 'Verified' : 'Basename Only'}</span>
+                    <span style={badgeStyle}>Verified</span>
                     <span style={badgeStyle}>
                       {match.hasStructuredPhotoTakenTime ? 'Has photoTakenTime' : 'No photoTakenTime'}
                     </span>
@@ -290,19 +352,16 @@ export function UnknownCaptureReviewPage() {
                       <span style={badgeStyle}>Exact Unknown Value</span>
                     ) : null}
                   </div>
-                  <div style={{ display: 'grid', gap: '4px', fontSize: '13px' }}>
-                    <div><strong>Sidecar:</strong> {match.sidecarPath}</div>
-                    <div><strong>Media:</strong> {match.mediaPath ?? 'Not found'}</div>
-                    <div><strong>Media Dimensions:</strong> {formatDimensions(match.mediaWidth, match.mediaHeight)}</div>
-                    <div><strong>photoTakenTime:</strong> {formatPhotoTakenTime(match.photoTakenTime)}</div>
+                  <div style={infoGridStyle}>
+                    <span style={labelStyle}>Sidecar</span>
+                    <span>{match.sidecarPath}</span>
+                    <span style={labelStyle}>Media</span>
+                    <span>{match.mediaPath ?? 'Not found'}</span>
+                    <span style={labelStyle}>Dimensions</span>
+                    <span>{formatDimensions(match.mediaWidth, match.mediaHeight)}</span>
+                    <span style={labelStyle}>photoTakenTime</span>
+                    <span>{formatPhotoTakenTime(match.photoTakenTime)}</span>
                   </div>
-                  {match.mediaPath ? (
-                    <img
-                      src={getThumbnailMediaUrl(currentItem.asset.id)}
-                      alt={currentItem.asset.filename}
-                      style={{ width: '120px', borderRadius: '6px', border: '1px solid #ddd' }}
-                    />
-                  ) : null}
                 </article>
               ))}
             </div>
