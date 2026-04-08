@@ -25,6 +25,8 @@ const DEFAULT_RUNS_ROOT = '/Volumes/ShMedia/PHOTO_ARCHIVE/RUNS';
 const DEFAULT_MULTIPLE_MATCHES_OUTPUT = fileURLToPath(
   new URL('../../../scripts/output/countUnknownCaptureAssetsWithPhotoTakenTime__multiple_matches.json', import.meta.url)
 );
+const UNKNOWN_CAPTURE_PHOTO_TAKEN_TIMESTAMP = '-63104400';
+const UNKNOWN_CAPTURE_PHOTO_TAKEN_FORMATTED = 'Jan 1, 1968, 3:00:00 PM UTC';
 
 const MEDIA_EXTENSIONS = [
   '.jpg',
@@ -58,6 +60,8 @@ type ParsedArgs = {
 type SidecarInfo = {
   path: string;
   hasPhotoTakenTime: boolean;
+  hasStructuredPhotoTakenTime: boolean;
+  hasExactUnknownCapturePhotoTakenTime: boolean;
   photoTakenTime?: unknown;
 };
 
@@ -68,6 +72,7 @@ type SidecarIndex = {
     unreadableJsonCount: number;
     withPhotoTakenTimeCount: number;
     withoutPhotoTakenTimeCount: number;
+    withExactUnknownCapturePhotoTakenTimeCount: number;
   };
 };
 
@@ -84,6 +89,7 @@ type MultipleMatchedSidecarRecord = {
   matchedSidecars: Array<{
     path: string;
     hasPhotoTakenTime: boolean;
+    hasStructuredPhotoTakenTime: boolean;
     photoTakenTime?: unknown;
   }>;
 };
@@ -178,6 +184,36 @@ function isTakeoutSidecarFilename(filename: string): boolean {
   return MEDIA_EXTENSIONS.some((extension) => lower.endsWith(`${extension}.json`));
 }
 
+function hasStructuredPhotoTakenTimeValue(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  const timestamp = (value as { timestamp?: unknown }).timestamp;
+  const formatted = (value as { formatted?: unknown }).formatted;
+
+  return (
+    typeof timestamp === 'string' &&
+    timestamp.length > 0 &&
+    typeof formatted === 'string' &&
+    formatted.length > 0
+  );
+}
+
+function hasExactUnknownCapturePhotoTakenTimeValue(value: unknown): boolean {
+  if (!hasStructuredPhotoTakenTimeValue(value)) {
+    return false;
+  }
+
+  const timestamp = (value as { timestamp: string }).timestamp;
+  const formatted = (value as { formatted: string }).formatted;
+
+  return (
+    timestamp === UNKNOWN_CAPTURE_PHOTO_TAKEN_TIMESTAMP &&
+    formatted === UNKNOWN_CAPTURE_PHOTO_TAKEN_FORMATTED
+  );
+}
+
 function walk(dirPath: string, visitor: (fullPath: string) => void): void {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
@@ -202,6 +238,7 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
   let unreadableJsonCount = 0;
   let withPhotoTakenTimeCount = 0;
   let withoutPhotoTakenTimeCount = 0;
+  let withExactUnknownCapturePhotoTakenTimeCount = 0;
 
   walk(runsRoot, (fullPath) => {
     const baseName = path.basename(fullPath);
@@ -224,18 +261,28 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
       parsed !== null &&
       typeof parsed === 'object' &&
       Object.prototype.hasOwnProperty.call(parsed, 'photoTakenTime');
+    const photoTakenTime = hasPhotoTakenTime ? (parsed as Record<string, unknown>).photoTakenTime : undefined;
+    const hasStructuredPhotoTakenTime = hasStructuredPhotoTakenTimeValue(photoTakenTime);
+    const hasExactUnknownCapturePhotoTakenTime =
+      hasExactUnknownCapturePhotoTakenTimeValue(photoTakenTime);
 
-    if (hasPhotoTakenTime) {
+    if (hasStructuredPhotoTakenTime) {
       withPhotoTakenTimeCount += 1;
     } else {
       withoutPhotoTakenTimeCount += 1;
+    }
+
+    if (hasExactUnknownCapturePhotoTakenTime) {
+      withExactUnknownCapturePhotoTakenTimeCount += 1;
     }
 
     const sidecars = byBaseName.get(baseName) ?? [];
     sidecars.push({
       path: fullPath,
       hasPhotoTakenTime,
-      photoTakenTime: hasPhotoTakenTime ? (parsed as Record<string, unknown>).photoTakenTime : undefined
+      hasStructuredPhotoTakenTime,
+      hasExactUnknownCapturePhotoTakenTime,
+      photoTakenTime
     });
     byBaseName.set(baseName, sidecars);
   });
@@ -246,7 +293,8 @@ function buildSidecarIndex(runsRoot: string): SidecarIndex {
       matchedSidecarCount,
       unreadableJsonCount,
       withPhotoTakenTimeCount,
-      withoutPhotoTakenTimeCount
+      withoutPhotoTakenTimeCount,
+      withExactUnknownCapturePhotoTakenTimeCount
     }
   };
 }
@@ -309,6 +357,9 @@ async function main(): Promise<void> {
     `  readable matched sidecars WITH photoTakenTime:     ${sidecarIndex.stats.withPhotoTakenTimeCount}`
   );
   console.log(
+    `  readable matched sidecars WITH exact unknown value:${sidecarIndex.stats.withExactUnknownCapturePhotoTakenTimeCount}`
+  );
+  console.log(
     `  readable matched sidecars WITHOUT photoTakenTime:  ${sidecarIndex.stats.withoutPhotoTakenTimeCount}`
   );
   console.log(
@@ -334,6 +385,7 @@ async function main(): Promise<void> {
   let unknownCaptureAssetCount = 0;
   let assetsWithMatchedSidecar = 0;
   let assetsWithMatchedSidecarAndPhotoTakenTime = 0;
+  let assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime = 0;
   let assetsWithMatchedSidecarButNoPhotoTakenTime = 0;
   let assetsWithoutMatchedSidecar = 0;
   let assetsWithMultipleMatchedSidecars = 0;
@@ -387,19 +439,24 @@ async function main(): Promise<void> {
         matchedSidecars: matches.map((match) => ({
           path: match.path,
           hasPhotoTakenTime: match.hasPhotoTakenTime,
+          hasStructuredPhotoTakenTime: match.hasStructuredPhotoTakenTime,
           ...(match.hasPhotoTakenTime ? { photoTakenTime: match.photoTakenTime } : {})
         }))
       });
     }
 
-    if (matches.some((match) => match.hasPhotoTakenTime)) {
+    if (matches.some((match) => match.hasStructuredPhotoTakenTime)) {
       assetsWithMatchedSidecarAndPhotoTakenTime += 1;
+
+      if (matches.some((match) => match.hasExactUnknownCapturePhotoTakenTime)) {
+        assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime += 1;
+      }
 
       if (sampleWithPhotoTakenTime.length < args.sampleLimit) {
         sampleWithPhotoTakenTime.push({
           asset: getAssetLabel(doc),
           matchedSidecars: matches
-            .filter((match) => match.hasPhotoTakenTime)
+            .filter((match) => match.hasStructuredPhotoTakenTime)
             .slice(0, 5)
             .map((match) => ({
               path: match.path,
@@ -426,6 +483,9 @@ async function main(): Promise<void> {
   console.log(`  of those, assets with any matched sidecar:        ${assetsWithMatchedSidecar}`);
   console.log(
     `  of those, matched sidecar has photoTakenTime:     ${assetsWithMatchedSidecarAndPhotoTakenTime}`
+  );
+  console.log(
+    `  of those, matched sidecar has exact unknown value:${assetsWithMatchedSidecarAndExactUnknownCapturePhotoTakenTime}`
   );
   console.log(
     `  of those, matched sidecar lacks photoTakenTime:   ${assetsWithMatchedSidecarButNoPhotoTakenTime}`
