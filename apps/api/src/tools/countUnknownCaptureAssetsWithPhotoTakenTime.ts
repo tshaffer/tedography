@@ -16,11 +16,15 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
 import { connectToMongo } from '../db.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
 
 const DEFAULT_RUNS_ROOT = '/Volumes/ShMedia/PHOTO_ARCHIVE/RUNS';
+const DEFAULT_MULTIPLE_MATCHES_OUTPUT = fileURLToPath(
+  new URL('../../../scripts/output/countUnknownCaptureAssetsWithPhotoTakenTime__multiple_matches.json', import.meta.url)
+);
 
 const MEDIA_EXTENSIONS = [
   '.jpg',
@@ -48,6 +52,7 @@ type ParsedArgs = {
   runsRoot: string;
   sampleLimit: number;
   verbose: boolean;
+  multipleMatchesOutput: string;
 };
 
 type SidecarInfo = {
@@ -73,11 +78,22 @@ type MediaAssetDoc = {
   captureDateTime?: string | null;
 };
 
+type MultipleMatchedSidecarRecord = {
+  asset: string;
+  candidateSidecars: string[];
+  matchedSidecars: Array<{
+    path: string;
+    hasPhotoTakenTime: boolean;
+    photoTakenTime?: unknown;
+  }>;
+};
+
 function parseArgs(argv: string[]): ParsedArgs {
   const args: ParsedArgs = {
     runsRoot: DEFAULT_RUNS_ROOT,
     sampleLimit: 20,
-    verbose: false
+    verbose: false,
+    multipleMatchesOutput: DEFAULT_MULTIPLE_MATCHES_OUTPUT
   };
 
   for (let index = 2; index < argv.length; index += 1) {
@@ -108,6 +124,16 @@ function parseArgs(argv: string[]): ParsedArgs {
       continue;
     }
 
+    if (arg === '--multiple-matches-output') {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error('Missing value for --multiple-matches-output');
+      }
+      args.multipleMatchesOutput = value;
+      index += 1;
+      continue;
+    }
+
     if (arg === '--help' || arg === '-h') {
       printHelpAndExit(0);
     }
@@ -130,6 +156,8 @@ Usage:
 Options:
   --runs-root <path>    Default: ${DEFAULT_RUNS_ROOT}
   --sample-limit <n>    Default: 20
+  --multiple-matches-output <path>
+                        Default: ${DEFAULT_MULTIPLE_MATCHES_OUTPUT}
   --verbose             Print sample matches
   --help, -h
 `);
@@ -242,6 +270,26 @@ function getAssetLabel(doc: MediaAssetDoc): string {
   return doc.originalArchivePath || doc.filename || String(doc._id);
 }
 
+function writeMultipleMatchesOutput(
+  outputPath: string,
+  records: MultipleMatchedSidecarRecord[]
+): void {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(
+    outputPath,
+    `${JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        recordCount: records.length,
+        records
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -302,6 +350,7 @@ async function main(): Promise<void> {
     asset: string;
     matchedSidecars: string[];
   }> = [];
+  const multipleMatchedSidecarRecords: MultipleMatchedSidecarRecord[] = [];
 
   for (const doc of docs) {
     unknownCaptureAssetCount += 1;
@@ -332,6 +381,15 @@ async function main(): Promise<void> {
 
     if (matches.length > 1) {
       assetsWithMultipleMatchedSidecars += 1;
+      multipleMatchedSidecarRecords.push({
+        asset: getAssetLabel(doc),
+        candidateSidecars: candidateBaseNames,
+        matchedSidecars: matches.map((match) => ({
+          path: match.path,
+          hasPhotoTakenTime: match.hasPhotoTakenTime,
+          ...(match.hasPhotoTakenTime ? { photoTakenTime: match.photoTakenTime } : {})
+        }))
+      });
     }
 
     if (matches.some((match) => match.hasPhotoTakenTime)) {
@@ -374,6 +432,9 @@ async function main(): Promise<void> {
   );
   console.log(`  of those, no matched sidecar found:               ${assetsWithoutMatchedSidecar}`);
   console.log(`  assets with multiple matched sidecars:            ${assetsWithMultipleMatchedSidecars}`);
+
+  writeMultipleMatchesOutput(args.multipleMatchesOutput, multipleMatchedSidecarRecords);
+  console.log(`  multiple-match details written to:                ${args.multipleMatchesOutput}`);
 
   if (args.verbose) {
     console.log('');
