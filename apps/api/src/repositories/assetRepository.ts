@@ -147,39 +147,6 @@ export async function findByIds(ids: string[]): Promise<MediaAsset[]> {
   return normalizeMediaAssets(assets);
 }
 
-export async function findByIdsForDuplicateReview(ids: string[]): Promise<MediaAsset[]> {
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const assets = (await MediaAssetModel.collection
-    .find(
-      { id: { $in: ids } },
-      {
-        projection: {
-          _id: 0,
-          id: 1,
-          filename: 1,
-          mediaType: 1,
-          archivePath: 1,
-          originalArchivePath: 1,
-          captureDateTime: 1,
-          width: 1,
-          height: 1,
-          photoState: 1,
-          albumIds: 1,
-          originalFileFormat: 1,
-          originalFileSizeBytes: 1,
-          displayStorageType: 1
-        }
-      }
-    )
-    .sort({ id: 1 })
-    .toArray()) as unknown as MediaAsset[];
-
-  return normalizeMediaAssets(assets);
-}
-
 export async function findByOriginalStorageRootAndArchivePaths(
   originalStorageRootId: string,
   originalArchivePaths: string[]

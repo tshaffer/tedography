@@ -8,7 +8,6 @@ import {
 } from '@tedography/domain';
 import {
   createMediaAsset,
-  findByOriginalContentHashes,
   findByOriginalStorageRootAndArchivePaths
 } from '../repositories/assetRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
@@ -99,20 +98,6 @@ export async function registerImportedFiles(input: {
     existingByPathMap.set(asset.originalArchivePath, asset);
   }
 
-  const knownContentHashes = Array.from(
-    new Set(
-      existingByPath
-        .map((asset) => asset.originalContentHash)
-        .filter((value): value is string => typeof value === 'string' && value.length > 0)
-    )
-  );
-  const existingByKnownContent = await findByOriginalContentHashes(knownContentHashes);
-
-  const existingByContentHashMap = new Map<string, MediaAsset>();
-  for (const asset of existingByKnownContent) {
-    existingByContentHashMap.set(asset.originalContentHash, asset);
-  }
-
   for (const requestedRelativePath of input.relativePaths) {
     let normalizedRelativePath = requestedRelativePath;
 
@@ -191,17 +176,6 @@ export async function registerImportedFiles(input: {
 
     try {
       const originalContentHash = await computeSha256ForFile(absolutePath);
-      const existingByContentAsset = existingByContentHashMap.get(originalContentHash);
-
-      if (existingByContentAsset) {
-        results.push({
-          relativePath: normalizedRelativePath,
-          status: 'DuplicateByContentHash',
-          asset: toRegisteredAsset(existingByContentAsset, normalizedRelativePath)
-        });
-        continue;
-      }
-
       const originalFileFormat = getOriginalFileFormat(mediaSupport.extension);
       const displayPlan = buildDisplayFilePlan({
         originalStorageRootId: root.id,
@@ -296,7 +270,6 @@ export async function registerImportedFiles(input: {
       });
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);
-      existingByContentHashMap.set(originalContentHash, createdAsset);
       schedulePeoplePipelineForAsset(createdAsset.id);
 
       results.push({
@@ -317,9 +290,6 @@ export async function registerImportedFiles(input: {
     importedCount: results.filter((result) => result.status === 'Imported').length,
     skippedAlreadyImportedByPathCount: results.filter(
       (result) => result.status === 'AlreadyImportedByPath'
-    ).length,
-    skippedDuplicateContentCount: results.filter(
-      (result) => result.status === 'DuplicateByContentHash'
     ).length,
     unsupportedCount: results.filter((result) => result.status === 'Unsupported').length,
     missingCount: results.filter((result) => result.status === 'Missing').length,

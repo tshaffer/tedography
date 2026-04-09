@@ -4,8 +4,6 @@ import { connectToMongo } from '../db.js';
 import { reverseGeocodeCoordinates } from '../import/exifMetadata.js';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
-import { listDuplicateGroupResolutions } from '../repositories/duplicateGroupResolutionRepository.js';
-import { resolveSelectedCanonicalAssetId } from '../services/duplicateGroupService.js';
 
 interface ScriptOptions {
   apply: boolean;
@@ -110,31 +108,6 @@ Options:
 `);
 }
 
-async function listSuppressedDuplicateAssetIds(): Promise<string[]> {
-  const confirmedResolutions = await listDuplicateGroupResolutions({
-    resolutionStatus: 'confirmed'
-  });
-
-  const suppressedAssetIds = new Set<string>();
-  for (const resolution of confirmedResolutions) {
-    const selectedCanonicalAssetId = resolveSelectedCanonicalAssetId({
-      assetIds: resolution.assetIds,
-      proposedCanonicalAssetId: resolution.proposedCanonicalAssetId,
-      ...(resolution.manualCanonicalAssetId !== undefined
-        ? { manualCanonicalAssetId: resolution.manualCanonicalAssetId }
-        : {})
-    });
-
-    for (const assetId of resolution.assetIds) {
-      if (assetId !== selectedCanonicalAssetId) {
-        suppressedAssetIds.add(assetId);
-      }
-    }
-  }
-
-  return Array.from(suppressedAssetIds);
-}
-
 async function buildFilteredCandidateQuery(options: ScriptOptions): Promise<Record<string, unknown>> {
   const allReverseGeocodeFieldsMissing = [
     {
@@ -148,7 +121,6 @@ async function buildFilteredCandidateQuery(options: ScriptOptions): Promise<Reco
     }
   ];
 
-  const suppressedDuplicateAssetIds = await listSuppressedDuplicateAssetIds();
   const query: Record<string, unknown> = {
     photoState: { $ne: PhotoState.Discard },
     locationLatitude: { $type: 'number' },
@@ -156,15 +128,8 @@ async function buildFilteredCandidateQuery(options: ScriptOptions): Promise<Reco
     $and: allReverseGeocodeFieldsMissing
   };
 
-  if (suppressedDuplicateAssetIds.length > 0) {
-    query.id = { $nin: suppressedDuplicateAssetIds };
-  }
-
   if (options.assetId) {
     query.id = options.assetId;
-    if (suppressedDuplicateAssetIds.includes(options.assetId)) {
-      query.id = '__suppressed_duplicate_asset__';
-    }
   }
 
   return query;

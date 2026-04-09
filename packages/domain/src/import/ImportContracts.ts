@@ -54,7 +54,6 @@ export interface ScanImportRequest {
 export type ScanFileStatus =
   | 'Importable'
   | 'AlreadyImportedByPath'
-  | 'DuplicateByContentHash'
   | 'Unsupported'
   | 'Missing';
 
@@ -64,7 +63,6 @@ export interface ScanSummaryDto {
   supportedMediaFileCount: number;
   unsupportedFileCount: number;
   alreadyImportedPathCount: number;
-  duplicateContentCount: number;
   importableCount: number;
 }
 
@@ -77,9 +75,7 @@ export interface ScannedCandidateFileDto {
   mediaType: MediaType | 'Unknown';
   isSupportedMedia: boolean;
   alreadyImportedByPath: boolean;
-  duplicateByContentHash: boolean;
   existingAssetIdByPath?: string;
-  existingAssetIdByContentHash?: string;
   status: ScanFileStatus;
   captureDateTime?: string | null;
   width?: number | null;
@@ -113,7 +109,6 @@ export interface RegisterImportRequest {
 export type RegisterImportFileStatus =
   | 'Imported'
   | 'AlreadyImportedByPath'
-  | 'DuplicateByContentHash'
   | 'Unsupported'
   | 'Missing'
   | 'Error';
@@ -134,7 +129,6 @@ export interface RegisterImportFileResultDto {
 export interface RegisterImportResponse {
   importedCount: number;
   skippedAlreadyImportedByPathCount: number;
-  skippedDuplicateContentCount: number;
   unsupportedCount: number;
   missingCount: number;
   errorCount: number;

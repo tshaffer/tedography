@@ -923,7 +923,6 @@ export function ImportAssetsDialog({
       setImportResultsPanelState('success');
       const nonImportedCount =
         response.skippedAlreadyImportedByPathCount +
-        response.skippedDuplicateContentCount +
         response.unsupportedCount +
         response.missingCount +
         response.errorCount;
@@ -1221,7 +1220,6 @@ export function ImportAssetsDialog({
                       <span>Supported: {scanResponse.summary.supportedMediaFileCount}</span>
                       <span>Unsupported: {scanResponse.summary.unsupportedFileCount}</span>
                       <span>Already imported by path: {scanResponse.summary.alreadyImportedPathCount}</span>
-                      <span>Duplicate by content hash: {scanResponse.summary.duplicateContentCount}</span>
                       <span>Importable: {scanResponse.summary.importableCount}</span>
                     </div>
 
@@ -1385,7 +1383,6 @@ export function ImportAssetsDialog({
                     <span>
                       Skipped:{' '}
                       {registerResponse.skippedAlreadyImportedByPathCount +
-                        registerResponse.skippedDuplicateContentCount +
                         registerResponse.unsupportedCount +
                         registerResponse.missingCount}
                     </span>

@@ -4,8 +4,6 @@ import { config } from './config.js';
 import { log } from './logger.js';
 import { syncMediaAssetIndexes } from './repositories/assetRepository.js';
 import { syncAlbumTreeNodeIndexes } from './repositories/albumTreeRepository.js';
-import { syncDuplicateCandidatePairIndexes } from './repositories/duplicateCandidatePairRepository.js';
-import { syncDuplicateGroupResolutionIndexes } from './repositories/duplicateGroupResolutionRepository.js';
 import { syncFaceDetectionIndexes } from './repositories/faceDetectionRepository.js';
 import { syncFaceMatchReviewIndexes } from './repositories/faceMatchReviewRepository.js';
 import { syncPersonIndexes } from './repositories/personRepository.js';
@@ -14,8 +12,6 @@ await connectToMongo();
 
 await syncMediaAssetIndexes();
 await syncAlbumTreeNodeIndexes();
-await syncDuplicateCandidatePairIndexes();
-await syncDuplicateGroupResolutionIndexes();
 await syncPersonIndexes();
 await syncFaceDetectionIndexes();
 await syncFaceMatchReviewIndexes();

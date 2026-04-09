@@ -10,7 +10,6 @@ import {
 } from './import/refreshService.js';
 import { findById, getAssetPageForLibrary, updatePhotoState } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
-import { duplicateCandidatePairRoutes } from './routes/duplicateCandidatePairRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
@@ -28,7 +27,6 @@ export function createServer(): Express {
   app.use('/api/media', mediaRoutes);
   app.use('/api/album-tree', albumTreeRoutes);
   app.use('/api/albums', albumMembershipRoutes);
-  app.use('/api/duplicate-candidate-pairs', duplicateCandidatePairRoutes);
   app.use('/api/people-pipeline', peoplePipelineRoutes);
 
   app.get('/api/health', (_req, res) => {

@@ -1,12 +1,10 @@
 import { type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { type MediaAsset } from '@tedography/domain';
-import { type DuplicateResolutionVisibilitySummary } from '../duplicates/duplicateResolutionVisibility';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
-  duplicateResolutionSummary?: DuplicateResolutionVisibilitySummary | null;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
   assetOperationBusy?: boolean;
@@ -182,7 +180,6 @@ function formatLocation(
 export function AssetDetailsPanel({
   asset,
   albumLabels = [],
-  duplicateResolutionSummary = null,
   onReimportAsset,
   onRebuildDerivedFiles,
   assetOperationBusy = false,
@@ -235,16 +232,6 @@ export function AssetDetailsPanel({
     { label: 'Imported', value: formatDateTime(asset.importedAt) }
   ];
 
-  if (duplicateResolutionSummary) {
-    rows.push(
-      {
-        label: 'Duplicate Role',
-        value: duplicateResolutionSummary.role === 'canonical' ? 'Canonical keeper' : 'Suppressed duplicate'
-      },
-      { label: 'Duplicate Group', value: duplicateResolutionSummary.groupKey }
-    );
-  }
-
   return (
     <section style={panelStyle}>
       <h3 style={titleStyle}>Asset Details</h3>
@@ -270,16 +257,6 @@ export function AssetDetailsPanel({
         <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>
           {assetOperationMessage}
         </p>
-      ) : null}
-      {duplicateResolutionSummary ? (
-        <div style={{ marginBottom: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Link
-            to={`/duplicates/groups?groupKey=${encodeURIComponent(duplicateResolutionSummary.groupKey)}`}
-            style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-          >
-            Open Duplicate Group Review
-          </Link>
-        </div>
       ) : null}
       {rows.map((row) => renderRow(row.label, row.value))}
       {peopleStatus ? (

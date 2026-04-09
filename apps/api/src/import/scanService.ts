@@ -1,9 +1,6 @@
 import fs from 'node:fs/promises';
 import type { ScanFileStatus, ScannedCandidateFileDto, ScanImportResponse } from '@tedography/domain';
-import {
-  findByOriginalContentHashes,
-  findByOriginalStorageRootAndArchivePaths
-} from '../repositories/assetRepository.js';
+import { findByOriginalStorageRootAndArchivePaths } from '../repositories/assetRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { computeSha256ForFile } from './fileHash.js';
@@ -38,7 +35,6 @@ type SupportedScannedFile = {
 function resolveStatus(input: {
   isSupportedMedia: boolean;
   alreadyImportedByPath: boolean;
-  duplicateByContentHash: boolean;
 }): ScanFileStatus {
   if (!input.isSupportedMedia) {
     return 'Unsupported';
@@ -46,10 +42,6 @@ function resolveStatus(input: {
 
   if (input.alreadyImportedByPath) {
     return 'AlreadyImportedByPath';
-  }
-
-  if (input.duplicateByContentHash) {
-    return 'DuplicateByContentHash';
   }
 
   return 'Importable';
@@ -145,38 +137,23 @@ export async function scanImportTarget(input: {
   }
 
   const archivePaths = walkResult.files.map((file) => file.relativePath);
-  const contentHashes = Array.from(
-    new Set(Array.from(supportedFileMap.values()).map((file) => file.contentHash))
-  );
-
   const existingByPath = await findByOriginalStorageRootAndArchivePaths(root.id, archivePaths);
-  const existingByContentHash = await findByOriginalContentHashes(contentHashes);
 
   const existingByPathMap = new Map<string, string>();
   for (const existingAsset of existingByPath) {
     existingByPathMap.set(existingAsset.originalArchivePath, existingAsset.id);
   }
 
-  const existingByContentMap = new Map<string, string>();
-  for (const existingAsset of existingByContentHash) {
-    existingByContentMap.set(existingAsset.originalContentHash, existingAsset.id);
-  }
-
   const files: ScannedCandidateFileDto[] = walkResult.files.map((discoveredFile) => {
     const mediaSupport = getMediaSupport(discoveredFile.filename);
     const supported = supportedFileMap.get(discoveredFile.relativePath);
     const existingAssetIdByPath = existingByPathMap.get(discoveredFile.relativePath);
-    const existingAssetIdByContentHash =
-      supported?.contentHash ? existingByContentMap.get(supported.contentHash) : undefined;
 
     const alreadyImportedByPath = existingByPathMap.has(discoveredFile.relativePath);
-    const duplicateByContentHash =
-      supported?.contentHash ? existingByContentMap.has(supported.contentHash) : false;
 
     const status = resolveStatus({
       isSupportedMedia: mediaSupport.isSupportedMedia,
-      alreadyImportedByPath,
-      duplicateByContentHash
+      alreadyImportedByPath
     });
 
     return {
@@ -188,11 +165,7 @@ export async function scanImportTarget(input: {
       mediaType: mediaSupport.mediaType,
       isSupportedMedia: mediaSupport.isSupportedMedia,
       alreadyImportedByPath,
-      duplicateByContentHash,
       ...(typeof existingAssetIdByPath === 'string' ? { existingAssetIdByPath } : {}),
-      ...(typeof existingAssetIdByContentHash === 'string'
-        ? { existingAssetIdByContentHash }
-        : {}),
       status,
       ...(mediaSupport.isSupportedMedia
         ? {
@@ -223,9 +196,6 @@ export async function scanImportTarget(input: {
   const alreadyImportedPathCount = files.filter(
     (file) => file.status === 'AlreadyImportedByPath'
   ).length;
-  const duplicateContentCount = files.filter(
-    (file) => file.status === 'DuplicateByContentHash'
-  ).length;
   const importableCount = files.filter((file) => file.status === 'Importable').length;
 
   return {
@@ -240,7 +210,6 @@ export async function scanImportTarget(input: {
       supportedMediaFileCount,
       unsupportedFileCount,
       alreadyImportedPathCount,
-      duplicateContentCount,
       importableCount
     },
     files

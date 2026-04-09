@@ -164,9 +164,6 @@ export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
   derivedRoot: requireAbsolutePathEnv('TEDOGRAPHY_DERIVED_ROOT'),
-  duplicateQuarantineSubdir:
-    (process.env.TEDOGRAPHY_DUPLICATE_QUARANTINE_SUBDIR ?? '.tedography-quarantine/duplicates').trim() ||
-    '.tedography-quarantine/duplicates',
   peoplePipeline: {
     enabled: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED, false),
     engine: parsePeoplePipelineEngine(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE),

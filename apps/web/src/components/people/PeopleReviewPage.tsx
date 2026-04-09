@@ -846,9 +846,6 @@ export function PeopleReviewPage() {
         <Link to="/people/dev" style={linkStyle}>
           People Dev Harness
         </Link>
-        <Link to="/duplicates/review" style={linkStyle}>
-          Duplicate Review
-        </Link>
       </div>
 
       <section style={panelStyle}>
