@@ -27,6 +27,7 @@ mock-media
 apps/api/.env
 
 apps/api/scripts/output
+apps/scripts/output
 
 scripts/output
 
