@@ -219,44 +219,6 @@ function getDescendantNodeIds(nodes: AlbumTreeNode[], groupId: string): Set<stri
   return descendantIds;
 }
 
-function getAncestorGroupIds(nodeId: string | null, nodesById: Map<string, AlbumTreeNode>): string[] {
-  const ancestorGroupIds = new Set<string>();
-  let currentId = nodeId;
-
-  while (currentId) {
-    const node = nodesById.get(currentId);
-    if (!node) {
-      break;
-    }
-
-    if (node.nodeType === 'Group') {
-      ancestorGroupIds.add(node.id);
-    }
-
-    currentId = node.parentId;
-  }
-
-  return Array.from(ancestorGroupIds);
-}
-
-function getInitialExpandedGroupIds(
-  nodes: AlbumTreeNode[],
-  nodeToMove: AlbumTreeNode | null
-): string[] {
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const expanded = new Set<string>(
-    nodes.filter((node) => node.nodeType === 'Group' && node.parentId === null).map((node) => node.id)
-  );
-
-  if (nodeToMove?.parentId) {
-    for (const ancestorId of getAncestorGroupIds(nodeToMove.parentId, nodesById)) {
-      expanded.add(ancestorId);
-    }
-  }
-
-  return Array.from(expanded);
-}
-
 function validateDestination(
   nodeToMove: AlbumTreeNode,
   destinationId: MoveDestinationId,
@@ -323,7 +285,7 @@ export function MoveAlbumTreeNodeDialog({
     }
 
     setSelectedDestinationId(nodeToMove.parentId ?? ROOT_DESTINATION);
-    setExpandedGroupIds(getInitialExpandedGroupIds(nodes, nodeToMove));
+    setExpandedGroupIds([]);
     setMovePending(false);
     setMoveError(null);
   }, [nodeToMove, nodes, open]);
