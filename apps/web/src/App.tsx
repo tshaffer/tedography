@@ -15,6 +15,10 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
 import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
+import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
+import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import TuneIcon from '@mui/icons-material/Tune';
 import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
@@ -5559,6 +5563,10 @@ export default function App() {
     setCheckedAlbumIds([]);
   }
 
+  function collapseAllAlbumGroups(): void {
+    setExpandedGroupIds([]);
+  }
+
   function revealCheckedAlbums(): void {
     if (checkedAlbumIds.length === 0) {
       return;
@@ -6675,42 +6683,75 @@ export default function App() {
         <div style={albumPanelHeaderStyle}>
           <h2 style={sidePanelTitleStyle}>{title}</h2>
           <div style={albumPanelUtilityRowStyle}>
-            <button
-              type="button"
-              style={
-                checkedAlbumIds.length > 0
-                  ? compactSecondaryButtonStyle
-                  : compactDisabledSecondaryButtonStyle
-              }
-              onClick={revealCheckedAlbums}
-              disabled={checkedAlbumIds.length === 0}
-              title="Reveal checked albums"
-            >
-              Reveal
-            </button>
-            <button
-              type="button"
-              style={
-                checkedAlbumIds.length > 0
-                  ? compactSecondaryButtonStyle
-                  : compactDisabledSecondaryButtonStyle
-              }
-              onClick={clearCheckedAlbums}
-              disabled={checkedAlbumIds.length === 0}
-              title="Clear checked albums"
-            >
-              Clear
-            </button>
+            <Tooltip title="Reveal checked albums">
+              <span>
+                <button
+                  type="button"
+                  style={
+                    checkedAlbumIds.length > 0
+                      ? toolbarIconButtonStyle
+                      : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                  }
+                  onClick={revealCheckedAlbums}
+                  disabled={checkedAlbumIds.length === 0}
+                  aria-label="Reveal checked albums"
+                >
+                  <VisibilityIcon sx={{ fontSize: 18 }} />
+                </button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Clear checked albums">
+              <span>
+                <button
+                  type="button"
+                  style={
+                    checkedAlbumIds.length > 0
+                      ? toolbarIconButtonStyle
+                      : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                  }
+                  onClick={clearCheckedAlbums}
+                  disabled={checkedAlbumIds.length === 0}
+                  aria-label="Clear checked albums"
+                >
+                  <ClearAllIcon sx={{ fontSize: 18 }} />
+                </button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Collapse album tree">
+              <span>
+                <button
+                  type="button"
+                  style={
+                    expandedGroupIds.length > 0
+                      ? toolbarIconButtonStyle
+                      : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                  }
+                  onClick={collapseAllAlbumGroups}
+                  disabled={expandedGroupIds.length === 0}
+                  aria-label="Collapse album tree"
+                >
+                  <UnfoldLessIcon sx={{ fontSize: 18 }} />
+                </button>
+              </span>
+            </Tooltip>
             {isLibraryArea ? (
-              <button
-                type="button"
-                style={canCreateGroupNode ? compactSecondaryButtonStyle : compactDisabledSecondaryButtonStyle}
-                onClick={() => void handleCreateTopLevelGroup()}
-                disabled={!canCreateGroupNode}
-                title="Add top-level group"
-              >
-                + Top Group Node
-              </button>
+              <Tooltip title="Add top-level group">
+                <span>
+                  <button
+                    type="button"
+                    style={
+                      canCreateGroupNode
+                        ? toolbarIconButtonStyle
+                        : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                    }
+                    onClick={() => void handleCreateTopLevelGroup()}
+                    disabled={!canCreateGroupNode}
+                    aria-label="Add top-level group"
+                  >
+                    <CreateNewFolderIcon sx={{ fontSize: 18 }} />
+                  </button>
+                </span>
+              </Tooltip>
             ) : null}
           </div>
         </div>
