@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import type { AlbumTreeNode } from '@tedography/domain';
 
 interface MoveAssetsToAlbumDialogProps {
@@ -261,6 +261,7 @@ export function MoveAssetsToAlbumDialog({
   const [keepInSourceAlbum, setKeepInSourceAlbum] = useState(false);
   const [movePending, setMovePending] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const destinationRowRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const nodesById = useMemo(() => new Map(albums.map((album) => [album.id, album])), [albums]);
   const destinationAlbums = useMemo(
@@ -287,6 +288,19 @@ export function MoveAssetsToAlbumDialog({
     setMovePending(false);
     setMoveError(null);
   }, [albums, destinationAlbums, open]);
+
+  useEffect(() => {
+    if (!open || !destinationAlbumId) {
+      return;
+    }
+
+    const targetRow = destinationRowRefs.current.get(destinationAlbumId);
+    if (!targetRow) {
+      return;
+    }
+
+    targetRow.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+  }, [destinationAlbumId, displayNodes, open]);
 
   if (!open || !sourceAlbum) {
     return null;
@@ -357,6 +371,13 @@ export function MoveAssetsToAlbumDialog({
                           }
                         }}
                         title={buildAlbumPathLabel(node, nodesById)}
+                        ref={(element) => {
+                          if (element) {
+                            destinationRowRefs.current.set(node.id, element);
+                          } else {
+                            destinationRowRefs.current.delete(node.id);
+                          }
+                        }}
                       >
                         <span>{node.label}</span>
                         <span style={{ color: '#64748b', fontSize: '11px' }}>
