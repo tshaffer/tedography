@@ -2892,6 +2892,10 @@ export default function App() {
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const albumTreeListRef = useRef<HTMLDivElement | null>(null);
+  const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const checkedAlbumRevealIndexRef = useRef(-1);
+  const pendingCheckedAlbumRevealIdRef = useRef<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [albumMembershipNotice, setAlbumMembershipNotice] = useState<{
     kind: 'success' | 'error';
@@ -4629,6 +4633,36 @@ export default function App() {
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode),
     [albumTreeNodes, expandedGroupIds, albumTreeSortMode]
   );
+  const checkedAlbumIdsInTreeOrder = useMemo(() => {
+    const allGroupIds = albumTreeNodes
+      .filter((node) => node.nodeType === 'Group')
+      .map((node) => node.id);
+    const checkedSet = new Set(checkedAlbumIds);
+
+    return buildAlbumTreeDisplayList(albumTreeNodes, allGroupIds, albumTreeSortMode)
+      .filter((node) => node.nodeType === 'Album' && checkedSet.has(node.id))
+      .map((node) => node.id);
+  }, [albumTreeNodes, albumTreeSortMode, checkedAlbumIds]);
+
+  useEffect(() => {
+    checkedAlbumRevealIndexRef.current = -1;
+    pendingCheckedAlbumRevealIdRef.current = null;
+  }, [checkedAlbumIdsInTreeOrder]);
+
+  useEffect(() => {
+    const pendingAlbumId = pendingCheckedAlbumRevealIdRef.current;
+    if (!pendingAlbumId) {
+      return;
+    }
+
+    const targetButton = albumTreeNodeButtonRefs.current.get(pendingAlbumId);
+    if (!targetButton) {
+      return;
+    }
+
+    pendingCheckedAlbumRevealIdRef.current = null;
+    targetButton.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [treeDisplayNodes]);
 
   function getTopVisibleTimelineMonthKey(): string | null {
     if (timelineMonthGroups.length === 0) {
@@ -5691,12 +5725,28 @@ export default function App() {
   }
 
   function revealCheckedAlbums(): void {
-    if (checkedAlbumIds.length === 0) {
+    if (checkedAlbumIdsInTreeOrder.length === 0) {
       return;
     }
 
-    const ancestorGroupIds = getAncestorGroupIdsForAlbumIds(checkedAlbumIds, albumNodesById);
-    setExpandedGroupIds(ancestorGroupIds);
+    const nextIndex = (checkedAlbumRevealIndexRef.current + 1) % checkedAlbumIdsInTreeOrder.length;
+    const targetAlbumId = checkedAlbumIdsInTreeOrder[nextIndex] ?? null;
+    if (!targetAlbumId) {
+      return;
+    }
+
+    checkedAlbumRevealIndexRef.current = nextIndex;
+    pendingCheckedAlbumRevealIdRef.current = targetAlbumId;
+
+    const ancestorGroupIds = getAncestorGroupIdsForAlbumIds([targetAlbumId], albumNodesById);
+    setExpandedGroupIds((previous) => {
+      const merged = new Set(previous);
+      for (const ancestorId of ancestorGroupIds) {
+        merged.add(ancestorId);
+      }
+
+      return Array.from(merged);
+    });
   }
 
   async function handleCreateAlbumTreeNode(
@@ -6541,7 +6591,7 @@ export default function App() {
     onToggleChecked: (albumId: string) => void
   ): ReactElement {
     return (
-      <div style={albumTreeListStyle}>
+      <div style={albumTreeListStyle} ref={albumTreeListRef}>
         {treeDisplayNodes.length === 0 ? (
           <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No tree nodes yet.</p>
         ) : (
@@ -6607,6 +6657,13 @@ export default function App() {
                   data-selected={isSelected ? 'true' : undefined}
                   onClick={() => setSelectedTreeNodeId(node.id)}
                   title={titleText}
+                  ref={(element) => {
+                    if (element) {
+                      albumTreeNodeButtonRefs.current.set(node.id, element);
+                    } else {
+                      albumTreeNodeButtonRefs.current.delete(node.id);
+                    }
+                  }}
                 >
                   <span style={albumTreeLabelContentStyle}>
                     <span style={albumTreeLabelTextStyle}>{labelText}</span>
