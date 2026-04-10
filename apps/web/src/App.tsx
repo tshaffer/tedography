@@ -3963,6 +3963,10 @@ export default function App() {
     const counts = new Map<string, number>();
 
     for (const asset of assets) {
+      if (asset.photoState === PhotoState.Discard) {
+        continue;
+      }
+
       for (const albumId of asset.albumIds ?? []) {
         counts.set(albumId, (counts.get(albumId) ?? 0) + 1);
       }
