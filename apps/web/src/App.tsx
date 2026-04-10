@@ -473,16 +473,34 @@ const sidePanelStyle: CSSProperties = {
   borderRadius: '10px',
   backgroundColor: '#fafafa',
   padding: '8px',
+  boxSizing: 'border-box',
   minHeight: 0,
   height: '100%',
   overflow: 'auto',
   overscrollBehavior: 'contain'
 };
 
+const leftPanelStyle: CSSProperties = {
+  ...sidePanelStyle,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+};
+
 const sidePanelSectionStyle: CSSProperties = {
   borderBottom: '1px solid #e9e9e9',
   paddingBottom: '8px',
   marginBottom: '8px'
+};
+
+const albumPanelSectionStyle: CSSProperties = {
+  ...sidePanelSectionStyle,
+  flex: '1 1 auto',
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  marginBottom: 0
 };
 
 const sidePanelHeaderStyle: CSSProperties = {
@@ -503,6 +521,9 @@ const mainColumnStyle: CSSProperties = {
   minWidth: 0,
   minHeight: 0,
   height: '100%',
+  paddingTop: '6px',
+  paddingRight: '4px',
+  boxSizing: 'border-box',
   overflow: 'auto',
   overscrollBehavior: 'contain'
 };
@@ -555,6 +576,16 @@ const albumTreeListStyle: CSSProperties = {
   display: 'grid',
   gap: '4px',
   marginTop: '6px'
+};
+
+const albumTreeScrollableListStyle: CSSProperties = {
+  ...albumTreeListStyle,
+  flex: '1 1 auto',
+  minHeight: 0,
+  marginTop: 0,
+  overflow: 'auto',
+  overscrollBehavior: 'contain',
+  paddingRight: '2px'
 };
 
 const albumTreeRowStyle: CSSProperties = {
@@ -682,6 +713,7 @@ const compactSelectStyle: CSSProperties = {
 
 const photoStateSummaryListStyle: CSSProperties = {
   display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: '6px',
   marginTop: '6px'
 };
@@ -691,7 +723,12 @@ const photoStateSummaryRowStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: '8px',
-  fontSize: '13px'
+  fontSize: '13px',
+  minWidth: 0,
+  border: '1px solid #e3e6ea',
+  borderRadius: '10px',
+  backgroundColor: '#fff',
+  padding: '6px 8px'
 };
 
 const photoStateCountBadgeStyle: CSSProperties = {
@@ -6588,10 +6625,20 @@ export default function App() {
 
   function renderAlbumTreeRows(
     checkedIds: string[],
-    onToggleChecked: (albumId: string) => void
+    onToggleChecked: (albumId: string) => void,
+    options?: {
+      scrollable?: boolean,
+      attachScrollRef?: boolean
+    }
   ): ReactElement {
+    const useScrollableContainer = options?.scrollable === true;
+    const attachScrollRef = options?.attachScrollRef === true;
+
     return (
-      <div style={albumTreeListStyle} ref={albumTreeListRef}>
+      <div
+        style={useScrollableContainer ? albumTreeScrollableListStyle : albumTreeListStyle}
+        ref={attachScrollRef ? albumTreeListRef : undefined}
+      >
         {treeDisplayNodes.length === 0 ? (
           <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No tree nodes yet.</p>
         ) : (
@@ -6875,7 +6922,7 @@ export default function App() {
           : 'Albums';
 
     return (
-      <section style={sidePanelSectionStyle}>
+      <section style={albumPanelSectionStyle}>
         <div style={albumPanelHeaderStyle}>
           <h2 style={sidePanelTitleStyle}>{title}</h2>
           <div style={albumPanelUtilityRowStyle}>
@@ -6953,7 +7000,12 @@ export default function App() {
         </div>
         {albumTreeLoading ? <p>Loading albums...</p> : null}
         {albumTreeError ? <p>Failed to load album tree: {albumTreeError}</p> : null}
-        {!albumTreeLoading ? renderAlbumTreeRows(checkedAlbumIds, toggleAlbumChecked) : null}
+        {!albumTreeLoading
+          ? renderAlbumTreeRows(checkedAlbumIds, toggleAlbumChecked, {
+              scrollable: true,
+              attachScrollRef: true
+            })
+          : null}
       </section>
     );
   }
@@ -7217,7 +7269,7 @@ export default function App() {
     }
 
     return (
-      <aside style={sidePanelStyle}>
+      <aside style={isAlbumsMode ? leftPanelStyle : sidePanelStyle}>
         {isReviewArea ? (
           <>
             <section style={sidePanelSectionStyle}>
@@ -7232,11 +7284,6 @@ export default function App() {
         ) : null}
         {isLibraryArea ? (
           <>
-            <section style={sidePanelSectionStyle}>
-              <div style={sidePanelHeaderStyle}>
-                <h2 style={sidePanelTitleStyle}>Library</h2>
-              </div>
-            </section>
             {renderVisibilityPanel()}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
             {isLibraryAlbumsMode ? renderAlbumTreePanel() : null}
