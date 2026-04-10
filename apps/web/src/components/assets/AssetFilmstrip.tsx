@@ -1,5 +1,8 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { type MediaAsset } from '@tedography/domain';
+import {
+  normalizeDisplayRotationDegrees,
+  type MediaAsset
+} from '@tedography/domain';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 type AssetFilmstripProps = {
@@ -43,6 +46,19 @@ const imageStyle: CSSProperties = {
   objectFit: 'cover',
   display: 'block'
 };
+
+function getRotatedImageStyle(asset: MediaAsset): CSSProperties {
+  const displayRotationDegrees = normalizeDisplayRotationDegrees(asset.displayRotationDegrees);
+  if (displayRotationDegrees === 0) {
+    return imageStyle;
+  }
+
+  return {
+    ...imageStyle,
+    transform: `rotate(${displayRotationDegrees}deg)`,
+    transformOrigin: 'center center'
+  };
+}
 
 export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFilmstripProps) {
   const containerRef = useRef<HTMLElement | null>(null);
@@ -115,7 +131,12 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
           }}
           aria-label={`Navigate to ${asset.filename}`}
         >
-          <img src={getThumbnailMediaUrl(asset.id)} alt={asset.filename} style={imageStyle} loading="lazy" />
+          <img
+            src={getThumbnailMediaUrl(asset.id)}
+            alt={asset.filename}
+            style={getRotatedImageStyle(asset)}
+            loading="lazy"
+          />
         </button>
       ))}
     </section>

@@ -2,6 +2,14 @@ import { MediaType } from '../enums/MediaType.js';
 import { PhotoState } from '../enums/PhotoState.js';
 
 export type DisplayStorageType = 'archive-root' | 'derived-root';
+export const displayRotationDegreesValues = [0, 90, 180, 270] as const;
+export type DisplayRotationDegrees = (typeof displayRotationDegreesValues)[number];
+
+export function normalizeDisplayRotationDegrees(value: unknown): DisplayRotationDegrees {
+  return displayRotationDegreesValues.includes(value as DisplayRotationDegrees)
+    ? (value as DisplayRotationDegrees)
+    : 0;
+}
 
 export type MediaAssetPersonSource =
   | 'confirmed-face-detection'
@@ -21,6 +29,7 @@ export interface MediaAsset {
   filename: string;
   mediaType: MediaType;
   photoState: PhotoState;
+  displayRotationDegrees?: DisplayRotationDegrees | null;
   captureDateTime?: string | null;
   width?: number | null;
   height?: number | null;

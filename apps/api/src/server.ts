@@ -1,6 +1,10 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
-import { PhotoState, normalizePhotoState } from '@tedography/domain';
+import {
+  PhotoState,
+  normalizeDisplayRotationDegrees,
+  normalizePhotoState
+} from '@tedography/domain';
 import type { RefreshOperationResponse } from '@tedography/domain';
 import { log } from './logger.js';
 import {
@@ -8,7 +12,12 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
-import { findById, getAssetPageForLibrary, updatePhotoState } from './repositories/assetRepository.js';
+import {
+  findById,
+  getAssetPageForLibrary,
+  updateDisplayRotationDegrees,
+  updatePhotoState
+} from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
@@ -16,6 +25,15 @@ import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
+}
+
+function parseDisplayRotationDegrees(value: unknown): 0 | 90 | 180 | 270 | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const normalized = normalizeDisplayRotationDegrees(value);
+  return normalized === value ? normalized : null;
 }
 
 export function createServer(): Express {
@@ -95,6 +113,30 @@ export function createServer(): Express {
       res.json(updatedAsset);
     } catch (error) {
       log.error('Failed to update asset photoState', error);
+      res.status(500).json({ error: 'Failed to update asset' });
+    }
+  });
+
+  app.patch('/api/assets/:id/displayRotationDegrees', async (req, res) => {
+    const displayRotationDegrees = parseDisplayRotationDegrees(
+      (req.body as { displayRotationDegrees?: unknown }).displayRotationDegrees
+    );
+    if (displayRotationDegrees === null) {
+      res.status(400).json({ error: 'displayRotationDegrees must be one of 0, 90, 180, 270' });
+      return;
+    }
+
+    try {
+      const updatedAsset = await updateDisplayRotationDegrees(req.params.id, displayRotationDegrees);
+
+      if (!updatedAsset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      res.json(updatedAsset);
+    } catch (error) {
+      log.error('Failed to update asset displayRotationDegrees', error);
       res.status(500).json({ error: 'Failed to update asset' });
     }
   });

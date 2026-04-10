@@ -1,8 +1,10 @@
 import {
   MediaType,
   PhotoState,
+  normalizeDisplayRotationDegrees,
   normalizePhotoState,
   type MediaAssetPerson,
+  type DisplayRotationDegrees,
   type DisplayStorageType,
   type MediaAsset
 } from '@tedography/domain';
@@ -18,7 +20,8 @@ export async function syncMediaAssetIndexes(): Promise<void> {
 function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
   return {
     ...asset,
-    photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New
+    photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New,
+    displayRotationDegrees: normalizeDisplayRotationDegrees(asset.displayRotationDegrees)
   };
 }
 
@@ -42,6 +45,7 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           filename: 1,
           mediaType: 1,
           photoState: 1,
+          displayRotationDegrees: 1,
           captureDateTime: 1,
           width: 1,
           height: 1,
@@ -93,6 +97,7 @@ export async function getAssetPageForLibrary(input?: {
           filename: 1,
           mediaType: 1,
           photoState: 1,
+          displayRotationDegrees: 1,
           captureDateTime: 1,
           width: 1,
           height: 1,
@@ -269,6 +274,7 @@ export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;
   photoState: PhotoState;
+  displayRotationDegrees?: DisplayRotationDegrees | null;
   captureDateTime: Date | null;
   width: number | null;
   height: number | null;
@@ -307,6 +313,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     filename: input.filename,
     mediaType: input.mediaType,
     photoState: input.photoState,
+    displayRotationDegrees: normalizeDisplayRotationDegrees(input.displayRotationDegrees),
     captureDateTime: input.captureDateTime?.toISOString() ?? null,
     width: input.width,
     height: input.height,
@@ -361,6 +368,18 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
   const asset = await MediaAssetModel.findOneAndUpdate(
     { id },
     { $set: { photoState } },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
+}
+
+export async function updateDisplayRotationDegrees(
+  id: string,
+  displayRotationDegrees: DisplayRotationDegrees
+): Promise<MediaAsset | null> {
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id },
+    { $set: { displayRotationDegrees } },
     { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
   return asset ? normalizeMediaAsset(asset) : null;

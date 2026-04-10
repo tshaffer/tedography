@@ -19,15 +19,19 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder';
+import RotateLeftIcon from '@mui/icons-material/RotateLeft';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import TuneIcon from '@mui/icons-material/Tune';
 import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
+  normalizeDisplayRotationDegrees,
   MediaType,
   type Person,
   PhotoState,
+  type DisplayRotationDegrees,
   normalizePhotoState,
   type AlbumTreeNode,
   type MediaAsset
@@ -42,7 +46,11 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
-import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
+import {
+  rebuildAssetDerivedFiles,
+  reimportAsset,
+  updateAssetDisplayRotationDegrees
+} from './api/assetApi';
 import {
   getPeoplePipelineAssetState,
   getPeopleScopedAssetSummary,
@@ -819,6 +827,15 @@ const thumbnailImageStyle: CSSProperties = {
   objectPosition: 'center'
 };
 
+const thumbnailImageStageStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden'
+};
+
 const thumbnailFallbackStyle: CSSProperties = {
   color: '#c7c7c7',
   fontSize: '12px'
@@ -1047,13 +1064,29 @@ const detailPanelStyle: CSSProperties = {
   backgroundColor: '#fafafa'
 };
 
-const detailImageStyle: CSSProperties = {
+const detailImageFrameStyle: CSSProperties = {
   width: '100%',
-  maxWidth: '520px',
+  minHeight: '240px',
+  maxHeight: '60vh',
   borderRadius: '8px',
   border: '1px solid #dedede',
+  backgroundColor: '#1f1f1f',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  marginBottom: '10px',
+  padding: '8px',
+  boxSizing: 'border-box'
+};
+
+const detailImageStyle: CSSProperties = {
+  width: 'auto',
+  maxWidth: '100%',
+  maxHeight: 'calc(60vh - 16px)',
+  borderRadius: '8px',
   display: 'block',
-  marginBottom: '10px'
+  flex: '0 1 auto'
 };
 
 const immersiveButtonStyle: CSSProperties = {
@@ -1272,6 +1305,17 @@ const immersiveImageWrapStyle: CSSProperties = {
   overflow: 'hidden',
   padding: 0,
   backgroundColor: '#000'
+};
+
+const immersiveImageStageStyle: CSSProperties = {
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  padding: 0,
+  boxSizing: 'border-box'
 };
 
 const immersiveImageStyle: CSSProperties = {
@@ -1627,6 +1671,153 @@ const reviewActions: PhotoState[] = [
   PhotoState.Pending,
   PhotoState.New
 ];
+
+function getAssetDisplayRotationDegrees(asset: Pick<MediaAsset, 'displayRotationDegrees'>): DisplayRotationDegrees {
+  return normalizeDisplayRotationDegrees(asset.displayRotationDegrees);
+}
+
+function getRotatedImageStyle(
+  baseStyle: CSSProperties,
+  asset: Pick<MediaAsset, 'displayRotationDegrees'>
+): CSSProperties {
+  const displayRotationDegrees = getAssetDisplayRotationDegrees(asset);
+  if (displayRotationDegrees === 0) {
+    return baseStyle;
+  }
+
+  return {
+    ...baseStyle,
+    transform: `${baseStyle.transform ? `${baseStyle.transform} ` : ''}rotate(${displayRotationDegrees}deg)`,
+    transformOrigin: 'center center'
+  };
+}
+
+function rotateDisplayRotationDegrees(
+  current: DisplayRotationDegrees,
+  delta: -90 | 90
+): DisplayRotationDegrees {
+  const next = (current + delta + 360) % 360;
+  return normalizeDisplayRotationDegrees(next);
+}
+
+type RotatedImageProps = {
+  asset: MediaAsset;
+  src: string;
+  alt: string;
+  stageStyle: CSSProperties;
+  imageStyle?: CSSProperties;
+  loading?: 'eager' | 'lazy';
+  onError?: () => void;
+  onLoad?: () => void;
+};
+
+function RotatedImage({
+  asset,
+  src,
+  alt,
+  stageStyle,
+  imageStyle,
+  loading,
+  onError,
+  onLoad
+}: RotatedImageProps): ReactElement {
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageSize, setStageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>(() => ({
+    width: asset.width && asset.width > 0 ? asset.width : 0,
+    height: asset.height && asset.height > 0 ? asset.height : 0
+  }));
+  const rotation = getAssetDisplayRotationDegrees(asset);
+
+  useEffect(() => {
+    const element = stageRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const updateStageSize = () => {
+      setStageSize({
+        width: element.clientWidth,
+        height: element.clientHeight
+      });
+    };
+
+    updateStageSize();
+    const observer = new ResizeObserver(() => updateStageSize());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setNaturalSize({
+      width: asset.width && asset.width > 0 ? asset.width : 0,
+      height: asset.height && asset.height > 0 ? asset.height : 0
+    });
+  }, [asset.height, asset.id, asset.width]);
+
+  const naturalWidth = naturalSize.width > 0 ? naturalSize.width : 1;
+  const naturalHeight = naturalSize.height > 0 ? naturalSize.height : 1;
+  const rotatedWidth = rotation === 90 || rotation === 270 ? naturalHeight : naturalWidth;
+  const rotatedHeight = rotation === 90 || rotation === 270 ? naturalWidth : naturalHeight;
+
+  let scaledImageWidth = naturalWidth;
+  let scaledImageHeight = naturalHeight;
+  let frameWidth = rotatedWidth;
+  let frameHeight = rotatedHeight;
+
+  if (stageSize.width > 0 && stageSize.height > 0) {
+    const scale = Math.min(stageSize.width / rotatedWidth, stageSize.height / rotatedHeight);
+    if (Number.isFinite(scale) && scale > 0) {
+      scaledImageWidth = naturalWidth * scale;
+      scaledImageHeight = naturalHeight * scale;
+      frameWidth = rotatedWidth * scale;
+      frameHeight = rotatedHeight * scale;
+    }
+  }
+
+  return (
+    <div ref={stageRef} style={stageStyle}>
+      <div
+        style={{
+          position: 'relative',
+          width: `${frameWidth}px`,
+          height: `${frameHeight}px`,
+          flex: '0 0 auto',
+          overflow: 'hidden'
+        }}
+      >
+        <img
+          src={src}
+          alt={alt}
+          loading={loading}
+          style={{
+            ...imageStyle,
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: `${scaledImageWidth}px`,
+            height: `${scaledImageHeight}px`,
+            maxWidth: 'none',
+            maxHeight: 'none',
+            objectFit: 'fill',
+            transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+            transformOrigin: 'center center',
+            display: 'block'
+          }}
+          onError={onError}
+          onLoad={(event) => {
+            const width = event.currentTarget.naturalWidth;
+            const height = event.currentTarget.naturalHeight;
+            if (width > 0 && height > 0) {
+              setNaturalSize({ width, height });
+            }
+            onLoad?.();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function formatCaptureDate(dateString?: string | null): string {
   if (typeof dateString !== 'string' || dateString.trim().length === 0) {
@@ -2290,10 +2481,12 @@ function AssetCard({
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
         {imageUrl && !imageFailed ? (
-          <img
+          <RotatedImage
+            asset={asset}
             src={imageUrl}
             alt={asset.filename}
-            style={thumbnailImageStyle}
+            stageStyle={thumbnailImageStageStyle}
+            imageStyle={thumbnailImageStyle}
             loading="lazy"
             onError={() => setImageFailed(true)}
           />
@@ -2327,9 +2520,15 @@ function AssetDetailPanel({ asset }: AssetDetailPanelProps) {
 
   return (
     <section style={detailPanelStyle}>
-      <h2 style={{ marginTop: 0 }}>Focused Asset</h2>
+      <h2 style={{ marginTop: 0, marginBottom: '10px' }}>Focused Asset</h2>
       {imageUrl ? (
-        <img src={imageUrl} alt={asset.filename} style={detailImageStyle} />
+        <RotatedImage
+          asset={asset}
+          src={imageUrl}
+          alt={asset.filename}
+          stageStyle={detailImageFrameStyle}
+          imageStyle={detailImageStyle}
+        />
       ) : null}
       <p>
         <strong>Filename:</strong> {asset.filename}
@@ -2367,7 +2566,15 @@ function LoupeViewer({
       <div style={loupeImageWrapStyle}>
         <div style={loupeImageScrollerStyle}>
           <div style={loupeImageStageStyle} onDoubleClick={() => onOpenImmersive(asset.id)}>
-            {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
+            {imageUrl ? (
+              <RotatedImage
+                asset={asset}
+                src={imageUrl}
+                alt={asset.filename}
+                stageStyle={{ width: '100%', height: '100%' }}
+                imageStyle={loupeImageStyle}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -2402,15 +2609,18 @@ function ImmersiveViewer({
       >
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
-            <img
-              key={asset.id}
+            <RotatedImage
+              asset={asset}
               src={imageUrl}
               alt={asset.filename}
-              style={immersiveImageStyle}
+              stageStyle={immersiveImageStageStyle}
+              imageStyle={immersiveImageStyle}
               onLoad={() => onActiveImageLoad(asset.id)}
             />
           ) : (
-            <div style={immersiveImageStyle} />
+            <div style={immersiveImageStageStyle}>
+              <div style={immersiveImageStyle} />
+            </div>
           )}
         </div>
       </section>
@@ -2471,15 +2681,18 @@ function SlideshowViewer({
         </div>
         <div style={immersiveImageWrapStyle}>
           {imageUrl ? (
-            <img
-              key={asset.id}
+            <RotatedImage
+              asset={asset}
               src={imageUrl}
               alt={asset.filename}
-              style={immersiveImageStyle}
+              stageStyle={immersiveImageStageStyle}
+              imageStyle={immersiveImageStyle}
               onLoad={() => onActiveImageLoad(asset.id)}
             />
           ) : (
-            <div style={immersiveImageStyle} />
+            <div style={immersiveImageStageStyle}>
+              <div style={immersiveImageStyle} />
+            </div>
           )}
         </div>
         <p style={immersiveBottomHintStyle}>
@@ -2649,18 +2862,19 @@ function SurveyZoomableTile({
           }}
         >
           {imageUrl ? (
-            <img
+            <RotatedImage
+              asset={asset}
               src={imageUrl}
               alt={asset.filename}
-              style={{
+              stageStyle={{ width: '100%', height: '100%' }}
+              imageStyle={{
                 ...surveyImageStyle,
                 cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
               }}
-              draggable={false}
-              onLoad={(event) =>
+              onLoad={() =>
                 setImageDimensions({
-                  width: event.currentTarget.naturalWidth,
-                  height: event.currentTarget.naturalHeight
+                  width: asset.width ?? 0,
+                  height: asset.height ?? 0
                 })
               }
             />
@@ -4989,11 +5203,49 @@ export default function App() {
       setAssets((previous) =>
         previous.map((asset) => updatesById.get(asset.id) ?? asset)
       );
+      setSelectedAssetDetails((current) => (current ? updatesById.get(current.id) ?? current : current));
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to update selected assets');
     } finally {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
+      }
+    }
+  }
+
+  async function handleRotateSelectedAssets(delta: -90 | 90): Promise<void> {
+    const selectedAssets = selectedAssetIds
+      .map((assetId) => assetsById.get(assetId) ?? null)
+      .filter((asset): asset is MediaAsset => asset !== null);
+
+    if (selectedAssets.length === 0) {
+      return;
+    }
+
+    for (const asset of selectedAssets) {
+      setAssetUpdating(asset.id, true);
+    }
+    setUpdateError(null);
+
+    try {
+      const updatedAssets = await Promise.all(
+        selectedAssets.map((asset) =>
+          updateAssetDisplayRotationDegrees(
+            asset.id,
+            rotateDisplayRotationDegrees(getAssetDisplayRotationDegrees(asset), delta)
+          )
+        )
+      );
+
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+      setSelectedAssetDetails((current) => (current ? updatesById.get(current.id) ?? current : current));
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to rotate selected assets');
+    } finally {
+      for (const asset of selectedAssets) {
+        setAssetUpdating(asset.id, false);
       }
     }
   }
@@ -7716,6 +7968,59 @@ export default function App() {
                   {state}
                 </button>
               ))
+            ) : null}
+          </div>
+
+          <div style={secondaryBarGroupStyle}>
+            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+              <>
+                <Tooltip
+                  title={
+                    hasSelectedAssets
+                      ? 'Rotate selected photos left'
+                      : 'Select one or more photos to rotate left'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        hasSelectedAssets
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleRotateSelectedAssets(-90)}
+                      disabled={!hasSelectedAssets}
+                      aria-label="Rotate selected photos left"
+                    >
+                      <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    hasSelectedAssets
+                      ? 'Rotate selected photos right'
+                      : 'Select one or more photos to rotate right'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        hasSelectedAssets
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleRotateSelectedAssets(90)}
+                      disabled={!hasSelectedAssets}
+                      aria-label="Rotate selected photos right"
+                    >
+                      <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+              </>
             ) : null}
           </div>
 

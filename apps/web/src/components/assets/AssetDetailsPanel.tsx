@@ -1,6 +1,6 @@
 import { type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { type MediaAsset } from '@tedography/domain';
+import { normalizeDisplayRotationDegrees, type MediaAsset } from '@tedography/domain';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
@@ -202,6 +202,7 @@ export function AssetDetailsPanel({
     { label: 'Photo State', value: formatValue(asset.photoState) },
     { label: 'Media Type', value: formatValue(asset.mediaType) },
     { label: 'Captured', value: formatDateTime(asset.captureDateTime) },
+    { label: 'Rotation', value: `${normalizeDisplayRotationDegrees(asset.displayRotationDegrees)}°` },
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
     { label: 'Albums', value: formatAlbumLabels(albumLabels) },
     {

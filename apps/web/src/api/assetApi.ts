@@ -1,4 +1,4 @@
-import type { RefreshOperationResponse } from '@tedography/domain';
+import type { DisplayRotationDegrees, MediaAsset, RefreshOperationResponse } from '@tedography/domain';
 
 type ApiErrorPayload = {
   error?: string;
@@ -29,4 +29,17 @@ export async function rebuildAssetDerivedFiles(
       method: 'POST'
     }
   );
+}
+
+export async function updateAssetDisplayRotationDegrees(
+  assetId: string,
+  displayRotationDegrees: DisplayRotationDegrees
+): Promise<MediaAsset> {
+  return fetchJson<MediaAsset>(`/api/assets/${encodeURIComponent(assetId)}/displayRotationDegrees`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ displayRotationDegrees })
+  });
 }
