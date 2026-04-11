@@ -14,6 +14,8 @@ import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
+import RotateLeftIcon from '@mui/icons-material/RotateLeft';
+import RotateRightIcon from '@mui/icons-material/RotateRight';
 import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
@@ -42,7 +44,12 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode
 } from './api/albumTreeApi';
-import { rebuildAssetDerivedFiles, reimportAsset } from './api/assetApi';
+import {
+  rebuildAssetDerivedFiles,
+  reimportAsset,
+  rotateAssetClockwise,
+  rotateAssetCounterclockwise
+} from './api/assetApi';
 import {
   getPeoplePipelineAssetState,
   getPeopleScopedAssetSummary,
@@ -2209,7 +2216,7 @@ function getPhotoStateBadgeColor(photoState: PhotoState): string {
 
 function getAssetDisplayImageUrl(asset: MediaAsset): string | null {
   if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
-    return getDisplayMediaUrl(asset.id);
+    return getDisplayMediaUrl(asset.id, asset.originalContentHash);
   }
 
   return null;
@@ -2217,7 +2224,7 @@ function getAssetDisplayImageUrl(asset: MediaAsset): string | null {
 
 function getAssetThumbnailImageUrl(asset: MediaAsset): string | null {
   if (typeof asset.id === 'string' && asset.id.trim().length > 0) {
-    return getThumbnailMediaUrl(asset.id);
+    return getThumbnailMediaUrl(asset.id, asset.originalContentHash);
   }
 
   return getAssetDisplayImageUrl(asset);
@@ -5073,6 +5080,56 @@ export default function App() {
     }
   }
 
+  async function handleRotateSelectedAssets(
+    direction: 'clockwise' | 'counterclockwise'
+  ): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    for (const assetId of assetIds) {
+      setAssetUpdating(assetId, true);
+    }
+    setUpdateError(null);
+
+    try {
+      const results = await Promise.allSettled(
+        assetIds.map(async (assetId) => {
+          const updatedAsset =
+            direction === 'clockwise'
+              ? await rotateAssetClockwise(assetId)
+              : await rotateAssetCounterclockwise(assetId);
+          return { assetId, updatedAsset };
+        })
+      );
+
+      const succeeded = results.filter((result): result is PromiseFulfilledResult<{ assetId: string; updatedAsset: MediaAsset }> => result.status === 'fulfilled');
+      const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+
+      if (succeeded.length > 0) {
+        const updatesById = new Map(succeeded.map((result) => [result.value.updatedAsset.id, result.value.updatedAsset]));
+        setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+
+        if (selectedAssetId && updatesById.has(selectedAssetId)) {
+          const refreshedAsset = await loadAssetDetails(selectedAssetId);
+          setSelectedAssetDetails(refreshedAsset);
+        }
+      }
+
+      if (failed.length > 0) {
+        const errorLines = failed.map((result) =>
+          result.reason instanceof Error ? result.reason.message : 'Failed to rotate one or more assets'
+        );
+        setUpdateError(errorLines.join(' | '));
+      }
+    } finally {
+      for (const assetId of assetIds) {
+        setAssetUpdating(assetId, false);
+      }
+    }
+  }
+
   async function handleRunPeopleRecognitionForSelectedAssets(): Promise<void> {
     const assetIds = selectedAssetIds;
     if (assetIds.length === 0 || peopleRecognitionBusy) {
@@ -7824,6 +7881,39 @@ export default function App() {
                   {state}
                 </button>
               ))
+            ) : null}
+          </div>
+
+          <div style={secondaryBarGroupStyle}>
+            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+              <>
+                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
+                  <span>
+                    <button
+                      type="button"
+                      style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                      onClick={() => void handleRotateSelectedAssets('counterclockwise')}
+                      disabled={!hasSelectedAssets}
+                      aria-label="Rotate selected photos counterclockwise"
+                    >
+                      <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
+                  <span>
+                    <button
+                      type="button"
+                      style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                      onClick={() => void handleRotateSelectedAssets('clockwise')}
+                      disabled={!hasSelectedAssets}
+                      aria-label="Rotate selected photos clockwise"
+                    >
+                      <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+              </>
             ) : null}
           </div>
 

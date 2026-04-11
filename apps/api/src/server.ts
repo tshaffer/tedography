@@ -4,6 +4,11 @@ import { PhotoState, normalizePhotoState } from '@tedography/domain';
 import type { RefreshOperationResponse } from '@tedography/domain';
 import { log } from './logger.js';
 import {
+  rotateAssetClockwise,
+  rotateAssetCounterclockwise,
+  AssetRotationServiceError
+} from './import/assetRotationService.js';
+import {
   rebuildDerivedFilesForAsset,
   RefreshServiceError,
   reimportAssetById
@@ -130,6 +135,48 @@ export function createServer(): Express {
 
       log.error('Failed to rebuild asset derived files', error);
       res.status(500).json({ error: 'Failed to rebuild asset derived files' });
+    }
+  });
+
+  app.post('/api/assets/:id/rotate-clockwise', async (req, res) => {
+    try {
+      const updatedAsset = await rotateAssetClockwise(req.params.id);
+      res.json(updatedAsset);
+    } catch (error) {
+      if (error instanceof AssetRotationServiceError) {
+        const status =
+          error.code === 'NOT_FOUND'
+            ? 404
+            : error.code === 'INVALID_INPUT'
+              ? 400
+              : 409;
+        res.status(status).json({ error: error.message });
+        return;
+      }
+
+      log.error('Failed to rotate asset clockwise', error);
+      res.status(500).json({ error: 'Failed to rotate asset' });
+    }
+  });
+
+  app.post('/api/assets/:id/rotate-counterclockwise', async (req, res) => {
+    try {
+      const updatedAsset = await rotateAssetCounterclockwise(req.params.id);
+      res.json(updatedAsset);
+    } catch (error) {
+      if (error instanceof AssetRotationServiceError) {
+        const status =
+          error.code === 'NOT_FOUND'
+            ? 404
+            : error.code === 'INVALID_INPUT'
+              ? 400
+              : 409;
+        res.status(status).json({ error: error.message });
+        return;
+      }
+
+      log.error('Failed to rotate asset counterclockwise', error);
+      res.status(500).json({ error: 'Failed to rotate asset' });
     }
   });
 

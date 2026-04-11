@@ -26,6 +26,24 @@ function requireAbsolutePathEnv(name: string): string {
   return value;
 }
 
+function parseOptionalAbsolutePathEnv(name: string): string | null {
+  const value = process.env[name];
+  if (value === undefined) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  if (!path.isAbsolute(trimmed)) {
+    throw new Error(`[config] ${name} must be an absolute path`);
+  }
+
+  return trimmed;
+}
+
 function requireNonEmpty(value: string, fieldName: string): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -164,6 +182,7 @@ export const config = {
   mongoUri: requireEnv('MONGODB_URI'),
   storageRoots: parseStorageRoots(process.env.TEDOGRAPHY_STORAGE_ROOTS),
   derivedRoot: requireAbsolutePathEnv('TEDOGRAPHY_DERIVED_ROOT'),
+  unrotatedRoot: parseOptionalAbsolutePathEnv('TEDOGRAPHY_UNROTATED_ROOT'),
   peoplePipeline: {
     enabled: parseBooleanEnv(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED, false),
     engine: parsePeoplePipelineEngine(process.env.TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE),
