@@ -1,7 +1,16 @@
-import { type AlbumTreeNode } from '@tedography/domain';
+import { type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
 
 type AlbumMembershipRequest = {
   assetIds: string[];
+};
+
+type AlbumManualOrderRequest = {
+  orderedAssetIds: string[];
+};
+
+type AlbumOrderingModeRequest = {
+  assetId: string;
+  forceManualOrder: boolean;
 };
 
 export interface CreateAlbumTreeNodeRequest {
@@ -149,4 +158,40 @@ export async function removeAssetsFromAlbum(
     const payload = (await response.json().catch(() => ({}))) as unknown;
     throw new Error(buildErrorMessage(response.status, payload));
   }
+}
+
+export async function updateAlbumManualOrder(
+  albumId: string,
+  request: AlbumManualOrderRequest
+): Promise<MediaAsset[]> {
+  const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/manual-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as MediaAsset[];
+}
+
+export async function updateAlbumOrderingMode(
+  albumId: string,
+  request: AlbumOrderingModeRequest
+): Promise<MediaAsset> {
+  const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/ordering-mode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as MediaAsset;
 }

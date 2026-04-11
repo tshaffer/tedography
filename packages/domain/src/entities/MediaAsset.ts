@@ -8,6 +8,12 @@ export type MediaAssetPersonSource =
   | 'imported-shafferography'
   | 'manual-asset-tag';
 
+export interface MediaAssetAlbumMembership {
+  albumId: string;
+  manualSortOrdinal?: number | null;
+  forceManualOrder?: boolean | null;
+}
+
 export interface MediaAssetPerson {
   personId: string;
   displayName: string;
@@ -50,6 +56,7 @@ export interface MediaAsset {
 
   // Virtual organization only; does not affect filesystem storage layout.
   albumIds?: string[];
+  albumMemberships?: MediaAssetAlbumMembership[];
 
   // Derived convenience field populated from confirmed person assignments.
   people?: MediaAssetPerson[];

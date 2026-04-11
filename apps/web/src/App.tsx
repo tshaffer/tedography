@@ -16,6 +16,10 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
+import VerticalAlignTopIcon from '@mui/icons-material/VerticalAlignTop';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import VerticalAlignBottomIcon from '@mui/icons-material/VerticalAlignBottom';
 import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
@@ -42,7 +46,9 @@ import {
   moveAlbumTreeNode,
   reorderAlbumTreeNode,
   removeAssetsFromAlbum,
-  renameAlbumTreeNode
+  renameAlbumTreeNode,
+  updateAlbumManualOrder,
+  updateAlbumOrderingMode
 } from './api/albumTreeApi';
 import {
   rebuildAssetDerivedFiles,
@@ -78,6 +84,14 @@ import {
   type TimelineNavigationYear
 } from './utilities/libraryTimeline';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
+import {
+  formatAlbumOrderingModeLabel,
+  getAlbumOrderingModeInAlbum,
+  isForcedManualOrderInAlbum,
+  isManualOrderEligibleInAlbum,
+  sortAssetsForSmartAlbumOrder,
+  usesCaptureTimeOrderInAlbum
+} from './utilities/smartAlbumOrder';
 import type { ListAssetFaceDetectionsResponse } from '@tedography/shared';
 
 const photoStateFilterOptions: PhotoState[] = [
@@ -220,6 +234,27 @@ function summarizeScopeLabels(labels: string[], fallbackLabel: string): string {
   }
 
   return `${firstLabel} + ${secondLabel} + ${labels.length - 2} more`;
+}
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (
+    fromIndex < 0 ||
+    fromIndex >= items.length ||
+    toIndex < 0 ||
+    toIndex >= items.length ||
+    fromIndex === toIndex
+  ) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [moved] = nextItems.splice(fromIndex, 1);
+  if (moved === undefined) {
+    return items;
+  }
+
+  nextItems.splice(toIndex, 0, moved);
+  return nextItems;
 }
 
 function logBootstrapTiming(label: string, startedAt: number): void {
@@ -4183,7 +4218,10 @@ export default function App() {
           return null;
         }
 
-        const scopedAssets = sortVisibleAssetsForTimeline(checkedAlbumsAssetsById.get(albumId) ?? []);
+        const scopedAssets = sortAssetsForSmartAlbumOrder(
+          checkedAlbumsAssetsById.get(albumId) ?? [],
+          albumId
+        );
         if (scopedAssets.length === 0) {
           return null;
         }
@@ -4198,14 +4236,20 @@ export default function App() {
   }, [albumNodesById, checkedAlbumIds, checkedAlbumsAssetsById, libraryBrowseMode, primaryArea, reviewBrowseMode]);
 
   const mergedAlbumAssets = useMemo(() => {
+    if (checkedAlbumSections.length === 1) {
+      return checkedAlbumSections[0]?.assets ?? [];
+    }
+
     const deduped = new Map<string, MediaAsset>();
     for (const section of checkedAlbumSections) {
       for (const asset of section.assets) {
-        deduped.set(asset.id, asset);
+        if (!deduped.has(asset.id)) {
+          deduped.set(asset.id, asset);
+        }
       }
     }
 
-    return sortVisibleAssetsForTimeline([...deduped.values()]);
+    return [...deduped.values()];
   }, [checkedAlbumSections]);
 
   const groupedAlbumNavigationAssets = useMemo(() => {
@@ -4323,6 +4367,50 @@ export default function App() {
     () => visibleAssets.find((asset) => asset.id === selectedAssetId) ?? null,
     [visibleAssets, selectedAssetId]
   );
+  const singleCheckedAlbumSection = useMemo(
+    () => (checkedAlbumSections.length === 1 ? checkedAlbumSections[0] ?? null : null),
+    [checkedAlbumSections]
+  );
+  const singleCheckedAlbumId = singleCheckedAlbumSection?.albumId ?? null;
+  const manualOrderEligibleAssetsInCurrentAlbum = useMemo(() => {
+    if (!singleCheckedAlbumId || !singleCheckedAlbumSection) {
+      return [];
+    }
+
+    return singleCheckedAlbumSection.assets.filter((asset) =>
+      isManualOrderEligibleInAlbum(asset, singleCheckedAlbumId)
+    );
+  }, [singleCheckedAlbumId, singleCheckedAlbumSection]);
+  const selectedManualOrderAsset = useMemo(() => {
+    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return null;
+    }
+
+    return isManualOrderEligibleInAlbum(selectedAsset, singleCheckedAlbumId) ? selectedAsset : null;
+  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
+  const selectedAssetCanForceManualOrderInCurrentAlbum = useMemo(() => {
+    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return false;
+    }
+
+    return usesCaptureTimeOrderInAlbum(selectedAsset, singleCheckedAlbumId);
+  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
+  const selectedAssetIsForcedManualInCurrentAlbum = useMemo(() => {
+    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return false;
+    }
+
+    return isForcedManualOrderInAlbum(selectedAsset, singleCheckedAlbumId);
+  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
+  const selectedManualOrderAssetIndex = useMemo(() => {
+    if (!selectedManualOrderAsset) {
+      return -1;
+    }
+
+    return manualOrderEligibleAssetsInCurrentAlbum.findIndex(
+      (asset) => asset.id === selectedManualOrderAsset.id
+    );
+  }, [manualOrderEligibleAssetsInCurrentAlbum, selectedManualOrderAsset]);
   const selectedAssetForDetails = useMemo(() => {
     if (!selectedAsset) {
       return null;
@@ -4344,6 +4432,22 @@ export default function App() {
       .filter((node): node is AlbumTreeNode => node?.nodeType === 'Album')
       .map((node) => node.label);
   }, [albumNodesById, selectedAsset]);
+  const selectedAssetAlbumOrderingModeLabel = useMemo(() => {
+    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return null;
+    }
+
+    return formatAlbumOrderingModeLabel(
+      getAlbumOrderingModeInAlbum(selectedAsset, singleCheckedAlbumId)
+    );
+  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
+  const selectedAssetAlbumOrderingMode = useMemo(() => {
+    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
+      return null;
+    }
+
+    return getAlbumOrderingModeInAlbum(selectedAsset, singleCheckedAlbumId);
+  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
 
   const compareAssets = useMemo(
     () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
@@ -4581,6 +4685,30 @@ export default function App() {
   const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
+  const canToggleSelectedAssetOrderingModeInCurrentAlbum =
+    isAlbumsMode &&
+    singleCheckedAlbumId !== null &&
+    selectedAssetIds.length === 1 &&
+    selectedAsset !== null &&
+    ((selectedAsset.albumIds ?? []).includes(singleCheckedAlbumId)) &&
+    (selectedAssetAlbumOrderingMode === 'capture-time' || selectedAssetAlbumOrderingMode === 'manual');
+  const canManuallyReorderCurrentAlbumSelection =
+    isAlbumsMode &&
+    singleCheckedAlbumId !== null &&
+    selectedManualOrderAsset !== null &&
+    manualOrderEligibleAssetsInCurrentAlbum.length > 1;
+  const canMoveCurrentAlbumSelectionToTop =
+    canManuallyReorderCurrentAlbumSelection && selectedManualOrderAssetIndex > 0;
+  const canMoveCurrentAlbumSelectionUp =
+    canManuallyReorderCurrentAlbumSelection && selectedManualOrderAssetIndex > 0;
+  const canMoveCurrentAlbumSelectionDown =
+    canManuallyReorderCurrentAlbumSelection &&
+    selectedManualOrderAssetIndex >= 0 &&
+    selectedManualOrderAssetIndex < manualOrderEligibleAssetsInCurrentAlbum.length - 1;
+  const canMoveCurrentAlbumSelectionToBottom =
+    canManuallyReorderCurrentAlbumSelection &&
+    selectedManualOrderAssetIndex >= 0 &&
+    selectedManualOrderAssetIndex < manualOrderEligibleAssetsInCurrentAlbum.length - 1;
   const checkedAlbumScopeAssetIds = useMemo(
     () => Array.from(new Set(checkedAlbumSections.flatMap((section) => section.assets.map((asset) => asset.id)))),
     [checkedAlbumSections]
@@ -5077,6 +5205,96 @@ export default function App() {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
       }
+    }
+  }
+
+  async function handleMoveSelectedAssetWithinAlbum(
+    destination: 'top' | 'up' | 'down' | 'bottom'
+  ): Promise<void> {
+    if (!singleCheckedAlbumId || !selectedManualOrderAsset) {
+      return;
+    }
+
+    const currentOrder = manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id);
+    const currentIndex = currentOrder.indexOf(selectedManualOrderAsset.id);
+    if (currentIndex < 0 || currentOrder.length < 2) {
+      return;
+    }
+
+    let nextIndex = currentIndex;
+    switch (destination) {
+      case 'top':
+        nextIndex = 0;
+        break;
+      case 'up':
+        nextIndex = Math.max(0, currentIndex - 1);
+        break;
+      case 'down':
+        nextIndex = Math.min(currentOrder.length - 1, currentIndex + 1);
+        break;
+      case 'bottom':
+        nextIndex = currentOrder.length - 1;
+        break;
+    }
+
+    if (nextIndex === currentIndex) {
+      return;
+    }
+
+    const reorderedAssetIds = moveArrayItem(currentOrder, currentIndex, nextIndex);
+    setAssetUpdating(selectedManualOrderAsset.id, true);
+    setUpdateError(null);
+
+    try {
+      const updatedAssets = await updateAlbumManualOrder(singleCheckedAlbumId, {
+        orderedAssetIds: reorderedAssetIds
+      });
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+
+      if (selectedAssetId && updatesById.has(selectedAssetId)) {
+        setSelectedAssetDetails((previous) =>
+          previous && previous.id === selectedAssetId
+            ? { ...previous, ...(updatesById.get(selectedAssetId) ?? previous) }
+            : previous
+        );
+      }
+    } catch (error: unknown) {
+      setUpdateError(
+        error instanceof Error ? error.message : 'Failed to reorder the selected album asset'
+      );
+    } finally {
+      setAssetUpdating(selectedManualOrderAsset.id, false);
+    }
+  }
+
+  async function handleSetSelectedAssetAlbumOrderingMode(forceManualOrder: boolean): Promise<void> {
+    if (!singleCheckedAlbumId || !selectedAsset || selectedAssetIds.length !== 1) {
+      return;
+    }
+
+    setAssetUpdating(selectedAsset.id, true);
+    setUpdateError(null);
+
+    try {
+      const updatedAsset = await updateAlbumOrderingMode(singleCheckedAlbumId, {
+        assetId: selectedAsset.id,
+        forceManualOrder
+      });
+      setAssets((previous) =>
+        previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
+      );
+      setSelectedAssetDetails((previous) =>
+        previous && previous.id === updatedAsset.id ? { ...previous, ...updatedAsset } : previous
+      );
+    } catch (error: unknown) {
+      setUpdateError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update album ordering mode for the selected asset'
+      );
+    } finally {
+      setAssetUpdating(selectedAsset.id, false);
     }
   }
 
@@ -7376,6 +7594,7 @@ export default function App() {
           <AssetDetailsPanel
             asset={selectedAssetForDetails}
             albumLabels={selectedAssetAlbumLabels}
+            albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
             assetOperationBusy={assetMaintenanceBusy !== null}
@@ -7881,6 +8100,125 @@ export default function App() {
                   {state}
                 </button>
               ))
+            ) : null}
+          </div>
+
+          <div style={secondaryBarGroupStyle}>
+            {(isReviewArea || isLibraryArea) && isAlbumsMode ? (
+              <>
+                {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
+                  <button
+                    type="button"
+                    style={compareButtonStyle}
+                    onClick={() =>
+                      void handleSetSelectedAssetAlbumOrderingMode(
+                        selectedAssetAlbumOrderingMode === 'capture-time'
+                      )
+                    }
+                    title={
+                      selectedAssetAlbumOrderingMode === 'manual'
+                        ? 'Use capture-time ordering for the selected photo in this album'
+                        : 'Force the selected photo to use manual ordering in this album'
+                    }
+                  >
+                    {selectedAssetAlbumOrderingMode === 'manual'
+                      ? 'Use Capture Time'
+                      : 'Use Manual Order'}
+                  </button>
+                ) : null}
+                <Tooltip
+                  title={
+                    canMoveCurrentAlbumSelectionToTop
+                      ? 'Move selected manually ordered album photo to the start of the manual section'
+                      : 'Select one manually ordered photo in a single checked album to reorder it'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        canMoveCurrentAlbumSelectionToTop
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleMoveSelectedAssetWithinAlbum('top')}
+                      disabled={!canMoveCurrentAlbumSelectionToTop}
+                      aria-label="Move selected album photo to top"
+                    >
+                      <VerticalAlignTopIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    canMoveCurrentAlbumSelectionUp
+                      ? 'Move selected manually ordered album photo up'
+                      : 'Select one manually ordered photo in a single checked album to reorder it'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        canMoveCurrentAlbumSelectionUp
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleMoveSelectedAssetWithinAlbum('up')}
+                      disabled={!canMoveCurrentAlbumSelectionUp}
+                      aria-label="Move selected album photo up"
+                    >
+                      <ArrowUpwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    canMoveCurrentAlbumSelectionDown
+                      ? 'Move selected manually ordered album photo down'
+                      : 'Select one manually ordered photo in a single checked album to reorder it'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        canMoveCurrentAlbumSelectionDown
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleMoveSelectedAssetWithinAlbum('down')}
+                      disabled={!canMoveCurrentAlbumSelectionDown}
+                      aria-label="Move selected album photo down"
+                    >
+                      <ArrowDownwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    canMoveCurrentAlbumSelectionToBottom
+                      ? 'Move selected manually ordered album photo to the end of the manual section'
+                      : 'Select one manually ordered photo in a single checked album to reorder it'
+                  }
+                >
+                  <span>
+                    <button
+                      type="button"
+                      style={
+                        canMoveCurrentAlbumSelectionToBottom
+                          ? toolbarIconButtonStyle
+                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                      }
+                      onClick={() => void handleMoveSelectedAssetWithinAlbum('bottom')}
+                      disabled={!canMoveCurrentAlbumSelectionToBottom}
+                      aria-label="Move selected album photo to bottom"
+                    >
+                      <VerticalAlignBottomIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+              </>
             ) : null}
           </div>
 

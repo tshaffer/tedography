@@ -2,6 +2,7 @@ import {
   MediaType,
   PhotoState,
   normalizePhotoState,
+  type MediaAssetAlbumMembership,
   type MediaAssetPerson,
   type DisplayStorageType,
   type MediaAsset
@@ -16,14 +17,42 @@ export async function syncMediaAssetIndexes(): Promise<void> {
 }
 
 function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
+  const albumMemberships = Array.isArray(asset.albumMemberships)
+    ? asset.albumMemberships
+        .filter(
+          (membership): membership is MediaAssetAlbumMembership =>
+            typeof membership?.albumId === 'string' && membership.albumId.trim().length > 0
+        )
+        .map((membership) => ({
+          albumId: membership.albumId.trim(),
+          manualSortOrdinal:
+            typeof membership.manualSortOrdinal === 'number' && Number.isFinite(membership.manualSortOrdinal)
+              ? membership.manualSortOrdinal
+              : null,
+          forceManualOrder:
+            (membership as MediaAssetAlbumMembership & { forceManualOrder?: boolean | null })
+              .forceManualOrder === true
+        }))
+        .sort((left, right) => left.albumId.localeCompare(right.albumId))
+    : [];
+
   return {
     ...asset,
-    photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New
+    photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New,
+    albumMemberships
   };
 }
 
 function normalizeMediaAssets(assets: MediaAsset[]): MediaAsset[] {
   return assets.map(normalizeMediaAsset);
+}
+
+function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(value).getTime());
 }
 
 export async function getAllAssets(): Promise<MediaAsset[]> {
@@ -56,6 +85,7 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           originalFileFormat: 1,
           displayFileFormat: 1,
           albumIds: 1,
+          albumMemberships: 1,
           people: 1
         }
       }
@@ -108,6 +138,7 @@ export async function getAssetPageForLibrary(input?: {
           originalFileFormat: 1,
           displayFileFormat: 1,
           albumIds: 1,
+          albumMemberships: 1,
           people: 1
         }
       }
@@ -296,15 +327,13 @@ export interface CreateMediaAssetInput {
   thumbnailFileFormat: string | null;
   thumbnailUrl: string | null;
   albumIds?: string[];
+  albumMemberships?: MediaAssetAlbumMembership[];
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
   const id = randomUUID();
 
-  const createPayload: Record<
-    string,
-    string | number | null | string[] | MediaAssetPerson[] | MediaType | PhotoState
-  > = {
+  const createPayload: Record<string, unknown> = {
     id,
     filename: input.filename,
     mediaType: input.mediaType,
@@ -330,6 +359,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayDerivedPath: input.displayDerivedPath,
     displayFileFormat: input.displayFileFormat,
     albumIds: input.albumIds ?? [],
+    albumMemberships: input.albumMemberships ?? [],
     people: []
   };
 
@@ -482,9 +512,14 @@ export async function updateMediaAssetAlbumIds(
     (left, right) => left.localeCompare(right)
   );
 
+  const existingAsset = await findById(id);
+  const nextAlbumMemberships = (existingAsset?.albumMemberships ?? []).filter((membership) =>
+    normalizedAlbumIds.includes(membership.albumId)
+  );
+
   const asset = await MediaAssetModel.findOneAndUpdate(
     { id },
-    { $set: { albumIds: normalizedAlbumIds } },
+    { $set: { albumIds: normalizedAlbumIds, albumMemberships: nextAlbumMemberships } },
     { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
 
@@ -502,7 +537,7 @@ export async function addAssetToAlbum(assetId: string, albumId: string): Promise
 export async function removeAssetFromAlbum(assetId: string, albumId: string): Promise<void> {
   await MediaAssetModel.updateOne(
     { id: assetId },
-    { $pull: { albumIds: albumId } },
+    { $pull: { albumIds: albumId, albumMemberships: { albumId } } },
     { runValidators: true }
   );
 }
@@ -552,7 +587,7 @@ export async function removeAssetsFromAlbum(assetIds: string[], albumId: string)
 
   await MediaAssetModel.updateMany(
     { id: { $in: assetIds } },
-    { $pull: { albumIds: albumId } },
+    { $pull: { albumIds: albumId, albumMemberships: { albumId } } },
     { runValidators: true }
   );
 }
@@ -560,7 +595,110 @@ export async function removeAssetsFromAlbum(assetIds: string[], albumId: string)
 export async function removeAlbumIdFromAllAssets(albumId: string): Promise<void> {
   await MediaAssetModel.updateMany(
     { albumIds: albumId },
-    { $pull: { albumIds: albumId } },
+    { $pull: { albumIds: albumId, albumMemberships: { albumId } } },
     { runValidators: true }
   );
+}
+
+export async function updateAlbumManualSortOrdinals(
+  albumId: string,
+  orderedAssetIds: string[]
+): Promise<MediaAsset[]> {
+  if (orderedAssetIds.length === 0) {
+    return [];
+  }
+
+  const assets = await findByIds(orderedAssetIds);
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+
+  await MediaAssetModel.bulkWrite(
+    orderedAssetIds.map((assetId, index) => {
+      const asset = assetsById.get(assetId);
+      const otherMemberships = (asset?.albumMemberships ?? []).filter((membership) => membership.albumId !== albumId);
+      return {
+        updateOne: {
+          filter: { id: assetId },
+          update: {
+            $set: {
+              albumMemberships: [
+                ...otherMemberships,
+                {
+                  albumId,
+                  manualSortOrdinal: index,
+                  forceManualOrder: true
+                }
+              ]
+            }
+          },
+          runValidators: true
+        }
+      };
+    })
+  );
+
+  return findByIds(orderedAssetIds);
+}
+
+export async function updateAlbumMembershipOrderingMode(
+  albumId: string,
+  assetId: string,
+  forceManualOrder: boolean
+): Promise<MediaAsset | null> {
+  const asset = await findById(assetId);
+  if (!asset) {
+    return null;
+  }
+
+  const otherMemberships = (asset.albumMemberships ?? []).filter(
+    (membership) => membership.albumId !== albumId
+  );
+  const currentMembership = asset.albumMemberships?.find((membership) => membership.albumId === albumId);
+
+  let nextManualSortOrdinal = currentMembership?.manualSortOrdinal ?? null;
+  if (forceManualOrder && nextManualSortOrdinal === null) {
+    const albumAssets = await MediaAssetModel.find(
+      { albumIds: albumId },
+      { _id: 0 }
+    ).lean<MediaAsset[]>();
+    const maxManualSortOrdinal = albumAssets.reduce<number>(
+      (maxValue: number, albumAsset: MediaAsset) => {
+        const membership = albumAsset.albumMemberships?.find(
+          (candidate: MediaAssetAlbumMembership) => candidate.albumId === albumId
+        );
+        if (
+          ((membership as (MediaAssetAlbumMembership & { forceManualOrder?: boolean | null }) | undefined)
+            ?.forceManualOrder === true) ||
+          !hasUsableCaptureDateTime(albumAsset.captureDateTime)
+        ) {
+          const ordinal = membership?.manualSortOrdinal;
+          if (typeof ordinal === 'number' && Number.isFinite(ordinal)) {
+            return Math.max(maxValue, ordinal);
+          }
+        }
+
+        return maxValue;
+      },
+      -1
+    );
+    nextManualSortOrdinal = maxManualSortOrdinal + 1;
+  }
+
+  await MediaAssetModel.updateOne(
+    { id: assetId },
+    {
+      $set: {
+        albumMemberships: [
+          ...otherMemberships,
+          {
+            albumId,
+            manualSortOrdinal: nextManualSortOrdinal,
+            forceManualOrder
+          }
+        ]
+      }
+    },
+    { runValidators: true }
+  );
+
+  return findById(assetId);
 }

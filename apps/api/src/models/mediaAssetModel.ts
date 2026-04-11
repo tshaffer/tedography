@@ -47,6 +47,20 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       required: true,
       default: []
     },
+    albumMemberships: {
+      type: [
+        new Schema(
+          {
+            albumId: { type: String, required: true, trim: true },
+            manualSortOrdinal: { type: Number, required: false },
+            forceManualOrder: { type: Boolean, required: false }
+          },
+          { _id: false }
+        )
+      ],
+      required: false,
+      default: []
+    },
     people: {
       type: [
         new Schema(

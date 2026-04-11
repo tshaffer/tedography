@@ -2,8 +2,11 @@ import { Router } from 'express';
 import type { AlbumTreeNode, AlbumTreeNodeType } from '@tedography/domain';
 import {
   addAssetsToAlbum,
+  findByIds,
   removeAlbumIdFromAllAssets,
-  removeAssetsFromAlbum
+  removeAssetsFromAlbum,
+  updateAlbumManualSortOrdinals,
+  updateAlbumMembershipOrderingMode
 } from '../repositories/assetRepository.js';
 import {
   AlbumTreeSiblingLabelConflictError,
@@ -19,6 +22,15 @@ import {
 
 type AlbumTreeErrorResponse = {
   error: string;
+};
+
+type AlbumManualOrderRequest = {
+  orderedAssetIds: string[];
+};
+
+type AlbumMembershipOrderingModeRequest = {
+  assetId?: unknown;
+  forceManualOrder?: unknown;
 };
 
 function parseNonEmptyLabel(value: unknown): string | null {
@@ -70,6 +82,14 @@ function parseAssetIds(value: unknown): string[] | null {
   }
 
   return Array.from(new Set(parsed));
+}
+
+function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(value).getTime());
 }
 
 function parseReorderDirection(value: unknown): 'up' | 'down' | null {
@@ -412,6 +432,115 @@ albumMembershipRoutes.delete('/:id/assets', async (req, res) => {
     res.json({ album: albumNode, assetIds });
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to remove assets from album' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumMembershipRoutes.post('/:id/manual-order', async (req, res) => {
+  const albumNode = await loadAlbumNode(req.params.id);
+  if (!albumNode) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const orderedAssetIds = parseAssetIds((req.body as AlbumManualOrderRequest).orderedAssetIds);
+  if (!orderedAssetIds) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'orderedAssetIds is required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const assets = await findByIds(orderedAssetIds);
+  if (assets.length !== orderedAssetIds.length) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'One or more assets were not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const invalidAsset = assets.find(
+    (asset) =>
+      !(asset.albumIds ?? []).includes(albumNode.id) ||
+      !(
+        (asset.albumMemberships?.find((membership) => membership.albumId === albumNode.id)?.forceManualOrder ===
+          true) ||
+        !hasUsableCaptureDateTime(asset.captureDateTime)
+      )
+  );
+  if (invalidAsset) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: `Asset "${invalidAsset.filename}" cannot be manually ordered in "${albumNode.label}"`
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updatedAssets = await updateAlbumManualSortOrdinals(albumNode.id, orderedAssetIds);
+    res.json(updatedAssets);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update album manual order' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumMembershipRoutes.post('/:id/ordering-mode', async (req, res) => {
+  const albumNode = await loadAlbumNode(req.params.id);
+  if (!albumNode) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const assetIdValue = (req.body as AlbumMembershipOrderingModeRequest).assetId;
+  const forceManualOrderValue = (req.body as AlbumMembershipOrderingModeRequest).forceManualOrder;
+  const assetId = typeof assetIdValue === 'string' ? assetIdValue.trim() : '';
+  if (!assetId) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'assetId is required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (typeof forceManualOrderValue !== 'boolean') {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'forceManualOrder is required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const asset = await findByIds([assetId]);
+  const matchedAsset = asset[0] ?? null;
+  if (!matchedAsset) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Asset not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  if (!(matchedAsset.albumIds ?? []).includes(albumNode.id)) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: `Asset "${matchedAsset.filename}" does not belong to "${albumNode.label}"`
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updatedAsset = await updateAlbumMembershipOrderingMode(
+      albumNode.id,
+      assetId,
+      forceManualOrderValue
+    );
+
+    if (!updatedAsset) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Asset not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updatedAsset);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'Failed to update album ordering mode'
+    };
     res.status(500).json(errorResponse);
   }
 });

@@ -5,6 +5,7 @@ import { type MediaAsset } from '@tedography/domain';
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
+  albumOrderingModeLabel?: string | null;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
   assetOperationBusy?: boolean;
@@ -180,6 +181,7 @@ function formatLocation(
 export function AssetDetailsPanel({
   asset,
   albumLabels = [],
+  albumOrderingModeLabel = null,
   onReimportAsset,
   onRebuildDerivedFiles,
   assetOperationBusy = false,
@@ -202,6 +204,7 @@ export function AssetDetailsPanel({
     { label: 'Photo State', value: formatValue(asset.photoState) },
     { label: 'Media Type', value: formatValue(asset.mediaType) },
     { label: 'Captured', value: formatDateTime(asset.captureDateTime) },
+    ...(albumOrderingModeLabel ? [{ label: 'Order in this Album', value: albumOrderingModeLabel }] : []),
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
     { label: 'Albums', value: formatAlbumLabels(albumLabels) },
     {
