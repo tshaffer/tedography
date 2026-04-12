@@ -6548,6 +6548,53 @@ export default function App() {
     destinationAlbumId: string;
     keepInSourceAlbum: boolean;
   }): Promise<void> {
+    if (primaryArea === 'Search') {
+      if (selectedAssetsForAlbumMembershipAction.length === 0) {
+        throw new Error('Select one or more assets first.');
+      }
+
+      setAlbumMembershipNotice(null);
+      setUpdateError(null);
+
+      const selectedAssets = selectedAssetsForAlbumMembershipAction;
+      const selectedAssetIds = selectedAssets.map((asset) => asset.id);
+      const albumIdsToRemove = Array.from(
+        new Set(
+          selectedAssets.flatMap((asset) => asset.albumIds ?? [])
+        )
+      ).filter((albumId) => albumId !== input.destinationAlbumId);
+
+      for (const albumId of albumIdsToRemove) {
+        const assetIdsInAlbum = selectedAssets
+          .filter((asset) => (asset.albumIds ?? []).includes(albumId))
+          .map((asset) => asset.id);
+
+        if (assetIdsInAlbum.length === 0) {
+          continue;
+        }
+
+        await removeAssetsFromAlbum(albumId, {
+          assetIds: assetIdsInAlbum
+        });
+      }
+
+      await addAssetsToAlbum(input.destinationAlbumId, {
+        assetIds: selectedAssetIds
+      });
+
+      const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
+      setAlbumMembershipNotice({
+        kind: 'success',
+        message:
+          `Moved ${selectedAssets.length} ${selectedAssets.length === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".`
+      });
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+      setSelectedAssetIds([]);
+      setSelectedAssetId(null);
+      setSelectionAnchorAssetId(null);
+      return;
+    }
+
     if (!focusedAlbumForMembershipAction) {
       throw new Error('Select a source album first.');
     }
@@ -7993,22 +8040,28 @@ export default function App() {
               >
                 +Album
               </button>
-              {focusedAlbumForMembershipAction ? (
+              {(focusedAlbumForMembershipAction || isSearchArea) ? (
                 <button
                   type="button"
                   style={
-                    selectedAssetsInFocusedAlbum.length > 0
+                    (isSearchArea
+                      ? hasSelectedAssets
+                      : selectedAssetsInFocusedAlbum.length > 0)
                       ? compareButtonStyle
                       : disabledToolbarActionButtonStyle
                   }
                   onClick={() => setMoveAssetsDialogOpen(true)}
-                  disabled={selectedAssetsInFocusedAlbum.length === 0}
+                  disabled={isSearchArea ? !hasSelectedAssets : selectedAssetsInFocusedAlbum.length === 0}
                   title={
-                    selectedAssetIdsForAlbumAction.length === 0
-                      ? `Select one or more photos to move them out of "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                      : selectedAssetsInFocusedAlbum.length > 0
-                        ? `Move selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}" to another album`
-                        : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                    isSearchArea
+                      ? hasSelectedAssets
+                        ? 'Move selected search results to another album'
+                        : 'Select one or more photos to move them to another album'
+                      : selectedAssetIdsForAlbumAction.length === 0
+                        ? `Select one or more photos to move them out of "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                        : selectedAssetsInFocusedAlbum.length > 0
+                          ? `Move selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}" to another album`
+                          : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
                   }
                 >
                   Move to Album...
@@ -8861,8 +8914,8 @@ export default function App() {
       <MoveAssetsToAlbumDialog
         open={moveAssetsDialogOpen}
         albums={albumTreeNodes}
-        sourceAlbum={focusedAlbumForMembershipAction}
-        selectedAssetCount={selectedAssetsInFocusedAlbum.length}
+        sourceAlbum={isSearchArea ? null : focusedAlbumForMembershipAction}
+        selectedAssetCount={isSearchArea ? selectedAssetIdsForAlbumAction.length : selectedAssetsInFocusedAlbum.length}
         onClose={() => setMoveAssetsDialogOpen(false)}
         onMove={handleMoveSelectedAssetsToAlbum}
       />

@@ -302,11 +302,12 @@ export function MoveAssetsToAlbumDialog({
     targetRow.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
   }, [destinationAlbumId, displayNodes, open]);
 
-  if (!open || !sourceAlbum) {
+  if (!open) {
     return null;
   }
 
   const canMove = destinationAlbumId.length > 0 && !movePending;
+  const isSearchStyleMove = sourceAlbum === null;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -314,16 +315,27 @@ export function MoveAssetsToAlbumDialog({
         <div style={headerStyle}>
           <h2 style={{ margin: 0 }}>Move Assets To Album</h2>
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#666' }}>
-            Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} from{' '}
-            <strong>{sourceAlbum.label}</strong>.
+            {isSearchStyleMove ? (
+              <>
+                Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} to a destination album.
+                Existing album memberships will be removed first.
+              </>
+            ) : (
+              <>
+                Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} from{' '}
+                <strong>{sourceAlbum.label}</strong>.
+              </>
+            )}
           </p>
         </div>
 
         <div style={bodyStyle}>
-          <label style={fieldLabelStyle}>
-            <span>From album</span>
-            <input type="text" value={buildAlbumPathLabel(sourceAlbum, nodesById)} readOnly style={inputStyle} />
-          </label>
+          {!isSearchStyleMove && sourceAlbum ? (
+            <label style={fieldLabelStyle}>
+              <span>From album</span>
+              <input type="text" value={buildAlbumPathLabel(sourceAlbum, nodesById)} readOnly style={inputStyle} />
+            </label>
+          ) : null}
 
           <div style={fieldLabelStyle}>
             <span>To album</span>
@@ -334,7 +346,8 @@ export function MoveAssetsToAlbumDialog({
                 displayNodes.map((node) => {
                   const isGroup = node.nodeType === 'Group';
                   const isExpanded = expandedGroupIds.includes(node.id);
-                  const isSelectable = node.nodeType === 'Album' && node.id !== sourceAlbum.id;
+                  const isSelectable =
+                    node.nodeType === 'Album' && node.id !== sourceAlbum?.id;
                   const isSelected = destinationAlbumId === node.id;
 
                   return (
@@ -391,14 +404,16 @@ export function MoveAssetsToAlbumDialog({
             </div>
           </div>
 
-          <label style={checkboxRowStyle}>
-            <input
-              type="checkbox"
-              checked={keepInSourceAlbum}
-              onChange={(event) => setKeepInSourceAlbum(event.target.checked)}
-            />
-            <span>Keep assets in source album too</span>
-          </label>
+          {!isSearchStyleMove ? (
+            <label style={checkboxRowStyle}>
+              <input
+                type="checkbox"
+                checked={keepInSourceAlbum}
+                onChange={(event) => setKeepInSourceAlbum(event.target.checked)}
+              />
+              <span>Keep assets in source album too</span>
+            </label>
+          ) : null}
 
           {moveError ? <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{moveError}</p> : null}
         </div>
