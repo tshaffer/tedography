@@ -1,5 +1,10 @@
 import { PhotoState } from '../enums/PhotoState.js';
 
+export type SearchCaptureDateAvailabilityMode =
+  | 'datedOnly'
+  | 'datedOrUndated'
+  | 'undatedOnly';
+
 export interface SearchSpec {
   photoStates?: PhotoState[];
   albumIds?: string[];
@@ -10,6 +15,6 @@ export interface SearchSpec {
   hasReviewableFaces?: boolean;
   captureDateFrom?: string;
   captureDateTo?: string;
-  includeNoCaptureDate?: boolean;
+  captureDateAvailability?: SearchCaptureDateAvailabilityMode;
   published?: boolean;
 }

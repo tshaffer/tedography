@@ -36,7 +36,8 @@ import {
   PhotoState,
   normalizePhotoState,
   type AlbumTreeNode,
-  type MediaAsset
+  type MediaAsset,
+  type SearchCaptureDateAvailabilityMode
 } from '@tedography/domain';
 import {
   addAssetsToAlbum,
@@ -117,6 +118,7 @@ const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchGroupIdsStorageKey = 'tedography.search.groupIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
+const searchCaptureDateAvailabilityStorageKey = 'tedography.search.captureDateAvailability';
 const searchIncludeNoCaptureDateStorageKey = 'tedography.search.includeNoCaptureDate';
 const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
@@ -1765,6 +1767,23 @@ function parseSearchPeopleMatchModeFromStorage(value: string | null): SearchPeop
   return value === 'All' ? 'All' : 'Any';
 }
 
+function parseSearchCaptureDateAvailabilityModeFromStorage(
+  value: string | null,
+  legacyIncludeNoCaptureDateValue: string | null
+): SearchCaptureDateAvailabilityMode {
+  if (
+    value === 'datedOnly' ||
+    value === 'datedOrUndated' ||
+    value === 'undatedOnly'
+  ) {
+    return value;
+  }
+
+  return parseBooleanFromStorage(legacyIncludeNoCaptureDateValue)
+    ? 'datedOrUndated'
+    : 'datedOnly';
+}
+
 function parsePrimaryAreaFromStorage(value: string | null): TedographyPrimaryArea {
   if (value === 'Review' || value === 'Library' || value === 'Search') {
     return value;
@@ -1875,17 +1894,21 @@ function doesAssetMatchSearchCaptureDateRange(
   asset: MediaAsset,
   captureDateFrom: string,
   captureDateTo: string,
-  includeNoCaptureDate: boolean
+  captureDateAvailability: SearchCaptureDateAvailabilityMode
 ): boolean {
   const hasRange = Boolean(captureDateFrom || captureDateTo);
   const hasUsableCaptureDate = hasUsableCaptureDateTime(asset);
 
+  if (captureDateAvailability === 'undatedOnly') {
+    return !hasUsableCaptureDate;
+  }
+
   if (!hasRange) {
-    return includeNoCaptureDate ? !hasUsableCaptureDate : true;
+    return true;
   }
 
   if (!hasUsableCaptureDate) {
-    return includeNoCaptureDate;
+    return captureDateAvailability === 'datedOrUndated';
   }
 
   const captureDate = new Date(asset.captureDateTime as string);
@@ -3078,12 +3101,16 @@ export default function App() {
 
     return window.localStorage.getItem(searchCaptureDateToStorageKey) ?? '';
   });
-  const [searchIncludeNoCaptureDate, setSearchIncludeNoCaptureDate] = useState<boolean>(() => {
+  const [searchCaptureDateAvailability, setSearchCaptureDateAvailability] =
+    useState<SearchCaptureDateAvailabilityMode>(() => {
     if (typeof window === 'undefined') {
-      return false;
+      return 'datedOnly';
     }
 
-    return parseBooleanFromStorage(window.localStorage.getItem(searchIncludeNoCaptureDateStorageKey));
+    return parseSearchCaptureDateAvailabilityModeFromStorage(
+      window.localStorage.getItem(searchCaptureDateAvailabilityStorageKey),
+      window.localStorage.getItem(searchIncludeNoCaptureDateStorageKey)
+    );
   });
   const [searchPeopleIds, setSearchPeopleIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') {
@@ -3628,10 +3655,10 @@ export default function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
-      searchIncludeNoCaptureDateStorageKey,
-      String(searchIncludeNoCaptureDate)
+      searchCaptureDateAvailabilityStorageKey,
+      searchCaptureDateAvailability
     );
-  }, [searchIncludeNoCaptureDate]);
+  }, [searchCaptureDateAvailability]);
 
   useEffect(() => {
     window.localStorage.setItem(searchPeopleIdsStorageKey, JSON.stringify(searchPeopleIds));
@@ -4187,7 +4214,7 @@ export default function App() {
         asset,
         searchCaptureDateFrom,
         searchCaptureDateTo,
-        searchIncludeNoCaptureDate
+        searchCaptureDateAvailability
       );
       const matchesPeople = doesAssetMatchSearchPeopleFilters(
         asset,
@@ -4217,7 +4244,7 @@ export default function App() {
     searchGroupIds,
     searchHasNoPeople,
     searchHasReviewableFaces,
-    searchIncludeNoCaptureDate,
+    searchCaptureDateAvailability,
     searchPeopleIds,
     searchPeopleMatchMode,
     searchPhotoStates
@@ -4699,7 +4726,7 @@ export default function App() {
     searchGroupIds.length > 0 ||
     searchCaptureDateFrom.length > 0 ||
     searchCaptureDateTo.length > 0 ||
-    searchIncludeNoCaptureDate ||
+    searchCaptureDateAvailability !== 'datedOnly' ||
     searchPeopleIds.length > 0 ||
     searchHasNoPeople ||
     searchHasReviewableFaces;
@@ -5201,7 +5228,7 @@ export default function App() {
             updatedAsset,
             searchCaptureDateFrom,
             searchCaptureDateTo,
-            searchIncludeNoCaptureDate
+            searchCaptureDateAvailability
           );
           const matchesSearchPeople = doesAssetMatchSearchPeopleFilters(
             updatedAsset,
@@ -6056,7 +6083,7 @@ export default function App() {
     setSearchGroupIds([]);
     setSearchCaptureDateFrom('');
     setSearchCaptureDateTo('');
-    setSearchIncludeNoCaptureDate(false);
+    setSearchCaptureDateAvailability('datedOnly');
     setSearchPeopleIds([]);
     setSearchPeopleMatchMode('Any');
     setSearchHasNoPeople(false);
@@ -7524,6 +7551,7 @@ export default function App() {
               <input
                 type="date"
                 value={searchCaptureDateFrom}
+                disabled={searchCaptureDateAvailability === 'undatedOnly'}
                 onChange={(event) => setSearchCaptureDateFrom(event.target.value)}
               />
             </label>
@@ -7532,18 +7560,27 @@ export default function App() {
               <input
                 type="date"
                 value={searchCaptureDateTo}
+                disabled={searchCaptureDateAvailability === 'undatedOnly'}
                 onChange={(event) => setSearchCaptureDateTo(event.target.value)}
               />
             </label>
           </div>
           <div style={filterRowStyle}>
             <label style={filterOptionLabelStyle}>
-              <input
-                type="checkbox"
-                checked={searchIncludeNoCaptureDate}
-                onChange={(event) => setSearchIncludeNoCaptureDate(event.target.checked)}
-              />
-              Include assets with no date
+              Date availability
+              <select
+                value={searchCaptureDateAvailability}
+                onChange={(event) =>
+                  setSearchCaptureDateAvailability(
+                    event.target.value as SearchCaptureDateAvailabilityMode
+                  )
+                }
+                style={compactSelectStyle}
+              >
+                <option value="datedOnly">Normal</option>
+                <option value="datedOrUndated">Include assets with no date</option>
+                <option value="undatedOnly">Only assets with no date</option>
+              </select>
             </label>
           </div>
         </div>
