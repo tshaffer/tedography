@@ -1037,6 +1037,11 @@ const loupeMainColumnStyle: CSSProperties = {
   gap: '8px'
 };
 
+const searchMainColumnStyle: CSSProperties = {
+  ...mainColumnStyle,
+  paddingTop: 0
+};
+
 const stickyAssetChromeStyle: CSSProperties = {
   flex: '0 0 auto',
   backgroundColor: '#f3f4f6',
@@ -1048,6 +1053,8 @@ const stickyAssetChromeStyle: CSSProperties = {
 
 const stickySearchSummaryBlockStyle: CSSProperties = {
   backgroundColor: '#f3f4f6',
+  marginTop: '-6px',
+  paddingTop: '6px',
   paddingBottom: '6px',
   marginBottom: '2px'
 };
@@ -8522,7 +8529,7 @@ export default function App() {
 
         <main
           ref={mainColumnRef}
-          style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}
+          style={isLoupeMode ? loupeMainColumnStyle : isSearchArea ? searchMainColumnStyle : mainColumnStyle}
         >
           {!isLoupeMode && !isSearchArea ? (
             <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
