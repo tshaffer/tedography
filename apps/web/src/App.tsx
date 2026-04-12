@@ -83,6 +83,7 @@ import {
   type TimelineMonthGroup,
   type TimelineNavigationYear
 } from './utilities/libraryTimeline';
+import { getDescendantAlbumIdsForGroupIds } from './utilities/albumTree';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 import {
   formatAlbumOrderingModeLabel,
@@ -113,8 +114,10 @@ const albumResultsPresentationStorageKey = 'tedography.albumResultsPresentation'
 const albumTreeSortModeStorageKey = 'tedography.albumTreeSortMode';
 const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
+const searchGroupIdsStorageKey = 'tedography.search.groupIds';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
+const searchIncludeNoCaptureDateStorageKey = 'tedography.search.includeNoCaptureDate';
 const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
 const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
@@ -1043,6 +1046,12 @@ const stickyAssetChromeStyle: CSSProperties = {
   paddingBottom: '2px'
 };
 
+const stickySearchSummaryBlockStyle: CSSProperties = {
+  backgroundColor: '#f3f4f6',
+  paddingBottom: '6px',
+  marginBottom: '2px'
+};
+
 const compactPaneMetaTextStyle: CSSProperties = {
   color: '#6b7280',
   fontSize: '11px',
@@ -1842,23 +1851,33 @@ function parseLocalDate(value: string): Date | null {
   return parsed;
 }
 
-function doesAssetMatchSearchCaptureDateRange(
-  asset: MediaAsset,
-  captureDateFrom: string,
-  captureDateTo: string
-): boolean {
-  if (!captureDateFrom && !captureDateTo) {
-    return true;
-  }
-
-  if (!asset.captureDateTime) {
+function hasUsableCaptureDateTime(asset: MediaAsset): boolean {
+  if (typeof asset.captureDateTime !== 'string' || asset.captureDateTime.trim().length === 0) {
     return false;
   }
 
   const captureDate = new Date(asset.captureDateTime);
-  if (Number.isNaN(captureDate.getTime())) {
-    return false;
+  return !Number.isNaN(captureDate.getTime());
+}
+
+function doesAssetMatchSearchCaptureDateRange(
+  asset: MediaAsset,
+  captureDateFrom: string,
+  captureDateTo: string,
+  includeNoCaptureDate: boolean
+): boolean {
+  const hasRange = Boolean(captureDateFrom || captureDateTo);
+  const hasUsableCaptureDate = hasUsableCaptureDateTime(asset);
+
+  if (!hasRange) {
+    return includeNoCaptureDate ? !hasUsableCaptureDate : true;
   }
+
+  if (!hasUsableCaptureDate) {
+    return includeNoCaptureDate;
+  }
+
+  const captureDate = new Date(asset.captureDateTime as string);
 
   const fromDate = parseLocalDate(captureDateFrom);
   if (fromDate && captureDate < fromDate) {
@@ -3027,6 +3046,13 @@ export default function App() {
 
     return parseStringArrayFromStorage(window.localStorage.getItem(searchAlbumIdsStorageKey));
   });
+  const [searchGroupIds, setSearchGroupIds] = useState<string[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    return parseStringArrayFromStorage(window.localStorage.getItem(searchGroupIdsStorageKey));
+  });
   const [searchCaptureDateFrom, setSearchCaptureDateFrom] = useState<string>(() => {
     if (typeof window === 'undefined') {
       return '';
@@ -3040,6 +3066,13 @@ export default function App() {
     }
 
     return window.localStorage.getItem(searchCaptureDateToStorageKey) ?? '';
+  });
+  const [searchIncludeNoCaptureDate, setSearchIncludeNoCaptureDate] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return parseBooleanFromStorage(window.localStorage.getItem(searchIncludeNoCaptureDateStorageKey));
   });
   const [searchPeopleIds, setSearchPeopleIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') {
@@ -3571,12 +3604,23 @@ export default function App() {
   }, [searchAlbumIds]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchGroupIdsStorageKey, JSON.stringify(searchGroupIds));
+  }, [searchGroupIds]);
+
+  useEffect(() => {
     window.localStorage.setItem(searchCaptureDateFromStorageKey, searchCaptureDateFrom);
   }, [searchCaptureDateFrom]);
 
   useEffect(() => {
     window.localStorage.setItem(searchCaptureDateToStorageKey, searchCaptureDateTo);
   }, [searchCaptureDateTo]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      searchIncludeNoCaptureDateStorageKey,
+      String(searchIncludeNoCaptureDate)
+    );
+  }, [searchIncludeNoCaptureDate]);
 
   useEffect(() => {
     window.localStorage.setItem(searchPeopleIdsStorageKey, JSON.stringify(searchPeopleIds));
@@ -3965,6 +4009,10 @@ export default function App() {
     const groupNodeIds = new Set(
       albumTreeNodes.filter((node) => node.nodeType === 'Group').map((node) => node.id)
     );
+    const nextSearchGroupIds = searchGroupIds.filter((id) => groupNodeIds.has(id));
+    if (!arraysEqual(nextSearchGroupIds, searchGroupIds)) {
+      setSearchGroupIds(nextSearchGroupIds);
+    }
     const nextExpandedIds = expandedGroupIds.filter((id) => groupNodeIds.has(id));
     if (!arraysEqual(nextExpandedIds, expandedGroupIds)) {
       setExpandedGroupIds(nextExpandedIds);
@@ -3982,6 +4030,7 @@ export default function App() {
     checkedAlbumIds,
     expandedGroupIds,
     searchAlbumIds,
+    searchGroupIds,
     selectedTreeNodeId
   ]);
 
@@ -4110,6 +4159,9 @@ export default function App() {
     }
 
     const searchAlbumIdsSet = new Set(searchAlbumIds);
+    const searchGroupAlbumIdsSet = new Set(
+      getDescendantAlbumIdsForGroupIds(albumTreeNodes, searchGroupIds)
+    );
 
     const filtered = areaPhotoStateVisibleAssets.filter((asset) => {
       const matchesPhotoState =
@@ -4117,10 +4169,14 @@ export default function App() {
       const matchesAlbum =
         searchAlbumIds.length === 0 ||
         (asset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
+      const matchesGroup =
+        searchGroupIds.length === 0 ||
+        (asset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
       const matchesCaptureDateRange = doesAssetMatchSearchCaptureDateRange(
         asset,
         searchCaptureDateFrom,
-        searchCaptureDateTo
+        searchCaptureDateTo,
+        searchIncludeNoCaptureDate
       );
       const matchesPeople = doesAssetMatchSearchPeopleFilters(
         asset,
@@ -4130,18 +4186,27 @@ export default function App() {
         searchHasReviewableFaces
       );
 
-      return matchesPhotoState && matchesAlbum && matchesCaptureDateRange && matchesPeople;
+      return (
+        matchesPhotoState &&
+        matchesAlbum &&
+        matchesGroup &&
+        matchesCaptureDateRange &&
+        matchesPeople
+      );
     });
 
     return sortVisibleAssetsForTimeline(filtered);
   }, [
+    albumTreeNodes,
     areaPhotoStateVisibleAssets,
     primaryArea,
     searchAlbumIds,
     searchCaptureDateFrom,
     searchCaptureDateTo,
+    searchGroupIds,
     searchHasNoPeople,
     searchHasReviewableFaces,
+    searchIncludeNoCaptureDate,
     searchPeopleIds,
     searchPeopleMatchMode,
     searchPhotoStates
@@ -4620,8 +4685,10 @@ export default function App() {
   const hasActiveSearchFilters =
     searchPhotoStates.length > 0 ||
     searchAlbumIds.length > 0 ||
+    searchGroupIds.length > 0 ||
     searchCaptureDateFrom.length > 0 ||
     searchCaptureDateTo.length > 0 ||
+    searchIncludeNoCaptureDate ||
     searchPeopleIds.length > 0 ||
     searchHasNoPeople ||
     searchHasReviewableFaces;
@@ -5108,15 +5175,22 @@ export default function App() {
       const remainsVisibleAfterUpdate = (() => {
         if (primaryArea === 'Search') {
           const searchAlbumIdsSet = new Set(searchAlbumIds);
+          const searchGroupAlbumIdsSet = new Set(
+            getDescendantAlbumIdsForGroupIds(albumTreeNodes, searchGroupIds)
+          );
           const matchesSearchPhotoState =
             searchPhotoStates.length === 0 || searchPhotoStates.includes(updatedAsset.photoState);
           const matchesSearchAlbum =
             searchAlbumIds.length === 0 ||
             (updatedAsset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
+          const matchesSearchGroup =
+            searchGroupIds.length === 0 ||
+            (updatedAsset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
           const matchesSearchDate = doesAssetMatchSearchCaptureDateRange(
             updatedAsset,
             searchCaptureDateFrom,
-            searchCaptureDateTo
+            searchCaptureDateTo,
+            searchIncludeNoCaptureDate
           );
           const matchesSearchPeople = doesAssetMatchSearchPeopleFilters(
             updatedAsset,
@@ -5126,7 +5200,13 @@ export default function App() {
             searchHasReviewableFaces
           );
 
-          return matchesSearchPhotoState && matchesSearchAlbum && matchesSearchDate && matchesSearchPeople;
+          return (
+            matchesSearchPhotoState &&
+            matchesSearchAlbum &&
+            matchesSearchGroup &&
+            matchesSearchDate &&
+            matchesSearchPeople
+          );
         }
 
         const matchesPhotoStateAfterUpdate = currentAreaPhotoStates.includes(updatedAsset.photoState);
@@ -5934,6 +6014,14 @@ export default function App() {
     );
   }
 
+  function toggleSearchGroup(groupId: string): void {
+    setSearchGroupIds((previous) =>
+      previous.includes(groupId)
+        ? previous.filter((id) => id !== groupId)
+        : [...previous, groupId]
+    );
+  }
+
   function toggleSearchPerson(personId: string): void {
     setSearchHasNoPeople(false);
     setSearchPeopleIds((previous) =>
@@ -5954,8 +6042,10 @@ export default function App() {
   function clearSearchFilters(): void {
     setSearchPhotoStates([]);
     setSearchAlbumIds([]);
+    setSearchGroupIds([]);
     setSearchCaptureDateFrom('');
     setSearchCaptureDateTo('');
+    setSearchIncludeNoCaptureDate(false);
     setSearchPeopleIds([]);
     setSearchPeopleMatchMode('Any');
     setSearchHasNoPeople(false);
@@ -7012,6 +7102,64 @@ export default function App() {
     );
   }
 
+  function renderSearchGroupTreeRows(): ReactElement {
+    const groupDisplayNodes = treeDisplayNodes.filter((node) => node.nodeType === 'Group');
+
+    return (
+      <div style={albumTreeListStyle}>
+        {groupDisplayNodes.length === 0 ? (
+          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No groups yet.</p>
+        ) : (
+          groupDisplayNodes.map((node) => {
+              const isExpanded = expandedGroupIds.includes(node.id);
+              const isChecked = searchGroupIds.includes(node.id);
+              const isSelected = selectedTreeNodeId === node.id;
+              const depthIndent = `${node.depth * 10}px`;
+
+              return (
+                <div
+                  key={node.id}
+                  style={{ ...albumTreeRowStyle, marginLeft: depthIndent }}
+                  onContextMenu={(event) => handleAlbumTreeNodeContextMenu(event, node)}
+                >
+                  <button
+                    type="button"
+                    style={albumTreeChevronButtonStyle}
+                    data-selected={isExpanded ? 'true' : undefined}
+                    onClick={() => toggleGroupExpanded(node.id)}
+                    aria-label={isExpanded ? `Collapse ${node.label}` : `Expand ${node.label}`}
+                    title={isExpanded ? 'Collapse group' : 'Expand group'}
+                  >
+                    {isExpanded ? '▾' : '▸'}
+                  </button>
+                  <span style={albumTreeCheckboxCellStyle}>
+                    <input
+                      type="checkbox"
+                      style={albumTreeShiftedCheckboxStyle}
+                      checked={isChecked}
+                      onChange={() => toggleSearchGroup(node.id)}
+                      title="Limit search to descendant albums"
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    style={albumTreeLabelButtonStyle}
+                    data-selected={isSelected ? 'true' : undefined}
+                    onClick={() => setSelectedTreeNodeId(node.id)}
+                    title={node.label}
+                  >
+                    <span style={albumTreeLabelContentStyle}>
+                      <span style={albumTreeLabelTextStyle}>{node.label}</span>
+                    </span>
+                  </button>
+                </div>
+              );
+            })
+        )}
+      </div>
+    );
+  }
+
   function renderAlbumTreeContextMenu(): ReactElement | null {
     if (!albumTreeContextMenu) {
       return null;
@@ -7377,6 +7525,16 @@ export default function App() {
               />
             </label>
           </div>
+          <div style={filterRowStyle}>
+            <label style={filterOptionLabelStyle}>
+              <input
+                type="checkbox"
+                checked={searchIncludeNoCaptureDate}
+                onChange={(event) => setSearchIncludeNoCaptureDate(event.target.checked)}
+              />
+              Include assets with no date
+            </label>
+          </div>
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>People</h3>
@@ -7483,6 +7641,14 @@ export default function App() {
           {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading albums...</p> : null}
           {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
           {!albumTreeLoading ? renderAlbumTreeRows(searchAlbumIds, toggleSearchAlbum) : null}
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>
+            GROUPS{searchGroupIds.length > 0 ? ` (${searchGroupIds.length} selected)` : ''}
+          </h3>
+          {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading groups...</p> : null}
+          {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
+          {!albumTreeLoading ? renderSearchGroupTreeRows() : null}
         </div>
       </section>
     );
@@ -8358,7 +8524,7 @@ export default function App() {
           ref={mainColumnRef}
           style={isLoupeMode ? loupeMainColumnStyle : mainColumnStyle}
         >
-          {!isLoupeMode ? (
+          {!isLoupeMode && !isSearchArea ? (
             <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
               {mainPaneDescription}
             </p>
@@ -8401,17 +8567,6 @@ export default function App() {
           ) : null}
         </div>
       ) : null}
-      {isSearchArea && !assetsLoading && !assetsError ? (
-        <p
-          style={
-            isLoupeMode
-              ? compactPaneMetaTextStyle
-              : { color: '#666', fontSize: '13px', margin: '0 0 8px 0' }
-          }
-        >
-          {visibleAssets.length} results
-        </p>
-      ) : null}
       {!assetsLoading && !assetsError ? (
         hasNoAssets ? (
           <section style={emptyStateStyle}>
@@ -8430,6 +8585,16 @@ export default function App() {
         ) : hasFilteredAssets ? (
           <>
             <div style={stickyAssetChromeStyle}>
+              {isSearchArea && !isLoupeMode ? (
+                <div style={stickySearchSummaryBlockStyle}>
+                  <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
+                    {mainPaneDescription}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
+                    {visibleAssets.length} results
+                  </p>
+                </div>
+              ) : null}
               {!immersiveOpen ? (
                 <AssetQuickBar
                   asset={selectedAsset}
