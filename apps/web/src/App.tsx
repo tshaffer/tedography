@@ -6550,11 +6550,20 @@ export default function App() {
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
+    const key = shortcutKey.toLowerCase();
+    if (key === 'delete') {
+      if (selectedAssetIds.length === 0) {
+        return;
+      }
+
+      await handleApplyPhotoStateToSelectedAssets(PhotoState.Discard);
+      return;
+    }
+
     if (!selectedAsset || updatingAssetIds[selectedAsset.id] === true) {
       return;
     }
 
-    const key = shortcutKey.toLowerCase();
     if (key === 's') {
       await handleSetPhotoState(selectedAsset.id, PhotoState.Keep);
       return;
@@ -6565,7 +6574,7 @@ export default function App() {
       return;
     }
 
-    if (key === 'r' || key === 'delete') {
+    if (key === 'r') {
       await handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
       return;
     }
