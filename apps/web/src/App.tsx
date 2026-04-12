@@ -116,6 +116,7 @@ const albumTreeSortModeStorageKey = 'tedography.albumTreeSortMode';
 const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchGroupIdsStorageKey = 'tedography.search.groupIds';
+const searchFilenamePatternStorageKey = 'tedography.search.filenamePattern';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
 const searchCaptureDateAvailabilityStorageKey = 'tedography.search.captureDateAvailability';
@@ -1959,6 +1960,28 @@ function doesAssetMatchSearchPeopleFilters(
   return peopleIds.some((personId) => confirmedPeopleIds.has(personId));
 }
 
+function buildFilenameSearchRegex(pattern: string): RegExp | null {
+  const trimmed = pattern.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  try {
+    return new RegExp(trimmed, 'i');
+  } catch {
+    return /^$/;
+  }
+}
+
+function doesAssetMatchSearchFilename(asset: MediaAsset, pattern: string): boolean {
+  const regex = buildFilenameSearchRegex(pattern);
+  if (!regex) {
+    return true;
+  }
+
+  return regex.test(asset.filename);
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -3087,6 +3110,13 @@ export default function App() {
 
     return parseStringArrayFromStorage(window.localStorage.getItem(searchGroupIdsStorageKey));
   });
+  const [searchFilenamePattern, setSearchFilenamePattern] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return window.localStorage.getItem(searchFilenamePatternStorageKey) ?? '';
+  });
   const [searchCaptureDateFrom, setSearchCaptureDateFrom] = useState<string>(() => {
     if (typeof window === 'undefined') {
       return '';
@@ -3644,6 +3674,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(searchGroupIdsStorageKey, JSON.stringify(searchGroupIds));
   }, [searchGroupIds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchFilenamePatternStorageKey, searchFilenamePattern);
+  }, [searchFilenamePattern]);
 
   useEffect(() => {
     window.localStorage.setItem(searchCaptureDateFromStorageKey, searchCaptureDateFrom);
@@ -4210,6 +4244,7 @@ export default function App() {
       const matchesGroup =
         searchGroupIds.length === 0 ||
         (asset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
+      const matchesFilename = doesAssetMatchSearchFilename(asset, searchFilenamePattern);
       const matchesCaptureDateRange = doesAssetMatchSearchCaptureDateRange(
         asset,
         searchCaptureDateFrom,
@@ -4228,6 +4263,7 @@ export default function App() {
         matchesPhotoState &&
         matchesAlbum &&
         matchesGroup &&
+        matchesFilename &&
         matchesCaptureDateRange &&
         matchesPeople
       );
@@ -4242,6 +4278,7 @@ export default function App() {
     searchCaptureDateFrom,
     searchCaptureDateTo,
     searchGroupIds,
+    searchFilenamePattern,
     searchHasNoPeople,
     searchHasReviewableFaces,
     searchCaptureDateAvailability,
@@ -4724,6 +4761,7 @@ export default function App() {
     searchPhotoStates.length > 0 ||
     searchAlbumIds.length > 0 ||
     searchGroupIds.length > 0 ||
+    searchFilenamePattern.trim().length > 0 ||
     searchCaptureDateFrom.length > 0 ||
     searchCaptureDateTo.length > 0 ||
     searchCaptureDateAvailability !== 'datedOnly' ||
@@ -5224,6 +5262,10 @@ export default function App() {
           const matchesSearchGroup =
             searchGroupIds.length === 0 ||
             (updatedAsset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
+          const matchesSearchFilename = doesAssetMatchSearchFilename(
+            updatedAsset,
+            searchFilenamePattern
+          );
           const matchesSearchDate = doesAssetMatchSearchCaptureDateRange(
             updatedAsset,
             searchCaptureDateFrom,
@@ -5242,6 +5284,7 @@ export default function App() {
             matchesSearchPhotoState &&
             matchesSearchAlbum &&
             matchesSearchGroup &&
+            matchesSearchFilename &&
             matchesSearchDate &&
             matchesSearchPeople
           );
@@ -6081,6 +6124,7 @@ export default function App() {
     setSearchPhotoStates([]);
     setSearchAlbumIds([]);
     setSearchGroupIds([]);
+    setSearchFilenamePattern('');
     setSearchCaptureDateFrom('');
     setSearchCaptureDateTo('');
     setSearchCaptureDateAvailability('datedOnly');
@@ -7728,6 +7772,21 @@ export default function App() {
                 onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
               />
               Has reviewable faces
+            </label>
+          </div>
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>File Name</h3>
+          <div style={filterRowStyle}>
+            <label style={{ ...filterOptionLabelStyle, display: 'grid', gap: '4px', width: '100%' }}>
+              Pattern
+              <input
+                type="text"
+                value={searchFilenamePattern}
+                onChange={(event) => setSearchFilenamePattern(event.target.value)}
+                placeholder="Case-insensitive regular expression"
+                style={{ minWidth: 0 }}
+              />
             </label>
           </div>
         </div>

@@ -9,6 +9,7 @@ export interface SearchSpec {
   photoStates?: PhotoState[];
   albumIds?: string[];
   groupIds?: string[];
+  filenamePattern?: string;
   peopleIds?: string[];
   peopleMatchMode?: 'any' | 'all';
   hasNoPeople?: boolean;
