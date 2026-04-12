@@ -2406,15 +2406,11 @@ function AssetDetailPanel({ asset }: AssetDetailPanelProps) {
 
   return (
     <section style={detailPanelStyle}>
-      <h2 style={{ marginTop: 0 }}>Focused Asset</h2>
       {imageUrl ? (
         <img src={imageUrl} alt={asset.filename} style={detailImageStyle} />
       ) : null}
       <p>
         <strong>Filename:</strong> {asset.filename}
-      </p>
-      <p>
-        <strong>Type:</strong> {asset.mediaType}
       </p>
       <p>
         <strong>Photo state:</strong> {asset.photoState}

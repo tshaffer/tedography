@@ -202,7 +202,6 @@ export function AssetDetailsPanel({
     { label: 'Asset ID', value: formatValue(asset.id) },
     { label: 'Filename', value: formatValue(asset.filename) },
     { label: 'Photo State', value: formatValue(asset.photoState) },
-    { label: 'Media Type', value: formatValue(asset.mediaType) },
     { label: 'Captured', value: formatDateTime(asset.captureDateTime) },
     ...(albumOrderingModeLabel ? [{ label: 'Order in this Album', value: albumOrderingModeLabel }] : []),
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
