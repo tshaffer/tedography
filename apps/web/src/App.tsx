@@ -1051,10 +1051,14 @@ const stickyAssetChromeStyle: CSSProperties = {
   paddingBottom: '2px'
 };
 
+const stickySearchAssetChromeStyle: CSSProperties = {
+  ...stickyAssetChromeStyle,
+  marginTop: '-10px',
+  paddingTop: '10px'
+};
+
 const stickySearchSummaryBlockStyle: CSSProperties = {
   backgroundColor: '#f3f4f6',
-  marginTop: '-6px',
-  paddingTop: '6px',
   paddingBottom: '6px',
   marginBottom: '2px'
 };
@@ -8591,7 +8595,7 @@ export default function App() {
           </section>
         ) : hasFilteredAssets ? (
           <>
-            <div style={stickyAssetChromeStyle}>
+            <div style={isSearchArea && !isLoupeMode ? stickySearchAssetChromeStyle : stickyAssetChromeStyle}>
               {isSearchArea && !isLoupeMode ? (
                 <div style={stickySearchSummaryBlockStyle}>
                   <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
