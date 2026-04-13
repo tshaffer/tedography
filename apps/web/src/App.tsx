@@ -44,6 +44,7 @@ import {
   createAlbumTreeNode,
   deleteAlbumTreeNode,
   listAlbumTreeNodes,
+  moveAssetsToAlbum as moveAssetsToAlbumRequest,
   moveAlbumTreeNode,
   reorderAlbumTreeNode,
   removeAssetsFromAlbum,
@@ -6602,29 +6603,16 @@ export default function App() {
 
       const selectedAssets = selectedAssetsForAlbumMembershipAction;
       const selectedAssetIds = selectedAssets.map((asset) => asset.id);
-      const albumIdsToRemove = Array.from(
-        new Set(
-          selectedAssets.flatMap((asset) => asset.albumIds ?? [])
-        )
-      ).filter((albumId) => albumId !== input.destinationAlbumId);
-
-      for (const albumId of albumIdsToRemove) {
-        const assetIdsInAlbum = selectedAssets
-          .filter((asset) => (asset.albumIds ?? []).includes(albumId))
-          .map((asset) => asset.id);
-
-        if (assetIdsInAlbum.length === 0) {
-          continue;
-        }
-
-        await removeAssetsFromAlbum(albumId, {
-          assetIds: assetIdsInAlbum
-        });
-      }
-
-      await addAssetsToAlbum(input.destinationAlbumId, {
+      const updatedAssets = await moveAssetsToAlbumRequest(input.destinationAlbumId, {
         assetIds: selectedAssetIds
       });
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+      setSelectedAssetDetails((previous) =>
+        previous && updatesById.has(previous.id)
+          ? { ...previous, ...(updatesById.get(previous.id) ?? previous) }
+          : previous
+      );
 
       const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
       setAlbumMembershipNotice({
@@ -6632,7 +6620,6 @@ export default function App() {
         message:
           `Moved ${selectedAssets.length} ${selectedAssets.length === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".`
       });
-      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
       setSelectedAssetIds([]);
       setSelectedAssetId(null);
       setSelectionAnchorAssetId(null);
@@ -6654,14 +6641,21 @@ export default function App() {
     setAlbumMembershipNotice(null);
     setUpdateError(null);
 
-    await addAssetsToAlbum(input.destinationAlbumId, {
-      assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
-    });
-
-    if (!input.keepInSourceAlbum) {
-      await removeAssetsFromAlbum(focusedAlbumForMembershipAction.id, {
+    if (input.keepInSourceAlbum) {
+      await addAssetsToAlbum(input.destinationAlbumId, {
         assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
       });
+    } else {
+      const updatedAssets = await moveAssetsToAlbumRequest(input.destinationAlbumId, {
+        assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
+      });
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+      setSelectedAssetDetails((previous) =>
+        previous && updatesById.has(previous.id)
+          ? { ...previous, ...(updatesById.get(previous.id) ?? previous) }
+          : previous
+      );
     }
 
     const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
@@ -6672,7 +6666,9 @@ export default function App() {
         `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${movedCount} ${movedCount === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".` +
         (input.keepInSourceAlbum ? ` They remain in "${focusedAlbumForMembershipAction.label}".` : '')
     });
-    await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+    if (input.keepInSourceAlbum) {
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+    }
     setSelectedAssetIds([]);
     setSelectedAssetId(null);
     setSelectionAnchorAssetId(null);

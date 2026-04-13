@@ -160,6 +160,24 @@ export async function removeAssetsFromAlbum(
   }
 }
 
+export async function moveAssetsToAlbum(
+  albumId: string,
+  request: AlbumMembershipRequest
+): Promise<MediaAsset[]> {
+  const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/move-assets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as MediaAsset[];
+}
+
 export async function updateAlbumManualOrder(
   albumId: string,
   request: AlbumManualOrderRequest

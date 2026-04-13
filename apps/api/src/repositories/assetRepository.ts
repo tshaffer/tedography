@@ -580,6 +580,53 @@ export async function addAssetsToAlbum(assetIds: string[], albumId: string): Pro
   );
 }
 
+export async function moveAssetsToAlbum(assetIds: string[], albumId: string): Promise<MediaAsset[]> {
+  if (assetIds.length === 0) {
+    return [];
+  }
+
+  const normalizedAssetIds = Array.from(
+    new Set(assetIds.map((assetId) => assetId.trim()).filter((assetId) => assetId.length > 0))
+  );
+  const existingAssets = await findByIds(normalizedAssetIds);
+  const existingAssetsById = new Map(existingAssets.map((asset) => [asset.id, asset]));
+
+  await MediaAssetModel.bulkWrite(
+    normalizedAssetIds.map((assetId) => {
+      const asset = existingAssetsById.get(assetId);
+      const destinationMembership =
+        asset?.albumMemberships?.find((membership) => membership.albumId === albumId) ?? null;
+
+      return {
+        updateOne: {
+          filter: { id: assetId },
+          update: {
+            $set: {
+              albumIds: [albumId],
+              albumMemberships: destinationMembership
+                ? [
+                    {
+                      albumId,
+                      manualSortOrdinal:
+                        typeof destinationMembership.manualSortOrdinal === 'number' &&
+                        Number.isFinite(destinationMembership.manualSortOrdinal)
+                          ? destinationMembership.manualSortOrdinal
+                          : null,
+                      forceManualOrder: destinationMembership.forceManualOrder === true
+                    }
+                  ]
+                : []
+            }
+          },
+          runValidators: true
+        }
+      };
+    })
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
 export async function removeAssetsFromAlbum(assetIds: string[], albumId: string): Promise<void> {
   if (assetIds.length === 0) {
     return;

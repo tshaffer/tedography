@@ -3,6 +3,7 @@ import type { AlbumTreeNode, AlbumTreeNodeType } from '@tedography/domain';
 import {
   addAssetsToAlbum,
   findByIds,
+  moveAssetsToAlbum,
   removeAlbumIdFromAllAssets,
   removeAssetsFromAlbum,
   updateAlbumManualSortOrdinals,
@@ -432,6 +433,30 @@ albumMembershipRoutes.delete('/:id/assets', async (req, res) => {
     res.json({ album: albumNode, assetIds });
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to remove assets from album' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumMembershipRoutes.post('/:id/move-assets', async (req, res) => {
+  const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
+  if (!assetIds) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const albumNode = await loadAlbumNode(req.params.id.trim());
+  if (!albumNode) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updatedAssets = await moveAssetsToAlbum(assetIds, albumNode.id);
+    res.json(updatedAssets);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to move assets to album' };
     res.status(500).json(errorResponse);
   }
 });
