@@ -5322,6 +5322,27 @@ export default function App() {
     }
   }
 
+  async function handleDiscardDisplayedImmersiveAsset(): Promise<void> {
+    if (!immersiveOpen || selectedAssetId === null || updatingAssetIds[selectedAssetId] === true) {
+      return;
+    }
+
+    const assetId = selectedAssetId;
+    const replacementAssetId =
+      getAdjacentReplacementAssetId(immersiveAssets, assetId) ??
+      getAdjacentReplacementAssetId(visibleAssets, assetId);
+
+    await handleSetPhotoState(assetId, PhotoState.Discard);
+
+    setSelectedAssetIds((previous) => previous.filter((id) => id !== assetId));
+    if (selectionAnchorAssetId === assetId) {
+      setSelectionAnchorAssetId(replacementAssetId);
+    }
+    if (selectedAssetId === assetId) {
+      setSelectedAssetId(replacementAssetId);
+    }
+  }
+
   async function handleApplyPhotoStateToSelectedAssets(photoState: PhotoState): Promise<void> {
     const assetIds = selectedAssetIds;
 
@@ -6760,14 +6781,32 @@ export default function App() {
     }
   }
 
+  function isDiscardKeyboardEvent(event: KeyboardEvent): boolean {
+    const key = event.key.toLowerCase();
+    const code = event.code.toLowerCase();
+    return (
+      key === 'delete' ||
+      key === 'backspace' ||
+      code === 'delete' ||
+      code === 'backspace' ||
+      event.keyCode === 8 ||
+      event.keyCode === 46
+    );
+  }
+
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
     const key = shortcutKey.toLowerCase();
-    if (key === 'delete') {
-      if (selectedAssetIds.length === 0) {
+    if (key === 'delete' || key === 'backspace') {
+      if (selectedAssetIds.length > 0) {
+        await handleApplyPhotoStateToSelectedAssets(PhotoState.Discard);
         return;
       }
 
-      await handleApplyPhotoStateToSelectedAssets(PhotoState.Discard);
+      if (!selectedAsset || updatingAssetIds[selectedAsset.id] === true) {
+        return;
+      }
+
+      await handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
       return;
     }
 
@@ -6947,6 +6986,12 @@ export default function App() {
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           handleSelectRelativeInList(immersiveNavigationAssets, -1);
+        }
+
+        if (isDiscardKeyboardEvent(event)) {
+          event.preventDefault();
+          void handleDiscardDisplayedImmersiveAsset();
+          return;
         }
 
         void handleKeyboardReview(event.key);
