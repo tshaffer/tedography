@@ -42,3 +42,16 @@ export async function rotateAssetCounterclockwise(assetId: string): Promise<Medi
     method: 'POST'
   });
 }
+
+export async function updateAssetsCaptureDateTime(request: {
+  assetIds: string[];
+  captureDateTime: string | null;
+}): Promise<MediaAsset[]> {
+  return fetchJson<MediaAsset[]>('/api/assets/capture-date', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}

@@ -56,7 +56,8 @@ import {
   rebuildAssetDerivedFiles,
   reimportAsset,
   rotateAssetClockwise,
-  rotateAssetCounterclockwise
+  rotateAssetCounterclockwise,
+  updateAssetsCaptureDateTime
 } from './api/assetApi';
 import {
   getPeoplePipelineAssetState,
@@ -70,6 +71,7 @@ import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDi
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
+import { SetCaptureDateDialog } from './components/assets/SetCaptureDateDialog';
 import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
@@ -3040,6 +3042,7 @@ export default function App() {
     useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
   const [moveDialogNodeId, setMoveDialogNodeId] = useState<string | null>(null);
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
+  const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
@@ -5384,6 +5387,57 @@ export default function App() {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
       }
+    }
+  }
+
+  function handleOpenSetCaptureDateDialog(): void {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+
+    setSetCaptureDateDialogOpen(true);
+  }
+
+  async function handleUpdateSelectedAssetsCaptureDateTime(input: {
+    captureDateTime: string | null;
+  }): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    setUpdateError(null);
+
+    try {
+      const updatedAssets = await updateAssetsCaptureDateTime({
+        assetIds,
+        captureDateTime: input.captureDateTime
+      });
+
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) =>
+        previous.map((asset) => updatesById.get(asset.id) ?? asset)
+      );
+
+      if (selectedAssetId && updatesById.has(selectedAssetId)) {
+        setSelectedAssetDetails((previous) => {
+          const updatedAsset = updatesById.get(selectedAssetId);
+          if (!updatedAsset) {
+            return previous;
+          }
+
+          return previous && previous.id === selectedAssetId
+            ? { ...previous, ...updatedAsset }
+            : updatedAsset;
+        });
+      }
+
+      setSetCaptureDateDialogOpen(false);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to update capture date.';
+      setUpdateError(message);
+      throw error instanceof Error ? error : new Error(message);
     }
   }
 
@@ -7961,6 +8015,11 @@ export default function App() {
             asset={selectedAssetForDetails}
             albumLabels={selectedAssetAlbumLabels}
             albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
+            onEditCaptureDate={
+              (isReviewArea || isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
+                ? handleOpenSetCaptureDateDialog
+                : undefined
+            }
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
             assetOperationBusy={assetMaintenanceBusy !== null}
@@ -8472,6 +8531,24 @@ export default function App() {
                   {state}
                 </button>
               ))
+            ) : null}
+          </div>
+
+          <div style={secondaryBarGroupStyle}>
+            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+              <button
+                type="button"
+                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                onClick={handleOpenSetCaptureDateDialog}
+                disabled={!hasSelectedAssets}
+                title={
+                  hasSelectedAssets
+                    ? 'Set or clear capture date/time for the current selection'
+                    : 'Select one or more photos to set capture date/time'
+                }
+              >
+                Set Capture Date...
+              </button>
             ) : null}
           </div>
 
@@ -9018,6 +9095,13 @@ export default function App() {
         selectedAssetCount={isSearchArea ? selectedAssetIdsForAlbumAction.length : selectedAssetsInFocusedAlbum.length}
         onClose={() => setMoveAssetsDialogOpen(false)}
         onMove={handleMoveSelectedAssetsToAlbum}
+      />
+      <SetCaptureDateDialog
+        open={setCaptureDateDialogOpen}
+        selectedAssetCount={selectedAssetIds.length}
+        initialCaptureDateTime={selectedAssetIds.length === 1 ? selectedAssetForDetails?.captureDateTime ?? null : null}
+        onClose={() => setSetCaptureDateDialogOpen(false)}
+        onSave={handleUpdateSelectedAssetsCaptureDateTime}
       />
 
       <ImportAssetsDialog

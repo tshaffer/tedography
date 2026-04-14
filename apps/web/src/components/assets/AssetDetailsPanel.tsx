@@ -6,6 +6,7 @@ interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
   albumOrderingModeLabel?: string | null;
+  onEditCaptureDate?: (() => void) | undefined;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
   assetOperationBusy?: boolean;
@@ -182,6 +183,7 @@ export function AssetDetailsPanel({
   asset,
   albumLabels = [],
   albumOrderingModeLabel = null,
+  onEditCaptureDate,
   onReimportAsset,
   onRebuildDerivedFiles,
   assetOperationBusy = false,
@@ -238,6 +240,14 @@ export function AssetDetailsPanel({
     <section style={panelStyle}>
       <h3 style={titleStyle}>Asset Details</h3>
       <div style={actionsStyle}>
+        <button
+          type="button"
+          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          onClick={onEditCaptureDate}
+          disabled={assetOperationBusy || !onEditCaptureDate}
+        >
+          {assetOperationBusy ? 'Working...' : 'Set Capture Date...'}
+        </button>
         <button
           type="button"
           style={assetOperationBusy ? disabledButtonStyle : buttonStyle}

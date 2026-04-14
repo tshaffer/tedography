@@ -13,7 +13,12 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
-import { findById, getAssetPageForLibrary, updatePhotoState } from './repositories/assetRepository.js';
+import {
+  findById,
+  getAssetPageForLibrary,
+  updateCaptureDateTimes,
+  updatePhotoState
+} from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
@@ -21,6 +26,23 @@ import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
+}
+
+function parseCaptureDateTime(value: unknown): Date | null | 'invalid' {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return 'invalid';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'invalid';
+  }
+
+  return parsed;
 }
 
 export function createServer(): Express {
@@ -101,6 +123,32 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to update asset photoState', error);
       res.status(500).json({ error: 'Failed to update asset' });
+    }
+  });
+
+  app.patch('/api/assets/capture-date', async (req, res) => {
+    const payload = req.body as { assetIds?: unknown; captureDateTime?: unknown };
+    const assetIds = Array.isArray(payload.assetIds)
+      ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must contain at least one asset id' });
+      return;
+    }
+
+    const captureDateTime = parseCaptureDateTime(payload.captureDateTime);
+    if (captureDateTime === 'invalid') {
+      res.status(400).json({ error: 'captureDateTime must be a valid datetime string or null' });
+      return;
+    }
+
+    try {
+      const updatedAssets = await updateCaptureDateTimes(assetIds, captureDateTime);
+      res.json(updatedAssets);
+    } catch (error) {
+      log.error('Failed to update asset captureDateTime', error);
+      res.status(500).json({ error: 'Failed to update asset capture date' });
     }
   });
 

@@ -398,6 +398,24 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function updateCaptureDateTimes(
+  assetIds: string[],
+  captureDateTime: Date | null
+): Promise<MediaAsset[]> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    { $set: { captureDateTime: captureDateTime?.toISOString() ?? null } },
+    { runValidators: true }
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
 export async function updateThumbnailReferenceFields(input: {
   id: string;
   thumbnailStorageType: 'derived-root';
