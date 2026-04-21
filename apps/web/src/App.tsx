@@ -5399,7 +5399,8 @@ export default function App() {
   }
 
   async function handleUpdateSelectedAssetsCaptureDateTime(input: {
-    captureDateTime: string | null;
+    captureDateTime?: string | null;
+    captureDate?: string;
   }): Promise<void> {
     const assetIds = selectedAssetIds;
     if (assetIds.length === 0) {
@@ -5409,10 +5410,17 @@ export default function App() {
     setUpdateError(null);
 
     try {
-      const updatedAssets = await updateAssetsCaptureDateTime({
+      const request: {
+        assetIds: string[];
+        captureDateTime?: string | null;
+        captureDate?: string;
+      } = {
         assetIds,
-        captureDateTime: input.captureDateTime
-      });
+        ...(input.captureDateTime !== undefined ? { captureDateTime: input.captureDateTime } : {}),
+        ...(input.captureDate !== undefined ? { captureDate: input.captureDate } : {})
+      };
+
+      const updatedAssets = await updateAssetsCaptureDateTime(request);
 
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
       setAssets((previous) =>

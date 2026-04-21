@@ -416,6 +416,53 @@ export async function updateCaptureDateTimes(
   return findByIds(normalizedAssetIds);
 }
 
+export async function updateCaptureDatesPreservingTimes(
+  assetIds: string[],
+  captureDate: { year: number; month: number; day: number }
+): Promise<MediaAsset[]> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return [];
+  }
+
+  const existingAssets = await findByIds(normalizedAssetIds);
+  if (existingAssets.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.bulkWrite(
+    existingAssets.map((asset) => {
+      const currentCaptureDate =
+        typeof asset.captureDateTime === 'string' && asset.captureDateTime.trim().length > 0
+          ? new Date(asset.captureDateTime)
+          : null;
+      const nextCaptureDate = new Date(
+        captureDate.year,
+        captureDate.month - 1,
+        captureDate.day,
+        currentCaptureDate && !Number.isNaN(currentCaptureDate.getTime()) ? currentCaptureDate.getHours() : 0,
+        currentCaptureDate && !Number.isNaN(currentCaptureDate.getTime()) ? currentCaptureDate.getMinutes() : 0,
+        currentCaptureDate && !Number.isNaN(currentCaptureDate.getTime()) ? currentCaptureDate.getSeconds() : 0,
+        currentCaptureDate && !Number.isNaN(currentCaptureDate.getTime()) ? currentCaptureDate.getMilliseconds() : 0
+      );
+
+      return {
+        updateOne: {
+          filter: { id: asset.id },
+          update: {
+            $set: {
+              captureDateTime: nextCaptureDate.toISOString()
+            }
+          }
+        }
+      };
+    }),
+    { ordered: false }
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
 export async function updateThumbnailReferenceFields(input: {
   id: string;
   thumbnailStorageType: 'derived-root';

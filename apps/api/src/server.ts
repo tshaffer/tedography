@@ -16,6 +16,7 @@ import {
 import {
   findById,
   getAssetPageForLibrary,
+  updateCaptureDatesPreservingTimes,
   updateCaptureDateTimes,
   updatePhotoState
 } from './repositories/assetRepository.js';
@@ -28,7 +29,11 @@ function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
 }
 
-function parseCaptureDateTime(value: unknown): Date | null | 'invalid' {
+function parseCaptureDateTime(value: unknown): Date | null | undefined | 'invalid' {
+  if (value === undefined) {
+    return undefined;
+  }
+
   if (value === null) {
     return null;
   }
@@ -43,6 +48,40 @@ function parseCaptureDateTime(value: unknown): Date | null | 'invalid' {
   }
 
   return parsed;
+}
+
+function parseCaptureDate(value: unknown): { year: number; month: number; day: number } | undefined | 'invalid' {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return 'invalid';
+  }
+
+  if (typeof value !== 'string') {
+    return 'invalid';
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) {
+    return 'invalid';
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return 'invalid';
+  }
+
+  return { year, month, day };
 }
 
 export function createServer(): Express {
@@ -127,7 +166,7 @@ export function createServer(): Express {
   });
 
   app.patch('/api/assets/capture-date', async (req, res) => {
-    const payload = req.body as { assetIds?: unknown; captureDateTime?: unknown };
+    const payload = req.body as { assetIds?: unknown; captureDateTime?: unknown; captureDate?: unknown };
     const assetIds = Array.isArray(payload.assetIds)
       ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
       : [];
@@ -138,13 +177,30 @@ export function createServer(): Express {
     }
 
     const captureDateTime = parseCaptureDateTime(payload.captureDateTime);
+    const captureDate = parseCaptureDate(payload.captureDate);
     if (captureDateTime === 'invalid') {
       res.status(400).json({ error: 'captureDateTime must be a valid datetime string or null' });
       return;
     }
+    if (captureDate === 'invalid') {
+      res.status(400).json({ error: 'captureDate must be a valid YYYY-MM-DD string' });
+      return;
+    }
+
+    if (captureDateTime !== undefined && captureDate !== undefined) {
+      res.status(400).json({ error: 'Specify either captureDateTime or captureDate, not both' });
+      return;
+    }
+    if (captureDateTime === undefined && captureDate === undefined) {
+      res.status(400).json({ error: 'Provide captureDateTime, captureDate, or null to clear' });
+      return;
+    }
 
     try {
-      const updatedAssets = await updateCaptureDateTimes(assetIds, captureDateTime);
+      const updatedAssets =
+        captureDate !== undefined
+          ? await updateCaptureDatesPreservingTimes(assetIds, captureDate)
+          : await updateCaptureDateTimes(assetIds, captureDateTime ?? null);
       res.json(updatedAssets);
     } catch (error) {
       log.error('Failed to update asset captureDateTime', error);

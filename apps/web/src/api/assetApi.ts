@@ -45,7 +45,8 @@ export async function rotateAssetCounterclockwise(assetId: string): Promise<Medi
 
 export async function updateAssetsCaptureDateTime(request: {
   assetIds: string[];
-  captureDateTime: string | null;
+  captureDateTime?: string | null;
+  captureDate?: string;
 }): Promise<MediaAsset[]> {
   return fetchJson<MediaAsset[]>('/api/assets/capture-date', {
     method: 'PATCH',

@@ -7,7 +7,7 @@ interface SetCaptureDateDialogProps {
   selectedAssetCount: number;
   initialCaptureDateTime?: string | null;
   onClose: () => void;
-  onSave: (input: { captureDateTime: string | null }) => Promise<void>;
+  onSave: (input: { captureDateTime?: string | null; captureDate?: string }) => Promise<void>;
 }
 
 const overlayStyle: CSSProperties = {
@@ -164,6 +164,8 @@ export function SetCaptureDateDialog({
   const [savePending, setSavePending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const isMultiSelect = selectedAssetCount > 1;
+
   useEffect(() => {
     if (!open) {
       return;
@@ -182,11 +184,16 @@ export function SetCaptureDateDialog({
       return 'Update the capture date/time for the selected asset.';
     }
 
-    return `Update the capture date/time for the ${selectedAssetCount} selected assets.`;
+    return `Update the capture date for the ${selectedAssetCount} selected assets. Existing capture times will be preserved when available.`;
   }, [selectedAssetCount]);
 
-  const nextCaptureDateTime = mode === 'clear' ? null : combineLocalDateAndTime(dateValue, timeValue);
-  const canSave = !savePending && (mode === 'clear' || nextCaptureDateTime !== null);
+  const nextCaptureDateTime =
+    mode === 'clear'
+      ? null
+      : isMultiSelect
+        ? null
+        : combineLocalDateAndTime(dateValue, timeValue);
+  const canSave = !savePending && (mode === 'clear' || (isMultiSelect ? dateValue.length > 0 : nextCaptureDateTime !== null));
 
   if (!open) {
     return null;
@@ -209,7 +216,7 @@ export function SetCaptureDateDialog({
                 checked={mode === 'set'}
                 onChange={() => setMode('set')}
               />
-              <span>Set capture date/time</span>
+              <span>{isMultiSelect ? 'Set capture date' : 'Set capture date/time'}</span>
             </label>
             <label style={radioOptionStyle}>
               <input
@@ -223,7 +230,7 @@ export function SetCaptureDateDialog({
           </div>
 
           {mode === 'set' ? (
-            <div style={formRowStyle}>
+            <div style={isMultiSelect ? { display: 'grid', gap: '12px' } : formRowStyle}>
               <label style={fieldLabelStyle}>
                 <span>Date</span>
                 <input
@@ -233,15 +240,21 @@ export function SetCaptureDateDialog({
                   style={inputStyle}
                 />
               </label>
-              <label style={fieldLabelStyle}>
-                <span>Time</span>
-                <input
-                  type="time"
-                  value={timeValue}
-                  onChange={(event) => setTimeValue(event.target.value)}
-                  style={inputStyle}
-                />
-              </label>
+              {!isMultiSelect ? (
+                <label style={fieldLabelStyle}>
+                  <span>Time</span>
+                  <input
+                    type="time"
+                    value={timeValue}
+                    onChange={(event) => setTimeValue(event.target.value)}
+                    style={inputStyle}
+                  />
+                </label>
+              ) : (
+                <p style={helperTextStyle}>
+                  The time for each selected asset will stay the same when available. Assets without a current capture time will use 12:00 AM.
+                </p>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '6px' }}>
@@ -264,15 +277,26 @@ export function SetCaptureDateDialog({
             style={canSave ? primaryButtonStyle : disabledButtonStyle}
             disabled={!canSave}
             onClick={() => {
+              if (mode === 'set' && isMultiSelect && dateValue.length === 0) {
+                setSaveError('Enter a date.');
+                return;
+              }
+
               const captureDateTime = mode === 'clear' ? null : nextCaptureDateTime;
-              if (mode === 'set' && captureDateTime === null) {
+              if (mode === 'set' && !isMultiSelect && captureDateTime === null) {
                 setSaveError('Enter both a date and time.');
                 return;
               }
 
               setSavePending(true);
               setSaveError(null);
-              void onSave({ captureDateTime })
+              void onSave(
+                mode === 'clear'
+                  ? { captureDateTime: null }
+                  : isMultiSelect
+                    ? { captureDate: dateValue }
+                    : { captureDateTime }
+              )
                 .catch((error: unknown) => {
                   setSaveError(error instanceof Error ? error.message : 'Failed to update capture date.');
                 })
