@@ -1,4 +1,4 @@
-import { type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
+import { type AlbumTreeChildOrderMode, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
 
 type AlbumMembershipRequest = {
   assetIds: string[];
@@ -25,6 +25,10 @@ export interface MoveAlbumTreeNodeRequest {
 
 export interface ReorderAlbumTreeNodeRequest {
   direction: 'up' | 'down';
+}
+
+export interface UpdateAlbumTreeChildOrderModeRequest {
+  childOrderMode: AlbumTreeChildOrderMode;
 }
 
 function buildErrorMessage(status: number, payload: unknown): string {
@@ -115,6 +119,24 @@ export async function reorderAlbumTreeNode(
   request: ReorderAlbumTreeNodeRequest
 ): Promise<AlbumTreeNode> {
   const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+export async function updateAlbumTreeChildOrderMode(
+  nodeId: string,
+  request: UpdateAlbumTreeChildOrderModeRequest
+): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/child-order-mode`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)

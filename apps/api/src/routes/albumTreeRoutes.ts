@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import type { AlbumTreeNode, AlbumTreeNodeType } from '@tedography/domain';
+import type {
+  AlbumTreeChildOrderMode,
+  AlbumTreeNode,
+  AlbumTreeNodeType
+} from '@tedography/domain';
 import {
   addAssetsToAlbum,
   findByIds,
@@ -18,7 +22,8 @@ import {
   listAlbumTreeNodes,
   moveAlbumTreeNode,
   reorderAlbumTreeNodeWithinSiblings,
-  renameAlbumTreeNode
+  renameAlbumTreeNode,
+  updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 
 type AlbumTreeErrorResponse = {
@@ -32,6 +37,10 @@ type AlbumManualOrderRequest = {
 type AlbumMembershipOrderingModeRequest = {
   assetId?: unknown;
   forceManualOrder?: unknown;
+};
+
+type AlbumTreeChildOrderModeRequest = {
+  childOrderMode?: unknown;
 };
 
 function parseNonEmptyLabel(value: unknown): string | null {
@@ -95,6 +104,14 @@ function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
 
 function parseReorderDirection(value: unknown): 'up' | 'down' | null {
   if (value === 'up' || value === 'down') {
+    return value;
+  }
+
+  return null;
+}
+
+function parseAlbumTreeChildOrderMode(value: unknown): AlbumTreeChildOrderMode | null {
+  if (value === 'Custom' || value === 'Name' || value === 'NumericThenName') {
     return value;
   }
 
@@ -347,6 +364,40 @@ albumTreeRoutes.post('/:id/reorder', async (req, res) => {
     res.json(reordered);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to reorder node' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.post('/:id/child-order-mode', async (req, res) => {
+  const childOrderMode = parseAlbumTreeChildOrderMode(
+    (req.body as AlbumTreeChildOrderModeRequest).childOrderMode
+  );
+  if (!childOrderMode) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'childOrderMode must be "Custom", "Name", or "NumericThenName"'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const node = await findAlbumTreeNodeById(req.params.id);
+  if (!node || node.nodeType !== 'Group') {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Group node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updated = await updateAlbumTreeNodeChildOrderMode(node.id, childOrderMode);
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Group node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update group child order mode' };
     res.status(500).json(errorResponse);
   }
 });

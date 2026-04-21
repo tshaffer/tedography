@@ -8,6 +8,12 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
     nodeType: { type: String, required: true, enum: ['Group', 'Album'] },
     parentId: { type: String, required: false, default: null, trim: true },
     sortOrder: { type: Number, required: true },
+    childOrderMode: {
+      type: String,
+      required: false,
+      enum: ['Custom', 'Name', 'NumericThenName'],
+      default: null
+    },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },

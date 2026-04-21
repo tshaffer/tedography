@@ -1,4 +1,8 @@
-import { type AlbumTreeNode, type AlbumTreeNodeType } from '@tedography/domain';
+import {
+  type AlbumTreeChildOrderMode,
+  type AlbumTreeNode,
+  type AlbumTreeNodeType
+} from '@tedography/domain';
 import { randomUUID } from 'node:crypto';
 import { AlbumTreeNodeModel } from '../models/albumTreeNodeModel.js';
 
@@ -165,6 +169,7 @@ export async function createAlbumTreeNode(
     nodeType: input.nodeType,
     parentId: input.parentId,
     sortOrder: 0,
+    childOrderMode: null,
     createdAt: now,
     updatedAt: now
   };
@@ -219,6 +224,22 @@ export async function renameAlbumTreeNode(
     {
       $set: {
         label: trimmedLabel,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<AlbumTreeNode | null>();
+}
+
+export async function updateAlbumTreeNodeChildOrderMode(
+  nodeId: string,
+  childOrderMode: AlbumTreeChildOrderMode
+): Promise<AlbumTreeNode | null> {
+  return AlbumTreeNodeModel.findOneAndUpdate(
+    { id: nodeId, nodeType: 'Group' },
+    {
+      $set: {
+        childOrderMode,
         updatedAt: new Date().toISOString()
       }
     },

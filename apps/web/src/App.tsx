@@ -31,6 +31,7 @@ import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
+  type AlbumTreeChildOrderMode,
   MediaType,
   type Person,
   PhotoState,
@@ -49,6 +50,7 @@ import {
   reorderAlbumTreeNode,
   removeAssetsFromAlbum,
   renameAlbumTreeNode,
+  updateAlbumTreeChildOrderMode,
   updateAlbumManualOrder,
   updateAlbumOrderingMode
 } from './api/albumTreeApi';
@@ -2066,6 +2068,8 @@ const albumTreeNameCollator = new Intl.Collator(undefined, {
   sensitivity: 'base'
 });
 
+const numericLabelPrefixPattern = /^\s*(\d+)/;
+
 const monthTokenToNumber = new Map<string, number>([
   ['jan', 1],
   ['january', 1],
@@ -2109,6 +2113,23 @@ function compareAlbumTreeNodeNames(left: AlbumTreeNode, right: AlbumTreeNode): n
   }
 
   return left.id.localeCompare(right.id);
+}
+
+function compareAlbumTreeNodeNumericThenName(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  const leftNumericPrefix = numericLabelPrefixPattern.exec(left.label);
+  const rightNumericPrefix = numericLabelPrefixPattern.exec(right.label);
+  const leftNumericValue = leftNumericPrefix ? Number(leftNumericPrefix[1]) : null;
+  const rightNumericValue = rightNumericPrefix ? Number(rightNumericPrefix[1]) : null;
+
+  if (leftNumericValue !== null && rightNumericValue !== null) {
+    if (leftNumericValue !== rightNumericValue) {
+      return leftNumericValue - rightNumericValue;
+    }
+  } else if (leftNumericValue !== null || rightNumericValue !== null) {
+    return leftNumericValue !== null ? -1 : 1;
+  }
+
+  return compareAlbumTreeNodeNames(left, right);
 }
 
 function compareAlbumTreeNodeTypes(left: AlbumTreeNode, right: AlbumTreeNode): number {
@@ -2200,6 +2221,57 @@ function getOrderedAlbumTreeSiblingsForCustomSort(
     .sort((left, right) => compareAlbumTreeNodes(left, right, 'Custom'));
 }
 
+function getEffectiveGroupChildOrderMode(node: AlbumTreeNode | null | undefined): AlbumTreeChildOrderMode {
+  if (!node || node.nodeType !== 'Group') {
+    return 'Custom';
+  }
+
+  return node.childOrderMode ?? 'Custom';
+}
+
+function compareAlbumChildrenForGroupMode(
+  left: AlbumTreeNode,
+  right: AlbumTreeNode,
+  childOrderMode: AlbumTreeChildOrderMode
+): number {
+  if (childOrderMode === 'Custom') {
+    return compareAlbumTreeNodes(left, right, 'Custom');
+  }
+
+  if (childOrderMode === 'NumericThenName') {
+    return compareAlbumTreeNodeNumericThenName(left, right);
+  }
+
+  return compareAlbumTreeNodeNames(left, right);
+}
+
+function sortAlbumTreeChildrenForParent(
+  nodesById: Map<string, AlbumTreeNode>,
+  parentId: string | null,
+  siblings: AlbumTreeNode[],
+  sortMode: AlbumTreeSortMode
+): AlbumTreeNode[] {
+  if (parentId === null) {
+    return [...siblings].sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
+  }
+
+  const parentNode = nodesById.get(parentId) ?? null;
+  if (!parentNode || parentNode.nodeType !== 'Group') {
+    return [...siblings].sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
+  }
+
+  const groupChildren = siblings
+    .filter((node) => node.nodeType === 'Group')
+    .sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
+  const albumChildren = siblings
+    .filter((node) => node.nodeType === 'Album')
+    .sort((left, right) =>
+      compareAlbumChildrenForGroupMode(left, right, getEffectiveGroupChildOrderMode(parentNode))
+    );
+
+  return [...groupChildren, ...albumChildren];
+}
+
 function buildAlbumTreeDisplayList(
   nodes: AlbumTreeNode[],
   expandedGroupIds: string[],
@@ -2207,6 +2279,7 @@ function buildAlbumTreeDisplayList(
 ): AlbumTreeNodeWithDepth[] {
   const expandedSet = new Set(expandedGroupIds);
   const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
   for (const node of nodes) {
     const siblings = childrenByParent.get(node.parentId) ?? [];
@@ -2214,8 +2287,8 @@ function buildAlbumTreeDisplayList(
     childrenByParent.set(node.parentId, siblings);
   }
 
-  for (const siblings of childrenByParent.values()) {
-    siblings.sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
+  for (const [parentId, siblings] of childrenByParent.entries()) {
+    childrenByParent.set(parentId, sortAlbumTreeChildrenForParent(nodesById, parentId, siblings, sortMode));
   }
 
   const ordered: AlbumTreeNodeWithDepth[] = [];
@@ -4680,6 +4753,14 @@ export default function App() {
     const node = albumNodesById.get(selectedTreeNodeId);
     return node?.nodeType === 'Album' ? node : null;
   }, [albumNodesById, selectedTreeNodeId]);
+  const selectedTreeNodeParent = useMemo(
+    () => (selectedTreeNode?.parentId ? albumNodesById.get(selectedTreeNode.parentId) ?? null : null),
+    [albumNodesById, selectedTreeNode]
+  );
+  const selectedGroupChildOrderMode = useMemo(
+    () => getEffectiveGroupChildOrderMode(selectedAlbumTreeGroupNode),
+    [selectedAlbumTreeGroupNode]
+  );
   const selectedAlbumTreeNodeCustomSiblings = useMemo(() => {
     if (!selectedTreeNode) {
       return [];
@@ -4694,7 +4775,18 @@ export default function App() {
 
     return selectedAlbumTreeNodeCustomSiblings.findIndex((node) => node.id === selectedTreeNode.id);
   }, [selectedAlbumTreeNodeCustomSiblings, selectedTreeNode]);
-  const canUseCustomReorderCommands = albumTreeSortMode === 'Custom';
+  const selectedTreeNodeSiblingOrderMode = useMemo<AlbumTreeChildOrderMode>(() => {
+    if (!selectedTreeNode) {
+      return 'Custom';
+    }
+
+    if (selectedTreeNodeParent?.nodeType === 'Group' && selectedTreeNode.nodeType === 'Album') {
+      return getEffectiveGroupChildOrderMode(selectedTreeNodeParent);
+    }
+
+    return albumTreeSortMode === 'Custom' ? 'Custom' : 'Name';
+  }, [albumTreeSortMode, selectedTreeNode, selectedTreeNodeParent]);
+  const canUseCustomReorderCommands = selectedTreeNodeSiblingOrderMode === 'Custom';
   const canMoveSelectedTreeNodeUp =
     canUseCustomReorderCommands && selectedAlbumTreeNodeCustomSiblingIndex > 0;
   const canMoveSelectedTreeNodeDown =
@@ -6423,6 +6515,28 @@ export default function App() {
     });
   }
 
+  async function handleSetSelectedGroupChildOrderMode(
+    childOrderMode: AlbumTreeChildOrderMode
+  ): Promise<void> {
+    if (!selectedAlbumTreeGroupNode) {
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+
+    try {
+      const updatedNode = await updateAlbumTreeChildOrderMode(selectedAlbumTreeGroupNode.id, {
+        childOrderMode
+      });
+      setAlbumTreeNodes((previous) =>
+        previous.map((node) => (node.id === updatedNode.id ? updatedNode : node))
+      );
+      setSelectedTreeNodeId(updatedNode.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to update group child order mode.');
+    }
+  }
+
   function handleAlbumTreeMoveToPlaceholder(): void {
     closeAlbumTreeContextMenu();
   }
@@ -7422,6 +7536,36 @@ export default function App() {
               type="button"
               style={contextMenuItemStyle}
               onClick={() => {
+                void handleSetSelectedGroupChildOrderMode('Custom');
+              }}
+              title="Use manual/custom ordering for albums in this group"
+            >
+              {selectedGroupChildOrderMode === 'Custom' ? '✓ ' : ''}Albums: Custom Order
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                void handleSetSelectedGroupChildOrderMode('Name');
+              }}
+              title="Sort albums in this group alphabetically"
+            >
+              {selectedGroupChildOrderMode === 'Name' ? '✓ ' : ''}Albums: Name
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
+                void handleSetSelectedGroupChildOrderMode('NumericThenName');
+              }}
+              title="Sort albums in this group numerically, then alphabetically"
+            >
+              {selectedGroupChildOrderMode === 'NumericThenName' ? '✓ ' : ''}Albums: Numeric Then Name
+            </button>
+            <button
+              type="button"
+              style={contextMenuItemStyle}
+              onClick={() => {
                 closeAlbumTreeContextMenu();
                 void handleCreateGroup();
               }}
@@ -7450,7 +7594,7 @@ export default function App() {
               disabled={!canMoveSelectedTreeNodeUp}
               title={
                 !canUseCustomReorderCommands
-                  ? 'Available only in Custom sort'
+                  ? 'Available only when these siblings use Custom order'
                   : canMoveSelectedTreeNodeUp
                     ? 'Move earlier among same-type siblings'
                     : 'Already first in custom order'
@@ -7467,7 +7611,7 @@ export default function App() {
               disabled={!canMoveSelectedTreeNodeDown}
               title={
                 !canUseCustomReorderCommands
-                  ? 'Available only in Custom sort'
+                  ? 'Available only when these siblings use Custom order'
                   : canMoveSelectedTreeNodeDown
                     ? 'Move later among same-type siblings'
                     : 'Already last in custom order'
@@ -7514,7 +7658,7 @@ export default function App() {
               disabled={!canMoveSelectedTreeNodeUp}
               title={
                 !canUseCustomReorderCommands
-                  ? 'Available only in Custom sort'
+                  ? 'Available only when these siblings use Custom order'
                   : canMoveSelectedTreeNodeUp
                     ? 'Move earlier among same-type siblings'
                     : 'Already first in custom order'
@@ -7531,7 +7675,7 @@ export default function App() {
               disabled={!canMoveSelectedTreeNodeDown}
               title={
                 !canUseCustomReorderCommands
-                  ? 'Available only in Custom sort'
+                  ? 'Available only when these siblings use Custom order'
                   : canMoveSelectedTreeNodeDown
                     ? 'Move later among same-type siblings'
                     : 'Already last in custom order'
