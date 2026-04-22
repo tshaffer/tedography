@@ -36,6 +36,22 @@ export async function listActivePersonFaceExamplesByDetectionId(faceDetectionId:
   return items.map(normalizePersonFaceExample);
 }
 
+export async function listActivePersonFaceExamplesByDetectionIds(
+  faceDetectionIds: string[]
+): Promise<PersonFaceExample[]> {
+  if (faceDetectionIds.length === 0) {
+    return [];
+  }
+
+  const items = await PersonFaceExampleModel.find(
+    { faceDetectionId: { $in: faceDetectionIds }, status: 'active' },
+    { _id: 0 }
+  )
+    .sort({ createdAt: -1, id: -1 })
+    .lean<PersonFaceExample[]>();
+  return items.map(normalizePersonFaceExample);
+}
+
 export async function countActivePersonFaceExamplesByPersonIds(personIds: string[]): Promise<Record<string, number>> {
   if (personIds.length === 0) {
     return {};
@@ -105,4 +121,38 @@ export async function markPersonFaceExampleRemoved(id: string): Promise<PersonFa
     { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<PersonFaceExample | null>();
   return item ? normalizePersonFaceExample(item) : null;
+}
+
+export async function reassignPersonFaceExamplesByDetectionIds(input: Array<{
+  previousFaceDetectionId: string;
+  nextFaceDetectionId: string;
+}>): Promise<void> {
+  if (input.length === 0) {
+    return;
+  }
+
+  const updateOperations = input.flatMap((item) =>
+    item.previousFaceDetectionId === item.nextFaceDetectionId
+      ? []
+      : [
+          {
+            updateMany: {
+              filter: {
+                faceDetectionId: item.previousFaceDetectionId
+              },
+              update: {
+                $set: {
+                  faceDetectionId: item.nextFaceDetectionId
+                }
+              }
+            }
+          }
+        ]
+  );
+
+  if (updateOperations.length === 0) {
+    return;
+  }
+
+  await PersonFaceExampleModel.bulkWrite(updateOperations, { ordered: true });
 }

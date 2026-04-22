@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   FaceDetection,
+  FaceDetectionAssignment,
   FaceDetectionIgnoredReason,
   FaceMatchReview,
   MediaAsset,
@@ -36,6 +37,7 @@ import {
 } from '../repositories/faceDetectionRepository.js';
 import {
   assignDetectedFaceToPerson,
+  listFaceDetectionAssignmentsByMediaAssetId,
   replaceFaceDetectionAssignmentsForAsset
 } from '../repositories/faceDetectionAssignmentRepository.js';
 import { listFaceMatchReviewsByDetectionIds, listFaceMatchReviewsByAssetId, countFaceMatchReviewsByDecision, replaceFaceMatchReviewsForAsset, upsertFaceMatchReview } from '../repositories/faceMatchReviewRepository.js';
@@ -45,8 +47,10 @@ import {
   findActivePersonFaceExampleByPersonAndDetection,
   findPersonFaceExampleById,
   listActivePersonFaceExamplesByDetectionId,
+  listActivePersonFaceExamplesByDetectionIds,
   listActivePersonFaceExamplesByPersonId,
-  markPersonFaceExampleRemoved
+  markPersonFaceExampleRemoved,
+  reassignPersonFaceExamplesByDetectionIds
 } from '../repositories/personFaceExampleRepository.js';
 import {
   AssetMediaPathResolutionError,
@@ -60,6 +64,101 @@ import { PeopleRecognitionEngineError } from './recognitionEngine.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function computeBoundingBoxArea(boundingBox: FaceDetection['boundingBox']): number {
+  return boundingBox.width * boundingBox.height;
+}
+
+function computeBoundingBoxIntersectionArea(
+  left: FaceDetection['boundingBox'],
+  right: FaceDetection['boundingBox']
+): number {
+  const overlapLeft = Math.max(left.left, right.left);
+  const overlapTop = Math.max(left.top, right.top);
+  const overlapRight = Math.min(left.left + left.width, right.left + right.width);
+  const overlapBottom = Math.min(left.top + left.height, right.top + right.height);
+  const overlapWidth = overlapRight - overlapLeft;
+  const overlapHeight = overlapBottom - overlapTop;
+
+  if (overlapWidth <= 0 || overlapHeight <= 0) {
+    return 0;
+  }
+
+  return overlapWidth * overlapHeight;
+}
+
+function computeBoundingBoxIoU(
+  left: FaceDetection['boundingBox'],
+  right: FaceDetection['boundingBox']
+): number {
+  const intersectionArea = computeBoundingBoxIntersectionArea(left, right);
+  if (intersectionArea <= 0) {
+    return 0;
+  }
+
+  const unionArea = computeBoundingBoxArea(left) + computeBoundingBoxArea(right) - intersectionArea;
+  if (unionArea <= 0) {
+    return 0;
+  }
+
+  return intersectionArea / unionArea;
+}
+
+type DetectionRemap = {
+  previousDetectionId: string;
+  nextFaceIndex: number;
+};
+
+function remapExistingDetections(
+  previousDetections: FaceDetection[],
+  nextDetections: Array<Pick<FaceDetection, 'faceIndex' | 'boundingBox'>>
+): DetectionRemap[] {
+  const scoredPairs = previousDetections.flatMap((previous) =>
+    nextDetections.flatMap((next) => {
+      const iou = computeBoundingBoxIoU(previous.boundingBox, next.boundingBox);
+      const score = iou + (previous.faceIndex === next.faceIndex ? 0.02 : 0);
+
+      if (iou < 0.2 && !(previous.faceIndex === next.faceIndex && iou >= 0.05)) {
+        return [];
+      }
+
+      return [
+        {
+          previousDetectionId: previous.id,
+          nextFaceIndex: next.faceIndex,
+          score
+        }
+      ];
+    })
+  );
+
+  scoredPairs.sort((left, right) =>
+    right.score === left.score
+      ? left.previousDetectionId === right.previousDetectionId
+        ? left.nextFaceIndex - right.nextFaceIndex
+        : left.previousDetectionId.localeCompare(right.previousDetectionId)
+      : right.score - left.score
+  );
+
+  const usedPreviousDetectionIds = new Set<string>();
+  const usedNextFaceIndexes = new Set<number>();
+  const remaps: DetectionRemap[] = [];
+
+  for (const pair of scoredPairs) {
+    if (usedPreviousDetectionIds.has(pair.previousDetectionId) || usedNextFaceIndexes.has(pair.nextFaceIndex)) {
+      continue;
+    }
+
+    usedPreviousDetectionIds.add(pair.previousDetectionId);
+    usedNextFaceIndexes.add(pair.nextFaceIndex);
+    remaps.push({
+      previousDetectionId: pair.previousDetectionId,
+      nextFaceIndex: pair.nextFaceIndex
+    });
+  }
+
+  return remaps;
 }
 
 function isEligibleMediaAsset(asset: MediaAsset): { eligible: boolean; reason?: string } {
@@ -210,6 +309,33 @@ async function syncDetectedFaceAssignment(input: {
   });
 }
 
+function preserveManualDetectionState(
+  nextDetections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>>,
+  previousDetectionsById: Map<string, FaceDetection>,
+  remaps: DetectionRemap[]
+): void {
+  for (const remap of remaps) {
+    const previousDetection = previousDetectionsById.get(remap.previousDetectionId);
+    const nextDetection = nextDetections[remap.nextFaceIndex];
+    if (!previousDetection || !nextDetection) {
+      continue;
+    }
+
+    if (
+      previousDetection.matchStatus !== 'confirmed' &&
+      previousDetection.matchStatus !== 'rejected' &&
+      previousDetection.matchStatus !== 'ignored'
+    ) {
+      continue;
+    }
+
+    nextDetection.matchedPersonId = previousDetection.matchedPersonId ?? null;
+    nextDetection.matchConfidence = previousDetection.matchConfidence ?? null;
+    nextDetection.matchStatus = previousDetection.matchStatus;
+    nextDetection.ignoredReason = previousDetection.ignoredReason ?? null;
+  }
+}
+
 async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetFaceDetectionsResponse> {
   const [detections, reviews, asset] = await Promise.all([
     listFaceDetectionsByAssetId(assetId),
@@ -323,6 +449,25 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
   }
 
   const people = await listPeople();
+  const [previousDetections, previousReviews, previousAssignments] = await Promise.all([
+    listFaceDetectionsByAssetId(asset.id),
+    listFaceMatchReviewsByAssetId(asset.id),
+    listFaceDetectionAssignmentsByMediaAssetId(asset.id)
+  ]);
+  const previousExamples = await listActivePersonFaceExamplesByDetectionIds(
+    previousDetections.map((item) => item.id)
+  );
+  const previousDetectionsById = new Map(previousDetections.map((detection) => [detection.id, detection]));
+  const previousReviewsByDetectionId = new Map(previousReviews.map((review) => [review.faceDetectionId, review]));
+  const previousAssignmentsByDetectionId = new Map(
+    previousAssignments.map((assignment) => [assignment.detectedFaceId, assignment])
+  );
+  const previousExamplesByDetectionId = new Map<string, typeof previousExamples>(
+    previousDetections.map((detection) => [
+      detection.id,
+      previousExamples.filter((example) => example.faceDetectionId === detection.id)
+    ])
+  );
   const engine = getPeopleRecognitionEngine();
   let detectedFaces;
   try {
@@ -346,7 +491,6 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
   }
 
   const nextDetections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>> = [];
-  const pendingReviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
   const detectionRunId = randomUUID();
 
   for (const [index, detectedFace] of detectedFaces.entries()) {
@@ -474,55 +618,174 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
     });
   }
 
+  const detectionRemaps = remapExistingDetections(previousDetections, nextDetections);
+  preserveManualDetectionState(nextDetections, previousDetectionsById, detectionRemaps);
+
   const detections = await replaceFaceDetectionsForAsset({
     mediaAssetId: asset.id,
     detections: nextDetections
   });
 
+  const createdDetectionsByFaceIndex = new Map(detections.map((detection) => [detection.faceIndex, detection]));
+  const createdDetectionsByPreviousId = new Map(
+    detectionRemaps.flatMap((remap) => {
+      const detection = createdDetectionsByFaceIndex.get(remap.nextFaceIndex);
+      return detection ? [[remap.previousDetectionId, detection] as const] : [];
+    })
+  );
+
+  const nextReviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
   for (const detection of detections) {
-    if (detection.matchStatus !== 'suggested' && detection.matchStatus !== 'autoMatched') {
+    if (detection.matchStatus === 'suggested' || detection.matchStatus === 'autoMatched') {
+      nextReviewSpecs.push({
+        faceDetectionId: detection.id,
+        mediaAssetId: asset.id,
+        suggestedPersonId: detection.autoMatchCandidatePersonId ?? null,
+        suggestedConfidence: detection.autoMatchCandidateConfidence ?? null,
+        finalPersonId: null,
+        decision: 'pending',
+        reviewer: null,
+        notes: null,
+        ignoredReason: null
+      });
+    }
+  }
+
+  for (const remap of detectionRemaps) {
+    const previousDetection = previousDetectionsById.get(remap.previousDetectionId);
+    const createdDetection = createdDetectionsByPreviousId.get(remap.previousDetectionId);
+    if (!previousDetection || !createdDetection) {
       continue;
     }
 
-    pendingReviewSpecs.push({
-      faceDetectionId: detection.id,
+    if (
+      previousDetection.matchStatus !== 'confirmed' &&
+      previousDetection.matchStatus !== 'rejected' &&
+      previousDetection.matchStatus !== 'ignored'
+    ) {
+      continue;
+    }
+
+    const previousReview = previousReviewsByDetectionId.get(remap.previousDetectionId) ?? null;
+    nextReviewSpecs.push({
+      faceDetectionId: createdDetection.id,
       mediaAssetId: asset.id,
-      suggestedPersonId: detection.autoMatchCandidatePersonId ?? null,
-      suggestedConfidence: detection.autoMatchCandidateConfidence ?? null,
-      finalPersonId: null,
-      decision: 'pending',
-      reviewer: null,
-      notes: null,
-      ignoredReason: null
+      suggestedPersonId:
+        previousReview?.suggestedPersonId ??
+        previousDetection.autoMatchCandidatePersonId ??
+        null,
+      suggestedConfidence:
+        previousReview?.suggestedConfidence ??
+        previousDetection.autoMatchCandidateConfidence ??
+        null,
+      finalPersonId:
+        previousReview?.finalPersonId ??
+        previousDetection.matchedPersonId ??
+        null,
+      decision:
+        previousReview?.decision ??
+        (previousDetection.matchStatus === 'confirmed'
+          ? determineConfirmedReviewDecision(previousDetection, previousDetection.matchedPersonId ?? null)
+          : previousDetection.matchStatus === 'ignored'
+            ? 'ignored'
+            : 'rejected'),
+      reviewer: previousReview?.reviewer ?? 'reprocess-preserve',
+      notes: previousReview?.notes ?? 'Preserved during people pipeline reprocess.',
+      ignoredReason: previousReview?.ignoredReason ?? previousDetection.ignoredReason ?? null
     });
   }
 
   const reviews = await replaceFaceMatchReviewsForAsset({
     mediaAssetId: asset.id,
-    reviews: pendingReviewSpecs
+    reviews: nextReviewSpecs
   });
+
+  const nextAssignments: Array<Omit<FaceDetectionAssignment, 'id' | 'createdAt' | 'updatedAt'>> =
+    detections.flatMap((detection) => {
+    if (
+      (detection.matchStatus !== 'suggested' && detection.matchStatus !== 'autoMatched') ||
+      typeof detection.autoMatchCandidatePersonId !== 'string'
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        detectedFaceId: detection.id,
+        mediaAssetId: detection.mediaAssetId,
+        personId: detection.autoMatchCandidatePersonId,
+        assignmentSource: 'auto-match' as const,
+        assignmentStatus: 'suggested' as const,
+        matchConfidence: detection.autoMatchCandidateConfidence ?? null
+      }
+    ];
+    });
+
+  for (const remap of detectionRemaps) {
+    const previousDetection = previousDetectionsById.get(remap.previousDetectionId);
+    const createdDetection = createdDetectionsByPreviousId.get(remap.previousDetectionId);
+    if (!previousDetection || !createdDetection) {
+      continue;
+    }
+
+    if (
+      previousDetection.matchStatus !== 'confirmed' &&
+      previousDetection.matchStatus !== 'rejected' &&
+      previousDetection.matchStatus !== 'ignored'
+    ) {
+      continue;
+    }
+
+    const previousAssignment = previousAssignmentsByDetectionId.get(remap.previousDetectionId) ?? null;
+    const personId =
+      previousAssignment?.personId ??
+      previousDetection.matchedPersonId ??
+      previousDetection.autoMatchCandidatePersonId ??
+      null;
+    if (!personId) {
+      continue;
+    }
+
+    nextAssignments.push({
+      detectedFaceId: createdDetection.id,
+      mediaAssetId: createdDetection.mediaAssetId,
+      personId,
+      assignmentSource: previousAssignment?.assignmentSource ?? 'manual-confirm',
+      assignmentStatus:
+        previousAssignment?.assignmentStatus ??
+        (previousDetection.matchStatus === 'confirmed'
+          ? 'confirmed'
+          : previousDetection.matchStatus === 'ignored'
+            ? 'ignored'
+            : 'rejected'),
+      matchConfidence:
+        previousAssignment?.matchConfidence ??
+        previousDetection.matchConfidence ??
+        previousDetection.autoMatchCandidateConfidence ??
+        null
+    });
+  }
+
   await replaceFaceDetectionAssignmentsForAsset({
     mediaAssetId: asset.id,
-    assignments: detections.flatMap((detection) => {
-      if (
-        (detection.matchStatus !== 'suggested' && detection.matchStatus !== 'autoMatched') ||
-        typeof detection.autoMatchCandidatePersonId !== 'string'
-      ) {
+    assignments: nextAssignments
+  });
+  await reassignPersonFaceExamplesByDetectionIds(
+    detectionRemaps.flatMap((remap) => {
+      const examples = previousExamplesByDetectionId.get(remap.previousDetectionId) ?? [];
+      const detection = createdDetectionsByPreviousId.get(remap.previousDetectionId);
+      if (examples.length === 0 || !detection) {
         return [];
       }
 
       return [
         {
-          detectedFaceId: detection.id,
-          mediaAssetId: detection.mediaAssetId,
-          personId: detection.autoMatchCandidatePersonId,
-          assignmentSource: 'auto-match' as const,
-          assignmentStatus: 'suggested' as const,
-          matchConfidence: detection.autoMatchCandidateConfidence ?? null
+          previousFaceDetectionId: remap.previousDetectionId,
+          nextFaceDetectionId: detection.id
         }
       ];
     })
-  });
+  );
   const derivedPeople = await recomputeMediaAssetPeople(asset.id);
 
   return {

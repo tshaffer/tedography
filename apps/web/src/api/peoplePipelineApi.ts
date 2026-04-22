@@ -3,6 +3,7 @@ import type {
   CreatePersonResponse,
   EnrollPersonFromDetectionRequest,
   EnrollPersonFromDetectionResponse,
+  GetPersonPhotosResponse,
   GetPersonDetailResponse,
   ListAssetFaceDetectionsResponse,
   ListPeopleBrowseResponse,
@@ -62,6 +63,28 @@ export async function listPeopleBrowse(): Promise<ListPeopleBrowseResponse> {
 
 export async function getPersonDetail(personId: string): Promise<GetPersonDetailResponse> {
   return fetchJson<GetPersonDetailResponse>(`/api/people-pipeline/people/${encodeURIComponent(personId)}`);
+}
+
+export async function getPersonPhotos(
+  personId: string,
+  input?: {
+    sortBy?: 'estimatedAge';
+    sortDirection?: 'asc' | 'desc';
+    uniquePhotosOnly?: boolean;
+    signal?: AbortSignal;
+  }
+): Promise<GetPersonPhotosResponse> {
+  const query = new URLSearchParams();
+  query.set('sortBy', input?.sortBy ?? 'estimatedAge');
+  query.set('sortDirection', input?.sortDirection ?? 'asc');
+  query.set('uniquePhotosOnly', input?.uniquePhotosOnly === false ? 'false' : 'true');
+
+  return fetchJson<GetPersonPhotosResponse>(
+    `/api/people/${encodeURIComponent(personId)}/photos?${query.toString()}`,
+    {
+      ...(input?.signal ? { signal: input.signal } : {})
+    }
+  );
 }
 
 export async function updatePerson(

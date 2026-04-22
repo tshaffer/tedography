@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { GetPersonDetailResponse, ListPeopleResponse } from '@tedography/shared';
+import type { GetPersonDetailResponse, GetPersonPhotosResponse, ListPeopleResponse } from '@tedography/shared';
 import {
   enrollPersonFromDetection,
   getPersonDetail,
+  getPersonPhotos,
   listPeople,
   mergePerson,
   processPeopleAsset,
@@ -147,6 +148,19 @@ const badgeStyle: CSSProperties = {
   fontWeight: 700
 };
 
+const controlRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '10px',
+  flexWrap: 'wrap',
+  alignItems: 'end'
+};
+
+const controlFieldStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  minWidth: '180px'
+};
+
 const warningBadgeStyle: CSSProperties = {
   ...badgeStyle,
   backgroundColor: '#fff7e8',
@@ -192,6 +206,18 @@ function formatAssetCount(count: number): string {
   return `${count} asset${count === 1 ? '' : 's'}`;
 }
 
+function formatEstimatedAge(value: number | null | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'Unknown';
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+type PersonPhotoSortMode = 'captureTime' | 'estimatedAge';
+type EstimatedAgeOrder = 'asc' | 'desc';
+type EstimatedAgeResultsMode = 'uniquePhotos' | 'allMatchedFaces';
+
 export function PersonDetailPage() {
   const { personId = '' } = useParams();
   const navigate = useNavigate();
@@ -206,6 +232,12 @@ export function PersonDetailPage() {
   const [splitTargetPersonId, setSplitTargetPersonId] = useState('');
   const [splitNewDisplayName, setSplitNewDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [photoSortMode, setPhotoSortMode] = useState<PersonPhotoSortMode>('captureTime');
+  const [estimatedAgeOrder, setEstimatedAgeOrder] = useState<EstimatedAgeOrder>('asc');
+  const [estimatedAgeResultsMode, setEstimatedAgeResultsMode] = useState<EstimatedAgeResultsMode>('uniquePhotos');
+  const [estimatedAgePhotos, setEstimatedAgePhotos] = useState<GetPersonPhotosResponse | null>(null);
+  const [estimatedAgePhotosLoading, setEstimatedAgePhotosLoading] = useState(false);
+  const [estimatedAgePhotosError, setEstimatedAgePhotosError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -230,6 +262,11 @@ export function PersonDetailPage() {
       setPeopleOptions(peopleResponse.items);
       setMergeTargetPersonId('');
       setSelectedConfirmedDetectionIds([]);
+      setPhotoSortMode('captureTime');
+      setEstimatedAgeOrder('asc');
+      setEstimatedAgeResultsMode('uniquePhotos');
+      setEstimatedAgePhotos(null);
+      setEstimatedAgePhotosError(null);
       setSplitDialogOpen(false);
       setSplitTargetPersonId('');
       setSplitNewDisplayName('');
@@ -249,6 +286,45 @@ export function PersonDetailPage() {
   useEffect(() => {
     void loadDetail();
   }, [personId]);
+
+  useEffect(() => {
+    if (!personId.trim() || photoSortMode !== 'estimatedAge') {
+      return;
+    }
+
+    const controller = new AbortController();
+    setEstimatedAgePhotosLoading(true);
+    setEstimatedAgePhotosError(null);
+
+    void getPersonPhotos(personId, {
+      sortBy: 'estimatedAge',
+      sortDirection: estimatedAgeOrder,
+      uniquePhotosOnly: estimatedAgeResultsMode === 'uniquePhotos',
+      signal: controller.signal
+    })
+      .then((response) => {
+        setEstimatedAgePhotos(response);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setEstimatedAgePhotosError(
+          error instanceof Error ? error.message : 'Failed to load estimated age photos'
+        );
+        setEstimatedAgePhotos(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setEstimatedAgePhotosLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [estimatedAgeOrder, estimatedAgeResultsMode, personId, photoSortMode]);
 
   const personSearchHref = useMemo(
     () => `/?area=Search&people=${encodeURIComponent(personId)}&peopleMode=Any`,
@@ -500,6 +576,11 @@ export function PersonDetailPage() {
     ? detail.confirmedFaces.filter((face) => selectedConfirmedDetectionIds.includes(face.detection.id))
     : [];
   const selectedExampleFaceCount = selectedConfirmedFaces.filter((face) => Boolean(face.exampleId)).length;
+  const estimatedAgeItems = estimatedAgePhotos?.items ?? [];
+  const assetsById = useMemo(
+    () => new Map((detail?.assets ?? []).map((asset) => [asset.id, asset])),
+    [detail?.assets]
+  );
 
   return (
     <div style={pageStyle}>
@@ -843,31 +924,123 @@ export function PersonDetailPage() {
                 View In Search
               </Link>
             </div>
-            {detail.assets.length === 0 ? (
+            <div style={{ ...controlRowStyle, marginBottom: '12px' }}>
+              <label style={controlFieldStyle}>
+                <span style={labelStyle}>Sort by</span>
+                <select
+                  value={photoSortMode}
+                  onChange={(event) => setPhotoSortMode(event.target.value as PersonPhotoSortMode)}
+                  style={{ ...inputStyle, width: '100%' }}
+                >
+                  <option value="captureTime">Capture Time</option>
+                  <option value="estimatedAge">Estimated Age</option>
+                </select>
+              </label>
+              {photoSortMode === 'estimatedAge' ? (
+                <>
+                  <label style={controlFieldStyle}>
+                    <span style={labelStyle}>Order</span>
+                    <select
+                      value={estimatedAgeOrder}
+                      onChange={(event) => setEstimatedAgeOrder(event.target.value as EstimatedAgeOrder)}
+                      style={{ ...inputStyle, width: '100%' }}
+                    >
+                      <option value="asc">Youngest First</option>
+                      <option value="desc">Oldest First</option>
+                    </select>
+                  </label>
+                  <label style={controlFieldStyle}>
+                    <span style={labelStyle}>Results Mode</span>
+                    <select
+                      value={estimatedAgeResultsMode}
+                      onChange={(event) =>
+                        setEstimatedAgeResultsMode(event.target.value as EstimatedAgeResultsMode)
+                      }
+                      style={{ ...inputStyle, width: '100%' }}
+                    >
+                      <option value="uniquePhotos">Unique Photos</option>
+                      <option value="allMatchedFaces">All Matched Faces</option>
+                    </select>
+                  </label>
+                </>
+              ) : null}
+            </div>
+            {photoSortMode === 'captureTime' && detail.assets.length === 0 ? (
               <p style={{ margin: 0, color: '#5b6673' }}>No confirmed photos for this person yet.</p>
+            ) : photoSortMode === 'estimatedAge' && estimatedAgePhotosLoading ? (
+              <p style={{ margin: 0, color: '#5b6673' }}>Loading photos ordered by estimated age...</p>
+            ) : photoSortMode === 'estimatedAge' && estimatedAgePhotosError ? (
+              <p style={{ margin: 0, color: '#a32222' }}>
+                Failed to load estimated age results: {estimatedAgePhotosError}
+              </p>
+            ) : photoSortMode === 'estimatedAge' && estimatedAgeItems.length === 0 ? (
+              <p style={{ margin: 0, color: '#5b6673' }}>
+                No photos with estimated age data are available for this person.
+              </p>
             ) : (
               <div style={gridStyle}>
-                {detail.assets.map((asset) => (
-                  <article key={asset.id} style={assetCardStyle}>
-                    <div style={previewFrameStyle}>
-                      <img
-                        src={getThumbnailMediaUrl(asset.id)}
-                        alt={asset.filename}
-                        style={previewImageStyle}
-                      />
-                    </div>
-                    <div style={{ fontSize: '15px', fontWeight: 700 }}>{asset.filename}</div>
-                    <div style={{ fontSize: '12px', color: '#5b6673' }}>{asset.originalArchivePath}</div>
-                    <div style={badgeRowStyle}>
-                      <span style={badgeStyle}>{asset.photoState}</span>
-                      {asset.reviewableDetectionsCount > 0 ? (
-                        <span style={warningBadgeStyle}>
-                          {asset.reviewableDetectionsCount} reviewable
-                        </span>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
+                {photoSortMode === 'estimatedAge'
+                  ? estimatedAgeItems.map((item) => {
+                      const asset = assetsById.get(item.mediaAssetId) ?? null;
+
+                      return (
+                        <article
+                          key={`${item.mediaAssetId}-${item.detectedFaceId}`}
+                          style={assetCardStyle}
+                        >
+                          <div style={previewFrameStyle}>
+                            <img
+                              src={getThumbnailMediaUrl(item.mediaAssetId)}
+                              alt={`${detail.person.displayName} estimated age result`}
+                              style={previewImageStyle}
+                            />
+                          </div>
+                          <div style={{ fontSize: '15px', fontWeight: 700 }}>
+                            {asset?.filename ?? item.mediaAssetId}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#5b6673' }}>
+                            {asset?.originalArchivePath ?? item.mediaAssetId}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#5b6673' }}>
+                            Estimated age: {formatEstimatedAge(item.estimatedAgeMidpoint)}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#5b6673' }}>
+                            Range: {formatEstimatedAge(item.ageRangeLow)}-{formatEstimatedAge(item.ageRangeHigh)}
+                          </div>
+                          <div style={badgeRowStyle}>
+                            <span style={badgeStyle}>Estimated Age</span>
+                            {estimatedAgeResultsMode === 'uniquePhotos' && typeof item.personFaceCountInAsset === 'number' ? (
+                              <span style={badgeStyle}>
+                                {item.personFaceCountInAsset} matched face{item.personFaceCountInAsset === 1 ? '' : 's'}
+                              </span>
+                            ) : (
+                              <span style={badgeStyle}>Face Result</span>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })
+                  : detail.assets.map((asset) => (
+                      <article key={asset.id} style={assetCardStyle}>
+                        <div style={previewFrameStyle}>
+                          <img
+                            src={getThumbnailMediaUrl(asset.id)}
+                            alt={asset.filename}
+                            style={previewImageStyle}
+                          />
+                        </div>
+                        <div style={{ fontSize: '15px', fontWeight: 700 }}>{asset.filename}</div>
+                        <div style={{ fontSize: '12px', color: '#5b6673' }}>{asset.originalArchivePath}</div>
+                        <div style={badgeRowStyle}>
+                          <span style={badgeStyle}>{asset.photoState}</span>
+                          {asset.reviewableDetectionsCount > 0 ? (
+                            <span style={warningBadgeStyle}>
+                              {asset.reviewableDetectionsCount} reviewable
+                            </span>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
               </div>
             )}
           </section>
