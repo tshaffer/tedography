@@ -48,6 +48,13 @@ type MoveAlbumTreeNodeRequest = {
   targetIndex?: unknown;
 };
 
+type CreateAlbumTreeNodeRequest = {
+  label?: unknown;
+  nodeType?: unknown;
+  parentId?: unknown;
+  targetIndex?: unknown;
+};
+
 function parseNonEmptyLabel(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -131,6 +138,14 @@ function parseNonNegativeInteger(value: unknown): number | null {
   return value;
 }
 
+function parseOptionalNonNegativeInteger(value: unknown): number | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return parseNonNegativeInteger(value);
+}
+
 async function loadAlbumNode(nodeId: string): Promise<AlbumTreeNode | null> {
   const node = await findAlbumTreeNodeById(nodeId);
   if (!node || node.nodeType !== 'Album') {
@@ -179,11 +194,19 @@ albumTreeRoutes.get('/', async (_req, res) => {
 });
 
 albumTreeRoutes.post('/', async (req, res) => {
-  const label = parseNonEmptyLabel((req.body as { label?: unknown }).label);
-  const nodeType = parseNodeType((req.body as { nodeType?: unknown }).nodeType);
-  const parentId = parseParentId((req.body as { parentId?: unknown }).parentId);
+  const createRequest = req.body as CreateAlbumTreeNodeRequest;
+  const label = parseNonEmptyLabel(createRequest.label);
+  const nodeType = parseNodeType(createRequest.nodeType);
+  const parentId = parseParentId(createRequest.parentId);
+  const targetIndex = parseOptionalNonNegativeInteger(createRequest.targetIndex);
   if (!label || !nodeType) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'label and nodeType are required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (targetIndex === null) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'targetIndex must be a non-negative integer' };
     res.status(400).json(errorResponse);
     return;
   }
@@ -206,7 +229,12 @@ albumTreeRoutes.post('/', async (req, res) => {
   }
 
   try {
-    const created = await createAlbumTreeNode({ label, nodeType, parentId });
+    const created = await createAlbumTreeNode({
+      label,
+      nodeType,
+      parentId,
+      ...(targetIndex !== undefined ? { targetIndex } : {})
+    });
     res.status(201).json(created);
   } catch (error) {
     if (error instanceof AlbumTreeSiblingLabelConflictError) {

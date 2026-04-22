@@ -70,6 +70,7 @@ import {
 } from './api/peoplePipelineApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
+import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -2893,6 +2894,7 @@ export default function App() {
   const [importDialogInitialAlbumDestination, setImportDialogInitialAlbumDestination] =
     useState<ImportAssetsDialogInitialAlbumDestination | null>(null);
   const [moveDialogNodeId, setMoveDialogNodeId] = useState<string | null>(null);
+  const [createTopLevelGroupDialogOpen, setCreateTopLevelGroupDialogOpen] = useState(false);
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
@@ -6187,7 +6189,8 @@ export default function App() {
 
   async function handleCreateAlbumTreeNode(
     nodeType: 'Group' | 'Album',
-    parentId: string | null
+    parentId: string | null,
+    targetIndex?: number
   ): Promise<void> {
     const canCreateNode = nodeType === 'Group' ? canCreateGroupNode : canCreateAlbumNode;
     if (!canCreateNode) {
@@ -6209,7 +6212,8 @@ export default function App() {
       const created = await createAlbumTreeNode({
         label,
         nodeType,
-        parentId
+        parentId,
+        ...(targetIndex !== undefined ? { targetIndex } : {})
       });
 
       if (nodeType === 'Album') {
@@ -6241,7 +6245,34 @@ export default function App() {
   }
 
   async function handleCreateTopLevelGroup(): Promise<void> {
-    await handleCreateAlbumTreeNode('Group', null);
+    if (!canCreateGroupNode) {
+      setUpdateError('Album tree is still loading.');
+      return;
+    }
+
+    setCreateTopLevelGroupDialogOpen(true);
+  }
+
+  async function handleCreateTopLevelGroupWithPosition(input: {
+    label: string;
+    targetIndex: number;
+  }): Promise<void> {
+    try {
+      const created = await createAlbumTreeNode({
+        label: input.label,
+        nodeType: 'Group',
+        parentId: null,
+        targetIndex: input.targetIndex
+      });
+
+      setSelectedTreeNodeId(created.id);
+      setCreateTopLevelGroupDialogOpen(false);
+      await loadAlbumTreeNodes({ showLoading: false });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to create group';
+      setUpdateError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
   }
 
   async function handleCreateAlbum(): Promise<void> {
@@ -9043,6 +9074,12 @@ export default function App() {
         nodeToMove={moveDialogNode}
         onClose={() => setMoveDialogNodeId(null)}
         onMove={handleMoveTreeNode}
+      />
+      <CreateTopLevelGroupDialog
+        open={createTopLevelGroupDialogOpen}
+        nodes={albumTreeNodes}
+        onClose={() => setCreateTopLevelGroupDialogOpen(false)}
+        onCreate={handleCreateTopLevelGroupWithPosition}
       />
       <MoveAssetsToAlbumDialog
         open={moveAssetsDialogOpen}

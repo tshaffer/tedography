@@ -17,6 +17,7 @@ export interface CreateAlbumTreeNodeRequest {
   label: string;
   nodeType: 'Group' | 'Album';
   parentId: string | null;
+  targetIndex?: number;
 }
 
 export interface MoveAlbumTreeNodeRequest {

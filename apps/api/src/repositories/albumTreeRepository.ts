@@ -10,6 +10,7 @@ export interface CreateAlbumTreeNodeInput {
   label: string;
   nodeType: AlbumTreeNodeType;
   parentId: string | null;
+  targetIndex?: number;
 }
 
 export type AlbumTreeNodeReorderDirection = 'up' | 'down';
@@ -193,7 +194,9 @@ export async function createAlbumTreeNode(
     nodeType: input.nodeType
   });
   const previousNodesById = new Map(siblings.map((node) => [node.id, node]));
-  const nextNodes = assignNormalizedSortOrders(insertNodeAtEndOfTypeBucket(siblings, newNode));
+  const nextNodes = assignNormalizedSortOrders(
+    insertNodeAtTypeBucketPosition(siblings, newNode, input.targetIndex)
+  );
   const createdNode = nextNodes.find((node) => node.id === newNode.id) ?? newNode;
   const siblingUpdateOperations = buildUpdateOperationsForChangedNodes(
     previousNodesById,
