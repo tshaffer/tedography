@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import type { AlbumTreeNode } from '@tedography/domain';
-import { buildAlbumTreeDisplayList, type AlbumTreeNodeWithDepth } from '../../utilities/albumTree';
+import { buildAlbumTreeDisplayList } from '../../utilities/albumTree';
 
 export const ROOT_DESTINATION = 'ROOT_DESTINATION';
 
@@ -11,12 +11,17 @@ type DestinationValidation = {
   reason: string | null;
 };
 
+type MovePositionOption = {
+  index: number;
+  label: string;
+};
+
 interface MoveAlbumTreeNodeDialogProps {
   open: boolean;
   nodes: AlbumTreeNode[];
   nodeToMove: AlbumTreeNode | null;
   onClose: () => void;
-  onMove: (destinationParentId: string | null) => Promise<void>;
+  onMove: (input: { destinationParentId: string | null; targetIndex: number }) => Promise<void>;
 }
 
 const overlayStyle: CSSProperties = {
@@ -51,6 +56,21 @@ const bodyStyle: CSSProperties = {
   overflow: 'auto',
   display: 'grid',
   gap: '12px'
+};
+
+const fieldLabelStyle: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  fontSize: '13px',
+  color: '#444'
+};
+
+const inputStyle: CSSProperties = {
+  border: '1px solid #c8c8c8',
+  borderRadius: '8px',
+  padding: '10px 12px',
+  fontSize: '13px',
+  backgroundColor: '#fff'
 };
 
 const chooserPanelStyle: CSSProperties = {
@@ -152,6 +172,39 @@ const disabledButtonStyle: CSSProperties = {
   cursor: 'not-allowed'
 };
 
+function compareAlbumTreeNodeNames(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  const labelComparison = left.label.localeCompare(right.label, undefined, {
+    numeric: true,
+    sensitivity: 'base'
+  });
+  if (labelComparison !== 0) {
+    return labelComparison;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function compareAlbumTreeNodeTypes(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  if (left.nodeType === right.nodeType) {
+    return 0;
+  }
+
+  return left.nodeType === 'Group' ? -1 : 1;
+}
+
+function compareAlbumTreeNodesByCustomBucketOrder(left: AlbumTreeNode, right: AlbumTreeNode): number {
+  const nodeTypeComparison = compareAlbumTreeNodeTypes(left, right);
+  if (nodeTypeComparison !== 0) {
+    return nodeTypeComparison;
+  }
+
+  if (left.sortOrder !== right.sortOrder) {
+    return left.sortOrder - right.sortOrder;
+  }
+
+  return compareAlbumTreeNodeNames(left, right);
+}
+
 function getDescendantNodeIds(nodes: AlbumTreeNode[], groupId: string): Set<string> {
   const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
 
@@ -177,6 +230,67 @@ function getDescendantNodeIds(nodes: AlbumTreeNode[], groupId: string): Set<stri
   return descendantIds;
 }
 
+function getAncestorGroupIds(nodesById: Map<string, AlbumTreeNode>, node: AlbumTreeNode | null): string[] {
+  const expanded: string[] = [];
+  let currentParentId = node?.parentId ?? null;
+
+  while (currentParentId) {
+    const currentNode = nodesById.get(currentParentId);
+    if (!currentNode) {
+      break;
+    }
+
+    if (currentNode.nodeType === 'Group') {
+      expanded.push(currentNode.id);
+    }
+
+    currentParentId = currentNode.parentId;
+  }
+
+  return expanded;
+}
+
+function getInitialExpandedGroupIds(nodes: AlbumTreeNode[], destinationNode: AlbumTreeNode | null): string[] {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  return Array.from(new Set(getAncestorGroupIds(nodesById, destinationNode)));
+}
+
+function getOrderedSameTypeSiblings(
+  nodes: AlbumTreeNode[],
+  parentId: string | null,
+  nodeType: AlbumTreeNode['nodeType'],
+  excludeNodeId?: string
+): AlbumTreeNode[] {
+  return nodes
+    .filter(
+      (candidate) =>
+        candidate.parentId === parentId &&
+        candidate.nodeType === nodeType &&
+        candidate.id !== excludeNodeId
+    )
+    .sort(compareAlbumTreeNodesByCustomBucketOrder);
+}
+
+function getCurrentSiblingIndex(nodes: AlbumTreeNode[], nodeToMove: AlbumTreeNode): number {
+  return getOrderedSameTypeSiblings(nodes, nodeToMove.parentId, nodeToMove.nodeType).findIndex(
+    (candidate) => candidate.id === nodeToMove.id
+  );
+}
+
+function buildPositionOptions(siblings: AlbumTreeNode[]): MovePositionOption[] {
+  if (siblings.length === 0) {
+    return [{ index: 0, label: '1. Only item' }];
+  }
+
+  return [
+    { index: 0, label: '1. Beginning' },
+    ...siblings.map((sibling, index) => ({
+      index: index + 1,
+      label: `${index + 2}. After ${sibling.label}`
+    }))
+  ];
+}
+
 function validateDestination(
   nodeToMove: AlbumTreeNode,
   destinationId: MoveDestinationId,
@@ -199,9 +313,7 @@ function validateDestination(
       return { isSelectable: false, reason: 'Sibling with same name exists' };
     }
 
-    return nodeToMove.parentId === null
-      ? { isSelectable: false, reason: 'Already top level' }
-      : { isSelectable: true, reason: null };
+    return { isSelectable: true, reason: null };
   }
 
   const destinationNode = nodesById.get(destinationId);
@@ -211,10 +323,6 @@ function validateDestination(
 
   if (destinationNode.nodeType === 'Album') {
     return { isSelectable: false, reason: 'Albums cannot contain children' };
-  }
-
-  if (destinationNode.id === nodeToMove.parentId) {
-    return { isSelectable: false, reason: 'Already in this group' };
   }
 
   if (nodeToMove.nodeType === 'Group') {
@@ -242,6 +350,7 @@ export function MoveAlbumTreeNodeDialog({
   onMove
 }: MoveAlbumTreeNodeDialogProps): ReactElement | null {
   const [selectedDestinationId, setSelectedDestinationId] = useState<MoveDestinationId>(ROOT_DESTINATION);
+  const [selectedTargetIndex, setSelectedTargetIndex] = useState(0);
   const [expandedGroupIds, setExpandedGroupIds] = useState<string[]>([]);
   const [movePending, setMovePending] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
@@ -264,17 +373,54 @@ export function MoveAlbumTreeNodeDialog({
     () => buildAlbumTreeDisplayList(nodes, expandedGroupIds),
     [expandedGroupIds, nodes]
   );
+  const currentSiblingIndex = useMemo(
+    () => (nodeToMove ? getCurrentSiblingIndex(nodes, nodeToMove) : -1),
+    [nodeToMove, nodes]
+  );
+  const selectedDestinationParentId =
+    selectedDestinationId === ROOT_DESTINATION ? null : selectedDestinationId;
+  const positionOptions = useMemo(() => {
+    if (!nodeToMove) {
+      return [];
+    }
+
+    return buildPositionOptions(
+      getOrderedSameTypeSiblings(nodes, selectedDestinationParentId, nodeToMove.nodeType, nodeToMove.id)
+    );
+  }, [nodeToMove, nodes, selectedDestinationParentId]);
 
   useEffect(() => {
     if (!open || !nodeToMove) {
       return;
     }
 
-    setSelectedDestinationId(nodeToMove.parentId ?? ROOT_DESTINATION);
-    setExpandedGroupIds([]);
+    const initialDestinationId = nodeToMove.parentId ?? ROOT_DESTINATION;
+    const initialDestinationNode = nodeToMove.parentId ? nodesById.get(nodeToMove.parentId) ?? null : null;
+
+    setSelectedDestinationId(initialDestinationId);
+    setSelectedTargetIndex(Math.max(0, getCurrentSiblingIndex(nodes, nodeToMove)));
+    setExpandedGroupIds(getInitialExpandedGroupIds(nodes, initialDestinationNode));
     setMovePending(false);
     setMoveError(null);
-  }, [nodeToMove, nodes, open]);
+  }, [nodeToMove, nodes, nodesById, open]);
+
+  useEffect(() => {
+    if (!nodeToMove) {
+      return;
+    }
+
+    const nextIndex =
+      selectedDestinationParentId === nodeToMove.parentId
+        ? Math.max(0, currentSiblingIndex)
+        : positionOptions.length - 1;
+    const clampedIndex = positionOptions.some((option) => option.index === selectedTargetIndex)
+      ? selectedTargetIndex
+      : Math.max(0, nextIndex);
+
+    if (clampedIndex !== selectedTargetIndex) {
+      setSelectedTargetIndex(clampedIndex);
+    }
+  }, [currentSiblingIndex, nodeToMove, positionOptions, selectedDestinationParentId, selectedTargetIndex]);
 
   if (!open || !nodeToMove) {
     return null;
@@ -287,7 +433,22 @@ export function MoveAlbumTreeNodeDialog({
     nodesByParentId,
     groupDescendantIds
   );
+  const isNoOp =
+    currentValidation.isSelectable &&
+    selectedDestinationParentId === nodeToMove.parentId &&
+    selectedTargetIndex === currentSiblingIndex;
   const moveTitle = nodeToMove.nodeType === 'Album' ? 'Move Album' : 'Move Group';
+  const siblingTypeLabel = nodeToMove.nodeType === 'Album' ? 'albums' : 'groups';
+  const selectDestination = (destinationId: MoveDestinationId): void => {
+    const destinationParentId = destinationId === ROOT_DESTINATION ? null : destinationId;
+    const nextIndex =
+      destinationParentId === nodeToMove.parentId
+        ? Math.max(0, currentSiblingIndex)
+        : getOrderedSameTypeSiblings(nodes, destinationParentId, nodeToMove.nodeType, nodeToMove.id).length;
+
+    setSelectedDestinationId(destinationId);
+    setSelectedTargetIndex(nextIndex);
+  };
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -300,11 +461,15 @@ export function MoveAlbumTreeNodeDialog({
         </div>
 
         <div style={bodyStyle}>
-          <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>Choose the new parent destination.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#666' }}>
+            Choose the destination parent and where this {nodeToMove.nodeType.toLocaleLowerCase()} should appear
+            among sibling {siblingTypeLabel}.
+          </p>
           <div style={chooserPanelStyle}>
             <div style={rowStyle}>
               <span style={spacerStyle} />
-              <div
+              <button
+                type="button"
                 style={{
                   ...destinationRowStyle,
                   ...(selectedDestinationId === ROOT_DESTINATION ? selectedDestinationRowStyle : {}),
@@ -318,6 +483,15 @@ export function MoveAlbumTreeNodeDialog({
                     ? disabledDestinationRowStyle
                     : {})
                 }}
+                disabled={
+                  !validateDestination(
+                    nodeToMove,
+                    ROOT_DESTINATION,
+                    nodesById,
+                    nodesByParentId,
+                    groupDescendantIds
+                  ).isSelectable
+                }
                 onClick={() => {
                   if (
                     validateDestination(
@@ -328,14 +502,14 @@ export function MoveAlbumTreeNodeDialog({
                       groupDescendantIds
                     ).isSelectable
                   ) {
-                    setSelectedDestinationId(ROOT_DESTINATION);
+                    selectDestination(ROOT_DESTINATION);
                   }
                 }}
                 title="Move to top level"
               >
                 <span>Top Level</span>
                 <span style={badgeStyle}>Root</span>
-              </div>
+              </button>
             </div>
             {displayNodes.map((node) => {
               const isGroup = node.nodeType === 'Group';
@@ -369,15 +543,17 @@ export function MoveAlbumTreeNodeDialog({
                   ) : (
                     <span style={spacerStyle} />
                   )}
-                  <div
+                  <button
+                    type="button"
                     style={{
                       ...destinationRowStyle,
                       ...(isSelected ? selectedDestinationRowStyle : {}),
                       ...(!validation.isSelectable ? disabledDestinationRowStyle : {})
                     }}
+                    disabled={!validation.isSelectable}
                     onClick={() => {
                       if (validation.isSelectable) {
-                        setSelectedDestinationId(node.id);
+                        selectDestination(node.id);
                       }
                     }}
                     title={validation.reason ?? node.label}
@@ -387,17 +563,34 @@ export function MoveAlbumTreeNodeDialog({
                     </span>
                     <span style={badgeStyle}>{node.nodeType}</span>
                     {validation.reason ? <span style={badgeStyle}>{validation.reason}</span> : null}
-                  </div>
+                  </button>
                 </div>
               );
             })}
           </div>
+
+          <label style={fieldLabelStyle}>
+            <span>Position</span>
+            <select
+              value={String(selectedTargetIndex)}
+              onChange={(event) => setSelectedTargetIndex(Number(event.target.value))}
+              style={inputStyle}
+              disabled={!currentValidation.isSelectable || movePending || positionOptions.length === 0}
+            >
+              {positionOptions.map((option) => (
+                <option key={option.index} value={String(option.index)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {moveError ? <p style={{ margin: 0, color: '#b00020', fontSize: '13px' }}>{moveError}</p> : null}
         </div>
 
         <div style={footerStyle}>
           <span style={{ color: '#666', fontSize: '12px' }}>
-            Only group destinations and Top Level are valid. Albums cannot contain children.
+            Groups and albums are ordered separately. Position applies within sibling {siblingTypeLabel} only.
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button type="button" style={buttonStyle} onClick={onClose} disabled={movePending}>
@@ -405,15 +598,22 @@ export function MoveAlbumTreeNodeDialog({
             </button>
             <button
               type="button"
-              style={!movePending && currentValidation.isSelectable ? primaryButtonStyle : disabledButtonStyle}
+              style={
+                !movePending && currentValidation.isSelectable && !isNoOp
+                  ? primaryButtonStyle
+                  : disabledButtonStyle
+              }
               onClick={() => {
-                if (!currentValidation.isSelectable || movePending) {
+                if (!currentValidation.isSelectable || movePending || isNoOp) {
                   return;
                 }
 
                 setMovePending(true);
                 setMoveError(null);
-                void onMove(selectedDestinationId === ROOT_DESTINATION ? null : selectedDestinationId)
+                void onMove({
+                  destinationParentId: selectedDestinationParentId,
+                  targetIndex: selectedTargetIndex
+                })
                   .catch((error: unknown) => {
                     setMoveError(error instanceof Error ? error.message : 'Failed to move node');
                   })
@@ -421,7 +621,7 @@ export function MoveAlbumTreeNodeDialog({
                     setMovePending(false);
                   });
               }}
-              disabled={movePending || !currentValidation.isSelectable}
+              disabled={movePending || !currentValidation.isSelectable || isNoOp}
             >
               {movePending ? 'Moving...' : 'Move'}
             </button>

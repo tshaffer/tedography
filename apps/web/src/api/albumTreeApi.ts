@@ -21,6 +21,7 @@ export interface CreateAlbumTreeNodeRequest {
 
 export interface MoveAlbumTreeNodeRequest {
   parentId: string | null;
+  targetIndex: number;
 }
 
 export interface ReorderAlbumTreeNodeRequest {

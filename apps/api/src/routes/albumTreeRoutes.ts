@@ -43,6 +43,11 @@ type AlbumTreeChildOrderModeRequest = {
   childOrderMode?: unknown;
 };
 
+type MoveAlbumTreeNodeRequest = {
+  parentId?: unknown;
+  targetIndex?: unknown;
+};
+
 function parseNonEmptyLabel(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -116,6 +121,14 @@ function parseAlbumTreeChildOrderMode(value: unknown): AlbumTreeChildOrderMode |
   }
 
   return null;
+}
+
+function parseNonNegativeInteger(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    return null;
+  }
+
+  return value;
 }
 
 async function loadAlbumNode(nodeId: string): Promise<AlbumTreeNode | null> {
@@ -237,17 +250,19 @@ albumTreeRoutes.patch('/:id', async (req, res) => {
 });
 
 albumTreeRoutes.post('/:id/move', async (req, res) => {
-  const parentId = parseParentId((req.body as { parentId?: unknown }).parentId);
+  const moveRequest = req.body as MoveAlbumTreeNodeRequest;
+  const parentId = parseParentId(moveRequest.parentId);
+  const targetIndex = parseNonNegativeInteger(moveRequest.targetIndex);
+  if (targetIndex === null) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'targetIndex must be a non-negative integer' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
   const node = await findAlbumTreeNodeById(req.params.id);
   if (!node) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
     res.status(404).json(errorResponse);
-    return;
-  }
-
-  if (parentId === node.parentId) {
-    const errorResponse: AlbumTreeErrorResponse = { error: 'Choose a different destination' };
-    res.status(409).json(errorResponse);
     return;
   }
 
@@ -283,7 +298,7 @@ albumTreeRoutes.post('/:id/move', async (req, res) => {
   }
 
   try {
-    const moved = await moveAlbumTreeNode(node.id, parentId);
+    const moved = await moveAlbumTreeNode(node.id, parentId, targetIndex);
     if (!moved) {
       const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
       res.status(404).json(errorResponse);

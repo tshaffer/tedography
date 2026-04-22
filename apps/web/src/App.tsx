@@ -6375,7 +6375,7 @@ export default function App() {
     });
   }
 
-  async function handleMoveTreeNode(destinationParentId: string | null): Promise<void> {
+  async function handleMoveTreeNode(input: { destinationParentId: string | null; targetIndex: number }): Promise<void> {
     if (!moveDialogNode) {
       return;
     }
@@ -6383,8 +6383,11 @@ export default function App() {
     setUpdateError(null);
 
     try {
-      const moved = await moveAlbumTreeNode(moveDialogNode.id, { parentId: destinationParentId });
-      const ancestorGroupIds = getAncestorGroupIdsForParentId(destinationParentId, albumNodesById);
+      const moved = await moveAlbumTreeNode(moveDialogNode.id, {
+        parentId: input.destinationParentId,
+        targetIndex: input.targetIndex
+      });
+      const ancestorGroupIds = getAncestorGroupIdsForParentId(input.destinationParentId, albumNodesById);
 
       if (ancestorGroupIds.length > 0) {
         setExpandedGroupIds((previous) => {

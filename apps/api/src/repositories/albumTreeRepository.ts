@@ -62,11 +62,23 @@ function assignNormalizedSortOrders(nodes: AlbumTreeNode[]): AlbumTreeNode[] {
 }
 
 function insertNodeAtEndOfTypeBucket(nodes: AlbumTreeNode[], nextNode: AlbumTreeNode): AlbumTreeNode[] {
+  return insertNodeAtTypeBucketPosition(nodes, nextNode);
+}
+
+function insertNodeAtTypeBucketPosition(
+  nodes: AlbumTreeNode[],
+  nextNode: AlbumTreeNode,
+  targetIndex?: number | null
+): AlbumTreeNode[] {
   const orderedNodes = sortNodesForCustomBucketOrder(nodes);
+  const groupCount = orderedNodes.filter((node) => node.nodeType === 'Group').length;
+  const sameTypeCount = orderedNodes.filter((node) => node.nodeType === nextNode.nodeType).length;
+  const normalizedTargetIndex =
+    typeof targetIndex === 'number'
+      ? Math.max(0, Math.min(targetIndex, sameTypeCount))
+      : sameTypeCount;
   const insertionIndex =
-    nextNode.nodeType === 'Group'
-      ? orderedNodes.filter((node) => node.nodeType === 'Group').length
-      : orderedNodes.length;
+    nextNode.nodeType === 'Group' ? normalizedTargetIndex : groupCount + normalizedTargetIndex;
 
   return [
     ...orderedNodes.slice(0, insertionIndex),
@@ -249,21 +261,18 @@ export async function updateAlbumTreeNodeChildOrderMode(
 
 export async function moveAlbumTreeNode(
   nodeId: string,
-  parentId: string | null
+  parentId: string | null,
+  targetIndex?: number | null
 ): Promise<AlbumTreeNode | null> {
   const node = await findAlbumTreeNodeById(nodeId);
   if (!node) {
     return null;
   }
 
-  if (node.parentId === parentId) {
-    return node;
-  }
+  const isSameParentMove = node.parentId === parentId;
+  const sourceSiblings = await listSiblingNodes(node.parentId);
+  const destinationSiblings = isSameParentMove ? sourceSiblings : await listSiblingNodes(parentId);
 
-  const [sourceSiblings, destinationSiblings] = await Promise.all([
-    listSiblingNodes(node.parentId),
-    listSiblingNodes(parentId)
-  ]);
   assertNoSiblingLabelConflict({
     siblings: destinationSiblings,
     label: node.label,
@@ -272,27 +281,26 @@ export async function moveAlbumTreeNode(
   });
   const now = new Date().toISOString();
 
-  const sourceRemainingNodes = sourceSiblings.filter((sibling) => sibling.id !== node.id);
-  const normalizedSourceNodes = assignNormalizedSortOrders(
-    sortNodesForCustomBucketOrder(sourceRemainingNodes)
-  );
-
   const destinationBaseNodes = destinationSiblings.filter((sibling) => sibling.id !== node.id);
   const destinationNode: AlbumTreeNode = {
     ...node,
     parentId
   };
   const normalizedDestinationNodes = assignNormalizedSortOrders(
-    insertNodeAtEndOfTypeBucket(destinationBaseNodes, destinationNode)
+    insertNodeAtTypeBucketPosition(destinationBaseNodes, destinationNode, targetIndex)
   );
 
-  const previousNodesById = new Map(
-    [...sourceSiblings, ...destinationSiblings, node].map((existingNode) => [existingNode.id, existingNode])
-  );
-  const updateOperations = [
-    ...buildUpdateOperationsForChangedNodes(previousNodesById, normalizedSourceNodes, now),
-    ...buildUpdateOperationsForChangedNodes(previousNodesById, normalizedDestinationNodes, now)
-  ];
+  const previousNodesById = new Map([...sourceSiblings, ...destinationSiblings, node].map((existingNode) => [existingNode.id, existingNode]));
+  const updateOperations = isSameParentMove
+    ? buildUpdateOperationsForChangedNodes(previousNodesById, normalizedDestinationNodes, now)
+    : [
+        ...buildUpdateOperationsForChangedNodes(
+          previousNodesById,
+          assignNormalizedSortOrders(sortNodesForCustomBucketOrder(sourceSiblings.filter((sibling) => sibling.id !== node.id))),
+          now
+        ),
+        ...buildUpdateOperationsForChangedNodes(previousNodesById, normalizedDestinationNodes, now)
+      ];
 
   if (updateOperations.length > 0) {
     await AlbumTreeNodeModel.bulkWrite(updateOperations);
