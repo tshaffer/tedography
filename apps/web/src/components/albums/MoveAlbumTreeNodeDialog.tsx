@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import type { AlbumTreeNode } from '@tedography/domain';
+import { buildAlbumTreeDisplayList, type AlbumTreeNodeWithDepth } from '../../utilities/albumTree';
 
 export const ROOT_DESTINATION = 'ROOT_DESTINATION';
 
 type MoveDestinationId = typeof ROOT_DESTINATION | string;
-
-type AlbumTreeNodeWithDepth = AlbumTreeNode & {
-  depth: number;
-};
 
 type DestinationValidation = {
   isSelectable: boolean;
@@ -154,45 +151,6 @@ const disabledButtonStyle: CSSProperties = {
   opacity: 0.55,
   cursor: 'not-allowed'
 };
-
-function buildAlbumTreeDisplayList(
-  nodes: AlbumTreeNode[],
-  expandedGroupIds: string[]
-): AlbumTreeNodeWithDepth[] {
-  const expandedSet = new Set(expandedGroupIds);
-  const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
-
-  for (const node of nodes) {
-    const siblings = childrenByParent.get(node.parentId) ?? [];
-    siblings.push(node);
-    childrenByParent.set(node.parentId, siblings);
-  }
-
-  for (const siblings of childrenByParent.values()) {
-    siblings.sort((left, right) => {
-      if (left.sortOrder !== right.sortOrder) {
-        return left.sortOrder - right.sortOrder;
-      }
-
-      return left.label.localeCompare(right.label);
-    });
-  }
-
-  const ordered: AlbumTreeNodeWithDepth[] = [];
-
-  function appendChildren(parentId: string | null, depth: number): void {
-    const children = childrenByParent.get(parentId) ?? [];
-    for (const child of children) {
-      ordered.push({ ...child, depth });
-      if (child.nodeType === 'Group' && expandedSet.has(child.id)) {
-        appendChildren(child.id, depth + 1);
-      }
-    }
-  }
-
-  appendChildren(null, 0);
-  return ordered;
-}
 
 function getDescendantNodeIds(nodes: AlbumTreeNode[], groupId: string): Set<string> {
   const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
