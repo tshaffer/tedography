@@ -1,8 +1,28 @@
-import type { FaceBoundingBox, FaceDetection, MediaAsset, Person } from '@tedography/domain';
+import type {
+  FaceBoundingBox,
+  FaceDetection,
+  FaceDetectionProvider,
+  FaceDetectionSourceImageVariant,
+  FaceLandmark,
+  FacePose,
+  MediaAsset,
+  Person
+} from '@tedography/domain';
 
 export interface DetectedFaceResult {
   boundingBox: FaceBoundingBox;
+  detectionProvider?: FaceDetectionProvider | null;
+  detectionModelVersion?: string | null;
   detectionConfidence?: number | null;
+  landmarks?: FaceLandmark[];
+  ageRangeLow?: number | null;
+  ageRangeHigh?: number | null;
+  estimatedAgeMidpoint?: number | null;
+  sharpness?: number | null;
+  brightness?: number | null;
+  pose?: FacePose | null;
+  sourceImageVariant?: FaceDetectionSourceImageVariant;
+  detectionRunId?: string | null;
   qualityScore?: number | null;
 }
 

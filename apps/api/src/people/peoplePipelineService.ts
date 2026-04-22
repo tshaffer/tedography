@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   FaceDetection,
   FaceDetectionIgnoredReason,
@@ -34,12 +35,10 @@ import {
   updateFaceDetection
 } from '../repositories/faceDetectionRepository.js';
 import {
-  listFaceMatchReviewsByDetectionIds,
-  listFaceMatchReviewsByAssetId,
-  countFaceMatchReviewsByDecision,
-  replaceFaceMatchReviewsForAsset,
-  upsertFaceMatchReview
-} from '../repositories/faceMatchReviewRepository.js';
+  assignDetectedFaceToPerson,
+  replaceFaceDetectionAssignmentsForAsset
+} from '../repositories/faceDetectionAssignmentRepository.js';
+import { listFaceMatchReviewsByDetectionIds, listFaceMatchReviewsByAssetId, countFaceMatchReviewsByDecision, replaceFaceMatchReviewsForAsset, upsertFaceMatchReview } from '../repositories/faceMatchReviewRepository.js';
 import { createPerson, findPeopleByIds, findPersonById, listPeople, updatePerson } from '../repositories/personRepository.js';
 import {
   createPersonFaceExample,
@@ -190,6 +189,27 @@ async function recomputeMediaAssetPeople(assetId: string): Promise<MediaAssetPer
   return derivedPeople;
 }
 
+async function syncDetectedFaceAssignment(input: {
+  detection: FaceDetection;
+  personId: string | null;
+  assignmentSource: 'auto-match' | 'manual-confirm' | 'manual-reject' | 'manual-merge-adjustment';
+  assignmentStatus: 'suggested' | 'confirmed' | 'rejected' | 'ignored';
+  matchConfidence?: number | null;
+}): Promise<void> {
+  if (!input.personId) {
+    return;
+  }
+
+  await assignDetectedFaceToPerson({
+    detectedFaceId: input.detection.id,
+    mediaAssetId: input.detection.mediaAssetId,
+    personId: input.personId,
+    assignmentSource: input.assignmentSource,
+    assignmentStatus: input.assignmentStatus,
+    matchConfidence: input.matchConfidence ?? null
+  });
+}
+
 async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetFaceDetectionsResponse> {
   const [detections, reviews, asset] = await Promise.all([
     listFaceDetectionsByAssetId(assetId),
@@ -327,6 +347,7 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
 
   const nextDetections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>> = [];
   const pendingReviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
+  const detectionRunId = randomUUID();
 
   for (const [index, detectedFace] of detectedFaces.entries()) {
     const normalizedBoundingBox = {
@@ -349,6 +370,17 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       cropPath: null as string | null,
       previewPath: null as string | null,
       detectionConfidence: detectedFace.detectionConfidence ?? null,
+      detectionProvider: detectedFace.detectionProvider ?? null,
+      detectionModelVersion: detectedFace.detectionModelVersion ?? null,
+      landmarks: detectedFace.landmarks ?? [],
+      ageRangeLow: detectedFace.ageRangeLow ?? null,
+      ageRangeHigh: detectedFace.ageRangeHigh ?? null,
+      estimatedAgeMidpoint: detectedFace.estimatedAgeMidpoint ?? null,
+      sharpness: detectedFace.sharpness ?? null,
+      brightness: detectedFace.brightness ?? null,
+      pose: detectedFace.pose ?? null,
+      sourceImageVariant: detectedFace.sourceImageVariant ?? 'original',
+      detectionRunId,
       qualityScore: detectedFace.qualityScore ?? null,
       faceAreaPercent: computeFaceAreaPercent(asset, { boundingBox: normalizedBoundingBox }),
       engine: engine.engineName,
@@ -468,6 +500,28 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
   const reviews = await replaceFaceMatchReviewsForAsset({
     mediaAssetId: asset.id,
     reviews: pendingReviewSpecs
+  });
+  await replaceFaceDetectionAssignmentsForAsset({
+    mediaAssetId: asset.id,
+    assignments: detections.flatMap((detection) => {
+      if (
+        (detection.matchStatus !== 'suggested' && detection.matchStatus !== 'autoMatched') ||
+        typeof detection.autoMatchCandidatePersonId !== 'string'
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          detectedFaceId: detection.id,
+          mediaAssetId: detection.mediaAssetId,
+          personId: detection.autoMatchCandidatePersonId,
+          assignmentSource: 'auto-match' as const,
+          assignmentStatus: 'suggested' as const,
+          matchConfidence: detection.autoMatchCandidateConfidence ?? null
+        }
+      ];
+    })
   });
   const derivedPeople = await recomputeMediaAssetPeople(asset.id);
 
@@ -911,6 +965,13 @@ export async function mergePersonIntoTarget(input: {
         notes: `Merged from ${sourcePerson.displayName} into ${targetPerson.displayName}.`,
         ignoredReason: null
       });
+      await syncDetectedFaceAssignment({
+        detection,
+        personId: targetPerson.id,
+        assignmentSource: 'manual-merge-adjustment',
+        assignmentStatus: 'confirmed',
+        matchConfidence: detection.matchConfidence ?? null
+      });
     } else {
       await reviewFaceDetection(detection.id, {
         action: 'assign',
@@ -1126,6 +1187,36 @@ export async function reviewFaceDetection(
   if (!updatedDetection) {
     return null;
   }
+
+  const assignmentSource =
+    request.reviewer === 'merge' || request.reviewer === 'split'
+      ? 'manual-merge-adjustment'
+      : request.action === 'reject' || request.action === 'ignore'
+        ? 'manual-reject'
+        : 'manual-confirm';
+  const assignmentPersonId =
+    finalPerson?.id ??
+    detection.autoMatchCandidatePersonId ??
+    detection.matchedPersonId ??
+    null;
+  const assignmentStatus =
+    nextStatus === 'confirmed'
+      ? 'confirmed'
+      : nextStatus === 'ignored'
+        ? 'ignored'
+        : nextStatus === 'rejected'
+          ? 'rejected'
+          : 'suggested';
+  await syncDetectedFaceAssignment({
+    detection: updatedDetection,
+    personId: assignmentPersonId,
+    assignmentSource,
+    assignmentStatus,
+    matchConfidence:
+      nextStatus === 'confirmed'
+        ? updatedDetection.matchConfidence ?? detection.autoMatchCandidateConfidence ?? null
+        : detection.autoMatchCandidateConfidence ?? detection.matchConfidence ?? null
+  });
 
   const review = await upsertFaceMatchReview({
     faceDetectionId: detection.id,

@@ -25,13 +25,34 @@ type DetectFaceBoundingBox = {
 };
 
 type DetectFaceQuality = {
+  Brightness?: number;
   Sharpness?: number;
+};
+
+type DetectFaceAgeRange = {
+  Low?: number;
+  High?: number;
+};
+
+type DetectFaceLandmark = {
+  Type?: string;
+  X?: number;
+  Y?: number;
+};
+
+type DetectFacePose = {
+  Pitch?: number;
+  Roll?: number;
+  Yaw?: number;
 };
 
 type DetectFaceDetail = {
   BoundingBox?: DetectFaceBoundingBox;
   Confidence?: number;
   Quality?: DetectFaceQuality;
+  AgeRange?: DetectFaceAgeRange;
+  Landmarks?: DetectFaceLandmark[];
+  Pose?: DetectFacePose;
 };
 
 type SearchUserRecord = {
@@ -236,7 +257,23 @@ export interface RekognitionDetectedFace {
     width: number;
     height: number;
   };
+  modelVersion?: string | null;
   confidence: number | null;
+  landmarks: Array<{
+    type: string;
+    x: number;
+    y: number;
+  }>;
+  ageRangeLow: number | null;
+  ageRangeHigh: number | null;
+  estimatedAgeMidpoint: number | null;
+  sharpness: number | null;
+  brightness: number | null;
+  pose: {
+    pitch: number | null;
+    roll: number | null;
+    yaw: number | null;
+  } | null;
   qualityScore: number | null;
 }
 
@@ -368,18 +405,20 @@ export class RekognitionClient {
     await this.ensureCollectionExists();
 
     const response = await this.sendImageCommandWithPreparedBytes<{
+      FaceModelVersion?: string;
       FaceDetails?: DetectFaceDetail[];
     }>({
       commandName: 'DetectFacesCommand',
       imagePath,
       buildInput: (bytes) => ({
         Image: { Bytes: bytes },
-        Attributes: ['DEFAULT']
+        Attributes: ['ALL']
       }),
       fallbackMessage: 'Rekognition DetectFaces request failed.'
     });
 
     const faceDetails = Array.isArray(response.FaceDetails) ? response.FaceDetails : [];
+    const faceModelVersion = typeof response.FaceModelVersion === 'string' ? response.FaceModelVersion : null;
     return faceDetails.flatMap((item) => {
       const box = item.BoundingBox;
       if (
@@ -400,7 +439,41 @@ export class RekognitionClient {
             width: box.Width,
             height: box.Height
           },
+          modelVersion: faceModelVersion,
           confidence: typeof item.Confidence === 'number' ? item.Confidence / 100 : null,
+          landmarks: Array.isArray(item.Landmarks)
+            ? item.Landmarks.flatMap((landmark) =>
+                typeof landmark.Type === 'string' &&
+                typeof landmark.X === 'number' &&
+                typeof landmark.Y === 'number'
+                  ? [
+                      {
+                        type: landmark.Type,
+                        x: landmark.X,
+                        y: landmark.Y
+                      }
+                    ]
+                  : []
+              )
+            : [],
+          ageRangeLow: typeof item.AgeRange?.Low === 'number' ? item.AgeRange.Low : null,
+          ageRangeHigh: typeof item.AgeRange?.High === 'number' ? item.AgeRange.High : null,
+          estimatedAgeMidpoint:
+            typeof item.AgeRange?.Low === 'number' && typeof item.AgeRange?.High === 'number'
+              ? Number((((item.AgeRange.Low + item.AgeRange.High) / 2)).toFixed(4))
+              : null,
+          sharpness: typeof item.Quality?.Sharpness === 'number' ? item.Quality.Sharpness / 100 : null,
+          brightness: typeof item.Quality?.Brightness === 'number' ? item.Quality.Brightness / 100 : null,
+          pose:
+            typeof item.Pose?.Pitch === 'number' ||
+            typeof item.Pose?.Roll === 'number' ||
+            typeof item.Pose?.Yaw === 'number'
+              ? {
+                  pitch: typeof item.Pose?.Pitch === 'number' ? item.Pose.Pitch : null,
+                  roll: typeof item.Pose?.Roll === 'number' ? item.Pose.Roll : null,
+                  yaw: typeof item.Pose?.Yaw === 'number' ? item.Pose.Yaw : null
+                }
+              : null,
           qualityScore: typeof item.Quality?.Sharpness === 'number' ? item.Quality.Sharpness / 100 : null
         }
       ];

@@ -21,6 +21,21 @@ export interface FaceBoundingBox {
   height: number;
 }
 
+export interface FaceLandmark {
+  type: string;
+  x: number;
+  y: number;
+}
+
+export interface FacePose {
+  pitch?: number | null;
+  roll?: number | null;
+  yaw?: number | null;
+}
+
+export type FaceDetectionProvider = 'amazon-rekognition';
+export type FaceDetectionSourceImageVariant = 'original' | 'display-jpeg' | 'thumbnail';
+
 export interface FaceDetection {
   id: string;
   mediaAssetId: string;
@@ -28,7 +43,18 @@ export interface FaceDetection {
   boundingBox: FaceBoundingBox;
   cropPath?: string | null;
   previewPath?: string | null;
+  detectionProvider?: FaceDetectionProvider | null;
+  detectionModelVersion?: string | null;
   detectionConfidence?: number | null;
+  landmarks?: FaceLandmark[];
+  ageRangeLow?: number | null;
+  ageRangeHigh?: number | null;
+  estimatedAgeMidpoint?: number | null;
+  sharpness?: number | null;
+  brightness?: number | null;
+  pose?: FacePose | null;
+  sourceImageVariant?: FaceDetectionSourceImageVariant | null;
+  detectionRunId?: string | null;
   qualityScore?: number | null;
   faceAreaPercent?: number | null;
   engine: string;

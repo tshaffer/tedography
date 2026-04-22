@@ -39,7 +39,32 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
     const faces = await this.client.detectFaces(input.imagePath);
     return faces.map((face) => ({
       boundingBox: normalizeBoundingBox(face.boundingBox),
+      detectionProvider: 'amazon-rekognition',
+      detectionModelVersion: face.modelVersion ?? null,
       detectionConfidence: face.confidence !== null ? Number(face.confidence.toFixed(4)) : null,
+      landmarks: face.landmarks.map((landmark) => ({
+        type: landmark.type,
+        x: Number(landmark.x.toFixed(4)),
+        y: Number(landmark.y.toFixed(4))
+      })),
+      ageRangeLow: face.ageRangeLow,
+      ageRangeHigh: face.ageRangeHigh,
+      estimatedAgeMidpoint: face.estimatedAgeMidpoint,
+      sharpness: face.sharpness !== null ? Number(face.sharpness.toFixed(4)) : null,
+      brightness: face.brightness !== null ? Number(face.brightness.toFixed(4)) : null,
+      pose: face.pose
+        ? {
+            pitch: face.pose.pitch !== null ? Number(face.pose.pitch.toFixed(4)) : null,
+            roll: face.pose.roll !== null ? Number(face.pose.roll.toFixed(4)) : null,
+            yaw: face.pose.yaw !== null ? Number(face.pose.yaw.toFixed(4)) : null
+          }
+        : null,
+      sourceImageVariant:
+        input.asset.originalFileFormat.toLowerCase() === 'jpg' ||
+        input.asset.originalFileFormat.toLowerCase() === 'jpeg' ||
+        input.asset.originalFileFormat.toLowerCase() === 'png'
+          ? 'original'
+          : 'display-jpeg',
       qualityScore: face.qualityScore !== null ? Number(face.qualityScore.toFixed(4)) : null
     }));
   }

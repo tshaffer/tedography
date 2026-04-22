@@ -7,11 +7,36 @@ function normalizeOptionalIsoDate(value: unknown): string | undefined {
   return value instanceof Date ? value.toISOString() : typeof value === 'string' ? value : undefined;
 }
 
+function computeEstimatedAgeMidpoint(input: {
+  ageRangeLow?: number | null;
+  ageRangeHigh?: number | null;
+}): number | null {
+  if (typeof input.ageRangeLow !== 'number' || typeof input.ageRangeHigh !== 'number') {
+    return null;
+  }
+
+  return Number((((input.ageRangeLow + input.ageRangeHigh) / 2)).toFixed(4));
+}
+
 function normalizeFaceDetection(detection: FaceDetection): FaceDetection {
   const createdAt = normalizeOptionalIsoDate((detection as { createdAt?: unknown }).createdAt);
   const updatedAt = normalizeOptionalIsoDate((detection as { updatedAt?: unknown }).updatedAt);
   return {
     ...detection,
+    ageRangeLow: detection.ageRangeLow ?? null,
+    ageRangeHigh: detection.ageRangeHigh ?? null,
+    estimatedAgeMidpoint:
+      typeof detection.estimatedAgeMidpoint === 'number'
+        ? detection.estimatedAgeMidpoint
+        : computeEstimatedAgeMidpoint(detection),
+    sharpness: detection.sharpness ?? null,
+    brightness: detection.brightness ?? null,
+    pose: detection.pose ?? null,
+    detectionProvider: detection.detectionProvider ?? null,
+    detectionModelVersion: detection.detectionModelVersion ?? null,
+    sourceImageVariant: detection.sourceImageVariant ?? null,
+    detectionRunId: detection.detectionRunId ?? null,
+    landmarks: Array.isArray(detection.landmarks) ? detection.landmarks : [],
     ...(createdAt !== undefined ? { createdAt } : {}),
     ...(updatedAt !== undefined ? { updatedAt } : {})
   };
@@ -34,6 +59,10 @@ export async function replaceFaceDetectionsForAsset(input: {
 
   const created = input.detections.map((detection) => ({
     ...detection,
+    estimatedAgeMidpoint:
+      typeof detection.estimatedAgeMidpoint === 'number'
+        ? detection.estimatedAgeMidpoint
+        : computeEstimatedAgeMidpoint(detection),
     id: randomUUID()
   }));
 
@@ -49,6 +78,56 @@ export async function listFaceDetectionsByAssetId(mediaAssetId: string): Promise
     .sort({ faceIndex: 1, id: 1 })
     .lean<FaceDetection[]>();
   return detections.map(normalizeFaceDetection);
+}
+
+export async function getDetectedFacesForMediaAsset(mediaAssetId: string): Promise<FaceDetection[]> {
+  return listFaceDetectionsByAssetId(mediaAssetId);
+}
+
+export async function createDetectedFace(
+  detection: Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<FaceDetection> {
+  const id = randomUUID();
+  await FaceDetectionModel.create({
+    ...detection,
+    estimatedAgeMidpoint:
+      typeof detection.estimatedAgeMidpoint === 'number'
+        ? detection.estimatedAgeMidpoint
+        : computeEstimatedAgeMidpoint(detection),
+    id
+  });
+
+  const created = await findFaceDetectionById(id);
+  if (!created) {
+    throw new Error(`Failed to load newly created detected face: ${id}`);
+  }
+
+  return created;
+}
+
+export async function bulkCreateDetectedFaces(
+  detections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>>
+): Promise<FaceDetection[]> {
+  if (detections.length === 0) {
+    return [];
+  }
+
+  const created = detections.map((detection) => ({
+    ...detection,
+    estimatedAgeMidpoint:
+      typeof detection.estimatedAgeMidpoint === 'number'
+        ? detection.estimatedAgeMidpoint
+        : computeEstimatedAgeMidpoint(detection),
+    id: randomUUID()
+  }));
+
+  await FaceDetectionModel.insertMany(created, { ordered: true });
+
+  const ids = created.map((item) => item.id);
+  const items = await FaceDetectionModel.find({ id: { $in: ids } }, { _id: 0 })
+    .sort({ mediaAssetId: 1, faceIndex: 1, id: 1 })
+    .lean<FaceDetection[]>();
+  return items.map(normalizeFaceDetection);
 }
 
 export async function listFaceDetections(input?: {

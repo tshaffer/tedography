@@ -5,6 +5,7 @@ import { log } from './logger.js';
 import { syncMediaAssetIndexes } from './repositories/assetRepository.js';
 import { syncAlbumTreeNodeIndexes } from './repositories/albumTreeRepository.js';
 import { syncFaceDetectionIndexes } from './repositories/faceDetectionRepository.js';
+import { syncFaceDetectionAssignmentIndexes } from './repositories/faceDetectionAssignmentRepository.js';
 import { syncFaceMatchReviewIndexes } from './repositories/faceMatchReviewRepository.js';
 import { syncPersonIndexes } from './repositories/personRepository.js';
 
@@ -14,6 +15,7 @@ await syncMediaAssetIndexes();
 await syncAlbumTreeNodeIndexes();
 await syncPersonIndexes();
 await syncFaceDetectionIndexes();
+await syncFaceDetectionAssignmentIndexes();
 await syncFaceMatchReviewIndexes();
 
 const app = createServer();

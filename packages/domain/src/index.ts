@@ -1,6 +1,7 @@
 export * from './entities/Album.js';
 export * from './entities/AlbumTreeNode.js';
 export * from './entities/AssetEvent.js';
+export * from './entities/FaceDetectionAssignment.js';
 export * from './entities/FaceDetection.js';
 export * from './entities/FaceMatchReview.js';
 export * from './entities/MediaAsset.js';
