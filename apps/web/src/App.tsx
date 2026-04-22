@@ -464,6 +464,27 @@ const disabledContextMenuItemStyle: CSSProperties = {
   cursor: 'not-allowed'
 };
 
+const contextMenuSubmenuTriggerStyle: CSSProperties = {
+  ...contextMenuItemStyle,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px'
+};
+
+const contextMenuSubmenuContainerStyle: CSSProperties = {
+  position: 'relative'
+};
+
+const contextMenuSubmenuStyle: CSSProperties = {
+  ...contextMenuStyle,
+  position: 'absolute',
+  left: '100%',
+  top: '0',
+  minWidth: '200px',
+  zIndex: 1401
+};
+
 const primaryAreaControlsStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
@@ -2877,6 +2898,7 @@ export default function App() {
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
+  const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -6238,6 +6260,7 @@ export default function App() {
   }
 
   function closeAlbumTreeContextMenu(): void {
+    setAlbumTreeOrderSubmenuOpen(false);
     setAlbumTreeContextMenu(null);
   }
 
@@ -6254,6 +6277,7 @@ export default function App() {
     }
 
     event.preventDefault();
+    setAlbumTreeOrderSubmenuOpen(false);
     setAlbumTreeContextMenu({
       nodeId: node.id,
       x: event.clientX,
@@ -7290,36 +7314,55 @@ export default function App() {
             <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
               Import Album
             </button>
-            <button
-              type="button"
-              style={contextMenuItemStyle}
-              onClick={() => {
-                void handleSetSelectedGroupChildOrderMode('Custom');
-              }}
-              title="Use manual/custom ordering for albums in this group"
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreeOrderSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreeOrderSubmenuOpen(false)}
             >
-              {selectedGroupChildOrderMode === 'Custom' ? '✓ ' : ''}Albums: Custom Order
-            </button>
-            <button
-              type="button"
-              style={contextMenuItemStyle}
-              onClick={() => {
-                void handleSetSelectedGroupChildOrderMode('Name');
-              }}
-              title="Sort albums in this group alphabetically"
-            >
-              {selectedGroupChildOrderMode === 'Name' ? '✓ ' : ''}Albums: Name
-            </button>
-            <button
-              type="button"
-              style={contextMenuItemStyle}
-              onClick={() => {
-                void handleSetSelectedGroupChildOrderMode('NumericThenName');
-              }}
-              title="Sort albums in this group numerically, then alphabetically"
-            >
-              {selectedGroupChildOrderMode === 'NumericThenName' ? '✓ ' : ''}Albums: Numeric Then Name
-            </button>
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreeOrderSubmenuOpen((previous) => !previous)}
+                title="Choose how albums in this group are ordered"
+              >
+                <span>Album Order</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreeOrderSubmenuOpen ? (
+                <div style={contextMenuSubmenuStyle}>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedGroupChildOrderMode('Custom');
+                    }}
+                    title="Use manual/custom ordering for albums in this group"
+                  >
+                    {selectedGroupChildOrderMode === 'Custom' ? '✓ ' : ''}Custom Order
+                  </button>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedGroupChildOrderMode('Name');
+                    }}
+                    title="Sort albums in this group alphabetically"
+                  >
+                    {selectedGroupChildOrderMode === 'Name' ? '✓ ' : ''}Name
+                  </button>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedGroupChildOrderMode('NumericThenName');
+                    }}
+                    title="Sort albums in this group numerically, then alphabetically"
+                  >
+                    {selectedGroupChildOrderMode === 'NumericThenName' ? '✓ ' : ''}Numeric Then Name
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               style={contextMenuItemStyle}
