@@ -32,6 +32,7 @@ import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
   type AlbumTreeChildOrderMode,
+  type AlbumTreeNodeSemanticKind,
   MediaType,
   type Person,
   PhotoState,
@@ -51,6 +52,7 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode,
   updateAlbumTreeChildOrderMode,
+  updateAlbumTreeNodeSemanticKind,
   updateAlbumManualOrder,
   updateAlbumOrderingMode
 } from './api/albumTreeApi';
@@ -2901,6 +2903,7 @@ export default function App() {
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
+  const [albumTreeSemanticKindSubmenuOpen, setAlbumTreeSemanticKindSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -6292,6 +6295,7 @@ export default function App() {
 
   function closeAlbumTreeContextMenu(): void {
     setAlbumTreeOrderSubmenuOpen(false);
+    setAlbumTreeSemanticKindSubmenuOpen(false);
     setAlbumTreeContextMenu(null);
   }
 
@@ -6309,6 +6313,7 @@ export default function App() {
 
     event.preventDefault();
     setAlbumTreeOrderSubmenuOpen(false);
+    setAlbumTreeSemanticKindSubmenuOpen(false);
     setAlbumTreeContextMenu({
       nodeId: node.id,
       x: event.clientX,
@@ -6347,6 +6352,43 @@ export default function App() {
       setSelectedTreeNodeId(updatedNode.id);
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Failed to update group child order mode.');
+    }
+  }
+
+  function formatAlbumTreeNodeSemanticKindLabel(
+    semanticKind: AlbumTreeNodeSemanticKind | null | undefined
+  ): string {
+    if (semanticKind === 'YearGroup') {
+      return 'YearGroup';
+    }
+
+    if (semanticKind === 'Miscellany') {
+      return 'Miscellany';
+    }
+
+    return 'None';
+  }
+
+  async function handleSetSelectedTreeNodeSemanticKind(
+    semanticKind: AlbumTreeNodeSemanticKind | null
+  ): Promise<void> {
+    if (!selectedTreeNodeId) {
+      return;
+    }
+
+    closeAlbumTreeContextMenu();
+    setUpdateError(null);
+
+    try {
+      const updatedNode = await updateAlbumTreeNodeSemanticKind(selectedTreeNodeId, {
+        semanticKind
+      });
+      setAlbumTreeNodes((previous) =>
+        previous.map((node) => (node.id === updatedNode.id ? updatedNode : node))
+      );
+      setSelectedTreeNodeId(updatedNode.id);
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to update node semantic kind');
     }
   }
 
@@ -7333,6 +7375,12 @@ export default function App() {
       return null;
     }
 
+    const semanticKindNode = isSelectedGroupMenu ? selectedAlbumTreeGroupNode : selectedAlbumTreeAlbumNode;
+    const currentSemanticKind = semanticKindNode?.semanticKind ?? null;
+    const semanticKindTriggerLabel = `Semantic Kind: ${formatAlbumTreeNodeSemanticKindLabel(currentSemanticKind)}`;
+    const canSetYearGroupSemanticKind = semanticKindNode?.nodeType === 'Group';
+    const canSetMiscellanySemanticKind = semanticKindNode?.nodeType === 'Album';
+
     return (
       <div
         ref={albumTreeContextMenuRef}
@@ -7420,6 +7468,73 @@ export default function App() {
             <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
             </button>
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreeSemanticKindSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreeSemanticKindSubmenuOpen(false)}
+            >
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreeSemanticKindSubmenuOpen((previous) => !previous)}
+                title="Set a maintenance semantic kind for this group"
+              >
+                <span>{semanticKindTriggerLabel}</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreeSemanticKindSubmenuOpen ? (
+                <div style={contextMenuSubmenuStyle}>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedTreeNodeSemanticKind(null);
+                    }}
+                    title="Clear the semantic kind for this node"
+                  >
+                    {currentSemanticKind === null ? '✓ ' : ''}None
+                  </button>
+                  <button
+                    type="button"
+                    style={canSetYearGroupSemanticKind ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => {
+                      if (!canSetYearGroupSemanticKind) {
+                        return;
+                      }
+
+                      void handleSetSelectedTreeNodeSemanticKind('YearGroup');
+                    }}
+                    disabled={!canSetYearGroupSemanticKind}
+                    title={
+                      canSetYearGroupSemanticKind
+                        ? 'Mark this group as an explicit year group'
+                        : 'YearGroup is only valid for Group nodes'
+                    }
+                  >
+                    {currentSemanticKind === 'YearGroup' ? '✓ ' : ''}YearGroup
+                  </button>
+                  <button
+                    type="button"
+                    style={canSetMiscellanySemanticKind ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => {
+                      if (!canSetMiscellanySemanticKind) {
+                        return;
+                      }
+
+                      void handleSetSelectedTreeNodeSemanticKind('Miscellany');
+                    }}
+                    disabled={!canSetMiscellanySemanticKind}
+                    title={
+                      canSetMiscellanySemanticKind
+                        ? 'Mark this album as an explicit Miscellany album'
+                        : 'Miscellany is only valid for Album nodes'
+                    }
+                  >
+                    {currentSemanticKind === 'Miscellany' ? '✓ ' : ''}Miscellany
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               style={canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}
@@ -7484,6 +7599,73 @@ export default function App() {
             <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
               Move To...
             </button>
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreeSemanticKindSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreeSemanticKindSubmenuOpen(false)}
+            >
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreeSemanticKindSubmenuOpen((previous) => !previous)}
+                title="Set a maintenance semantic kind for this album"
+              >
+                <span>{semanticKindTriggerLabel}</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreeSemanticKindSubmenuOpen ? (
+                <div style={contextMenuSubmenuStyle}>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedTreeNodeSemanticKind(null);
+                    }}
+                    title="Clear the semantic kind for this node"
+                  >
+                    {currentSemanticKind === null ? '✓ ' : ''}None
+                  </button>
+                  <button
+                    type="button"
+                    style={canSetYearGroupSemanticKind ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => {
+                      if (!canSetYearGroupSemanticKind) {
+                        return;
+                      }
+
+                      void handleSetSelectedTreeNodeSemanticKind('YearGroup');
+                    }}
+                    disabled={!canSetYearGroupSemanticKind}
+                    title={
+                      canSetYearGroupSemanticKind
+                        ? 'Mark this group as an explicit year group'
+                        : 'YearGroup is only valid for Group nodes'
+                    }
+                  >
+                    {currentSemanticKind === 'YearGroup' ? '✓ ' : ''}YearGroup
+                  </button>
+                  <button
+                    type="button"
+                    style={canSetMiscellanySemanticKind ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => {
+                      if (!canSetMiscellanySemanticKind) {
+                        return;
+                      }
+
+                      void handleSetSelectedTreeNodeSemanticKind('Miscellany');
+                    }}
+                    disabled={!canSetMiscellanySemanticKind}
+                    title={
+                      canSetMiscellanySemanticKind
+                        ? 'Mark this album as an explicit Miscellany album'
+                        : 'Miscellany is only valid for Album nodes'
+                    }
+                  >
+                    {currentSemanticKind === 'Miscellany' ? '✓ ' : ''}Miscellany
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               style={canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}

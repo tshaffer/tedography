@@ -24,6 +24,7 @@ import {
   moveAlbumTreeNode,
   reorderAlbumTreeNodeWithinSiblings,
   renameAlbumTreeNode,
+  updateAlbumTreeNodeSemanticKind,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 
@@ -42,6 +43,10 @@ type AlbumMembershipOrderingModeRequest = {
 
 type AlbumTreeChildOrderModeRequest = {
   childOrderMode?: unknown;
+};
+
+type AlbumTreeSemanticKindRequest = {
+  semanticKind?: unknown;
 };
 
 type MoveAlbumTreeNodeRequest = {
@@ -485,6 +490,56 @@ albumTreeRoutes.post('/:id/child-order-mode', async (req, res) => {
     res.json(updated);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update group child order mode' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.patch('/:id/semantic-kind', async (req, res) => {
+  const semanticKind = parseAlbumTreeNodeSemanticKind(
+    (req.body as AlbumTreeSemanticKindRequest).semanticKind
+  );
+  if (semanticKind === undefined) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind must be "YearGroup", "Miscellany", or null'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const node = await findAlbumTreeNodeById(req.params.id);
+  if (!node) {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  if (semanticKind === 'YearGroup' && node.nodeType !== 'Group') {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind "YearGroup" is only valid for Group nodes'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (semanticKind === 'Miscellany' && node.nodeType !== 'Album') {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind "Miscellany" is only valid for Album nodes'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updated = await updateAlbumTreeNodeSemanticKind(node.id, semanticKind);
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update node semantic kind' };
     res.status(500).json(errorResponse);
   }
 });

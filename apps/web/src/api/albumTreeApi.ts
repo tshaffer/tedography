@@ -1,4 +1,9 @@
-import { type AlbumTreeChildOrderMode, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
+import {
+  type AlbumTreeChildOrderMode,
+  type AlbumTreeNode,
+  type AlbumTreeNodeSemanticKind,
+  type MediaAsset
+} from '@tedography/domain';
 
 type AlbumMembershipRequest = {
   assetIds: string[];
@@ -31,6 +36,10 @@ export interface ReorderAlbumTreeNodeRequest {
 
 export interface UpdateAlbumTreeChildOrderModeRequest {
   childOrderMode: AlbumTreeChildOrderMode;
+}
+
+export interface UpdateAlbumTreeNodeSemanticKindRequest {
+  semanticKind: AlbumTreeNodeSemanticKind | null;
 }
 
 function buildErrorMessage(status: number, payload: unknown): string {
@@ -140,6 +149,24 @@ export async function updateAlbumTreeChildOrderMode(
 ): Promise<AlbumTreeNode> {
   const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/child-order-mode`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+export async function updateAlbumTreeNodeSemanticKind(
+  nodeId: string,
+  request: UpdateAlbumTreeNodeSemanticKindRequest
+): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/semantic-kind`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
   });

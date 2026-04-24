@@ -284,6 +284,27 @@ export async function updateAlbumTreeNodeChildOrderMode(
   ).lean<AlbumTreeNode | null>();
 }
 
+export async function updateAlbumTreeNodeSemanticKind(
+  nodeId: string,
+  semanticKind: AlbumTreeNodeSemanticKind | null
+): Promise<AlbumTreeNode | null> {
+  const node = await findAlbumTreeNodeById(nodeId);
+  if (!node) {
+    return null;
+  }
+
+  return AlbumTreeNodeModel.findOneAndUpdate(
+    { id: nodeId },
+    {
+      $set: {
+        semanticKind,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<AlbumTreeNode | null>();
+}
+
 export async function moveAlbumTreeNode(
   nodeId: string,
   parentId: string | null,
