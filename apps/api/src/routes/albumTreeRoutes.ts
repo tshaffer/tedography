@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type {
   AlbumTreeChildOrderMode,
+  AlbumTreeNodeSemanticKind,
   AlbumTreeNode,
   AlbumTreeNodeType
 } from '@tedography/domain';
@@ -53,6 +54,7 @@ type CreateAlbumTreeNodeRequest = {
   nodeType?: unknown;
   parentId?: unknown;
   targetIndex?: unknown;
+  semanticKind?: unknown;
 };
 
 function parseNonEmptyLabel(value: unknown): string | null {
@@ -130,6 +132,22 @@ function parseAlbumTreeChildOrderMode(value: unknown): AlbumTreeChildOrderMode |
   return null;
 }
 
+function parseAlbumTreeNodeSemanticKind(value: unknown): AlbumTreeNodeSemanticKind | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (value === 'YearGroup' || value === 'Miscellany') {
+    return value;
+  }
+
+  return null;
+}
+
 function parseNonNegativeInteger(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     return null;
@@ -199,6 +217,7 @@ albumTreeRoutes.post('/', async (req, res) => {
   const nodeType = parseNodeType(createRequest.nodeType);
   const parentId = parseParentId(createRequest.parentId);
   const targetIndex = parseOptionalNonNegativeInteger(createRequest.targetIndex);
+  const semanticKind = parseAlbumTreeNodeSemanticKind(createRequest.semanticKind);
   if (!label || !nodeType) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'label and nodeType are required' };
     res.status(400).json(errorResponse);
@@ -207,6 +226,30 @@ albumTreeRoutes.post('/', async (req, res) => {
 
   if (targetIndex === null) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'targetIndex must be a non-negative integer' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (semanticKind === null) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind must be "YearGroup", "Miscellany", null, or omitted'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (semanticKind === 'YearGroup' && nodeType !== 'Group') {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind "YearGroup" is only valid for Group nodes'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  if (semanticKind === 'Miscellany' && nodeType !== 'Album') {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'semanticKind "Miscellany" is only valid for Album nodes'
+    };
     res.status(400).json(errorResponse);
     return;
   }
@@ -233,6 +276,7 @@ albumTreeRoutes.post('/', async (req, res) => {
       label,
       nodeType,
       parentId,
+      ...(semanticKind !== undefined ? { semanticKind } : {}),
       ...(targetIndex !== undefined ? { targetIndex } : {})
     });
     res.status(201).json(created);

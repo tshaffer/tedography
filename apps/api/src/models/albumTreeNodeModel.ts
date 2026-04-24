@@ -14,6 +14,12 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
       enum: ['Custom', 'Name', 'NumericThenName'],
       default: null
     },
+    semanticKind: {
+      type: String,
+      required: false,
+      enum: ['YearGroup', 'Miscellany'],
+      default: null
+    },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },

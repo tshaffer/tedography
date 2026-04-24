@@ -316,7 +316,6 @@ export async function listAssetsForAlbumCoverage(
       albumIds: 1
     }
   )
-    .sort({ captureDateTime: 1, filename: 1, id: 1 })
     .lean<Array<Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime' | 'albumIds'>>>();
 
   return assets.map((asset) => ({

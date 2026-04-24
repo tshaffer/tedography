@@ -1,5 +1,6 @@
 import {
   type AlbumTreeChildOrderMode,
+  type AlbumTreeNodeSemanticKind,
   type AlbumTreeNode,
   type AlbumTreeNodeType
 } from '@tedography/domain';
@@ -11,6 +12,7 @@ export interface CreateAlbumTreeNodeInput {
   nodeType: AlbumTreeNodeType;
   parentId: string | null;
   targetIndex?: number;
+  semanticKind?: AlbumTreeNodeSemanticKind | null;
 }
 
 export type AlbumTreeNodeReorderDirection = 'up' | 'down';
@@ -163,6 +165,25 @@ export async function listAlbumTreeNodes(): Promise<AlbumTreeNode[]> {
     .lean<AlbumTreeNode[]>();
 }
 
+export async function listAlbumTreeNodesForCoverage(): Promise<
+  Array<Pick<AlbumTreeNode, 'id' | 'label' | 'nodeType' | 'parentId' | 'sortOrder' | 'semanticKind'>>
+> {
+  return AlbumTreeNodeModel.find(
+    {},
+    {
+      _id: 0,
+      id: 1,
+      label: 1,
+      nodeType: 1,
+      parentId: 1,
+      sortOrder: 1,
+      semanticKind: 1
+    }
+  )
+    .sort({ parentId: 1, sortOrder: 1, label: 1 })
+    .lean<Array<Pick<AlbumTreeNode, 'id' | 'label' | 'nodeType' | 'parentId' | 'sortOrder' | 'semanticKind'>>>();
+}
+
 export async function findAlbumTreeNodeById(id: string): Promise<AlbumTreeNode | null> {
   return AlbumTreeNodeModel.findOne({ id }, { _id: 0 }).lean<AlbumTreeNode | null>();
 }
@@ -183,6 +204,7 @@ export async function createAlbumTreeNode(
     parentId: input.parentId,
     sortOrder: 0,
     childOrderMode: null,
+    semanticKind: input.semanticKind ?? null,
     createdAt: now,
     updatedAt: now
   };
