@@ -115,13 +115,21 @@ export function createServer(): Express {
               .map((value) => value.trim())
               .filter(Boolean)
           : [];
+      const assetIds =
+        typeof _req.query.assetIds === 'string'
+          ? _req.query.assetIds
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean)
+          : [];
       const response = await getAssetPageForLibrary({
         offset: Number.isFinite(rawOffset) ? rawOffset : 0,
         limit: Number.isFinite(rawLimit) ? rawLimit : 1000,
-        albumIds
+        albumIds,
+        assetIds
       });
       log.info(
-        `GET /api/assets loaded ${response.items.length} assets at offset ${response.offset} in ${Date.now() - startedAt}ms before JSON response${albumIds.length > 0 ? ` (album scoped: ${albumIds.length})` : ''}`
+        `GET /api/assets loaded ${response.items.length} assets at offset ${response.offset} in ${Date.now() - startedAt}ms before JSON response${assetIds.length > 0 ? ` (asset scoped: ${assetIds.length})` : albumIds.length > 0 ? ` (album scoped: ${albumIds.length})` : ''}`
       );
       res.json(response);
     } catch (error) {

@@ -104,6 +104,7 @@ export async function getAssetPageForLibrary(input?: {
   limit?: number;
   offset?: number;
   albumIds?: string[];
+  assetIds?: string[];
 }): Promise<{
   items: MediaAsset[];
   offset: number;
@@ -113,6 +114,60 @@ export async function getAssetPageForLibrary(input?: {
   const offset = Math.max(0, Math.floor(input?.offset ?? 0));
   const limit = Math.max(1, Math.min(5000, Math.floor(input?.limit ?? 1000)));
   const albumIds = [...new Set((input?.albumIds ?? []).map((albumId) => albumId.trim()).filter(Boolean))];
+  const assetIds = [...new Set((input?.assetIds ?? []).map((assetId) => assetId.trim()).filter(Boolean))];
+
+  if (assetIds.length > 0) {
+    const documents = (await MediaAssetModel.collection
+      .find(
+        { id: { $in: assetIds } },
+        {
+          projection: {
+            _id: 0,
+            id: 1,
+            filename: 1,
+            mediaType: 1,
+            photoState: 1,
+            originalContentHash: 1,
+            captureDateTime: 1,
+            width: 1,
+            height: 1,
+            locationLabel: 1,
+            locationLatitude: 1,
+            locationLongitude: 1,
+            city: 1,
+            state: 1,
+            country: 1,
+            importedAt: 1,
+            originalFileFormat: 1,
+            displayFileFormat: 1,
+            albumIds: 1,
+            albumMemberships: 1,
+            people: 1
+          }
+        }
+      )
+      .toArray()) as unknown as MediaAsset[];
+
+    const assetsById = new Map(normalizeMediaAssets(documents).map((asset) => [asset.id, asset]));
+    const orderedItems = assetIds
+      .map((assetId) => assetsById.get(assetId) ?? null)
+      .filter((asset): asset is MediaAsset => asset !== null)
+      .map((asset) => ({
+        ...asset,
+        detectionsCount: 0,
+        reviewableDetectionsCount: 0,
+        confirmedDetectionsCount: 0
+      }));
+    const pagedItems = orderedItems.slice(offset, offset + limit);
+
+    return {
+      items: pagedItems,
+      offset,
+      limit,
+      hasMore: offset + limit < orderedItems.length
+    };
+  }
+
   const query = albumIds.length > 0 ? { albumIds: { $in: albumIds } } : {};
   const documents = (await MediaAssetModel.collection
     .find(

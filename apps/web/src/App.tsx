@@ -161,7 +161,8 @@ type SearchPeopleMatchMode = 'Any' | 'All';
 
 type AssetsBootstrapScope =
   | { kind: 'all' }
-  | { kind: 'albums'; albumIds: string[] };
+  | { kind: 'albums'; albumIds: string[] }
+  | { kind: 'assetIds'; assetIds: string[]; label?: string };
 
 type AlbumAssetCountStatus = 'known-complete' | 'not-in-current-scope' | 'loading-indeterminate';
 
@@ -207,6 +208,10 @@ function buildAssetsPageRequestPath(scope: AssetsBootstrapScope, offset: number,
 
   if (scope.kind === 'albums' && scope.albumIds.length > 0) {
     params.set('albumIds', scope.albumIds.join(','));
+  }
+
+  if (scope.kind === 'assetIds' && scope.assetIds.length > 0) {
+    params.set('assetIds', scope.assetIds.join(','));
   }
 
   return `/api/assets?${params.toString()}`;
@@ -316,6 +321,14 @@ function writeSessionStorageJson(key: string, value: unknown): void {
 }
 
 function normalizeAssetsBootstrapScope(scope: AssetsBootstrapScope): AssetsBootstrapScope {
+  if (scope.kind === 'assetIds') {
+    return {
+      kind: 'assetIds',
+      assetIds: [...new Set(scope.assetIds.map((assetId) => assetId.trim()).filter(Boolean))],
+      ...(scope.label && scope.label.trim().length > 0 ? { label: scope.label.trim() } : {})
+    };
+  }
+
   if (scope.kind !== 'albums') {
     return { kind: 'all' };
   }
@@ -329,7 +342,15 @@ function normalizeAssetsBootstrapScope(scope: AssetsBootstrapScope): AssetsBoots
 }
 
 function getAssetsBootstrapScopeKey(scope: AssetsBootstrapScope): string {
-  return scope.kind === 'albums' ? `albums:${scope.albumIds.join(',')}` : 'all';
+  if (scope.kind === 'albums') {
+    return `albums:${scope.albumIds.join(',')}`;
+  }
+
+  if (scope.kind === 'assetIds') {
+    return `assetIds:${scope.assetIds.join(',')}`;
+  }
+
+  return 'all';
 }
 
 function readCachedBootstrapAssets(): CachedBootstrapAssets | null {
@@ -347,7 +368,8 @@ function readCachedBootstrapAssets(): CachedBootstrapAssets | null {
     cached.scope &&
     typeof cached.scope === 'object' &&
     (cached.scope.kind === 'all' ||
-      (cached.scope.kind === 'albums' && Array.isArray(cached.scope.albumIds)))
+      (cached.scope.kind === 'albums' && Array.isArray(cached.scope.albumIds)) ||
+      (cached.scope.kind === 'assetIds' && Array.isArray(cached.scope.assetIds)))
   ) {
     return {
       items: cached.items,
@@ -2891,6 +2913,7 @@ export default function App() {
     () => !(appBootstrapCache.albumTreeNodes ?? readCachedBootstrapAlbumTreeNodes())
   );
   const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [organizationDiagnosticNotice, setOrganizationDiagnosticNotice] = useState<string | null>(null);
   const [albumTreeError, setAlbumTreeError] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importDialogInitialAlbumDestination, setImportDialogInitialAlbumDestination] =
@@ -3586,6 +3609,12 @@ export default function App() {
       writeSessionStorageJson(albumTreeBootstrapStorageKey, albumTreeNodes);
     }
   }, [albumTreeNodes]);
+
+  useEffect(() => {
+    if (loadedAssetsScope.kind !== 'assetIds' && organizationDiagnosticNotice) {
+      setOrganizationDiagnosticNotice(null);
+    }
+  }, [loadedAssetsScope, organizationDiagnosticNotice]);
 
   const preferredStartupAssetsScope = useMemo<AssetsBootstrapScope>(() => {
     if (primaryArea !== 'Library' || libraryBrowseMode !== 'Albums' || checkedAlbumIds.length === 0) {
@@ -4819,7 +4848,9 @@ export default function App() {
         ? 'Review: timeline curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
         : 'Review: flat curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
     : isLibraryArea
-      ? 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
+      ? loadedAssetsScope.kind === 'assetIds' && loadedAssetsScope.label
+        ? `Library: ${loadedAssetsScope.label}. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.`
+        : 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
       : 'Search: structured photo finding by state, album, and date.';
   const treeDisplayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode),
@@ -6536,6 +6567,35 @@ export default function App() {
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to delete node');
     }
+  }
+
+  async function handleOpenOrganizationDiagnosticAssets(input: {
+    assetIds: string[];
+    scopeLabel: string;
+    emptyMessage: string;
+  }): Promise<void> {
+    if (input.assetIds.length === 0) {
+      setOrganizationDiagnosticNotice(input.emptyMessage);
+      return;
+    }
+
+    setOrganizationDiagnosticNotice(null);
+    setPrimaryArea('Library');
+    setLibraryBrowseMode('Timeline');
+    setSelectedAssetId(null);
+    setSelectedAssetIds([]);
+    setSelectionAnchorAssetId(null);
+    setMaintenanceDialogOpen(false);
+
+    await loadAssets({
+      showLoading: true,
+      preserveCachedFirstPage: false,
+      scope: {
+        kind: 'assetIds',
+        assetIds: input.assetIds,
+        label: input.scopeLabel
+      }
+    });
   }
 
   async function handleAddSelectedToAlbum(): Promise<void> {
@@ -8980,6 +9040,11 @@ export default function App() {
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
+      {organizationDiagnosticNotice ? (
+        <p style={{ color: '#7a4d00', fontSize: '12px', margin: '0 0 8px 0' }}>
+          {organizationDiagnosticNotice}
+        </p>
+      ) : null}
       {albumMembershipNotice ? (
         <p
           style={{
@@ -9294,6 +9359,11 @@ export default function App() {
       <MaintenanceDialog
         open={maintenanceDialogOpen}
         onClose={() => setMaintenanceDialogOpen(false)}
+        albumTreeNodes={albumTreeNodes}
+        selectedTreeNodeId={selectedTreeNodeId}
+        onOpenOrganizationDiagnosticAssets={(input) => {
+          void handleOpenOrganizationDiagnosticAssets(input);
+        }}
         onMaintenanceCompleted={() => {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });

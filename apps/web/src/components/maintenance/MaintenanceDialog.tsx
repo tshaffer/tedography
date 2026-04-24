@@ -12,6 +12,8 @@ import {
   reimportKnownAssetsInFolder,
   verifyKnownAssetsInFolder
 } from '../../api/importApi';
+import type { AlbumTreeNode } from '@tedography/domain';
+import { OrganizationDiagnosticsSection } from './OrganizationDiagnosticsSection';
 
 type SourceSelection = {
   rootId: string;
@@ -253,9 +255,23 @@ interface MaintenanceDialogProps {
   open: boolean;
   onClose: () => void;
   onMaintenanceCompleted?: () => void;
+  albumTreeNodes: AlbumTreeNode[];
+  selectedTreeNodeId: string | null;
+  onOpenOrganizationDiagnosticAssets: (input: {
+    assetIds: string[];
+    scopeLabel: string;
+    emptyMessage: string;
+  }) => void;
 }
 
-export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: MaintenanceDialogProps) {
+export function MaintenanceDialog({
+  open,
+  onClose,
+  onMaintenanceCompleted,
+  albumTreeNodes,
+  selectedTreeNodeId,
+  onOpenOrganizationDiagnosticAssets
+}: MaintenanceDialogProps) {
   const [roots, setRoots] = useState<StorageRootDto[]>([]);
   const [rootsLoading, setRootsLoading] = useState(false);
   const [rootsError, setRootsError] = useState<string | null>(null);
@@ -756,6 +772,12 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
                   </p>
                 )}
               </section>
+
+              <OrganizationDiagnosticsSection
+                albumTreeNodes={albumTreeNodes}
+                selectedTreeNodeId={selectedTreeNodeId}
+                onOpenDiagnosticAssets={onOpenOrganizationDiagnosticAssets}
+              />
             </div>
           </section>
         </div>
