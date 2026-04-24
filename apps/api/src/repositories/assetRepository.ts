@@ -298,6 +298,35 @@ export async function listAssetsByConfirmedPersonId(personId: string): Promise<
   }));
 }
 
+export async function listAssetsForAlbumCoverage(
+  albumIds: string[]
+): Promise<Array<Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime' | 'albumIds'>>> {
+  const normalizedAlbumIds = [...new Set(albumIds.map((albumId) => albumId.trim()).filter(Boolean))];
+  if (normalizedAlbumIds.length === 0) {
+    return [];
+  }
+
+  const assets = await MediaAssetModel.find(
+    { albumIds: { $in: normalizedAlbumIds } },
+    {
+      _id: 0,
+      id: 1,
+      filename: 1,
+      captureDateTime: 1,
+      albumIds: 1
+    }
+  )
+    .sort({ captureDateTime: 1, filename: 1, id: 1 })
+    .lean<Array<Pick<MediaAsset, 'id' | 'filename' | 'captureDateTime' | 'albumIds'>>>();
+
+  return assets.map((asset) => ({
+    id: asset.id,
+    filename: asset.filename,
+    captureDateTime: asset.captureDateTime ?? null,
+    albumIds: asset.albumIds ?? []
+  }));
+}
+
 export interface CreateMediaAssetInput {
   filename: string;
   mediaType: MediaType;
