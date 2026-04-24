@@ -22,8 +22,10 @@ import {
 } from './repositories/assetRepository.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
+import { assetKeywordRoutes, keywordRoutes } from './routes/keywordRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
+import { smartAlbumRoutes } from './routes/smartAlbumRoutes.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -93,6 +95,9 @@ export function createServer(): Express {
   app.use('/api/media', mediaRoutes);
   app.use('/api/album-tree', albumTreeRoutes);
   app.use('/api/albums', albumMembershipRoutes);
+  app.use('/api/keywords', keywordRoutes);
+  app.use('/api/smart-albums', smartAlbumRoutes);
+  app.use('/api/assets', assetKeywordRoutes);
   app.use('/api/people-pipeline', peoplePipelineRoutes);
 
   app.get('/api/health', (_req, res) => {

@@ -6,13 +6,17 @@ import { syncMediaAssetIndexes } from './repositories/assetRepository.js';
 import { syncAlbumTreeNodeIndexes } from './repositories/albumTreeRepository.js';
 import { syncFaceDetectionIndexes } from './repositories/faceDetectionRepository.js';
 import { syncFaceMatchReviewIndexes } from './repositories/faceMatchReviewRepository.js';
+import { syncKeywordIndexes } from './repositories/keywordRepository.js';
 import { syncPersonIndexes } from './repositories/personRepository.js';
+import { syncSmartAlbumIndexes } from './repositories/smartAlbumRepository.js';
 
 await connectToMongo();
 
 await syncMediaAssetIndexes();
 await syncAlbumTreeNodeIndexes();
 await syncPersonIndexes();
+await syncKeywordIndexes();
+await syncSmartAlbumIndexes();
 await syncFaceDetectionIndexes();
 await syncFaceMatchReviewIndexes();
 

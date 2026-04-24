@@ -10,6 +10,8 @@ import {
   type WheelEvent as ReactWheelEvent
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -37,7 +39,10 @@ import {
   PhotoState,
   normalizePhotoState,
   type AlbumTreeNode,
+  type Keyword,
   type MediaAsset,
+  type SmartAlbum,
+  type SmartAlbumFilterSpec,
   type SearchCaptureDateAvailabilityMode
 } from '@tedography/domain';
 import {
@@ -62,6 +67,16 @@ import {
   updateAssetsCaptureDateTime
 } from './api/assetApi';
 import {
+  addKeywordsToAssets as addKeywordsToAssetsRequest,
+  createKeyword as createKeywordRequest,
+  listKeywords as listKeywordsRequest,
+  removeKeywordsFromAssets as removeKeywordsFromAssetsRequest
+} from './api/keywordApi';
+import {
+  createSmartAlbum as createSmartAlbumRequest,
+  listSmartAlbums as listSmartAlbumsRequest
+} from './api/smartAlbumApi';
+import {
   getPeoplePipelineAssetState,
   getPeopleScopedAssetSummary,
   listPeople,
@@ -73,6 +88,7 @@ import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDi
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
+import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { SetCaptureDateDialog } from './components/assets/SetCaptureDateDialog';
 import {
@@ -83,6 +99,11 @@ import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
 import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleMaintenanceDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
+import {
+  collectKeywordDescendantIds,
+  formatKeywordPathLabel,
+  sortKeywordsByPath
+} from './utilities/keywords';
 import { prefetchImage } from './utilities/imagePrefetch';
 import {
   buildTimelineNavigationYears,
@@ -138,6 +159,72 @@ const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
 const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
+const searchKeywordIdStorageKey = 'tedography.search.keywordId';
+const recentKeywordIdsStorageKey = 'tedography.keywords.recent';
+
+function normalizeKeywordLabel(label: string): string {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function readRecentKeywordIds(): string[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(recentKeywordIdsStorageKey);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((value): value is string => typeof value === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function isYearGroupNode(node: AlbumTreeNode): boolean {
+  return node.nodeType === 'Group' && /^\d{4}$/.test(node.label.trim());
+}
+
+function normalizeSmartAlbumSaveLabel(label: string): string {
+  return label.trim().replace(/\s+/g, ' ');
+}
+
+function normalizeSmartAlbumFilterSpecForComparison(
+  filterSpec: SmartAlbumFilterSpec
+): SmartAlbumFilterSpec {
+  return {
+    keywordId:
+      typeof filterSpec.keywordId === 'string' && filterSpec.keywordId.trim().length > 0
+        ? filterSpec.keywordId.trim()
+        : null,
+    photoState: filterSpec.photoState ?? null,
+    yearGroupId:
+      typeof filterSpec.yearGroupId === 'string' && filterSpec.yearGroupId.trim().length > 0
+        ? filterSpec.yearGroupId.trim()
+        : null
+  };
+}
+
+function smartAlbumFilterSpecsEqual(
+  left: SmartAlbumFilterSpec,
+  right: SmartAlbumFilterSpec
+): boolean {
+  const normalizedLeft = normalizeSmartAlbumFilterSpecForComparison(left);
+  const normalizedRight = normalizeSmartAlbumFilterSpecForComparison(right);
+
+  return (
+    normalizedLeft.keywordId === normalizedRight.keywordId &&
+    normalizedLeft.photoState === normalizedRight.photoState &&
+    normalizedLeft.yearGroupId === normalizedRight.yearGroupId
+  );
+}
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
 const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 const leftPanelVisibleStorageKey = 'tedography.leftPanelVisible';
@@ -3029,6 +3116,15 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasReviewableFacesStorageKey));
   });
+  const [searchKeywordId, setSearchKeywordId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const stored = window.localStorage.getItem(searchKeywordIdStorageKey);
+    return typeof stored === 'string' && stored.trim().length > 0 ? stored : null;
+  });
+  const [searchKeywordQuery, setSearchKeywordQuery] = useState('');
   const [searchPeopleQuery, setSearchPeopleQuery] = useState('');
   const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
@@ -3113,6 +3209,19 @@ export default function App() {
   const [selectedAssetPeopleStatus, setSelectedAssetPeopleStatus] = useState<ListAssetFaceDetectionsResponse | null>(null);
   const [selectedAssetPeopleStatusLoading, setSelectedAssetPeopleStatusLoading] = useState(false);
   const [selectedAssetPeopleStatusError, setSelectedAssetPeopleStatusError] = useState<string | null>(null);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
+  const [keywordsError, setKeywordsError] = useState<string | null>(null);
+  const [keywordUpdateBusy, setKeywordUpdateBusy] = useState(false);
+  const [recentKeywordIds, setRecentKeywordIds] = useState<string[]>(() => readRecentKeywordIds());
+  const [smartAlbums, setSmartAlbums] = useState<SmartAlbum[]>([]);
+  const [smartAlbumsLoading, setSmartAlbumsLoading] = useState(false);
+  const [smartAlbumsError, setSmartAlbumsError] = useState<string | null>(null);
+  const [activeSmartAlbumId, setActiveSmartAlbumId] = useState<string | null>(null);
+  const [smartAlbumSaveLabel, setSmartAlbumSaveLabel] = useState('');
+  const [smartAlbumSaveBusy, setSmartAlbumSaveBusy] = useState(false);
+  const [smartAlbumSaveError, setSmartAlbumSaveError] = useState<string | null>(null);
+  const [smartAlbumSaveNotice, setSmartAlbumSaveNotice] = useState<string | null>(null);
   const assetsLoadGenerationRef = useRef(0);
   const [selectionAnchorAssetId, setSelectionAnchorAssetId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<ViewerMode>('Grid');
@@ -3570,6 +3679,15 @@ export default function App() {
   }, [searchHasReviewableFaces]);
 
   useEffect(() => {
+    if (searchKeywordId) {
+      window.localStorage.setItem(searchKeywordIdStorageKey, searchKeywordId);
+      return;
+    }
+
+    window.localStorage.removeItem(searchKeywordIdStorageKey);
+  }, [searchKeywordId]);
+
+  useEffect(() => {
     if (assets.length > 0) {
       writeSessionStorageJson(assetsBootstrapStorageKey, {
         items: assets,
@@ -3792,6 +3910,59 @@ export default function App() {
     }
   }
 
+  async function loadKeywords(options?: { showLoading?: boolean }): Promise<void> {
+    if (options?.showLoading ?? true) {
+      setKeywordsLoading(true);
+    }
+
+    setKeywordsError(null);
+
+    try {
+      const response = await listKeywordsRequest();
+      setKeywords(sortKeywordsByPath(response.items));
+    } catch (error) {
+      setKeywordsError(error instanceof Error ? error.message : 'Failed to load keywords');
+    } finally {
+      setKeywordsLoading(false);
+    }
+  }
+
+  async function loadSmartAlbums(options?: { showLoading?: boolean }): Promise<void> {
+    if (options?.showLoading ?? true) {
+      setSmartAlbumsLoading(true);
+    }
+
+    setSmartAlbumsError(null);
+
+    try {
+      const response = await listSmartAlbumsRequest();
+      setSmartAlbums(response.items);
+    } catch (error) {
+      setSmartAlbumsError(error instanceof Error ? error.message : 'Failed to load Smart Albums');
+    } finally {
+      setSmartAlbumsLoading(false);
+    }
+  }
+
+  function rememberRecentKeywordIds(keywordIds: string[]): void {
+    if (keywordIds.length === 0) {
+      return;
+    }
+
+    setRecentKeywordIds((current) => {
+      const next = [...keywordIds, ...current.filter((keywordId) => !keywordIds.includes(keywordId))].slice(0, 8);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(recentKeywordIdsStorageKey, JSON.stringify(next));
+        } catch {
+          // Best-effort only.
+        }
+      }
+
+      return next;
+    });
+  }
+
   useEffect(() => {
     const hasCachedAssets = Array.isArray(appBootstrapCache.assets?.items);
     const hasCachedAlbumTree = Array.isArray(appBootstrapCache.albumTreeNodes);
@@ -3811,6 +3982,9 @@ export default function App() {
     } else {
       void loadAlbumTreeNodes({ showLoading: true });
     }
+
+    void loadKeywords({ showLoading: true });
+    void loadSmartAlbums({ showLoading: true });
   }, []);
 
   useEffect(() => {
@@ -4083,6 +4257,13 @@ export default function App() {
         : assets.filter((asset) => currentAreaPhotoStates.includes(asset.photoState)),
     [assets, currentAreaPhotoStates, primaryArea]
   );
+  const activeSearchKeywordIds = useMemo(() => {
+    if (!searchKeywordId) {
+      return null;
+    }
+
+    return collectKeywordDescendantIds(keywords, searchKeywordId);
+  }, [keywords, searchKeywordId]);
 
   const searchResults = useMemo(() => {
     if (primaryArea !== 'Search') {
@@ -4117,6 +4298,9 @@ export default function App() {
         searchHasNoPeople,
         searchHasReviewableFaces
       );
+      const matchesKeyword =
+        activeSearchKeywordIds === null ||
+        (asset.keywordIds ?? []).some((keywordId) => activeSearchKeywordIds.has(keywordId));
 
       return (
         matchesPhotoState &&
@@ -4124,7 +4308,8 @@ export default function App() {
         matchesGroup &&
         matchesFilename &&
         matchesCaptureDateRange &&
-        matchesPeople
+        matchesPeople &&
+        matchesKeyword
       );
     });
 
@@ -4140,6 +4325,8 @@ export default function App() {
     searchFilenamePattern,
     searchHasNoPeople,
     searchHasReviewableFaces,
+    activeSearchKeywordIds,
+    searchKeywordId,
     searchCaptureDateAvailability,
     searchPeopleIds,
     searchPeopleMatchMode,
@@ -4448,6 +4635,49 @@ export default function App() {
     () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
     [visibleAssets, selectedAssetIds]
   );
+  const selectedAssetsForKeywordEditing = useMemo(() => {
+    if (selectedAssetIds.length === 0) {
+      return [];
+    }
+
+    if (selectedAssetIds.length === 1) {
+      return selectedAssetForDetails ? [selectedAssetForDetails] : [];
+    }
+
+    return selectedAssetIds
+      .map((assetId) => assetsById.get(assetId) ?? null)
+      .filter((asset): asset is MediaAsset => asset !== null);
+  }, [assetsById, selectedAssetForDetails, selectedAssetIds]);
+  const keywordsById = useMemo(
+    () => new Map(keywords.map((keyword) => [keyword.id, keyword])),
+    [keywords]
+  );
+  const recentKeywords = useMemo(
+    () =>
+      recentKeywordIds
+        .map((keywordId) => keywordsById.get(keywordId) ?? null)
+        .filter((keyword): keyword is Keyword => keyword !== null),
+    [keywordsById, recentKeywordIds]
+  );
+  const displayedKeywordsForSelection = useMemo(() => {
+    if (selectedAssetsForKeywordEditing.length === 0) {
+      return [];
+    }
+
+    const keywordIdSets = selectedAssetsForKeywordEditing.map(
+      (asset) => new Set(asset.keywordIds ?? [])
+    );
+    const commonKeywordIds = Array.from(keywordIdSets[0] ?? []);
+    const filteredIds = commonKeywordIds.filter((keywordId) =>
+      keywordIdSets.every((set) => set.has(keywordId))
+    );
+
+    return sortKeywordsByPath(
+      filteredIds
+        .map((keywordId) => keywordsById.get(keywordId) ?? null)
+        .filter((keyword): keyword is Keyword => keyword !== null)
+    );
+  }, [keywordsById, selectedAssetsForKeywordEditing]);
   const selectedAssetsForAlbumMembershipAction = useMemo(
     () =>
       selectedAssetIdsForAlbumAction
@@ -4498,6 +4728,120 @@ export default function App() {
     return Array.from(byId.values()).sort((left, right) => left.displayName.localeCompare(right.displayName));
   }, [assets]);
   const availableSearchPeopleOptions = searchPeopleOptions.length > 0 ? searchPeopleOptions : fallbackSearchPeople;
+  const smartAlbumsById = useMemo(
+    () => new Map(smartAlbums.map((smartAlbum) => [smartAlbum.id, smartAlbum])),
+    [smartAlbums]
+  );
+  const yearGroupOptions = useMemo(
+    () =>
+      albumTreeNodes
+        .filter(isYearGroupNode)
+        .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }))
+        .map((node) => ({ id: node.id, label: node.label })),
+    [albumTreeNodes]
+  );
+  const yearGroupById = useMemo(
+    () => new Map(yearGroupOptions.map((group) => [group.id, group])),
+    [yearGroupOptions]
+  );
+  const selectedSearchKeyword = useMemo(
+    () => (searchKeywordId ? keywordsById.get(searchKeywordId) ?? null : null),
+    [keywordsById, searchKeywordId]
+  );
+  const activeSmartAlbum = useMemo(
+    () => (activeSmartAlbumId ? smartAlbumsById.get(activeSmartAlbumId) ?? null : null),
+    [activeSmartAlbumId, smartAlbumsById]
+  );
+  const filteredSearchKeywordOptions = useMemo(() => {
+    const query = searchKeywordQuery.trim().toLowerCase();
+
+    if (query.length === 0) {
+      return keywords;
+    }
+
+    return keywords.filter((keyword) =>
+      formatKeywordPathLabel(keyword, keywordsById).toLowerCase().includes(query)
+    );
+  }, [keywords, keywordsById, searchKeywordQuery]);
+  const currentSearchSmartAlbumFilterSpec = useMemo<SmartAlbumFilterSpec | null>(() => {
+    const activeUnsupportedFilters =
+      searchAlbumIds.length > 0 ||
+      searchFilenamePattern.trim().length > 0 ||
+      searchCaptureDateFrom.length > 0 ||
+      searchCaptureDateTo.length > 0 ||
+      searchCaptureDateAvailability !== 'datedOnly' ||
+      searchPeopleIds.length > 0 ||
+      searchHasNoPeople ||
+      searchHasReviewableFaces ||
+      searchPhotoStates.length > 1 ||
+      searchGroupIds.length > 1;
+
+    if (activeUnsupportedFilters) {
+      return null;
+    }
+
+    const firstSearchGroupId = searchGroupIds[0];
+    const yearGroupId =
+      searchGroupIds.length === 1 &&
+      typeof firstSearchGroupId === 'string' &&
+      yearGroupById.has(firstSearchGroupId)
+        ? firstSearchGroupId
+        : null;
+
+    if (searchGroupIds.length === 1 && !yearGroupId) {
+      return null;
+    }
+
+    const firstSearchPhotoState =
+      searchPhotoStates.length === 1 ? (searchPhotoStates[0] ?? null) : null;
+    const filterSpec = normalizeSmartAlbumFilterSpecForComparison({
+      keywordId: searchKeywordId,
+      photoState: firstSearchPhotoState,
+      yearGroupId
+    });
+
+    if (!filterSpec.keywordId && !filterSpec.photoState && !filterSpec.yearGroupId) {
+      return null;
+    }
+
+    return filterSpec;
+  }, [
+    searchAlbumIds.length,
+    searchCaptureDateAvailability,
+    searchCaptureDateFrom,
+    searchCaptureDateTo,
+    searchFilenamePattern,
+    searchGroupIds,
+    searchHasNoPeople,
+    searchHasReviewableFaces,
+    searchKeywordId,
+    searchPeopleIds.length,
+    searchPhotoStates,
+    yearGroupById
+  ]);
+  const isActiveSmartAlbumView = useMemo(
+    () =>
+      primaryArea === 'Search' &&
+      activeSmartAlbum !== null &&
+      currentSearchSmartAlbumFilterSpec !== null &&
+      smartAlbumFilterSpecsEqual(activeSmartAlbum.filterSpec, currentSearchSmartAlbumFilterSpec),
+    [activeSmartAlbum, currentSearchSmartAlbumFilterSpec, primaryArea]
+  );
+  useEffect(() => {
+    if (keywordsLoading || keywordsError || !searchKeywordId) {
+      return;
+    }
+
+    if (!keywordsById.has(searchKeywordId)) {
+      setSearchKeywordId(null);
+      setSearchKeywordQuery('');
+    }
+  }, [keywordsById, keywordsError, keywordsLoading, searchKeywordId]);
+  useEffect(() => {
+    if (activeSmartAlbumId && !smartAlbumsById.has(activeSmartAlbumId)) {
+      setActiveSmartAlbumId(null);
+    }
+  }, [activeSmartAlbumId, smartAlbumsById]);
   const selectedSearchPeople = useMemo(
     () =>
       searchPeopleIds
@@ -4636,6 +4980,24 @@ export default function App() {
     areaDefaultPhotoStates ?? currentAreaPhotoStates
   );
   const hasActiveSearchFilters =
+    searchPhotoStates.length > 0 ||
+    searchAlbumIds.length > 0 ||
+    searchGroupIds.length > 0 ||
+    searchFilenamePattern.trim().length > 0 ||
+    searchCaptureDateFrom.length > 0 ||
+    searchCaptureDateTo.length > 0 ||
+    searchCaptureDateAvailability !== 'datedOnly' ||
+    searchPeopleIds.length > 0 ||
+    searchHasNoPeople ||
+    searchHasReviewableFaces ||
+    searchKeywordId !== null;
+  const canSaveCurrentSearchAsSmartAlbum =
+    currentSearchSmartAlbumFilterSpec !== null &&
+    normalizeSmartAlbumSaveLabel(smartAlbumSaveLabel).length > 0 &&
+    !smartAlbumSaveBusy;
+  const hasUnsupportedActiveSearchFiltersForSmartAlbums =
+    hasActiveSearchFilters && currentSearchSmartAlbumFilterSpec === null;
+  const hasAdditionalSearchFiltersBesidesKeyword =
     searchPhotoStates.length > 0 ||
     searchAlbumIds.length > 0 ||
     searchGroupIds.length > 0 ||
@@ -5261,6 +5623,109 @@ export default function App() {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
       }
+    }
+  }
+
+  function applyKeywordIdsToLocalAssets(
+    assetIds: string[],
+    updateKeywordIds: (currentKeywordIds: string[]) => string[]
+  ): void {
+    const assetIdSet = new Set(assetIds);
+
+    setAssets((previous) =>
+      previous.map((asset) =>
+        assetIdSet.has(asset.id)
+          ? { ...asset, keywordIds: updateKeywordIds(asset.keywordIds ?? []) }
+          : asset
+      )
+    );
+    setSelectedAssetDetails((previous) =>
+      previous && assetIdSet.has(previous.id)
+        ? { ...previous, keywordIds: updateKeywordIds(previous.keywordIds ?? []) }
+        : previous
+    );
+  }
+
+  async function ensureKeywordForEntry(entry: Keyword | string): Promise<Keyword> {
+    if (typeof entry !== 'string') {
+      return entry;
+    }
+
+    const trimmedLabel = entry.trim().replace(/\s+/g, ' ');
+    const normalizedLabel = normalizeKeywordLabel(trimmedLabel);
+    const existing = keywords.find((keyword) => keyword.normalizedLabel === normalizedLabel);
+    if (existing) {
+      return existing;
+    }
+
+    try {
+      const response = await createKeywordRequest({ label: trimmedLabel });
+      setKeywords((previous) => sortKeywordsByPath([...previous, response.item]));
+      return response.item;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create keyword';
+      if (message.toLowerCase().includes('already exists')) {
+        const response = await listKeywordsRequest();
+        const sorted = sortKeywordsByPath(response.items);
+        setKeywords(sorted);
+        const matched = sorted.find((keyword) => keyword.normalizedLabel === normalizedLabel);
+        if (matched) {
+          return matched;
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  async function handleAddKeywordsToSelectedAssets(entries: Array<Keyword | string>): Promise<boolean> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0 || entries.length === 0) {
+      return false;
+    }
+
+    setKeywordUpdateBusy(true);
+    setUpdateError(null);
+
+    try {
+      const resolvedKeywords = await Promise.all(entries.map((entry) => ensureKeywordForEntry(entry)));
+      const keywordIds = Array.from(new Set(resolvedKeywords.map((keyword) => keyword.id)));
+      if (keywordIds.length === 0) {
+        return false;
+      }
+
+      await addKeywordsToAssetsRequest({ assetIds, keywordIds });
+      applyKeywordIdsToLocalAssets(assetIds, (currentKeywordIds) =>
+        Array.from(new Set([...currentKeywordIds, ...keywordIds]))
+      );
+      rememberRecentKeywordIds(keywordIds);
+      return true;
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to add keywords');
+      return false;
+    } finally {
+      setKeywordUpdateBusy(false);
+    }
+  }
+
+  async function handleRemoveKeywordFromSelectedAssets(keyword: Keyword): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    setKeywordUpdateBusy(true);
+    setUpdateError(null);
+
+    try {
+      await removeKeywordsFromAssetsRequest({ assetIds, keywordIds: [keyword.id] });
+      applyKeywordIdsToLocalAssets(assetIds, (currentKeywordIds) =>
+        currentKeywordIds.filter((keywordId) => keywordId !== keyword.id)
+      );
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to remove keyword');
+    } finally {
+      setKeywordUpdateBusy(false);
     }
   }
 
@@ -6090,7 +6555,80 @@ export default function App() {
     setSearchPeopleMatchMode('Any');
     setSearchHasNoPeople(false);
     setSearchHasReviewableFaces(false);
+    setSearchKeywordId(null);
+    setSearchKeywordQuery('');
     setSearchPeopleQuery('');
+    setActiveSmartAlbumId(null);
+    setSmartAlbumSaveError(null);
+    setSmartAlbumSaveNotice(null);
+  }
+
+  function applySmartAlbumToSearch(smartAlbum: SmartAlbum): void {
+    const filterSpec = normalizeSmartAlbumFilterSpecForComparison(smartAlbum.filterSpec);
+    const keyword = filterSpec.keywordId ? keywordsById.get(filterSpec.keywordId) ?? null : null;
+
+    setPrimaryArea('Search');
+    setSearchPhotoStates(filterSpec.photoState ? [filterSpec.photoState] : []);
+    setSearchAlbumIds([]);
+    setSearchGroupIds(filterSpec.yearGroupId ? [filterSpec.yearGroupId] : []);
+    setSearchFilenamePattern('');
+    setSearchCaptureDateFrom('');
+    setSearchCaptureDateTo('');
+    setSearchCaptureDateAvailability('datedOnly');
+    setSearchPeopleIds([]);
+    setSearchPeopleMatchMode('Any');
+    setSearchHasNoPeople(false);
+    setSearchHasReviewableFaces(false);
+    setSearchKeywordId(filterSpec.keywordId ?? null);
+    setSearchKeywordQuery(keyword ? formatKeywordPathLabel(keyword, keywordsById) : '');
+    setSearchPeopleQuery('');
+    setActiveSmartAlbumId(smartAlbum.id);
+    setSmartAlbumSaveError(null);
+    setSmartAlbumSaveNotice(null);
+    setSelectedAssetId(null);
+    setSelectedAssetIds([]);
+    setSelectionAnchorAssetId(null);
+  }
+
+  async function handleSaveCurrentSearchAsSmartAlbum(): Promise<void> {
+    if (!currentSearchSmartAlbumFilterSpec) {
+      setSmartAlbumSaveError(
+        'Smart Albums currently support one keyword, one photo state, and one year group only.'
+      );
+      setSmartAlbumSaveNotice(null);
+      return;
+    }
+
+    const label = normalizeSmartAlbumSaveLabel(smartAlbumSaveLabel);
+    if (label.length === 0) {
+      setSmartAlbumSaveError('Enter a Smart Album label.');
+      setSmartAlbumSaveNotice(null);
+      return;
+    }
+
+    setSmartAlbumSaveBusy(true);
+    setSmartAlbumSaveError(null);
+    setSmartAlbumSaveNotice(null);
+
+    try {
+      const response = await createSmartAlbumRequest({
+        label,
+        filterSpec: currentSearchSmartAlbumFilterSpec
+      });
+      setSmartAlbums((previous) =>
+        [...previous, response.item].sort((left, right) =>
+          left.label.localeCompare(right.label, undefined, { sensitivity: 'base' })
+        )
+      );
+      setSmartAlbumSaveLabel('');
+      setSmartAlbumSaveNotice(`Saved Smart Album "${response.item.label}".`);
+      setActiveSmartAlbumId(response.item.id);
+      await loadSmartAlbums({ showLoading: false });
+    } catch (error) {
+      setSmartAlbumSaveError(error instanceof Error ? error.message : 'Failed to save Smart Album');
+    } finally {
+      setSmartAlbumSaveBusy(false);
+    }
   }
 
   function clearSelection(): void {
@@ -7700,6 +8238,118 @@ export default function App() {
           </button>
         </div>
         <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Smart Album</h3>
+          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
+            Save a reusable derived view from the current Search filters. This first slice supports one keyword, one photo state, and one year group.
+          </div>
+          {isActiveSmartAlbumView && activeSmartAlbum ? (
+            <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
+              <div style={selectionChipStyle}>Smart Album: {activeSmartAlbum.label}</div>
+              <button
+                type="button"
+                style={compareButtonStyle}
+                onClick={clearSearchFilters}
+              >
+                Exit Smart Album
+              </button>
+            </div>
+          ) : null}
+          <div style={{ ...filterRowStyle, marginTop: '8px' }}>
+            <label style={{ ...filterOptionLabelStyle, display: 'grid', gap: '4px', width: '100%' }}>
+              Save current Search as
+              <input
+                type="text"
+                value={smartAlbumSaveLabel}
+                onChange={(event) => setSmartAlbumSaveLabel(event.target.value)}
+                placeholder="Smart Album label"
+                style={{ minWidth: 0 }}
+              />
+            </label>
+          </div>
+          <div style={filterRowStyle}>
+            <button
+              type="button"
+              style={canSaveCurrentSearchAsSmartAlbum ? compareButtonStyle : disabledToolbarActionButtonStyle}
+              disabled={!canSaveCurrentSearchAsSmartAlbum}
+              onClick={() => void handleSaveCurrentSearchAsSmartAlbum()}
+            >
+              {smartAlbumSaveBusy ? 'Saving...' : 'Save as Smart Album'}
+            </button>
+          </div>
+          {hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+              Current Search uses filters that Smart Albums do not support yet. Clear albums, date, filename, or people filters to save this view.
+            </p>
+          ) : currentSearchSmartAlbumFilterSpec === null ? (
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+              Choose at least one supported filter before saving a Smart Album.
+            </p>
+          ) : null}
+          {smartAlbumSaveError ? (
+            <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{smartAlbumSaveError}</p>
+          ) : null}
+          {smartAlbumSaveNotice ? (
+            <p style={{ margin: 0, color: '#2f6f3e', fontSize: '12px' }}>{smartAlbumSaveNotice}</p>
+          ) : null}
+          {smartAlbumsLoading ? (
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Refreshing Smart Albums...</p>
+          ) : null}
+          {smartAlbumsError && smartAlbums.length === 0 ? (
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+              Failed to refresh Smart Albums: {smartAlbumsError}
+            </p>
+          ) : null}
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Keyword</h3>
+          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
+            Find photos tagged with one keyword across the whole library. Parent keywords include their descendants.
+          </div>
+          <div style={filterRowStyle}>
+            <Autocomplete
+              options={filteredSearchKeywordOptions}
+              value={selectedSearchKeyword}
+              inputValue={searchKeywordQuery}
+              onInputChange={(_event, value) => setSearchKeywordQuery(value)}
+              onChange={(_event, value) => {
+                setSearchKeywordId(value?.id ?? null);
+                setSearchKeywordQuery(
+                  value ? formatKeywordPathLabel(value, keywordsById) : ''
+                );
+              }}
+              getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              loading={keywordsLoading}
+              style={{ minWidth: 0, width: '100%' }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small"
+                  label="Keyword"
+                  placeholder="Find keyword"
+                  error={Boolean(keywordsError)}
+                  helperText={keywordsError ?? undefined}
+                />
+              )}
+            />
+          </div>
+          {selectedSearchKeyword ? (
+            <div style={searchPeopleChipRowStyle}>
+              <button
+                type="button"
+                style={searchPeopleChipStyle}
+                onClick={() => {
+                  setSearchKeywordId(null);
+                  setSearchKeywordQuery('');
+                }}
+                title={`Remove keyword filter ${selectedSearchKeyword.label}`}
+              >
+                Keyword: {formatKeywordPathLabel(selectedSearchKeyword, keywordsById)} ×
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Photo State</h3>
           <div style={filterRowStyle}>
             <div style={filterGroupStyle}>
@@ -8030,6 +8680,17 @@ export default function App() {
                   }
                 : null
             }
+          />
+          <AssetKeywordsPanel
+            selectedAssetCount={selectedAssetsForKeywordEditing.length}
+            displayedKeywords={displayedKeywordsForSelection}
+            allKeywords={keywords}
+            recentKeywords={recentKeywords}
+            keywordsLoading={keywordsLoading}
+            keywordsError={keywordsError}
+            updateBusy={keywordUpdateBusy}
+            onAddKeywords={handleAddKeywordsToSelectedAssets}
+            onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
           />
         </section>
       </aside>
@@ -8858,6 +9519,37 @@ export default function App() {
                   <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
                     {visibleAssets.length} results
                   </p>
+                  {isActiveSmartAlbumView && activeSmartAlbum ? (
+                    <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
+                      <div style={selectionChipStyle}>
+                        Smart Album: {activeSmartAlbum.label}
+                      </div>
+                      <button
+                        type="button"
+                        style={compareButtonStyle}
+                        onClick={clearSearchFilters}
+                      >
+                        Exit Smart Album
+                      </button>
+                    </div>
+                  ) : null}
+                  {selectedSearchKeyword ? (
+                    <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
+                      <div style={selectionChipStyle}>
+                        Keyword: {formatKeywordPathLabel(selectedSearchKeyword, keywordsById)}
+                      </div>
+                      <button
+                        type="button"
+                        style={compareButtonStyle}
+                        onClick={() => {
+                          setSearchKeywordId(null);
+                          setSearchKeywordQuery('');
+                        }}
+                      >
+                        Clear Keyword
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {!immersiveOpen ? (
@@ -8974,7 +9666,15 @@ export default function App() {
             ) : isLibraryAlbumsMode && !hasAssetsInCheckedAlbumsAfterFilters ? (
               <p>No photos in the checked albums match the current filters.</p>
             ) : isSearchArea ? (
-              <p>No photos match the current search filters.</p>
+              <p>
+                {isActiveSmartAlbumView && activeSmartAlbum
+                  ? `No photos found for Smart Album "${activeSmartAlbum.label}".`
+                  : selectedSearchKeyword
+                  ? `No photos found for keyword "${formatKeywordPathLabel(selectedSearchKeyword, keywordsById)}"${
+                      hasAdditionalSearchFiltersBesidesKeyword ? ' with the current search filters.' : '.'
+                    }`
+                  : 'No photos match the current search filters.'}
+              </p>
             ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
               <p>No photos need review right now. Switch to Library to browse selected photos.</p>
             ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
@@ -9115,6 +9815,17 @@ export default function App() {
         onMaintenanceCompleted={() => {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });
+        }}
+        albumTreeNodes={albumTreeNodes}
+        onOpenSmartAlbum={(smartAlbum) => {
+          applySmartAlbumToSearch(smartAlbum);
+          setMaintenanceDialogOpen(false);
+        }}
+        onSmartAlbumsChanged={() => {
+          void loadSmartAlbums({ showLoading: false });
+        }}
+        onKeywordsChanged={() => {
+          void loadKeywords({ showLoading: false });
         }}
       />
       <AssetPeopleReviewDialog

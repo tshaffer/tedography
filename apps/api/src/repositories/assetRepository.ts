@@ -17,6 +17,11 @@ export async function syncMediaAssetIndexes(): Promise<void> {
 }
 
 function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
+  const keywordIds = Array.isArray(asset.keywordIds)
+    ? [...new Set(asset.keywordIds.filter((keywordId): keywordId is string => typeof keywordId === 'string' && keywordId.trim().length > 0).map((keywordId) => keywordId.trim()))].sort(
+        (left, right) => left.localeCompare(right)
+      )
+    : [];
   const albumMemberships = Array.isArray(asset.albumMemberships)
     ? asset.albumMemberships
         .filter(
@@ -39,6 +44,7 @@ function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
   return {
     ...asset,
     photoState: normalizePhotoState(asset.photoState) ?? PhotoState.New,
+    keywordIds,
     albumMemberships
   };
 }
@@ -85,6 +91,7 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           originalFileFormat: 1,
           displayFileFormat: 1,
           albumIds: 1,
+          keywordIds: 1,
           albumMemberships: 1,
           people: 1
         }
@@ -138,6 +145,7 @@ export async function getAssetPageForLibrary(input?: {
           originalFileFormat: 1,
           displayFileFormat: 1,
           albumIds: 1,
+          keywordIds: 1,
           albumMemberships: 1,
           people: 1
         }
@@ -327,6 +335,7 @@ export interface CreateMediaAssetInput {
   thumbnailFileFormat: string | null;
   thumbnailUrl: string | null;
   albumIds?: string[];
+  keywordIds?: string[];
   albumMemberships?: MediaAssetAlbumMembership[];
 }
 
@@ -359,6 +368,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     displayDerivedPath: input.displayDerivedPath,
     displayFileFormat: input.displayFileFormat,
     albumIds: input.albumIds ?? [],
+    keywordIds: input.keywordIds ?? [],
     albumMemberships: input.albumMemberships ?? [],
     people: []
   };
@@ -643,6 +653,92 @@ export async function addAssetsToAlbum(assetIds: string[], albumId: string): Pro
     { $addToSet: { albumIds: albumId } },
     { runValidators: true }
   );
+}
+
+export async function addKeywordsToAssets(assetIds: string[], keywordIds: string[]): Promise<void> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  const normalizedKeywordIds = [...new Set(keywordIds.map((keywordId) => keywordId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0 || normalizedKeywordIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    { $addToSet: { keywordIds: { $each: normalizedKeywordIds } } },
+    { runValidators: true }
+  );
+}
+
+export async function removeKeywordsFromAssets(assetIds: string[], keywordIds: string[]): Promise<void> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  const normalizedKeywordIds = [...new Set(keywordIds.map((keywordId) => keywordId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0 || normalizedKeywordIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    { $pull: { keywordIds: { $in: normalizedKeywordIds } } },
+    { runValidators: true }
+  );
+}
+
+export async function listAssetsByKeyword(keywordId: string): Promise<
+  Array<
+    Pick<
+      MediaAsset,
+      | 'id'
+      | 'filename'
+      | 'mediaType'
+      | 'photoState'
+      | 'captureDateTime'
+      | 'importedAt'
+      | 'albumIds'
+      | 'keywordIds'
+    >
+  >
+> {
+  const assets = await MediaAssetModel.find(
+    { keywordIds: keywordId },
+    {
+      _id: 0,
+      id: 1,
+      filename: 1,
+      mediaType: 1,
+      photoState: 1,
+      captureDateTime: 1,
+      importedAt: 1,
+      albumIds: 1,
+      keywordIds: 1
+    }
+  )
+    .sort({ captureDateTime: -1, importedAt: -1, id: -1 })
+    .lean<
+      Array<
+        Pick<
+          MediaAsset,
+          | 'id'
+          | 'filename'
+          | 'mediaType'
+          | 'photoState'
+          | 'captureDateTime'
+          | 'importedAt'
+          | 'albumIds'
+          | 'keywordIds'
+        >
+      >
+    >();
+
+  return assets.map((asset) => ({
+    id: asset.id,
+    filename: asset.filename,
+    mediaType: asset.mediaType,
+    photoState: asset.photoState,
+    captureDateTime: asset.captureDateTime ?? null,
+    importedAt: asset.importedAt,
+    albumIds: asset.albumIds ?? [],
+    keywordIds: asset.keywordIds ?? []
+  }));
 }
 
 export async function moveAssetsToAlbum(assetIds: string[], albumId: string): Promise<MediaAsset[]> {

@@ -1,7 +1,9 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import type {
+  AlbumTreeNode,
   BrowseDirectoryResponse,
   RefreshOperationResponse,
+  SmartAlbum,
   StorageRootDto,
   VerifyKnownAssetsInFolderResponse
 } from '@tedography/domain';
@@ -12,6 +14,8 @@ import {
   reimportKnownAssetsInFolder,
   verifyKnownAssetsInFolder
 } from '../../api/importApi';
+import { KeywordHierarchySection } from './KeywordHierarchySection';
+import { SmartAlbumsSection } from './SmartAlbumsSection';
 
 type SourceSelection = {
   rootId: string;
@@ -253,9 +257,28 @@ interface MaintenanceDialogProps {
   open: boolean;
   onClose: () => void;
   onMaintenanceCompleted?: () => void;
+  onKeywordsChanged?: () => void;
+  albumTreeNodes?: AlbumTreeNode[];
+  onOpenSmartAlbum?: (smartAlbum: SmartAlbum) => void;
+  onSmartAlbumsChanged?: () => void;
 }
 
-export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: MaintenanceDialogProps) {
+function getYearGroupOptions(albumTreeNodes: AlbumTreeNode[]): Array<{ id: string; label: string }> {
+  return albumTreeNodes
+    .filter((node) => node.nodeType === 'Group' && /^\d{4}$/.test(node.label.trim()))
+    .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }))
+    .map((node) => ({ id: node.id, label: node.label }));
+}
+
+export function MaintenanceDialog({
+  open,
+  onClose,
+  onMaintenanceCompleted,
+  onKeywordsChanged,
+  albumTreeNodes = [],
+  onOpenSmartAlbum,
+  onSmartAlbumsChanged
+}: MaintenanceDialogProps) {
   const [roots, setRoots] = useState<StorageRootDto[]>([]);
   const [rootsLoading, setRootsLoading] = useState(false);
   const [rootsError, setRootsError] = useState<string | null>(null);
@@ -270,6 +293,7 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
   const [folderOperationLoading, setFolderOperationLoading] = useState<null | 'reimport' | 'rebuild'>(null);
   const [folderOperationError, setFolderOperationError] = useState<string | null>(null);
   const [folderOperationResponse, setFolderOperationResponse] = useState<RefreshOperationResponse | null>(null);
+  const yearGroupOptions = getYearGroupOptions(albumTreeNodes);
 
   async function loadBrowse(rootId: string, relativePath: string): Promise<void> {
     const cacheKey = getBrowseCacheKey(rootId, relativePath);
@@ -756,6 +780,16 @@ export function MaintenanceDialog({ open, onClose, onMaintenanceCompleted }: Mai
                   </p>
                 )}
               </section>
+              <KeywordHierarchySection
+                open={open}
+                onKeywordsChanged={onKeywordsChanged}
+              />
+              <SmartAlbumsSection
+                open={open}
+                yearGroups={yearGroupOptions}
+                onOpenSmartAlbum={onOpenSmartAlbum}
+                onSmartAlbumsChanged={onSmartAlbumsChanged}
+              />
             </div>
           </section>
         </div>

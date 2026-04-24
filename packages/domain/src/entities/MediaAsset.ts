@@ -57,6 +57,7 @@ export interface MediaAsset {
   // Virtual organization only; does not affect filesystem storage layout.
   albumIds?: string[];
   albumMemberships?: MediaAssetAlbumMembership[];
+  keywordIds?: string[];
 
   // Derived convenience field populated from confirmed person assignments.
   people?: MediaAssetPerson[];
