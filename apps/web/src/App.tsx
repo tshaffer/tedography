@@ -244,6 +244,21 @@ type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 type SearchPeopleMatchMode = 'Any' | 'All';
 
+type SearchFilters = {
+  photoStates: PhotoState[];
+  albumIds: string[];
+  groupIds: string[];
+  filenamePattern: string;
+  captureDateFrom: string;
+  captureDateTo: string;
+  captureDateAvailability: SearchCaptureDateAvailabilityMode;
+  peopleIds: string[];
+  peopleMatchMode: SearchPeopleMatchMode;
+  hasNoPeople: boolean;
+  hasReviewableFaces: boolean;
+  keywordId: string | null;
+};
+
 type AssetsBootstrapScope =
   | { kind: 'all' }
   | { kind: 'albums'; albumIds: string[] };
@@ -1289,6 +1304,14 @@ const compareButtonStyle: CSSProperties = {
   padding: '5px 8px'
 };
 
+const primarySearchButtonStyle: CSSProperties = {
+  ...compareButtonStyle,
+  backgroundColor: '#1f5fbf',
+  borderColor: '#174a95',
+  color: '#fff',
+  fontWeight: 600
+};
+
 const toolbarButtonStyle: CSSProperties = {
   ...compareButtonStyle,
   padding: '4px 8px',
@@ -2130,6 +2153,60 @@ function photoStatesEqual(left: PhotoState[], right: PhotoState[]): boolean {
 
   return photoStateFilterOptions.every(
     (state) => left.includes(state) === right.includes(state)
+  );
+}
+
+function getDefaultSearchFilters(): SearchFilters {
+  return {
+    photoStates: [],
+    albumIds: [],
+    groupIds: [],
+    filenamePattern: '',
+    captureDateFrom: '',
+    captureDateTo: '',
+    captureDateAvailability: 'datedOnly',
+    peopleIds: [],
+    peopleMatchMode: 'Any',
+    hasNoPeople: false,
+    hasReviewableFaces: false,
+    keywordId: null
+  };
+}
+
+function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  return (
+    photoStatesEqual(left.photoStates, right.photoStates) &&
+    arraysEqual(left.albumIds, right.albumIds) &&
+    arraysEqual(left.groupIds, right.groupIds) &&
+    left.filenamePattern === right.filenamePattern &&
+    left.captureDateFrom === right.captureDateFrom &&
+    left.captureDateTo === right.captureDateTo &&
+    left.captureDateAvailability === right.captureDateAvailability &&
+    arraysEqual(left.peopleIds, right.peopleIds) &&
+    left.peopleMatchMode === right.peopleMatchMode &&
+    left.hasNoPeople === right.hasNoPeople &&
+    left.hasReviewableFaces === right.hasReviewableFaces &&
+    left.keywordId === right.keywordId
+  );
+}
+
+function hasSearchFilters(filters: SearchFilters): boolean {
+  return (
+    filters.photoStates.length > 0 ||
+    filters.albumIds.length > 0 ||
+    filters.groupIds.length > 0 ||
+    filters.filenamePattern.trim().length > 0 ||
+    filters.captureDateFrom.length > 0 ||
+    filters.captureDateTo.length > 0 ||
+    filters.captureDateAvailability !== 'datedOnly' ||
+    filters.peopleIds.length > 0 ||
+    filters.hasNoPeople ||
+    filters.hasReviewableFaces ||
+    filters.keywordId !== null
   );
 }
 
@@ -3124,6 +3201,7 @@ export default function App() {
     const stored = window.localStorage.getItem(searchKeywordIdStorageKey);
     return typeof stored === 'string' && stored.trim().length > 0 ? stored : null;
   });
+  const [appliedSearchFilters, setAppliedSearchFilters] = useState<SearchFilters | null>(null);
   const [searchKeywordQuery, setSearchKeywordQuery] = useState('');
   const [searchPeopleQuery, setSearchPeopleQuery] = useState('');
   const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
@@ -4257,46 +4335,77 @@ export default function App() {
         : assets.filter((asset) => currentAreaPhotoStates.includes(asset.photoState)),
     [assets, currentAreaPhotoStates, primaryArea]
   );
+  const pendingSearchFilters = useMemo<SearchFilters>(
+    () => ({
+      photoStates: searchPhotoStates,
+      albumIds: searchAlbumIds,
+      groupIds: searchGroupIds,
+      filenamePattern: searchFilenamePattern,
+      captureDateFrom: searchCaptureDateFrom,
+      captureDateTo: searchCaptureDateTo,
+      captureDateAvailability: searchCaptureDateAvailability,
+      peopleIds: searchPeopleIds,
+      peopleMatchMode: searchPeopleMatchMode,
+      hasNoPeople: searchHasNoPeople,
+      hasReviewableFaces: searchHasReviewableFaces,
+      keywordId: searchKeywordId
+    }),
+    [
+      searchAlbumIds,
+      searchCaptureDateAvailability,
+      searchCaptureDateFrom,
+      searchCaptureDateTo,
+      searchFilenamePattern,
+      searchGroupIds,
+      searchHasNoPeople,
+      searchHasReviewableFaces,
+      searchKeywordId,
+      searchPeopleIds,
+      searchPeopleMatchMode,
+      searchPhotoStates
+    ]
+  );
   const activeSearchKeywordIds = useMemo(() => {
-    if (!searchKeywordId) {
+    if (!appliedSearchFilters?.keywordId) {
       return null;
     }
 
-    return collectKeywordDescendantIds(keywords, searchKeywordId);
-  }, [keywords, searchKeywordId]);
+    return collectKeywordDescendantIds(keywords, appliedSearchFilters.keywordId);
+  }, [appliedSearchFilters?.keywordId, keywords]);
 
   const searchResults = useMemo(() => {
-    if (primaryArea !== 'Search') {
+    if (primaryArea !== 'Search' || appliedSearchFilters === null) {
       return [];
     }
 
-    const searchAlbumIdsSet = new Set(searchAlbumIds);
+    const searchAlbumIdsSet = new Set(appliedSearchFilters.albumIds);
     const searchGroupAlbumIdsSet = new Set(
-      getDescendantAlbumIdsForGroupIds(albumTreeNodes, searchGroupIds)
+      getDescendantAlbumIdsForGroupIds(albumTreeNodes, appliedSearchFilters.groupIds)
     );
 
     const filtered = areaPhotoStateVisibleAssets.filter((asset) => {
       const matchesPhotoState =
-        searchPhotoStates.length === 0 || searchPhotoStates.includes(asset.photoState);
+        appliedSearchFilters.photoStates.length === 0 ||
+        appliedSearchFilters.photoStates.includes(asset.photoState);
       const matchesAlbum =
-        searchAlbumIds.length === 0 ||
+        appliedSearchFilters.albumIds.length === 0 ||
         (asset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
       const matchesGroup =
-        searchGroupIds.length === 0 ||
+        appliedSearchFilters.groupIds.length === 0 ||
         (asset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
-      const matchesFilename = doesAssetMatchSearchFilename(asset, searchFilenamePattern);
+      const matchesFilename = doesAssetMatchSearchFilename(asset, appliedSearchFilters.filenamePattern);
       const matchesCaptureDateRange = doesAssetMatchSearchCaptureDateRange(
         asset,
-        searchCaptureDateFrom,
-        searchCaptureDateTo,
-        searchCaptureDateAvailability
+        appliedSearchFilters.captureDateFrom,
+        appliedSearchFilters.captureDateTo,
+        appliedSearchFilters.captureDateAvailability
       );
       const matchesPeople = doesAssetMatchSearchPeopleFilters(
         asset,
-        searchPeopleIds,
-        searchPeopleMatchMode,
-        searchHasNoPeople,
-        searchHasReviewableFaces
+        appliedSearchFilters.peopleIds,
+        appliedSearchFilters.peopleMatchMode,
+        appliedSearchFilters.hasNoPeople,
+        appliedSearchFilters.hasReviewableFaces
       );
       const matchesKeyword =
         activeSearchKeywordIds === null ||
@@ -4315,22 +4424,11 @@ export default function App() {
 
     return sortVisibleAssetsForTimeline(filtered);
   }, [
+    appliedSearchFilters,
     albumTreeNodes,
     areaPhotoStateVisibleAssets,
     primaryArea,
-    searchAlbumIds,
-    searchCaptureDateFrom,
-    searchCaptureDateTo,
-    searchGroupIds,
-    searchFilenamePattern,
-    searchHasNoPeople,
-    searchHasReviewableFaces,
     activeSearchKeywordIds,
-    searchKeywordId,
-    searchCaptureDateAvailability,
-    searchPeopleIds,
-    searchPeopleMatchMode,
-    searchPhotoStates
   ]);
 
   const assetsAfterAdditionalFilters = useMemo(() => {
@@ -4763,39 +4861,39 @@ export default function App() {
       formatKeywordPathLabel(keyword, keywordsById).toLowerCase().includes(query)
     );
   }, [keywords, keywordsById, searchKeywordQuery]);
-  const currentSearchSmartAlbumFilterSpec = useMemo<SmartAlbumFilterSpec | null>(() => {
+  function getSmartAlbumFilterSpecForSearchFilters(filters: SearchFilters): SmartAlbumFilterSpec | null {
     const activeUnsupportedFilters =
-      searchAlbumIds.length > 0 ||
-      searchFilenamePattern.trim().length > 0 ||
-      searchCaptureDateFrom.length > 0 ||
-      searchCaptureDateTo.length > 0 ||
-      searchCaptureDateAvailability !== 'datedOnly' ||
-      searchPeopleIds.length > 0 ||
-      searchHasNoPeople ||
-      searchHasReviewableFaces ||
-      searchPhotoStates.length > 1 ||
-      searchGroupIds.length > 1;
+      filters.albumIds.length > 0 ||
+      filters.filenamePattern.trim().length > 0 ||
+      filters.captureDateFrom.length > 0 ||
+      filters.captureDateTo.length > 0 ||
+      filters.captureDateAvailability !== 'datedOnly' ||
+      filters.peopleIds.length > 0 ||
+      filters.hasNoPeople ||
+      filters.hasReviewableFaces ||
+      filters.photoStates.length > 1 ||
+      filters.groupIds.length > 1;
 
     if (activeUnsupportedFilters) {
       return null;
     }
 
-    const firstSearchGroupId = searchGroupIds[0];
+    const firstSearchGroupId = filters.groupIds[0];
     const yearGroupId =
-      searchGroupIds.length === 1 &&
+      filters.groupIds.length === 1 &&
       typeof firstSearchGroupId === 'string' &&
       yearGroupById.has(firstSearchGroupId)
         ? firstSearchGroupId
         : null;
 
-    if (searchGroupIds.length === 1 && !yearGroupId) {
+    if (filters.groupIds.length === 1 && !yearGroupId) {
       return null;
     }
 
     const firstSearchPhotoState =
-      searchPhotoStates.length === 1 ? (searchPhotoStates[0] ?? null) : null;
+      filters.photoStates.length === 1 ? (filters.photoStates[0] ?? null) : null;
     const filterSpec = normalizeSmartAlbumFilterSpecForComparison({
-      keywordId: searchKeywordId,
+      keywordId: filters.keywordId,
       photoState: firstSearchPhotoState,
       yearGroupId
     });
@@ -4805,27 +4903,21 @@ export default function App() {
     }
 
     return filterSpec;
-  }, [
-    searchAlbumIds.length,
-    searchCaptureDateAvailability,
-    searchCaptureDateFrom,
-    searchCaptureDateTo,
-    searchFilenamePattern,
-    searchGroupIds,
-    searchHasNoPeople,
-    searchHasReviewableFaces,
-    searchKeywordId,
-    searchPeopleIds.length,
-    searchPhotoStates,
-    yearGroupById
-  ]);
+  }
+  const appliedSearchSmartAlbumFilterSpec = useMemo<SmartAlbumFilterSpec | null>(
+    () => (appliedSearchFilters ? getSmartAlbumFilterSpecForSearchFilters(appliedSearchFilters) : null),
+    [
+      appliedSearchFilters,
+      yearGroupById
+    ]
+  );
   const isActiveSmartAlbumView = useMemo(
     () =>
       primaryArea === 'Search' &&
       activeSmartAlbum !== null &&
-      currentSearchSmartAlbumFilterSpec !== null &&
-      smartAlbumFilterSpecsEqual(activeSmartAlbum.filterSpec, currentSearchSmartAlbumFilterSpec),
-    [activeSmartAlbum, currentSearchSmartAlbumFilterSpec, primaryArea]
+      appliedSearchSmartAlbumFilterSpec !== null &&
+      smartAlbumFilterSpecsEqual(activeSmartAlbum.filterSpec, appliedSearchSmartAlbumFilterSpec),
+    [activeSmartAlbum, appliedSearchSmartAlbumFilterSpec, primaryArea]
   );
   useEffect(() => {
     if (keywordsLoading || keywordsError || !searchKeywordId) {
@@ -4979,35 +5071,37 @@ export default function App() {
     currentAreaPhotoStates,
     areaDefaultPhotoStates ?? currentAreaPhotoStates
   );
-  const hasActiveSearchFilters =
-    searchPhotoStates.length > 0 ||
-    searchAlbumIds.length > 0 ||
-    searchGroupIds.length > 0 ||
-    searchFilenamePattern.trim().length > 0 ||
-    searchCaptureDateFrom.length > 0 ||
-    searchCaptureDateTo.length > 0 ||
-    searchCaptureDateAvailability !== 'datedOnly' ||
-    searchPeopleIds.length > 0 ||
-    searchHasNoPeople ||
-    searchHasReviewableFaces ||
-    searchKeywordId !== null;
+  const hasActiveSearchFilters = hasSearchFilters(pendingSearchFilters);
+  const hasAppliedSearch = appliedSearchFilters !== null;
+  const isPendingSearchDefault = searchFiltersEqual(pendingSearchFilters, getDefaultSearchFilters());
+  const hasPendingSearchChanges = appliedSearchFilters === null
+    ? !isPendingSearchDefault
+    : !searchFiltersEqual(pendingSearchFilters, appliedSearchFilters);
+  const appliedSearchKeyword = useMemo(
+    () => (appliedSearchFilters?.keywordId ? keywordsById.get(appliedSearchFilters.keywordId) ?? null : null),
+    [appliedSearchFilters?.keywordId, keywordsById]
+  );
   const canSaveCurrentSearchAsSmartAlbum =
-    currentSearchSmartAlbumFilterSpec !== null &&
+    appliedSearchSmartAlbumFilterSpec !== null &&
+    !hasPendingSearchChanges &&
     normalizeSmartAlbumSaveLabel(smartAlbumSaveLabel).length > 0 &&
     !smartAlbumSaveBusy;
   const hasUnsupportedActiveSearchFiltersForSmartAlbums =
-    hasActiveSearchFilters && currentSearchSmartAlbumFilterSpec === null;
-  const hasAdditionalSearchFiltersBesidesKeyword =
-    searchPhotoStates.length > 0 ||
-    searchAlbumIds.length > 0 ||
-    searchGroupIds.length > 0 ||
-    searchFilenamePattern.trim().length > 0 ||
-    searchCaptureDateFrom.length > 0 ||
-    searchCaptureDateTo.length > 0 ||
-    searchCaptureDateAvailability !== 'datedOnly' ||
-    searchPeopleIds.length > 0 ||
-    searchHasNoPeople ||
-    searchHasReviewableFaces;
+    appliedSearchFilters !== null &&
+    hasSearchFilters(appliedSearchFilters) &&
+    appliedSearchSmartAlbumFilterSpec === null;
+  const hasAdditionalAppliedSearchFiltersBesidesKeyword =
+    appliedSearchFilters !== null &&
+    (appliedSearchFilters.photoStates.length > 0 ||
+      appliedSearchFilters.albumIds.length > 0 ||
+      appliedSearchFilters.groupIds.length > 0 ||
+      appliedSearchFilters.filenamePattern.trim().length > 0 ||
+      appliedSearchFilters.captureDateFrom.length > 0 ||
+      appliedSearchFilters.captureDateTo.length > 0 ||
+      appliedSearchFilters.captureDateAvailability !== 'datedOnly' ||
+      appliedSearchFilters.peopleIds.length > 0 ||
+      appliedSearchFilters.hasNoPeople ||
+      appliedSearchFilters.hasReviewableFaces);
   const hasCheckedAlbums = checkedAlbumIds.length > 0;
   const hasAssetsInCheckedAlbumsAfterFilters = checkedAlbumSections.length > 0;
   const isReviewArea = primaryArea === 'Review';
@@ -5126,8 +5220,17 @@ export default function App() {
       };
     }
 
-    if (isSearchArea && (searchCaptureDateFrom.trim().length > 0 || searchCaptureDateTo.trim().length > 0) && visibleAssets.length > 0) {
-      const dateLabel = formatScopedDateLabel(searchCaptureDateFrom, searchCaptureDateTo);
+    if (
+      isSearchArea &&
+      appliedSearchFilters &&
+      (appliedSearchFilters.captureDateFrom.trim().length > 0 ||
+        appliedSearchFilters.captureDateTo.trim().length > 0) &&
+      visibleAssets.length > 0
+    ) {
+      const dateLabel = formatScopedDateLabel(
+        appliedSearchFilters.captureDateFrom,
+        appliedSearchFilters.captureDateTo
+      );
       return {
         source: 'searchDateRange',
         scopeType: 'Date range',
@@ -5154,11 +5257,10 @@ export default function App() {
   }, [
     checkedAlbumScopeAssetIds,
     checkedAlbumScopeLabel,
+    appliedSearchFilters,
     isLibraryArea,
     isSearchArea,
     libraryBrowseMode,
-    searchCaptureDateFrom,
-    searchCaptureDateTo,
     selectedAssetIds,
     visibleAssets
   ]);
@@ -5489,35 +5591,36 @@ export default function App() {
       }
 
       const remainsVisibleAfterUpdate = (() => {
-        if (primaryArea === 'Search') {
-          const searchAlbumIdsSet = new Set(searchAlbumIds);
+        if (primaryArea === 'Search' && appliedSearchFilters) {
+          const searchAlbumIdsSet = new Set(appliedSearchFilters.albumIds);
           const searchGroupAlbumIdsSet = new Set(
-            getDescendantAlbumIdsForGroupIds(albumTreeNodes, searchGroupIds)
+            getDescendantAlbumIdsForGroupIds(albumTreeNodes, appliedSearchFilters.groupIds)
           );
           const matchesSearchPhotoState =
-            searchPhotoStates.length === 0 || searchPhotoStates.includes(updatedAsset.photoState);
+            appliedSearchFilters.photoStates.length === 0 ||
+            appliedSearchFilters.photoStates.includes(updatedAsset.photoState);
           const matchesSearchAlbum =
-            searchAlbumIds.length === 0 ||
+            appliedSearchFilters.albumIds.length === 0 ||
             (updatedAsset.albumIds ?? []).some((albumId) => searchAlbumIdsSet.has(albumId));
           const matchesSearchGroup =
-            searchGroupIds.length === 0 ||
+            appliedSearchFilters.groupIds.length === 0 ||
             (updatedAsset.albumIds ?? []).some((albumId) => searchGroupAlbumIdsSet.has(albumId));
           const matchesSearchFilename = doesAssetMatchSearchFilename(
             updatedAsset,
-            searchFilenamePattern
+            appliedSearchFilters.filenamePattern
           );
           const matchesSearchDate = doesAssetMatchSearchCaptureDateRange(
             updatedAsset,
-            searchCaptureDateFrom,
-            searchCaptureDateTo,
-            searchCaptureDateAvailability
+            appliedSearchFilters.captureDateFrom,
+            appliedSearchFilters.captureDateTo,
+            appliedSearchFilters.captureDateAvailability
           );
           const matchesSearchPeople = doesAssetMatchSearchPeopleFilters(
             updatedAsset,
-            searchPeopleIds,
-            searchPeopleMatchMode,
-            searchHasNoPeople,
-            searchHasReviewableFaces
+            appliedSearchFilters.peopleIds,
+            appliedSearchFilters.peopleMatchMode,
+            appliedSearchFilters.hasNoPeople,
+            appliedSearchFilters.hasReviewableFaces
           );
 
           return (
@@ -6535,6 +6638,30 @@ export default function App() {
     );
   }
 
+  function setPendingSearchFilters(filters: SearchFilters): void {
+    setSearchPhotoStates(filters.photoStates);
+    setSearchAlbumIds(filters.albumIds);
+    setSearchGroupIds(filters.groupIds);
+    setSearchFilenamePattern(filters.filenamePattern);
+    setSearchCaptureDateFrom(filters.captureDateFrom);
+    setSearchCaptureDateTo(filters.captureDateTo);
+    setSearchCaptureDateAvailability(filters.captureDateAvailability);
+    setSearchPeopleIds(filters.peopleIds);
+    setSearchPeopleMatchMode(filters.peopleMatchMode);
+    setSearchHasNoPeople(filters.hasNoPeople);
+    setSearchHasReviewableFaces(filters.hasReviewableFaces);
+    setSearchKeywordId(filters.keywordId);
+  }
+
+  function applyPendingSearchFilters(): void {
+    setAppliedSearchFilters(pendingSearchFilters);
+    setSmartAlbumSaveError(null);
+    setSmartAlbumSaveNotice(null);
+    setSelectedAssetId(null);
+    setSelectedAssetIds([]);
+    setSelectionAnchorAssetId(null);
+  }
+
   function clearFilters(): void {
     const defaultStates = getDefaultPhotoStatesForPrimaryArea(primaryArea);
     if (defaultStates) {
@@ -6544,42 +6671,31 @@ export default function App() {
   }
 
   function clearSearchFilters(): void {
-    setSearchPhotoStates([]);
-    setSearchAlbumIds([]);
-    setSearchGroupIds([]);
-    setSearchFilenamePattern('');
-    setSearchCaptureDateFrom('');
-    setSearchCaptureDateTo('');
-    setSearchCaptureDateAvailability('datedOnly');
-    setSearchPeopleIds([]);
-    setSearchPeopleMatchMode('Any');
-    setSearchHasNoPeople(false);
-    setSearchHasReviewableFaces(false);
-    setSearchKeywordId(null);
+    setPendingSearchFilters(getDefaultSearchFilters());
+    setAppliedSearchFilters(null);
     setSearchKeywordQuery('');
     setSearchPeopleQuery('');
     setActiveSmartAlbumId(null);
     setSmartAlbumSaveError(null);
     setSmartAlbumSaveNotice(null);
+    setSelectedAssetId(null);
+    setSelectedAssetIds([]);
+    setSelectionAnchorAssetId(null);
   }
 
   function applySmartAlbumToSearch(smartAlbum: SmartAlbum): void {
     const filterSpec = normalizeSmartAlbumFilterSpecForComparison(smartAlbum.filterSpec);
     const keyword = filterSpec.keywordId ? keywordsById.get(filterSpec.keywordId) ?? null : null;
+    const nextFilters: SearchFilters = {
+      ...getDefaultSearchFilters(),
+      photoStates: filterSpec.photoState ? [filterSpec.photoState] : [],
+      groupIds: filterSpec.yearGroupId ? [filterSpec.yearGroupId] : [],
+      keywordId: filterSpec.keywordId ?? null
+    };
 
     setPrimaryArea('Search');
-    setSearchPhotoStates(filterSpec.photoState ? [filterSpec.photoState] : []);
-    setSearchAlbumIds([]);
-    setSearchGroupIds(filterSpec.yearGroupId ? [filterSpec.yearGroupId] : []);
-    setSearchFilenamePattern('');
-    setSearchCaptureDateFrom('');
-    setSearchCaptureDateTo('');
-    setSearchCaptureDateAvailability('datedOnly');
-    setSearchPeopleIds([]);
-    setSearchPeopleMatchMode('Any');
-    setSearchHasNoPeople(false);
-    setSearchHasReviewableFaces(false);
-    setSearchKeywordId(filterSpec.keywordId ?? null);
+    setPendingSearchFilters(nextFilters);
+    setAppliedSearchFilters(nextFilters);
     setSearchKeywordQuery(keyword ? formatKeywordPathLabel(keyword, keywordsById) : '');
     setSearchPeopleQuery('');
     setActiveSmartAlbumId(smartAlbum.id);
@@ -6591,7 +6707,13 @@ export default function App() {
   }
 
   async function handleSaveCurrentSearchAsSmartAlbum(): Promise<void> {
-    if (!currentSearchSmartAlbumFilterSpec) {
+    if (hasPendingSearchChanges) {
+      setSmartAlbumSaveError('Run Search before saving a Smart Album.');
+      setSmartAlbumSaveNotice(null);
+      return;
+    }
+
+    if (!appliedSearchSmartAlbumFilterSpec) {
       setSmartAlbumSaveError(
         'Smart Albums currently support one keyword, one photo state, and one year group only.'
       );
@@ -6613,7 +6735,7 @@ export default function App() {
     try {
       const response = await createSmartAlbumRequest({
         label,
-        filterSpec: currentSearchSmartAlbumFilterSpec
+        filterSpec: appliedSearchSmartAlbumFilterSpec
       });
       setSmartAlbums((previous) =>
         [...previous, response.item].sort((left, right) =>
@@ -8232,10 +8354,31 @@ export default function App() {
             type="button"
             style={compareButtonStyle}
             onClick={clearSearchFilters}
-            disabled={!hasActiveSearchFilters}
+            disabled={!hasActiveSearchFilters && !hasAppliedSearch}
           >
             Reset
           </button>
+        </div>
+        <div style={{ ...filterRowStyle, marginTop: '8px' }}>
+          <button
+            type="button"
+            style={hasPendingSearchChanges ? primarySearchButtonStyle : disabledToolbarActionButtonStyle}
+            onClick={applyPendingSearchFilters}
+            disabled={!hasPendingSearchChanges}
+          >
+            Search
+          </button>
+          {hasPendingSearchChanges ? (
+            <span style={{ color: '#5f6b78', fontSize: '12px' }}>
+              {hasAppliedSearch
+                ? 'Search criteria changed. Click Search to update results.'
+                : 'Set search criteria and click Search.'}
+            </span>
+          ) : hasAppliedSearch ? (
+            <span style={{ color: '#5f6b78', fontSize: '12px' }}>Search results are current.</span>
+          ) : (
+            <span style={{ color: '#5f6b78', fontSize: '12px' }}>Set search criteria and click Search.</span>
+          )}
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Smart Album</h3>
@@ -8245,6 +8388,9 @@ export default function App() {
           {isActiveSmartAlbumView && activeSmartAlbum ? (
             <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
               <div style={selectionChipStyle}>Smart Album: {activeSmartAlbum.label}</div>
+              {hasPendingSearchChanges ? (
+                <span style={{ color: '#7a5c00', fontSize: '12px' }}>Pending changes</span>
+              ) : null}
               <button
                 type="button"
                 style={compareButtonStyle}
@@ -8276,11 +8422,15 @@ export default function App() {
               {smartAlbumSaveBusy ? 'Saving...' : 'Save as Smart Album'}
             </button>
           </div>
-          {hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
+          {hasPendingSearchChanges ? (
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
+              Run Search before saving a Smart Album.
+            </p>
+          ) : hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
               Current Search uses filters that Smart Albums do not support yet. Clear albums, date, filename, or people filters to save this view.
             </p>
-          ) : currentSearchSmartAlbumFilterSpec === null ? (
+          ) : appliedSearchSmartAlbumFilterSpec === null ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
               Choose at least one supported filter before saving a Smart Album.
             </p>
@@ -9508,6 +9658,11 @@ export default function App() {
               Import Assets
             </button>
           </section>
+        ) : isSearchArea && !hasAppliedSearch ? (
+          <section style={emptyStateStyle}>
+            <h2 style={emptyStateHeadingStyle}>Ready to search</h2>
+            <p style={emptyStateTextStyle}>Set search criteria and click Search.</p>
+          </section>
         ) : hasFilteredAssets ? (
           <>
             <div style={isSearchArea && !isLoupeMode ? stickySearchAssetChromeStyle : stickyAssetChromeStyle}>
@@ -9519,11 +9674,19 @@ export default function App() {
                   <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
                     {visibleAssets.length} results
                   </p>
+                  {hasPendingSearchChanges ? (
+                    <p style={{ color: '#7a5c00', fontSize: '12px', margin: '6px 0 0 0' }}>
+                      Search criteria changed. Click Search to update results.
+                    </p>
+                  ) : null}
                   {isActiveSmartAlbumView && activeSmartAlbum ? (
                     <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
                       <div style={selectionChipStyle}>
                         Smart Album: {activeSmartAlbum.label}
                       </div>
+                      {hasPendingSearchChanges ? (
+                        <span style={{ color: '#7a5c00', fontSize: '12px' }}>Pending changes</span>
+                      ) : null}
                       <button
                         type="button"
                         style={compareButtonStyle}
@@ -9533,10 +9696,10 @@ export default function App() {
                       </button>
                     </div>
                   ) : null}
-                  {selectedSearchKeyword ? (
+                  {appliedSearchKeyword ? (
                     <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
                       <div style={selectionChipStyle}>
-                        Keyword: {formatKeywordPathLabel(selectedSearchKeyword, keywordsById)}
+                        Keyword: {formatKeywordPathLabel(appliedSearchKeyword, keywordsById)}
                       </div>
                       <button
                         type="button"
@@ -9666,15 +9829,22 @@ export default function App() {
             ) : isLibraryAlbumsMode && !hasAssetsInCheckedAlbumsAfterFilters ? (
               <p>No photos in the checked albums match the current filters.</p>
             ) : isSearchArea ? (
-              <p>
-                {isActiveSmartAlbumView && activeSmartAlbum
-                  ? `No photos found for Smart Album "${activeSmartAlbum.label}".`
-                  : selectedSearchKeyword
-                  ? `No photos found for keyword "${formatKeywordPathLabel(selectedSearchKeyword, keywordsById)}"${
-                      hasAdditionalSearchFiltersBesidesKeyword ? ' with the current search filters.' : '.'
-                    }`
-                  : 'No photos match the current search filters.'}
-              </p>
+              <>
+                <p>
+                  {isActiveSmartAlbumView && activeSmartAlbum
+                    ? `No photos found for Smart Album "${activeSmartAlbum.label}".`
+                    : appliedSearchKeyword
+                    ? `No photos found for keyword "${formatKeywordPathLabel(appliedSearchKeyword, keywordsById)}"${
+                        hasAdditionalAppliedSearchFiltersBesidesKeyword ? ' with the current search filters.' : '.'
+                      }`
+                    : 'No photos match the current search filters.'}
+                </p>
+                {hasPendingSearchChanges ? (
+                  <p style={{ color: '#7a5c00', fontSize: '12px', margin: '0 0 8px 0' }}>
+                    Search criteria changed. Click Search to update results.
+                  </p>
+                ) : null}
+              </>
             ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
               <p>No photos need review right now. Switch to Library to browse selected photos.</p>
             ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
@@ -9689,7 +9859,7 @@ export default function App() {
                 </button>
               </div>
             ) : null}
-            {isSearchArea && hasActiveSearchFilters ? (
+            {isSearchArea && (hasActiveSearchFilters || hasAppliedSearch) ? (
               <div style={actionsStyle}>
                 <button type="button" style={compareButtonStyle} onClick={clearSearchFilters}>
                   Clear Filters
