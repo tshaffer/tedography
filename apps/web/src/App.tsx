@@ -735,6 +735,69 @@ const selectionChipStyle: CSSProperties = {
   fontWeight: 600
 };
 
+const smartAlbumChipStyle: CSSProperties = {
+  ...selectionChipStyle,
+  borderColor: '#cfc6ef',
+  backgroundColor: '#f3f0ff',
+  color: '#352169'
+};
+
+const contextSummaryStyle: CSSProperties = {
+  display: 'grid',
+  gap: '4px',
+  borderLeft: '3px solid #9aa7b8',
+  backgroundColor: '#f8fafc',
+  padding: '8px 10px',
+  margin: '0 0 8px 0'
+};
+
+const smartAlbumContextSummaryStyle: CSSProperties = {
+  ...contextSummaryStyle,
+  borderLeftColor: '#7c5cc4',
+  backgroundColor: '#f7f4ff'
+};
+
+const contextSummaryTitleRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexWrap: 'wrap',
+  minWidth: 0
+};
+
+const contextSummaryTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '14px',
+  fontWeight: 700,
+  color: '#1f2937'
+};
+
+const contextSummaryBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  borderRadius: '999px',
+  border: '1px solid #d5dbe5',
+  backgroundColor: '#fff',
+  color: '#4b5563',
+  padding: '2px 8px',
+  fontSize: '11px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.03em'
+};
+
+const smartAlbumContextSummaryBadgeStyle: CSSProperties = {
+  ...contextSummaryBadgeStyle,
+  borderColor: '#cfc6ef',
+  color: '#4f3792'
+};
+
+const contextSummaryMetaStyle: CSSProperties = {
+  margin: 0,
+  color: '#5f6b78',
+  fontSize: '12px'
+};
+
 const topBarSpacerStyle: CSSProperties = {
   flex: '1 1 auto'
 };
@@ -5282,6 +5345,80 @@ export default function App() {
     : isLibraryArea
       ? 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
       : 'Search: structured photo finding by state, album, and date.';
+  const isSearchFromSmartAlbum = isSearchArea && activeSmartAlbum !== null;
+  const hasPendingSmartAlbumSearchChanges =
+    isSearchFromSmartAlbum && isActiveSmartAlbumView && hasPendingSearchChanges;
+  const hasDivergedSmartAlbumSearch =
+    isSearchFromSmartAlbum && !isActiveSmartAlbumView;
+  const activeContextSummary = useMemo(() => {
+    if (isSearchFromSmartAlbum && activeSmartAlbum) {
+      if (hasPendingSmartAlbumSearchChanges) {
+        return {
+          title: `Search (from Smart Album: ${activeSmartAlbum.label})`,
+          badge: 'Pending Changes',
+          meta: 'Current results still match the saved Smart Album. Run Search to view the edited filters.',
+          kind: 'smart-album' as const
+        };
+      }
+
+      if (hasDivergedSmartAlbumSearch) {
+        return {
+          title: `Search (from Smart Album: ${activeSmartAlbum.label})`,
+          badge: 'Derived Search',
+          meta: 'Filters no longer match the saved Smart Album. Exit Smart Album to return to ordinary Search.',
+          kind: 'smart-album' as const
+        };
+      }
+
+      return {
+        title: `Smart Album: ${activeSmartAlbum.label}`,
+        badge: 'Saved Filters',
+        meta: 'Derived from saved filters. It is not a manual album and photos are not stored in it.',
+        kind: 'smart-album' as const
+      };
+    }
+
+    if (isSearchArea) {
+      return {
+        title: hasAppliedSearch ? 'Search' : 'Search',
+        badge: hasAppliedSearch ? 'Ad Hoc Results' : 'Ready',
+        meta: hasAppliedSearch
+          ? 'Ordinary Search results from the current filters. Save supported filters as a Smart Album when needed.'
+          : 'Set filters and run Search to view results.',
+        kind: 'search' as const
+      };
+    }
+
+    if (isAlbumsMode && singleCheckedAlbumSection) {
+      return {
+        title: `Album: ${singleCheckedAlbumSection.albumLabel}`,
+        badge: 'Manual Album',
+        meta: 'Curated album membership. Move, remove, and manual ordering actions apply to this album.',
+        kind: 'album' as const
+      };
+    }
+
+    if (isAlbumsMode && checkedAlbumIds.length > 1) {
+      return {
+        title: `Albums: ${checkedAlbumIds.length} checked`,
+        badge: 'Manual Albums',
+        meta: 'Curated album membership. Asset actions add to or move between manual albums.',
+        kind: 'album' as const
+      };
+    }
+
+    return null;
+  }, [
+    activeSmartAlbum,
+    checkedAlbumIds.length,
+    hasAppliedSearch,
+    hasDivergedSmartAlbumSearch,
+    hasPendingSmartAlbumSearchChanges,
+    isAlbumsMode,
+    isSearchArea,
+    isSearchFromSmartAlbum,
+    singleCheckedAlbumSection
+  ]);
   const treeDisplayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode),
     [albumTreeNodes, expandedGroupIds, albumTreeSortMode]
@@ -7815,6 +7952,34 @@ export default function App() {
     targetNode.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
   }, [selectedAssetId, viewerMode, visibleAssets]);
 
+  function renderActiveContextSummary(): ReactElement | null {
+    if (!activeContextSummary) {
+      return null;
+    }
+
+    const isSmartAlbumContext = activeContextSummary.kind === 'smart-album';
+
+    return (
+      <section
+        style={isSmartAlbumContext ? smartAlbumContextSummaryStyle : contextSummaryStyle}
+        aria-label="Current browsing context"
+      >
+        <div style={contextSummaryTitleRowStyle}>
+          <h2 style={contextSummaryTitleStyle}>{activeContextSummary.title}</h2>
+          <span style={isSmartAlbumContext ? smartAlbumContextSummaryBadgeStyle : contextSummaryBadgeStyle}>
+            {activeContextSummary.badge}
+          </span>
+          {isSearchFromSmartAlbum ? (
+            <button type="button" style={compareButtonStyle} onClick={clearSearchFilters}>
+              Exit Smart Album
+            </button>
+          ) : null}
+        </div>
+        <p style={contextSummaryMetaStyle}>{activeContextSummary.meta}</p>
+      </section>
+    );
+  }
+
   function renderAlbumTreeRows(
     checkedIds: string[],
     onToggleChecked: (albumId: string) => void,
@@ -8385,11 +8550,17 @@ export default function App() {
           <div style={{ fontSize: '12px', color: '#5f6b78' }}>
             Save a reusable derived view from the current Search filters. This first slice supports one keyword, one photo state, and one year group.
           </div>
-          {isActiveSmartAlbumView && activeSmartAlbum ? (
+          {isSearchFromSmartAlbum && activeSmartAlbum ? (
             <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
-              <div style={selectionChipStyle}>Smart Album: {activeSmartAlbum.label}</div>
+              <div style={smartAlbumChipStyle}>
+                {isActiveSmartAlbumView && !hasPendingSearchChanges
+                  ? `Smart Album: ${activeSmartAlbum.label}`
+                  : `Search from Smart Album: ${activeSmartAlbum.label}`}
+              </div>
               {hasPendingSearchChanges ? (
                 <span style={{ color: '#7a5c00', fontSize: '12px' }}>Pending changes</span>
+              ) : hasDivergedSmartAlbumSearch ? (
+                <span style={{ color: '#7a5c00', fontSize: '12px' }}>Filters diverged</span>
               ) : null}
               <button
                 type="button"
@@ -9003,8 +9174,8 @@ export default function App() {
                 disabled={!hasSelectedAssets}
                 title={
                   hasSelectedAssets
-                    ? 'Add current selection to album'
-                    : 'Select one or more photos to add them to an album'
+                    ? 'Add current selection to a manual album'
+                    : 'Select one or more photos to add them to a manual album'
                 }
               >
                 +Album
@@ -9024,8 +9195,8 @@ export default function App() {
                   title={
                     isSearchArea
                       ? hasSelectedAssets
-                        ? 'Move selected search results to another album'
-                        : 'Select one or more photos to move them to another album'
+                        ? 'Move selected search results to a manual album'
+                        : 'Select one or more photos to move them to a manual album'
                       : selectedAssetIdsForAlbumAction.length === 0
                         ? `Select one or more photos to move them out of "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
                         : selectedAssetsInFocusedAlbum.length > 0
@@ -9612,10 +9783,14 @@ export default function App() {
           ref={mainColumnRef}
           style={isLoupeMode ? loupeMainColumnStyle : isSearchArea ? searchMainColumnStyle : mainColumnStyle}
         >
-          {!isLoupeMode && !isSearchArea ? (
-            <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
-              {mainPaneDescription}
-            </p>
+          {!isLoupeMode ? (
+            activeContextSummary ? (
+              renderActiveContextSummary()
+            ) : (
+              <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
+                {mainPaneDescription}
+              </p>
+            )
           ) : null}
 
       {assetsLoading ? <p>Loading assets...</p> : null}
@@ -9680,24 +9855,43 @@ export default function App() {
             <div style={isSearchArea && !isLoupeMode ? stickySearchAssetChromeStyle : stickyAssetChromeStyle}>
               {isSearchArea && !isLoupeMode ? (
                 <div style={stickySearchSummaryBlockStyle}>
-                  <p style={{ color: '#666', fontSize: '12px', margin: '0 0 8px 0' }}>
-                    {mainPaneDescription}
-                  </p>
-                  <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
-                    {visibleAssets.length} results
-                  </p>
+                  {activeContextSummary ? (
+                    <div style={contextSummaryTitleRowStyle}>
+                      <strong style={{ fontSize: '13px' }}>{activeContextSummary.title}</strong>
+                      <span
+                        style={
+                          activeContextSummary.kind === 'smart-album'
+                            ? smartAlbumContextSummaryBadgeStyle
+                            : contextSummaryBadgeStyle
+                        }
+                      >
+                        {activeContextSummary.badge}
+                      </span>
+                      <span style={{ color: '#666', fontSize: '13px' }}>
+                        {visibleAssets.length} results
+                      </span>
+                    </div>
+                  ) : (
+                    <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
+                      {visibleAssets.length} results
+                    </p>
+                  )}
                   {hasPendingSearchChanges ? (
                     <p style={{ color: '#7a5c00', fontSize: '12px', margin: '6px 0 0 0' }}>
                       Search criteria changed. Click Search to update results.
                     </p>
                   ) : null}
-                  {isActiveSmartAlbumView && activeSmartAlbum ? (
+                  {isSearchFromSmartAlbum && activeSmartAlbum ? (
                     <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
-                      <div style={selectionChipStyle}>
-                        Smart Album: {activeSmartAlbum.label}
+                      <div style={smartAlbumChipStyle}>
+                        {isActiveSmartAlbumView && !hasPendingSearchChanges
+                          ? `Smart Album: ${activeSmartAlbum.label}`
+                          : `Search from Smart Album: ${activeSmartAlbum.label}`}
                       </div>
                       {hasPendingSearchChanges ? (
                         <span style={{ color: '#7a5c00', fontSize: '12px' }}>Pending changes</span>
+                      ) : hasDivergedSmartAlbumSearch ? (
+                        <span style={{ color: '#7a5c00', fontSize: '12px' }}>Filters diverged</span>
                       ) : null}
                       <button
                         type="button"
@@ -9845,6 +10039,8 @@ export default function App() {
                 <p>
                   {isActiveSmartAlbumView && activeSmartAlbum
                     ? `No photos found for Smart Album "${activeSmartAlbum.label}".`
+                    : hasDivergedSmartAlbumSearch && activeSmartAlbum
+                    ? `No photos found for Search from Smart Album "${activeSmartAlbum.label}".`
                     : appliedSearchKeyword
                     ? `No photos found for keyword "${formatKeywordPathLabel(appliedSearchKeyword, keywordsById)}"${
                         hasAdditionalAppliedSearchFiltersBesidesKeyword ? ' with the current search filters.' : '.'

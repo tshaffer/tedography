@@ -25,6 +25,21 @@ const mutedTextStyle: CSSProperties = {
   color: '#666'
 };
 
+const smartAlbumBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  width: 'fit-content',
+  border: '1px solid #cfc6ef',
+  borderRadius: '999px',
+  backgroundColor: '#f3f0ff',
+  color: '#4f3792',
+  padding: '2px 8px',
+  fontSize: '11px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.03em'
+};
+
 const panelStyle: CSSProperties = {
   border: '1px solid #d8d8d8',
   borderRadius: '10px',
@@ -305,6 +320,7 @@ export function SmartAlbumsSection({
                     onClick={() => setSelectedSmartAlbumId(item.id)}
                     title={item.label}
                   >
+                    <span style={smartAlbumBadgeStyle}>Saved filters</span>
                     <strong>{item.label}</strong>
                     <span style={{ ...mutedTextStyle, margin: 0 }}>
                       {formatSmartAlbumFilterSummary({
@@ -321,9 +337,12 @@ export function SmartAlbumsSection({
             {selectedSmartAlbum ? (
               <>
                 <div>
-                  <strong>{selectedSmartAlbum.label}</strong>
+                  <span style={smartAlbumBadgeStyle}>Smart Album</span>
+                  <div style={{ marginTop: '6px' }}>
+                    <strong>{selectedSmartAlbum.label}</strong>
+                  </div>
                   <p style={{ ...mutedTextStyle, marginTop: '4px' }}>
-                    Edit this saved search or open it in Search.
+                    Edit these saved filters or open them in Search. This is separate from manual albums.
                   </p>
                 </div>
                 <label style={{ display: 'grid', gap: '4px' }}>
@@ -396,7 +415,7 @@ export function SmartAlbumsSection({
                     disabled={actionBusy !== null}
                     onClick={() => onOpenSmartAlbum?.(selectedSmartAlbum)}
                   >
-                    Open in Search
+                    Open Saved Filters in Search
                   </button>
                   <button
                     type="button"
