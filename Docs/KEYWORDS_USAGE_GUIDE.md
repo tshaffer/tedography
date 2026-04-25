@@ -293,8 +293,16 @@ This is the main payoff of hierarchy right now.
 When a keyword filter is active in Search:
 
 - the selected keyword is shown in the Search panel
-- the active keyword also appears above the results
+- the active keyword also appears in the results chrome as a `Keyword: ...` chip
 - you can clear it with the remove control or `Clear Keyword`
+
+Search also shows a current context label above the results:
+
+- ordinary ad hoc Search appears as `Search`
+- an exact saved Smart Album appears as `Smart Album: <label>`
+- a Search that started from a Smart Album but no longer exactly matches it appears as `Search (from Smart Album: <label>)`
+
+This context label is separate from the keyword chip. A keyword chip tells you which keyword filter is active; the context label tells you whether you are looking at ordinary Search results, a saved Smart Album, or a Search derived from a Smart Album.
 
 ## Smart Albums
 
@@ -335,9 +343,19 @@ From there you can:
 
 When a Smart Album is active in Search:
 
-- Search shows the active Smart Album name
+- Search shows `Smart Album: <label>` when the current results exactly match the saved filters
 - the normal asset grid shows the matching results
 - `Exit Smart Album` clears that saved-search view
+
+If you open a Smart Album and then edit Search filters:
+
+- before running Search, Tedography shows `Search (from Smart Album: <label>)` with pending changes
+- after running Search with filters that no longer match the saved Smart Album, Tedography keeps the `Search (from Smart Album: <label>)` label and marks it as a derived Search
+- `Exit Smart Album` clears that Smart Album origin and returns you to ordinary ad hoc Search
+
+This distinction matters because Smart Albums are saved derived views, not manual albums. Photos are not stored in a Smart Album, and album membership actions still target manual albums.
+
+In `Maintenance -> Smart Albums`, Smart Albums are labeled as saved filters. The open action is `Open Saved Filters in Search`.
 
 ## Current Limitations
 
