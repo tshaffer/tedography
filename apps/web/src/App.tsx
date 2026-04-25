@@ -8537,6 +8537,18 @@ export default function App() {
                 onChange={(event) => setSearchCaptureDateTo(event.target.value)}
               />
             </label>
+            {(searchCaptureDateFrom || searchCaptureDateTo) && (
+              <button
+                onClick={() => {
+                  setSearchCaptureDateFrom('');
+                  setSearchCaptureDateTo('');
+                }}
+                style={{ alignSelf: 'flex-end', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+                title="Clear date range"
+              >
+                Clear
+              </button>
+            )}
           </div>
           <div style={filterRowStyle}>
             <label style={filterOptionLabelStyle}>
