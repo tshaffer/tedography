@@ -1,0 +1,125 @@
+// Usage:
+//   mongosh "$MONGODB_URI" scripts/export-duplicate-mediaasset-filenames.mongosh
+//
+// Optional output path:
+//   OUTPUT_FILE=/tmp/duplicate-mediaasset-filenames.json mongosh "$MONGODB_URI" scripts/export-duplicate-mediaasset-filenames.mongosh
+
+const outputFile = process.env.OUTPUT_FILE || 'duplicate-mediaasset-filenames.json';
+
+const duplicateFilenameReport = db.mediaAssets.aggregate([
+  {
+    $match: {
+      filename: { $type: 'string', $ne: '' }
+    }
+  },
+  {
+    $group: {
+      _id: '$filename',
+      duplicateCount: { $sum: 1 },
+      mediaAssets: {
+        $push: {
+          id: '$id',
+          filename: '$filename',
+          originalArchivePath: '$originalArchivePath',
+          albumIds: { $ifNull: ['$albumIds', []] },
+          albumMemberships: { $ifNull: ['$albumMemberships', []] }
+        }
+      }
+    }
+  },
+  {
+    $match: {
+      duplicateCount: { $gt: 1 }
+    }
+  },
+  { $unwind: '$mediaAssets' },
+  {
+    $project: {
+      filename: '$_id',
+      duplicateCount: 1,
+      mediaAsset: '$mediaAssets',
+      membershipAlbumIds: {
+        $setUnion: [
+          { $ifNull: ['$mediaAssets.albumIds', []] },
+          {
+            $map: {
+              input: { $ifNull: ['$mediaAssets.albumMemberships', []] },
+              as: 'membership',
+              in: '$$membership.albumId'
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: 'albumTreeNodes',
+      localField: 'membershipAlbumIds',
+      foreignField: 'id',
+      as: 'albums'
+    }
+  },
+  {
+    $lookup: {
+      from: 'albumTreeNodes',
+      localField: 'albums.parentId',
+      foreignField: 'id',
+      as: 'parentNodes'
+    }
+  },
+  {
+    $project: {
+      filename: 1,
+      duplicateCount: 1,
+      mediaAsset: {
+        id: '$mediaAsset.id',
+        originalArchivePath: '$mediaAsset.originalArchivePath',
+        albums: {
+          $map: {
+            input: '$albums',
+            as: 'album',
+            in: {
+              albumLabel: '$$album.label',
+              parentAlbumLabel: {
+                $let: {
+                  vars: {
+                    parentNode: {
+                      $first: {
+                        $filter: {
+                          input: '$parentNodes',
+                          as: 'parentNode',
+                          cond: { $eq: ['$$parentNode.id', '$$album.parentId'] }
+                        }
+                      }
+                    }
+                  },
+                  in: { $ifNull: ['$$parentNode.label', null] }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    $group: {
+      _id: '$filename',
+      duplicateCount: { $first: '$duplicateCount' },
+      mediaAssets: { $push: '$mediaAsset' }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      filename: '$_id',
+      duplicateCount: 1,
+      mediaAssets: 1
+    }
+  },
+  { $sort: { filename: 1 } }
+]).toArray();
+
+fs.writeFileSync(outputFile, `${JSON.stringify(duplicateFilenameReport, null, 2)}\n`);
+print(`Wrote ${duplicateFilenameReport.length} duplicate filename groups to ${outputFile}`);
