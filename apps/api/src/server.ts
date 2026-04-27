@@ -6,6 +6,7 @@ import { log } from './logger.js';
 import {
   rotateAssetClockwise,
   rotateAssetCounterclockwise,
+  rotateAsset180,
   AssetRotationServiceError
 } from './import/assetRotationService.js';
 import {
@@ -285,6 +286,27 @@ export function createServer(): Express {
       }
 
       log.error('Failed to rotate asset counterclockwise', error);
+      res.status(500).json({ error: 'Failed to rotate asset' });
+    }
+  });
+
+  app.post('/api/assets/:id/rotate-180', async (req, res) => {
+    try {
+      const updatedAsset = await rotateAsset180(req.params.id);
+      res.json(updatedAsset);
+    } catch (error) {
+      if (error instanceof AssetRotationServiceError) {
+        const status =
+          error.code === 'NOT_FOUND'
+            ? 404
+            : error.code === 'INVALID_INPUT'
+              ? 400
+              : 409;
+        res.status(status).json({ error: error.message });
+        return;
+      }
+
+      log.error('Failed to rotate asset 180 degrees', error);
       res.status(500).json({ error: 'Failed to rotate asset' });
     }
   });

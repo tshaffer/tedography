@@ -43,6 +43,12 @@ export async function rotateAssetCounterclockwise(assetId: string): Promise<Medi
   });
 }
 
+export async function rotateAsset180(assetId: string): Promise<MediaAsset> {
+  return fetchJson<MediaAsset>(`/api/assets/${encodeURIComponent(assetId)}/rotate-180`, {
+    method: 'POST'
+  });
+}
+
 export async function updateAssetsCaptureDateTime(request: {
   assetIds: string[];
   captureDateTime?: string | null;

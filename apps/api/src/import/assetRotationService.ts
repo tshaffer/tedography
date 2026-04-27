@@ -18,7 +18,7 @@ import { getStorageRootById } from './storageRoots.js';
 import { resolveSafeAbsolutePath } from './storagePathUtils.js';
 
 export type AssetRotationServiceErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'CONFLICT' | 'UNAVAILABLE';
-export type AssetRotationDirection = 'clockwise' | 'counterclockwise';
+export type AssetRotationDirection = 'clockwise' | 'counterclockwise' | '180';
 
 export class AssetRotationServiceError extends Error {
   public readonly code: AssetRotationServiceErrorCode;
@@ -29,8 +29,10 @@ export class AssetRotationServiceError extends Error {
   }
 }
 
-function getSipsRotateDegrees(direction: AssetRotationDirection): '90' | '270' {
-  return direction === 'clockwise' ? '90' : '270';
+function getSipsRotateDegrees(direction: AssetRotationDirection): '90' | '180' | '270' {
+  if (direction === 'clockwise') return '90';
+  if (direction === '180') return '180';
+  return '270';
 }
 
 function execFilePromise(command: string, args: string[]): Promise<void> {
@@ -241,4 +243,8 @@ export async function rotateAssetClockwise(assetId: string): Promise<MediaAsset>
 
 export async function rotateAssetCounterclockwise(assetId: string): Promise<MediaAsset> {
   return rotateAsset(assetId, 'counterclockwise');
+}
+
+export async function rotateAsset180(assetId: string): Promise<MediaAsset> {
+  return rotateAsset(assetId, '180');
 }

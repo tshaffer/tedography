@@ -64,6 +64,7 @@ import {
   reimportAsset,
   rotateAssetClockwise,
   rotateAssetCounterclockwise,
+  rotateAsset180,
   updateAssetsCaptureDateTime
 } from './api/assetApi';
 import {
@@ -6119,7 +6120,7 @@ export default function App() {
   }
 
   async function handleRotateSelectedAssets(
-    direction: 'clockwise' | 'counterclockwise'
+    direction: 'clockwise' | 'counterclockwise' | '180'
   ): Promise<void> {
     const assetIds = selectedAssetIds;
     if (assetIds.length === 0) {
@@ -6137,7 +6138,9 @@ export default function App() {
           const updatedAsset =
             direction === 'clockwise'
               ? await rotateAssetClockwise(assetId)
-              : await rotateAssetCounterclockwise(assetId);
+              : direction === '180'
+                ? await rotateAsset180(assetId)
+                : await rotateAssetCounterclockwise(assetId);
           return { assetId, updatedAsset };
         })
       );
@@ -9665,6 +9668,19 @@ export default function App() {
                       aria-label="Rotate selected photos counterclockwise"
                     >
                       <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                    </button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
+                  <span>
+                    <button
+                      type="button"
+                      style={hasSelectedAssets ? { ...toolbarIconButtonStyle, fontSize: '11px', fontWeight: 'bold' } : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle, fontSize: '11px', fontWeight: 'bold' }}
+                      onClick={() => void handleRotateSelectedAssets('180')}
+                      disabled={!hasSelectedAssets}
+                      aria-label="Rotate selected photos 180 degrees"
+                    >
+                      180°
                     </button>
                   </span>
                 </Tooltip>
