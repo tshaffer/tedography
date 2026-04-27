@@ -7732,6 +7732,12 @@ export default function App() {
           handleSelectRelativeInList(compareAssets, -1);
         }
 
+        if (isDiscardKeyboardEvent(event) && surveyFocusedAsset) {
+          event.preventDefault();
+          void handleSetPhotoState(surveyFocusedAsset.id, PhotoState.Discard);
+          return;
+        }
+
         void handleKeyboardReview(event.key);
         return;
       }
@@ -7843,6 +7849,12 @@ export default function App() {
         openImmersive();
       }
 
+      if (isLoupeMode && isDiscardKeyboardEvent(event) && selectedAsset) {
+        event.preventDefault();
+        void handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
+        return;
+      }
+
       void handleKeyboardReview(event.key);
     };
 
@@ -7865,6 +7877,7 @@ export default function App() {
     slideshowSelectedAssetIndex,
     slideshowActive,
     selectedAssetIds.length,
+    surveyFocusedAsset,
     surveyOpen,
     updatingAssetIds,
     viewerMode
@@ -9504,7 +9517,13 @@ export default function App() {
                   key={state}
                   type="button"
                   style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                  onClick={() => void handleApplyPhotoStateToSelectedAssets(state)}
+                  onClick={() => {
+                    if (isLoupeMode && selectedAsset) {
+                      void handleSetPhotoState(selectedAsset.id, state);
+                    } else {
+                      void handleApplyPhotoStateToSelectedAssets(state);
+                    }
+                  }}
                   disabled={!hasSelectedAssets}
                   title={
                     hasSelectedAssets
