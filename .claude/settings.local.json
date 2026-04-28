@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm -r typecheck)"
+      "Bash(pnpm -r typecheck)",
+      "Bash(pnpm --filter @tedography/shared build)",
+      "Bash(sed -n '25,60p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/repositories/faceDetectionRepository.ts)",
+      "Bash(sed -n '25,60p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/repositories/faceMatchReviewRepository.ts)",
+      "Bash(sed -n '96,125p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/repositories/personFaceExampleRepository.ts)",
+      "Bash(sed -n '335,350p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/people/peoplePipelineService.ts)",
+      "Bash(sed -n '746,760p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/people/peoplePipelineService.ts)"
     ]
   }
 }

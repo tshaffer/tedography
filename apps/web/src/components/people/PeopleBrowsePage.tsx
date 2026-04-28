@@ -335,7 +335,7 @@ export function PeopleBrowsePage() {
                 <div style={badgeRowStyle}>
                   <span style={badgeStyle}>{formatRelativeAssetCount(item.assetCount)}</span>
                   <span style={item.exampleCount < 3 ? warningBadgeStyle : badgeStyle}>
-                    {item.exampleCount === 0 ? 'Not enrolled' : `${item.exampleCount} examples`}
+                    {item.exampleCount === 0 ? 'No examples' : `${item.exampleCount} examples`}
                   </span>
                   {item.reviewableAssetCount > 0 ? (
                     <span style={warningBadgeStyle}>

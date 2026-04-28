@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, useCallback, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus, MediaAsset } from '@tedography/domain';
 import type { ListAssetFaceDetectionsResponse } from '@tedography/shared';
@@ -9,6 +9,7 @@ import {
   reviewFaceDetection
 } from '../../api/peoplePipelineApi';
 import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getAssignmentActionState, getExampleActionState, getFaceReviewActionState } from './peopleReviewActionState';
 
 interface AssetPeopleReviewDialogProps {
   open: boolean;
@@ -243,6 +244,58 @@ const disabledButtonStyle: CSSProperties = {
   cursor: 'not-allowed'
 };
 
+const compactButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  padding: '6px 10px',
+  fontSize: '12px'
+};
+
+const applyButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  backgroundColor: '#0f5f73',
+  color: '#fff',
+  borderColor: '#0f5f73'
+};
+
+const queuedBadgeStyle: CSSProperties = {
+  borderRadius: '999px',
+  border: '1px solid #d4a72c',
+  backgroundColor: '#fffbeb',
+  padding: '4px 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#7a4f00',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
+const queuedConfirmBadgeStyle: CSSProperties = {
+  borderRadius: '999px',
+  border: '1px solid #2e9e68',
+  backgroundColor: '#edfaf3',
+  padding: '4px 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#15603a',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
+const queuedIgnoreBadgeStyle: CSSProperties = {
+  borderRadius: '999px',
+  border: '1px solid #64748b',
+  backgroundColor: '#f1f5f9',
+  padding: '4px 10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#334155',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
 const ignoredReasonOptions: FaceDetectionIgnoredReason[] = [
   'user-ignored',
   'too-small',
@@ -308,18 +361,6 @@ function getMatchStatusSummary(
     default:
       return 'Review this face before trusting it as derived asset people.';
   }
-}
-
-function getConfirmActionLabel(suggestedPersonName: string, assignedPersonName: string): string {
-  if (suggestedPersonName.length > 0 && suggestedPersonName !== assignedPersonName) {
-    return `Confirm Suggested (${suggestedPersonName})`;
-  }
-
-  if (assignedPersonName.length > 0) {
-    return `Confirm ${assignedPersonName}`;
-  }
-
-  return 'Confirm';
 }
 
 function getConfirmActionHint(suggestedPersonName: string, assignedPersonName: string): string | null {
@@ -392,6 +433,15 @@ export function AssetPeopleReviewDialog({
 
     return window.localStorage.getItem(showFaceBoxesStorageKey) === 'true';
   });
+  const [imageLayout, setImageLayout] = useState<{
+    offsetLeftFrac: number;
+    offsetTopFrac: number;
+    scaleX: number;
+    scaleY: number;
+  } | null>(null);
+  const [pendingAssignments, setPendingAssignments] = useState<Record<string, { personId: string; personName: string }>>({});
+  const [pendingConfirmations, setPendingConfirmations] = useState<Record<string, { confirmPersonId: string | null; personName: string }>>({});
+  const [pendingIgnores, setPendingIgnores] = useState<Record<string, { ignoredReason: FaceDetectionIgnoredReason }>>({});
 
   useEffect(() => {
     if (!open) {
@@ -434,6 +484,10 @@ export function AssetPeopleReviewDialog({
       return;
     }
 
+    setImageLayout(null);
+    setPendingAssignments({});
+    setPendingConfirmations({});
+    setPendingIgnores({});
     setAssetState(initialState);
     void loadDialogData();
   }, [open, asset?.id, initialState?.assetId]);
@@ -461,6 +515,41 @@ export function AssetPeopleReviewDialog({
     window.localStorage.setItem(showFaceBoxesStorageKey, showFaceBoxes ? 'true' : 'false');
   }, [showFaceBoxes]);
 
+  const handleSourceImageLoad = useCallback((event: React.SyntheticEvent<HTMLImageElement>): void => {
+    const img = event.currentTarget;
+    const cw = img.clientWidth;
+    const ch = img.clientHeight;
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+
+    if (!cw || !ch || !nw || !nh) {
+      setImageLayout(null);
+      return;
+    }
+
+    // Compute where objectFit:contain places the image within its box.
+    // If the image's aspect ratio is narrower than the container's (portrait),
+    // there are gray bars left and right that must be excluded from box coords.
+    const containerAspect = cw / ch;
+    const imageAspect = nw / nh;
+
+    let displayedWidth: number, displayedHeight: number;
+    if (imageAspect >= containerAspect) {
+      displayedWidth = cw;
+      displayedHeight = cw / imageAspect;
+    } else {
+      displayedHeight = ch;
+      displayedWidth = ch * imageAspect;
+    }
+
+    setImageLayout({
+      offsetLeftFrac: (cw - displayedWidth) / 2 / cw,
+      offsetTopFrac: (ch - displayedHeight) / 2 / ch,
+      scaleX: displayedWidth / cw,
+      scaleY: displayedHeight / ch
+    });
+  }, []);
+
   function getDraft(detectionId: string): DraftState {
     return (
       draftByDetectionId[detectionId] ?? {
@@ -485,6 +574,131 @@ export function AssetPeopleReviewDialog({
     setNoticeMessage(notice);
     await loadDialogData();
     await onUpdated?.();
+  }
+
+  function queueAssignment(detectionId: string, personId: string): void {
+    const personName = peopleOptions.find((p) => p.id === personId)?.displayName ?? personId;
+    setPendingAssignments((current) => ({ ...current, [detectionId]: { personId, personName } }));
+  }
+
+  function cancelQueuedAssignment(detectionId: string): void {
+    setPendingAssignments((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingAssignments(): Promise<void> {
+    const entries = Object.entries(pendingAssignments);
+    if (entries.length === 0) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { personId }]) =>
+          reviewFaceDetection(detectionId, { action: 'assign', personId, reviewer: 'library-asset-review-dialog' })
+        )
+      );
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      setPendingAssignments({});
+      await refreshAfterMutation(
+        failed === 0
+          ? `Assigned ${succeeded} face${succeeded === 1 ? '' : 's'}.`
+          : `Assigned ${succeeded} face${succeeded === 1 ? '' : 's'}; ${failed} failed.`
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply assignments');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
+  function queueConfirmation(detectionId: string, confirmPersonId: string | null, personName: string): void {
+    setPendingConfirmations((current) => ({ ...current, [detectionId]: { confirmPersonId, personName } }));
+  }
+
+  function cancelQueuedConfirmation(detectionId: string): void {
+    setPendingConfirmations((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingConfirmations(): Promise<void> {
+    const entries = Object.entries(pendingConfirmations);
+    if (entries.length === 0) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { confirmPersonId }]) =>
+          reviewFaceDetection(detectionId, {
+            action: 'confirm',
+            ...(confirmPersonId ? { personId: confirmPersonId } : {}),
+            reviewer: 'library-asset-review-dialog'
+          })
+        )
+      );
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      setPendingConfirmations({});
+      await refreshAfterMutation(
+        failed === 0
+          ? `Confirmed ${succeeded} face${succeeded === 1 ? '' : 's'}.`
+          : `Confirmed ${succeeded} face${succeeded === 1 ? '' : 's'}; ${failed} failed.`
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply confirmations');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
+  function queueIgnore(detectionId: string, ignoredReason: FaceDetectionIgnoredReason): void {
+    setPendingIgnores((current) => ({ ...current, [detectionId]: { ignoredReason } }));
+  }
+
+  function cancelQueuedIgnore(detectionId: string): void {
+    setPendingIgnores((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingIgnores(): Promise<void> {
+    const entries = Object.entries(pendingIgnores);
+    if (entries.length === 0) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { ignoredReason }]) =>
+          reviewFaceDetection(detectionId, { action: 'ignore', ignoredReason, reviewer: 'library-asset-review-dialog' })
+        )
+      );
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      setPendingIgnores({});
+      await refreshAfterMutation(
+        failed === 0
+          ? `Ignored ${succeeded} face${succeeded === 1 ? '' : 's'}.`
+          : `Ignored ${succeeded} face${succeeded === 1 ? '' : 's'}; ${failed} failed.`
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply ignores');
+    } finally {
+      setBusyDetectionId(null);
+    }
   }
 
   async function runAction(
@@ -527,6 +741,7 @@ export function AssetPeopleReviewDialog({
           displayName: action.displayName,
           reviewer: 'library-asset-review-dialog'
         });
+        updateDraft(detectionId, { newPersonName: '' });
         await refreshAfterMutation(`Created and assigned person for face ${detectionId}.`);
       } else {
         await reviewFaceDetection(detectionId, {
@@ -565,6 +780,18 @@ export function AssetPeopleReviewDialog({
     () => new Map((assetState?.reviews ?? []).map((review) => [review.faceDetectionId, review])),
     [assetState?.reviews]
   );
+  const examplesByDetectionId = useMemo(() => {
+    const grouped = new Map<string, NonNullable<ListAssetFaceDetectionsResponse['examples']>>();
+    for (const example of assetState?.examples ?? []) {
+      const existing = grouped.get(example.faceDetectionId);
+      if (existing) {
+        existing.push(example);
+      } else {
+        grouped.set(example.faceDetectionId, [example]);
+      }
+    }
+    return grouped;
+  }, [assetState?.examples]);
 
   const reviewableCount = useMemo(
     () =>
@@ -654,6 +881,7 @@ export function AssetPeopleReviewDialog({
                     src={getThumbnailMediaUrl(asset.id)}
                     alt={`${asset.filename} source thumbnail`}
                     style={sourcePreviewImageStyle}
+                    onLoad={handleSourceImageLoad}
                   />
                   {showFaceBoxes ? (
                     <div style={overlaySurfaceStyle}>
@@ -674,10 +902,18 @@ export function AssetPeopleReviewDialog({
                             style={{
                               ...overlayBoxBaseStyle,
                               ...getDetectionOverlayPalette(detection.matchStatus, isSelected),
-                              left: `${detection.boundingBox.left * 100}%`,
-                              top: `${detection.boundingBox.top * 100}%`,
-                              width: `${detection.boundingBox.width * 100}%`,
-                              height: `${detection.boundingBox.height * 100}%`
+                              left: imageLayout
+                                ? `${(imageLayout.offsetLeftFrac + detection.boundingBox.left * imageLayout.scaleX) * 100}%`
+                                : `${detection.boundingBox.left * 100}%`,
+                              top: imageLayout
+                                ? `${(imageLayout.offsetTopFrac + detection.boundingBox.top * imageLayout.scaleY) * 100}%`
+                                : `${detection.boundingBox.top * 100}%`,
+                              width: imageLayout
+                                ? `${detection.boundingBox.width * imageLayout.scaleX * 100}%`
+                                : `${detection.boundingBox.width * 100}%`,
+                              height: imageLayout
+                                ? `${detection.boundingBox.height * imageLayout.scaleY * 100}%`
+                                : `${detection.boundingBox.height * 100}%`
                             }}
                             title={`${getDetectionOverlayLabel(
                               detection.matchStatus,
@@ -721,6 +957,54 @@ export function AssetPeopleReviewDialog({
             </div>
           ) : null}
 
+          {Object.keys(pendingAssignments).length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginTop: '12px', padding: '10px 12px', backgroundColor: '#fffdf0', border: '1px solid #d4a72c', borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#7a4f00' }}>
+                {Object.keys(pendingAssignments).length} assignment{Object.keys(pendingAssignments).length === 1 ? '' : 's'} queued
+              </span>
+              <div style={inlineRowStyle}>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : applyButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => void applyPendingAssignments()}>
+                  Apply Assignments ({Object.keys(pendingAssignments).length})
+                </button>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : compactButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => setPendingAssignments({})}>
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {Object.keys(pendingConfirmations).length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginTop: '12px', padding: '10px 12px', backgroundColor: '#f0faf5', border: '1px solid #2e9e68', borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#15603a' }}>
+                {Object.keys(pendingConfirmations).length} confirmation{Object.keys(pendingConfirmations).length === 1 ? '' : 's'} queued
+              </span>
+              <div style={inlineRowStyle}>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : applyButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => void applyPendingConfirmations()}>
+                  Apply Confirmations ({Object.keys(pendingConfirmations).length})
+                </button>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : compactButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => setPendingConfirmations({})}>
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {Object.keys(pendingIgnores).length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginTop: '12px', padding: '10px 12px', backgroundColor: '#f8fafc', border: '1px solid #64748b', borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                {Object.keys(pendingIgnores).length} ignore{Object.keys(pendingIgnores).length === 1 ? '' : 's'} queued
+              </span>
+              <div style={inlineRowStyle}>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : applyButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => void applyPendingIgnores()}>
+                  Apply Ignores ({Object.keys(pendingIgnores).length})
+                </button>
+                <button type="button" style={busyDetectionId ? disabledButtonStyle : compactButtonStyle} disabled={Boolean(busyDetectionId)} onClick={() => setPendingIgnores({})}>
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {errorMessage ? <p style={{ color: '#a32222', marginBottom: 0 }}>{errorMessage}</p> : null}
           {noticeMessage ? <p style={{ color: '#15603a', marginBottom: 0 }}>{noticeMessage}</p> : null}
         </section>
@@ -734,7 +1018,10 @@ export function AssetPeopleReviewDialog({
         {!loading &&
           assetState?.detections.map((detection) => {
             const draft = getDraft(detection.id);
-            const isBusy = busyDetectionId === detection.id;
+            const isBusy = busyDetectionId === detection.id || busyDetectionId === '__batch__';
+            const pendingAssignment = pendingAssignments[detection.id] ?? null;
+            const pendingConfirmation = pendingConfirmations[detection.id] ?? null;
+            const pendingIgnore = pendingIgnores[detection.id] ?? null;
             const suggestedPersonName = detection.autoMatchCandidatePersonId
               ? peopleById.get(detection.autoMatchCandidatePersonId) ?? ''
               : '';
@@ -743,11 +1030,31 @@ export function AssetPeopleReviewDialog({
               : '';
             const confirmHint = getConfirmActionHint(suggestedPersonName, matchedPersonName);
             const review = reviewByDetectionId.get(detection.id) ?? null;
-            const canConfirm =
-              typeof detection.autoMatchCandidatePersonId === 'string' ||
-              typeof detection.matchedPersonId === 'string';
+            const faceState = getFaceReviewActionState({
+              detection,
+              review,
+              matchedPerson: detection.matchedPersonId
+                ? { id: detection.matchedPersonId, displayName: matchedPersonName }
+                : null,
+              suggestedPerson: detection.autoMatchCandidatePersonId
+                ? { id: detection.autoMatchCandidatePersonId, displayName: suggestedPersonName }
+                : null
+            });
             const enrollPersonId = detection.matchedPersonId ?? detection.autoMatchCandidatePersonId ?? '';
             const isSelected = selectedDetection?.id === detection.id;
+            const exampleActionState = getExampleActionState({
+              faceState,
+              detection,
+              assignedPersonName: matchedPersonName || suggestedPersonName,
+              examples: examplesByDetectionId.get(detection.id) ?? [],
+              busy: isBusy
+            });
+            const selectedPersonOption = draft.selectedPersonId
+              ? peopleOptions.find((person) => person.id === draft.selectedPersonId) ?? null
+              : null;
+            const selectedPersonAssignmentState = selectedPersonOption
+              ? getAssignmentActionState({ faceState, person: selectedPersonOption, busy: isBusy })
+              : null;
 
             return (
               <section
@@ -794,6 +1101,24 @@ export function AssetPeopleReviewDialog({
                     {isSelected ? <span style={badgeStyle}>Selected</span> : null}
                     <span style={badgeStyle}>Face #{detection.faceIndex}</span>
                     <span style={badgeStyle}>Detection: {detection.id}</span>
+                    {pendingAssignment ? (
+                      <span style={queuedBadgeStyle}>
+                        Queued → {pendingAssignment.personName}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); cancelQueuedAssignment(detection.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#7a4f00', fontWeight: 700, fontSize: '13px' }} title="Cancel queued assignment">✕</button>
+                      </span>
+                    ) : null}
+                    {pendingConfirmation ? (
+                      <span style={queuedConfirmBadgeStyle}>
+                        Queued → Confirm {pendingConfirmation.personName}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); cancelQueuedConfirmation(detection.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#15603a', fontWeight: 700, fontSize: '13px' }} title="Cancel queued confirmation">✕</button>
+                      </span>
+                    ) : null}
+                    {pendingIgnore ? (
+                      <span style={queuedIgnoreBadgeStyle}>
+                        Queued → Ignore ({pendingIgnore.ignoredReason})
+                        <button type="button" onClick={(e) => { e.stopPropagation(); cancelQueuedIgnore(detection.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#334155', fontWeight: 700, fontSize: '13px' }} title="Cancel queued ignore">✕</button>
+                      </span>
+                    ) : null}
                   </div>
 
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
@@ -839,17 +1164,16 @@ export function AssetPeopleReviewDialog({
                     <div style={inlineRowStyle}>
                       <button
                         type="button"
-                        style={isBusy || !canConfirm ? disabledButtonStyle : primaryButtonStyle}
-                        disabled={isBusy || !canConfirm}
-                        onClick={() =>
-                          void runAction(detection.id, {
-                            type: 'confirm',
-                            personId: detection.autoMatchCandidatePersonId ?? detection.matchedPersonId ?? null
-                          })
-                        }
-                        title={confirmHint ?? undefined}
+                        style={isBusy || !faceState.canConfirm ? disabledButtonStyle : primaryButtonStyle}
+                        disabled={isBusy || !faceState.canConfirm}
+                        onClick={() => {
+                          const confirmPersonId = detection.autoMatchCandidatePersonId ?? detection.matchedPersonId ?? null;
+                          const personName = (confirmPersonId ? peopleById.get(confirmPersonId) : null) ?? 'Unknown';
+                          queueConfirmation(detection.id, confirmPersonId, personName);
+                        }}
+                        title={faceState.isPassiveConfirmed ? undefined : confirmHint ?? undefined}
                       >
-                        {getConfirmActionLabel(suggestedPersonName, matchedPersonName)}
+                        {faceState.label}
                       </button>
                       <button
                         type="button"
@@ -866,15 +1190,13 @@ export function AssetPeopleReviewDialog({
                     <div style={inlineRowStyle}>
                       <button
                         type="button"
-                        style={
-                          isBusy || detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0
-                            ? disabledButtonStyle
-                            : buttonStyle
-                        }
-                        disabled={isBusy || detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0}
+                        style={exampleActionState.canAddAssignedPersonAsExample ? buttonStyle : disabledButtonStyle}
+                        disabled={!exampleActionState.canAddAssignedPersonAsExample}
                         onClick={() => void handleEnroll(detection.id, enrollPersonId)}
                       >
-                        {matchedPersonName ? `Add ${matchedPersonName} As Example` : 'Add As Example'}
+                        {isBusy && !exampleActionState.alreadyExampleForAssignedPerson && (matchedPersonName || suggestedPersonName)
+                          ? `Adding ${matchedPersonName || suggestedPersonName} As Example...`
+                          : exampleActionState.label}
                       </button>
                     </div>
 
@@ -894,11 +1216,21 @@ export function AssetPeopleReviewDialog({
                       </select>
                       <button
                         type="button"
-                        style={isBusy || draft.selectedPersonId.length === 0 ? disabledButtonStyle : buttonStyle}
-                        disabled={isBusy || draft.selectedPersonId.length === 0}
-                        onClick={() => void runAction(detection.id, { type: 'assign', personId: draft.selectedPersonId })}
+                        style={
+                          isBusy ||
+                            draft.selectedPersonId.length === 0 ||
+                            selectedPersonAssignmentState?.isAlreadyAssigned
+                            ? disabledButtonStyle
+                            : buttonStyle
+                        }
+                        disabled={
+                          isBusy ||
+                          draft.selectedPersonId.length === 0 ||
+                          selectedPersonAssignmentState?.isAlreadyAssigned
+                        }
+                        onClick={() => queueAssignment(detection.id, draft.selectedPersonId)}
                       >
-                        Assign Existing
+                        {selectedPersonAssignmentState?.isAlreadyAssigned ? 'Already Assigned' : 'Queue Assignment'}
                       </button>
                     </div>
 
@@ -945,9 +1277,9 @@ export function AssetPeopleReviewDialog({
                         type="button"
                         style={isBusy ? disabledButtonStyle : buttonStyle}
                         disabled={isBusy}
-                        onClick={() => void runAction(detection.id, { type: 'ignore', ignoredReason: draft.ignoredReason })}
+                        onClick={() => queueIgnore(detection.id, draft.ignoredReason)}
                       >
-                        Ignore Face
+                        Queue Ignore
                       </button>
                     </div>
                   </div>

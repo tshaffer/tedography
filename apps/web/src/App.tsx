@@ -99,6 +99,7 @@ import {
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
 import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleMaintenanceDialog';
+import { PeopleRecognitionRunSummaryDialog } from './components/people/PeopleRecognitionRunSummaryDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import {
   collectKeywordDescendantIds,
@@ -129,7 +130,7 @@ import {
   sortAssetsForSmartAlbumOrder,
   usesCaptureTimeOrderInAlbum
 } from './utilities/smartAlbumOrder';
-import type { ListAssetFaceDetectionsResponse } from '@tedography/shared';
+import type { ListAssetFaceDetectionsResponse, PeopleRecognitionRunSummary, ProcessPeopleAssetResponse } from '@tedography/shared';
 
 const photoStateFilterOptions: PhotoState[] = [
   PhotoState.New,
@@ -162,6 +163,7 @@ const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
 const searchKeywordIdStorageKey = 'tedography.search.keywordId';
 const recentKeywordIdsStorageKey = 'tedography.keywords.recent';
+const peopleRunSummaryStorageKey = 'tedography.people.runSummary';
 
 function normalizeKeywordLabel(label: string): string {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -3078,6 +3080,86 @@ function SurveyMode({
   );
 }
 
+function computePeopleRunSummary(
+  requestedAssetIds: string[],
+  results: PromiseSettledResult<{ assetId: string; response: ProcessPeopleAssetResponse }>[],
+  scopeLabel: string,
+  scopeType: string
+): PeopleRecognitionRunSummary {
+  const processedAssetIds: string[] = [];
+  const notProcessedAssetIds: string[] = [];
+  const failedAssetIds: string[] = [];
+  const assetIdsWithFacesDetected: string[] = [];
+  const assetIdsWithSuggestedMatches: string[] = [];
+  const assetIdsWithConfirmedPeople: string[] = [];
+  const assetIdsWithUnmatchedFaces: string[] = [];
+  const assetIdsWithUserIgnoredFaces: string[] = [];
+  const assetIdsWithPipelineIgnoredFaces: string[] = [];
+  const assetIdsWithNoFacesDetected: string[] = [];
+
+  results.forEach((result, index) => {
+    const assetId = requestedAssetIds[index];
+    if (assetId === undefined) return;
+
+    if (result.status === 'rejected') {
+      failedAssetIds.push(assetId);
+      return;
+    }
+
+    const { response } = result.value;
+
+    if (!response.processed) {
+      notProcessedAssetIds.push(assetId);
+      return;
+    }
+
+    processedAssetIds.push(assetId);
+
+    if (response.detections.length === 0) {
+      assetIdsWithNoFacesDetected.push(assetId);
+      return;
+    }
+
+    assetIdsWithFacesDetected.push(assetId);
+
+    if (response.detections.some((d) => d.matchStatus === 'suggested' || d.matchStatus === 'autoMatched')) {
+      assetIdsWithSuggestedMatches.push(assetId);
+    }
+    if (response.detections.some((d) => d.matchStatus === 'confirmed')) {
+      assetIdsWithConfirmedPeople.push(assetId);
+    }
+    if (response.detections.some((d) => d.matchStatus === 'unmatched')) {
+      assetIdsWithUnmatchedFaces.push(assetId);
+    }
+
+    const userIgnoredDetectionIds = new Set(
+      response.reviews.filter((r) => r.decision === 'ignored').map((r) => r.faceDetectionId)
+    );
+    if (response.detections.some((d) => d.matchStatus === 'ignored' && userIgnoredDetectionIds.has(d.id))) {
+      assetIdsWithUserIgnoredFaces.push(assetId);
+    }
+    if (response.detections.some((d) => d.matchStatus === 'ignored' && !userIgnoredDetectionIds.has(d.id))) {
+      assetIdsWithPipelineIgnoredFaces.push(assetId);
+    }
+  });
+
+  return {
+    scopeLabel,
+    scopeType,
+    requestedAssetIds,
+    processedAssetIds,
+    assetIdsWithFacesDetected,
+    assetIdsWithSuggestedMatches,
+    assetIdsWithConfirmedPeople,
+    assetIdsWithUnmatchedFaces,
+    assetIdsWithUserIgnoredFaces,
+    assetIdsWithPipelineIgnoredFaces,
+    assetIdsWithNoFacesDetected,
+    failedAssetIds,
+    notProcessedAssetIds
+  };
+}
+
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -3155,6 +3237,10 @@ export default function App() {
   const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [peopleRecognitionBusy, setPeopleRecognitionBusy] = useState(false);
+  const [runSummary, setRunSummary] = useState<PeopleRecognitionRunSummary | null>(
+    () => readSessionStorageJson<PeopleRecognitionRunSummary>(peopleRunSummaryStorageKey)
+  );
+  const [runSummaryRefreshing, setRunSummaryRefreshing] = useState(false);
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [reviewVisiblePhotoStates, setReviewVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
@@ -5337,6 +5423,17 @@ export default function App() {
     void loadScopedPeopleSummary(currentScopedPeopleScope.assetIds);
   }, [currentScopedPeopleScope, scopedPeopleDialogOpen]);
 
+  // Refresh bucket counts whenever the dialog reappears after navigation (e.g. returning
+  // from the People Review page). The summary in session storage may reflect stale face
+  // statuses if the user confirmed or rejected faces while away.
+  useEffect(() => {
+    const restored = readSessionStorageJson<PeopleRecognitionRunSummary>(peopleRunSummaryStorageKey);
+    if (restored) {
+      void refreshRunSummaryBuckets(restored);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount only
+
   const mainPaneDescription = isReviewArea
     ? reviewBrowseMode === 'Albums'
       ? 'Review: album-scoped curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
@@ -6189,25 +6286,13 @@ export default function App() {
         })
       );
 
-      const succeeded = results.filter((result) => result.status === 'fulfilled');
+      const succeeded = results.filter(
+        (result): result is PromiseFulfilledResult<{ assetId: string; response: ProcessPeopleAssetResponse }> =>
+          result.status === 'fulfilled'
+      );
       const failed = results.filter((result) => result.status === 'rejected');
 
-      if (failed.length === 0) {
-        if (assetIds.length === 1 && selectedAssetId === assetIds[0]) {
-          await loadSelectedAssetPeopleStatus(assetIds[0]);
-        }
-        setPeopleRecognitionNotice({
-          kind: 'success',
-          message:
-            succeeded.length === 1
-              ? 'People recognition completed for 1 asset.'
-              : `People recognition completed for ${succeeded.length} assets.`,
-          ...(assetIds.length === 1 ? { reviewAssetId: assetIds[0] } : {})
-        });
-        return;
-      }
-
-      if (succeeded.length === 0) {
+      if (succeeded.length === 0 && failed.length > 0) {
         setPeopleRecognitionNotice({
           kind: 'error',
           message:
@@ -6218,14 +6303,43 @@ export default function App() {
         return;
       }
 
+      // Update asset detection counts in the grid
+      if (succeeded.length > 0) {
+        const updatesById = new Map(
+          succeeded.map(({ value }) => [
+            value.assetId,
+            {
+              people: value.response.people,
+              detectionsCount: value.response.detections.length,
+              reviewableDetectionsCount: value.response.detections.filter(
+                (d) => d.matchStatus === 'unmatched' || d.matchStatus === 'suggested' || d.matchStatus === 'autoMatched'
+              ).length,
+              confirmedDetectionsCount: value.response.detections.filter(
+                (d) => d.matchStatus === 'confirmed'
+              ).length
+            }
+          ])
+        );
+        setAssets((previous) =>
+          previous.map((asset) => {
+            const update = updatesById.get(asset.id);
+            return update ? { ...asset, ...update } : asset;
+          })
+        );
+      }
+
       if (assetIds.length === 1 && selectedAssetId === assetIds[0]) {
         await loadSelectedAssetPeopleStatus(assetIds[0]);
       }
-      setPeopleRecognitionNotice({
-        kind: 'error',
-        message: `People recognition completed for ${succeeded.length} assets, ${failed.length} failed.`,
-        ...(assetIds.length === 1 ? { reviewAssetId: assetIds[0] } : {})
-      });
+
+      const scopeLabel =
+        assetIds.length === 1
+          ? (assets.find((a) => a.id === assetIds[0])?.filename ?? '1 selected asset')
+          : `${assetIds.length} selected assets`;
+
+      const newRunSummary = computePeopleRunSummary(assetIds, results, scopeLabel, 'selected-assets');
+      writeSessionStorageJson(peopleRunSummaryStorageKey, newRunSummary);
+      setRunSummary(newRunSummary);
     } finally {
       setPeopleRecognitionBusy(false);
     }
@@ -6264,10 +6378,11 @@ export default function App() {
       return;
     }
 
-    const assetIds = currentScopedPeopleScope.assetIds;
+    const { assetIds, scopeType, scopeSourceLabel } = currentScopedPeopleScope;
+
     if (assetIds.length > 300) {
       const confirmed = window.confirm(
-        `${force ? 'Reprocess' : 'Run'} people recognition for ${assetIds.length} assets in ${currentScopedPeopleScope.scopeSourceLabel}?`
+        `${force ? 'Reprocess' : 'Run'} people recognition for ${assetIds.length} assets in ${scopeSourceLabel}?`
       );
       if (!confirmed) {
         return;
@@ -6286,7 +6401,7 @@ export default function App() {
       );
 
       const succeeded = results.filter(
-        (result): result is PromiseFulfilledResult<{ assetId: string; response: Awaited<ReturnType<typeof processPeopleAsset>> }> =>
+        (result): result is PromiseFulfilledResult<{ assetId: string; response: ProcessPeopleAssetResponse }> =>
           result.status === 'fulfilled'
       );
       const failed = results.filter((result) => result.status === 'rejected');
@@ -6314,12 +6429,7 @@ export default function App() {
         setAssets((previous) =>
           previous.map((asset) => {
             const update = updatesById.get(asset.id);
-            return update
-              ? {
-                  ...asset,
-                  ...update
-                }
-              : asset;
+            return update ? { ...asset, ...update } : asset;
           })
         );
       }
@@ -6335,6 +6445,10 @@ export default function App() {
           skipped > 0 ? `, skipped ${skipped}` : ''
         }${failureCount > 0 ? `, failed ${failureCount}` : ''}.`
       );
+
+      const newRunSummary = computePeopleRunSummary(assetIds, results, scopeSourceLabel, scopeType);
+      writeSessionStorageJson(peopleRunSummaryStorageKey, newRunSummary);
+      setRunSummary(newRunSummary);
     } catch (error) {
       setScopedPeopleError(error instanceof Error ? error.message : 'Failed to run scoped people recognition');
     } finally {
@@ -6363,6 +6477,133 @@ export default function App() {
     }
 
     setAssetPeopleReviewDialogOpen(true);
+  }
+
+  async function refreshRunSummaryBuckets(summary: PeopleRecognitionRunSummary): Promise<void> {
+    if (summary.processedAssetIds.length === 0) return;
+    setRunSummaryRefreshing(true);
+    try {
+      // TODO: replace with a bulk detection-status endpoint for large runs
+      const results = await Promise.allSettled(
+        summary.processedAssetIds.map(async (assetId) => {
+          const state = await getPeoplePipelineAssetState(assetId);
+          return { assetId, detections: state.detections, reviews: state.reviews };
+        })
+      );
+
+      const assetIdsWithFacesDetected: string[] = [];
+      const assetIdsWithSuggestedMatches: string[] = [];
+      const assetIdsWithConfirmedPeople: string[] = [];
+      const assetIdsWithUnmatchedFaces: string[] = [];
+      const assetIdsWithUserIgnoredFaces: string[] = [];
+      const assetIdsWithPipelineIgnoredFaces: string[] = [];
+      const assetIdsWithNoFacesDetected: string[] = [];
+
+      results.forEach((result, index) => {
+        const assetId = summary.processedAssetIds[index];
+        if (assetId === undefined || result.status === 'rejected') return;
+
+        const { detections, reviews } = result.value;
+        if (detections.length === 0) {
+          assetIdsWithNoFacesDetected.push(assetId);
+          return;
+        }
+
+        assetIdsWithFacesDetected.push(assetId);
+        if (detections.some((d) => d.matchStatus === 'suggested' || d.matchStatus === 'autoMatched')) {
+          assetIdsWithSuggestedMatches.push(assetId);
+        }
+        if (detections.some((d) => d.matchStatus === 'confirmed')) {
+          assetIdsWithConfirmedPeople.push(assetId);
+        }
+        if (detections.some((d) => d.matchStatus === 'unmatched')) {
+          assetIdsWithUnmatchedFaces.push(assetId);
+        }
+
+        const userIgnoredDetectionIds = new Set(
+          reviews.filter((r) => r.decision === 'ignored').map((r) => r.faceDetectionId)
+        );
+        if (detections.some((d) => d.matchStatus === 'ignored' && userIgnoredDetectionIds.has(d.id))) {
+          assetIdsWithUserIgnoredFaces.push(assetId);
+        }
+        if (detections.some((d) => d.matchStatus === 'ignored' && !userIgnoredDetectionIds.has(d.id))) {
+          assetIdsWithPipelineIgnoredFaces.push(assetId);
+        }
+      });
+
+      const refreshed: PeopleRecognitionRunSummary = {
+        ...summary,
+        assetIdsWithFacesDetected,
+        assetIdsWithSuggestedMatches,
+        assetIdsWithConfirmedPeople,
+        assetIdsWithUnmatchedFaces,
+        assetIdsWithUserIgnoredFaces,
+        assetIdsWithPipelineIgnoredFaces,
+        assetIdsWithNoFacesDetected
+      };
+
+      writeSessionStorageJson(peopleRunSummaryStorageKey, refreshed);
+      setRunSummary(refreshed);
+    } catch {
+      // Keep existing counts on error — user can dismiss and re-run if needed
+    } finally {
+      setRunSummaryRefreshing(false);
+    }
+  }
+
+  function dismissRunSummary(): void {
+    setRunSummary(null);
+    window.sessionStorage.removeItem(peopleRunSummaryStorageKey);
+  }
+
+  function handleRunSummaryReviewSuggested(): void {
+    if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) return;
+    writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
+    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
+      assetIds: runSummary.assetIdsWithSuggestedMatches,
+      scopeType: runSummary.scopeType,
+      scopeLabel: `Run summary – suggested matches (${runSummary.assetIdsWithSuggestedMatches.length} assets)`,
+      scopeSourceLabel: runSummary.scopeLabel
+    } satisfies ScopedPeopleReviewAssetIdsState);
+    void navigate('/people/review?scopeAssetIds=active');
+  }
+
+  function handleRunSummaryReviewUnmatched(): void {
+    if (!runSummary || runSummary.assetIdsWithUnmatchedFaces.length === 0) return;
+    writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
+    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
+      assetIds: runSummary.assetIdsWithUnmatchedFaces,
+      scopeType: runSummary.scopeType,
+      scopeLabel: `Run summary – unmatched faces (${runSummary.assetIdsWithUnmatchedFaces.length} assets)`,
+      scopeSourceLabel: runSummary.scopeLabel
+    } satisfies ScopedPeopleReviewAssetIdsState);
+    void navigate('/people/review?scopeAssetIds=active');
+  }
+
+  function handleRunSummaryReviewIgnoredFaces(): void {
+    if (!runSummary || runSummary.assetIdsWithPipelineIgnoredFaces.length === 0) return;
+    writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
+    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
+      assetIds: runSummary.assetIdsWithPipelineIgnoredFaces,
+      scopeType: runSummary.scopeType,
+      scopeLabel: `Run summary – auto-ignored faces (${runSummary.assetIdsWithPipelineIgnoredFaces.length} assets)`,
+      scopeSourceLabel: runSummary.scopeLabel
+    } satisfies ScopedPeopleReviewAssetIdsState);
+    void navigate('/people/review?scopeAssetIds=active');
+  }
+
+  function handleRunSummaryShowNoFaceAssets(): void {
+    if (!runSummary || runSummary.assetIdsWithNoFacesDetected.length === 0) return;
+    setSelectedAssetIds(runSummary.assetIdsWithNoFacesDetected);
+    setSelectedAssetId(runSummary.assetIdsWithNoFacesDetected[0] ?? null);
+    dismissRunSummary();
+  }
+
+  function handleRunSummaryShowFailedAssets(): void {
+    if (!runSummary || runSummary.failedAssetIds.length === 0) return;
+    setSelectedAssetIds(runSummary.failedAssetIds);
+    setSelectedAssetId(runSummary.failedAssetIds[0] ?? null);
+    dismissRunSummary();
   }
 
   function handleSelectRelativeInList(list: MediaAsset[], offset: number): void {
@@ -10268,6 +10509,19 @@ export default function App() {
         onReprocessRecognition={() => void runPeopleRecognitionForAssetScope(true)}
         onOpenReview={handleOpenScopedPeopleReview}
       />
+      {runSummary ? (
+        <PeopleRecognitionRunSummaryDialog
+          open
+          summary={runSummary}
+          isRefreshing={runSummaryRefreshing}
+          onClose={dismissRunSummary}
+          onReviewSuggestedMatches={handleRunSummaryReviewSuggested}
+          onReviewUnmatchedFaces={handleRunSummaryReviewUnmatched}
+          onReviewIgnoredFaces={handleRunSummaryReviewIgnoredFaces}
+          onShowNoFaceAssets={handleRunSummaryShowNoFaceAssets}
+          onShowFailedAssets={handleRunSummaryShowFailedAssets}
+        />
+      ) : null}
     </div>
   );
 }

@@ -117,12 +117,14 @@ export interface ListAssetFaceDetectionsResponse {
   assetId: string;
   detections: FaceDetection[];
   reviews: FaceMatchReview[];
+  examples: PersonFaceExample[];
   people: MediaAssetPerson[];
 }
 
 export interface PeopleReviewQueueItem {
   detection: FaceDetection;
   review: FaceMatchReview | null;
+  examples: PersonFaceExample[];
   asset: Pick<MediaAsset, 'id' | 'filename' | 'originalArchivePath' | 'captureDateTime' | 'photoState' | 'people'>;
   suggestedPerson: Person | null;
   matchedPerson: Person | null;
@@ -270,4 +272,22 @@ export interface SplitPersonResponse {
   movedExampleCount: number;
   affectedAssetCount: number;
   createdTargetPerson: boolean;
+}
+
+export interface PeopleRecognitionRunSummary {
+  scopeLabel: string;
+  scopeType: string;
+  requestedAssetIds: string[];
+  processedAssetIds: string[];
+  assetIdsWithFacesDetected: string[];
+  assetIdsWithSuggestedMatches: string[];
+  assetIdsWithConfirmedPeople: string[];
+  assetIdsWithUnmatchedFaces: string[];
+  /** Assets where the user explicitly clicked Ignore Face (has a review record with decision=ignored). */
+  assetIdsWithUserIgnoredFaces: string[];
+  /** Assets where the recognition engine auto-ignored a face (no user review record). */
+  assetIdsWithPipelineIgnoredFaces: string[];
+  assetIdsWithNoFacesDetected: string[];
+  failedAssetIds: string[];
+  notProcessedAssetIds: string[];
 }

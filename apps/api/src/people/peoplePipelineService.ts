@@ -46,6 +46,7 @@ import {
   findActivePersonFaceExampleByPersonAndDetection,
   findPersonFaceExampleById,
   listActivePersonFaceExamplesByDetectionId,
+  listActivePersonFaceExamplesByDetectionIds,
   listActivePersonFaceExamplesByPersonId,
   markPersonFaceExampleRemoved
 } from '../repositories/personFaceExampleRepository.js';
@@ -61,6 +62,25 @@ import { PeopleRecognitionEngineError } from './recognitionEngine.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+// Minimum IoU for two bounding boxes to be considered the same face across runs.
+const confirmedPreservationIoUThreshold = 0.4;
+
+function computeBoundingBoxIoU(
+  a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number }
+): number {
+  const intersectionLeft = Math.max(a.left, b.left);
+  const intersectionTop = Math.max(a.top, b.top);
+  const intersectionRight = Math.min(a.left + a.width, b.left + b.width);
+  const intersectionBottom = Math.min(a.top + a.height, b.top + b.height);
+  const intersectionWidth = Math.max(0, intersectionRight - intersectionLeft);
+  const intersectionHeight = Math.max(0, intersectionBottom - intersectionTop);
+  const intersectionArea = intersectionWidth * intersectionHeight;
+  if (intersectionArea === 0) return 0;
+  const unionArea = a.width * a.height + b.width * b.height - intersectionArea;
+  return unionArea <= 0 ? 0 : intersectionArea / unionArea;
 }
 
 function isEligibleMediaAsset(asset: MediaAsset): { eligible: boolean; reason?: string } {
@@ -196,11 +216,13 @@ async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetF
     listFaceMatchReviewsByAssetId(assetId),
     findById(assetId)
   ]);
+  const examples = await listActivePersonFaceExamplesByDetectionIds(detections.map((detection) => detection.id));
 
   return {
     assetId,
     detections,
     reviews,
+    examples,
     people: asset?.people ?? []
   };
 }
@@ -302,6 +324,19 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
     throw error;
   }
 
+  // Snapshot confirmed detections + their reviews before the engine run so we can
+  // restore human-confirmed assignments for faces that the engine re-detects at the
+  // same bounding-box location.
+  const priorDetections = await listFaceDetectionsByAssetId(asset.id);
+  const priorConfirmed = priorDetections.filter(
+    (d): d is FaceDetection & { matchedPersonId: string } =>
+      d.matchStatus === 'confirmed' && typeof d.matchedPersonId === 'string'
+  );
+  const priorReviews = priorConfirmed.length > 0
+    ? await listFaceMatchReviewsByDetectionIds(priorConfirmed.map((d) => d.id))
+    : [];
+  const priorReviewByDetectionId = new Map(priorReviews.map((r) => [r.faceDetectionId, r]));
+
   const people = await listPeople();
   const engine = getPeopleRecognitionEngine();
   let detectedFaces;
@@ -326,7 +361,6 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
   }
 
   const nextDetections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>> = [];
-  const pendingReviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
 
   for (const [index, detectedFace] of detectedFaces.entries()) {
     const normalizedBoundingBox = {
@@ -442,32 +476,116 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
     });
   }
 
+  // Match each new detection to a prior confirmed detection by bounding-box IoU.
+  // A greedy highest-IoU-first approach prevents two new detections claiming the same
+  // prior confirmed detection.
+  const usedPriorConfirmedIds = new Set<string>();
+  // Maps index in nextDetections → the prior confirmed detection it was matched to.
+  const confirmedPreservationByIndex = new Map<number, typeof priorConfirmed[number]>();
+
+  for (let i = 0; i < nextDetections.length; i++) {
+    const newSpec = nextDetections[i];
+    if (!newSpec) continue;
+
+    let bestMatch: typeof priorConfirmed[number] | null = null;
+    let bestIoU = 0;
+
+    for (const prior of priorConfirmed) {
+      if (usedPriorConfirmedIds.has(prior.id)) continue;
+      const iou = computeBoundingBoxIoU(newSpec.boundingBox, prior.boundingBox);
+      if (iou >= confirmedPreservationIoUThreshold && iou > bestIoU) {
+        bestIoU = iou;
+        bestMatch = prior;
+      }
+    }
+
+    if (bestMatch) {
+      usedPriorConfirmedIds.add(bestMatch.id);
+      confirmedPreservationByIndex.set(i, bestMatch);
+      // Inherit confirmed state; keep the new engine metadata (boundingBox, crop,
+      // autoMatchCandidate) so the record reflects the current run's output.
+      nextDetections[i] = {
+        ...newSpec,
+        matchStatus: 'confirmed',
+        matchedPersonId: bestMatch.matchedPersonId,
+        matchConfidence: bestMatch.matchConfidence ?? null
+      };
+    }
+  }
+
   const detections = await replaceFaceDetectionsForAsset({
     mediaAssetId: asset.id,
     detections: nextDetections
   });
 
-  for (const detection of detections) {
-    if (detection.matchStatus !== 'suggested' && detection.matchStatus !== 'autoMatched') {
-      continue;
-    }
+  // replaceFaceDetectionsForAsset returns detections sorted by faceIndex, so
+  // detections[i] corresponds to nextDetections[i].
+  //
+  // For each preserved confirmed detection: migrate PersonFaceExample records from
+  // the old detection ID to the new one (without re-enrolling with the engine — the
+  // face is still enrolled; only the DB tracking reference needs updating).
+  for (let i = 0; i < detections.length; i++) {
+    const newDetection = detections[i];
+    const priorConfirmedDetection = confirmedPreservationByIndex.get(i);
+    if (!newDetection || !priorConfirmedDetection) continue;
 
-    pendingReviewSpecs.push({
-      faceDetectionId: detection.id,
-      mediaAssetId: asset.id,
-      suggestedPersonId: detection.autoMatchCandidatePersonId ?? null,
-      suggestedConfidence: detection.autoMatchCandidateConfidence ?? null,
-      finalPersonId: null,
-      decision: 'pending',
-      reviewer: null,
-      notes: null,
-      ignoredReason: null
-    });
+    const oldExamples = await listActivePersonFaceExamplesByDetectionId(priorConfirmedDetection.id);
+    for (const oldExample of oldExamples) {
+      await createPersonFaceExample({
+        personId: oldExample.personId,
+        faceDetectionId: newDetection.id,
+        mediaAssetId: newDetection.mediaAssetId,
+        engine: oldExample.engine,
+        subjectKey: oldExample.subjectKey ?? null,
+        engineExampleId: oldExample.engineExampleId ?? null
+      });
+      // Mark the old record removed without calling the engine — the face remains enrolled.
+      await markPersonFaceExampleRemoved(oldExample.id);
+    }
+  }
+
+  // Build review specs: carry forward preserved confirmed reviews (with updated
+  // faceDetectionId) and create fresh pending reviews for new suggested/autoMatched faces.
+  const reviewSpecs: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>> = [];
+
+  for (let i = 0; i < detections.length; i++) {
+    const detection = detections[i];
+    if (!detection) continue;
+
+    const priorConfirmedDetection = confirmedPreservationByIndex.get(i);
+    if (priorConfirmedDetection) {
+      const priorReview = priorReviewByDetectionId.get(priorConfirmedDetection.id);
+      if (priorReview) {
+        reviewSpecs.push({
+          faceDetectionId: detection.id,
+          mediaAssetId: asset.id,
+          suggestedPersonId: priorReview.suggestedPersonId ?? null,
+          suggestedConfidence: priorReview.suggestedConfidence ?? null,
+          finalPersonId: priorReview.finalPersonId ?? null,
+          decision: priorReview.decision,
+          reviewer: priorReview.reviewer ?? null,
+          notes: priorReview.notes ?? null,
+          ignoredReason: priorReview.ignoredReason ?? null
+        });
+      }
+    } else if (detection.matchStatus === 'suggested' || detection.matchStatus === 'autoMatched') {
+      reviewSpecs.push({
+        faceDetectionId: detection.id,
+        mediaAssetId: asset.id,
+        suggestedPersonId: detection.autoMatchCandidatePersonId ?? null,
+        suggestedConfidence: detection.autoMatchCandidateConfidence ?? null,
+        finalPersonId: null,
+        decision: 'pending',
+        reviewer: null,
+        notes: null,
+        ignoredReason: null
+      });
+    }
   }
 
   const reviews = await replaceFaceMatchReviewsForAsset({
     mediaAssetId: asset.id,
-    reviews: pendingReviewSpecs
+    reviews: reviewSpecs
   });
   const derivedPeople = await recomputeMediaAssetPeople(asset.id);
 
@@ -505,7 +623,7 @@ export async function listPeopleReviewQueue(input?: {
     ...(input?.statuses ? { statuses: input.statuses } : {}),
     ...(input?.limit !== undefined ? { limit: input.limit } : {})
   });
-  const [reviews, assets, counts] = await Promise.all([
+  const [reviews, assets, counts, examples] = await Promise.all([
     listFaceMatchReviewsByDetectionIds(detections.map((item) => item.id)),
     findByIds(Array.from(new Set(detections.map((item) => item.mediaAssetId)))),
     countFaceDetectionsByStatus(
@@ -516,10 +634,20 @@ export async function listPeopleReviewQueue(input?: {
         : input?.personId
           ? { personId: input.personId }
           : undefined
-    )
+    ),
+    listActivePersonFaceExamplesByDetectionIds(detections.map((item) => item.id))
   ]);
 
   const reviewsByDetectionId = new Map(reviews.map((review) => [review.faceDetectionId, review]));
+  const examplesByDetectionId = new Map<string, typeof examples>();
+  for (const example of examples) {
+    const existing = examplesByDetectionId.get(example.faceDetectionId);
+    if (existing) {
+      existing.push(example);
+    } else {
+      examplesByDetectionId.set(example.faceDetectionId, [example]);
+    }
+  }
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const personIds = Array.from(
     new Set(
@@ -542,6 +670,7 @@ export async function listPeopleReviewQueue(input?: {
       {
         detection,
         review: reviewsByDetectionId.get(detection.id) ?? null,
+        examples: examplesByDetectionId.get(detection.id) ?? [],
         asset: {
           id: asset.id,
           filename: asset.filename,

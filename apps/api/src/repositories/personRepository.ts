@@ -23,7 +23,7 @@ export async function syncPersonIndexes(): Promise<void> {
 }
 
 export async function listPeople(): Promise<Person[]> {
-  const people = await PersonModel.find({}, { _id: 0 })
+  const people = await PersonModel.find({ isHidden: { $ne: true }, isArchived: { $ne: true } }, { _id: 0 })
     .sort({ displayName: 1, id: 1 })
     .lean<Person[]>();
   return people.map(normalizePerson);

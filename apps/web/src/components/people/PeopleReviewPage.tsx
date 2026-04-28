@@ -10,6 +10,7 @@ import {
   reviewFaceDetection
 } from '../../api/peoplePipelineApi';
 import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getAssignmentActionState, getExampleActionState, getFaceReviewActionState } from './peopleReviewActionState';
 
 const pageStyle: CSSProperties = {
   fontFamily: 'Arial, sans-serif',
@@ -193,6 +194,43 @@ const compactButtonStyle: CSSProperties = {
   fontSize: '12px'
 };
 
+const queuedBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  backgroundColor: '#fffbeb',
+  borderColor: '#d4a72c',
+  color: '#7a4f00',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
+const applyButtonStyle: CSSProperties = {
+  ...buttonStyle,
+  backgroundColor: '#0f5f73',
+  color: '#fff',
+  borderColor: '#0f5f73'
+};
+
+const queuedConfirmBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  backgroundColor: '#edfaf3',
+  borderColor: '#2e9e68',
+  color: '#15603a',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
+const queuedIgnoreBadgeStyle: CSSProperties = {
+  ...badgeStyle,
+  backgroundColor: '#f1f5f9',
+  borderColor: '#64748b',
+  color: '#334155',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px'
+};
+
 const statusOptions: Array<{ value: FaceDetectionMatchStatus; label: string }> = [
   { value: 'suggested', label: 'Suggested' },
   { value: 'autoMatched', label: 'Auto Matched' },
@@ -255,7 +293,7 @@ function readScopedPeopleReviewAssetIdsState(): ScopedPeopleReviewAssetIdsState 
 }
 
 function getDefaultStatusesForAssetScope(assetId: string): FaceDetectionMatchStatus[] {
-  return assetId.trim().length > 0 ? [...defaultStatuses, 'confirmed'] : defaultStatuses;
+  return assetId.trim().length > 0 ? [...defaultStatuses, 'confirmed', 'ignored'] : defaultStatuses;
 }
 
 type ReviewDraftState = {
@@ -356,21 +394,6 @@ function getMatchStatusSummary(item: PeopleReviewQueueItem): string {
   }
 }
 
-function getConfirmActionLabel(item: PeopleReviewQueueItem): string {
-  const suggestedPersonName = item.suggestedPerson?.displayName?.trim() ?? '';
-  const assignedPersonName = item.matchedPerson?.displayName?.trim() ?? '';
-
-  if (suggestedPersonName.length > 0 && suggestedPersonName !== assignedPersonName) {
-    return `Confirm Suggested (${suggestedPersonName})`;
-  }
-
-  if (assignedPersonName.length > 0) {
-    return `Confirm ${assignedPersonName}`;
-  }
-
-  return 'Confirm';
-}
-
 function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
   const suggestedPersonName = item.suggestedPerson?.displayName?.trim() ?? '';
   const assignedPersonName = item.matchedPerson?.displayName?.trim() ?? '';
@@ -414,6 +437,9 @@ export function PeopleReviewPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [summary, setSummary] = useState<PeoplePipelineSummaryResponse | null>(null);
+  const [pendingAssignments, setPendingAssignments] = useState<Record<string, { personId: string; personName: string }>>({});
+  const [pendingConfirmations, setPendingConfirmations] = useState<Record<string, { confirmPersonId: string | null; personName: string }>>({});
+  const [pendingIgnores, setPendingIgnores] = useState<Record<string, { ignoredReason: FaceDetectionIgnoredReason }>>({});
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const assignSelectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
   const createInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -502,12 +528,12 @@ export function PeopleReviewPage() {
     });
   }, [searchParams]);
 
-  function getDraft(detectionId: string): ReviewDraftState {
+  function getDraft(detectionId: string, storedIgnoredReason?: FaceDetectionIgnoredReason | null): ReviewDraftState {
     return (
       draftByDetectionId[detectionId] ?? {
         selectedPersonId: '',
         newPersonName: '',
-        ignoredReason: 'user-ignored'
+        ignoredReason: storedIgnoredReason ?? 'user-ignored'
       }
     );
   }
@@ -604,6 +630,176 @@ export function PeopleReviewPage() {
     }
   }
 
+  function queueAssignment(item: PeopleReviewQueueItem, personId: string): void {
+    const personName = peopleOptions.find((p) => p.id === personId)?.displayName ?? personId;
+    setPendingAssignments((current) => ({ ...current, [item.detection.id]: { personId, personName } }));
+    rememberRecentPerson(personId);
+    advanceAfterAction(item.detection.id);
+  }
+
+  function cancelQueuedAssignment(detectionId: string): void {
+    setPendingAssignments((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingAssignments(): Promise<void> {
+    const entries = Object.entries(pendingAssignments);
+    if (entries.length === 0) {
+      return;
+    }
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { personId }]) =>
+          reviewFaceDetection(detectionId, {
+            action: 'assign',
+            personId,
+            reviewer: 'people-review-ui'
+          })
+        )
+      );
+
+      const succeededCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+
+      setPendingAssignments({});
+      await loadPageData();
+
+      if (failedCount === 0) {
+        setNoticeMessage(`Assigned ${succeededCount} face${succeededCount === 1 ? '' : 's'}.`);
+      } else {
+        setNoticeMessage(
+          `Assigned ${succeededCount} face${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+        );
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply assignments');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
+  function queueConfirmation(item: PeopleReviewQueueItem): void {
+    const confirmPersonId =
+      item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId ?? null;
+    const personName =
+      item.suggestedPerson?.displayName ?? item.matchedPerson?.displayName ?? 'Unknown';
+    setPendingConfirmations((current) => ({
+      ...current,
+      [item.detection.id]: { confirmPersonId, personName }
+    }));
+    rememberRecentPerson(confirmPersonId);
+    advanceAfterAction(item.detection.id);
+  }
+
+  function cancelQueuedConfirmation(detectionId: string): void {
+    setPendingConfirmations((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingConfirmations(): Promise<void> {
+    const entries = Object.entries(pendingConfirmations);
+    if (entries.length === 0) {
+      return;
+    }
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { confirmPersonId }]) =>
+          reviewFaceDetection(detectionId, {
+            action: 'confirm',
+            ...(confirmPersonId ? { personId: confirmPersonId } : {}),
+            reviewer: 'people-review-ui'
+          })
+        )
+      );
+
+      const succeededCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+
+      setPendingConfirmations({});
+      await loadPageData();
+
+      if (failedCount === 0) {
+        setNoticeMessage(`Confirmed ${succeededCount} face${succeededCount === 1 ? '' : 's'}.`);
+      } else {
+        setNoticeMessage(
+          `Confirmed ${succeededCount} face${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+        );
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply confirmations');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
+  function queueIgnore(item: PeopleReviewQueueItem, ignoredReason: FaceDetectionIgnoredReason): void {
+    setPendingIgnores((current) => ({ ...current, [item.detection.id]: { ignoredReason } }));
+    advanceAfterAction(item.detection.id);
+  }
+
+  function cancelQueuedIgnore(detectionId: string): void {
+    setPendingIgnores((current) => {
+      const next = { ...current };
+      delete next[detectionId];
+      return next;
+    });
+  }
+
+  async function applyPendingIgnores(): Promise<void> {
+    const entries = Object.entries(pendingIgnores);
+    if (entries.length === 0) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled(
+        entries.map(([detectionId, { ignoredReason }]) =>
+          reviewFaceDetection(detectionId, {
+            action: 'ignore',
+            ignoredReason,
+            reviewer: 'people-review-ui'
+          })
+        )
+      );
+
+      const succeededCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+
+      setPendingIgnores({});
+      await loadPageData();
+
+      if (failedCount === 0) {
+        setNoticeMessage(`Ignored ${succeededCount} face${succeededCount === 1 ? '' : 's'}.`);
+      } else {
+        setNoticeMessage(
+          `Ignored ${succeededCount} face${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+        );
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply ignores');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
   async function runAction(
     item: PeopleReviewQueueItem,
     action:
@@ -653,6 +849,7 @@ export function PeopleReviewPage() {
           displayName: action.displayName,
           reviewer: 'people-review-ui'
         });
+        updateDraft(item.detection.id, { newPersonName: '' });
         setNoticeMessage(`Created and assigned person for face ${item.detection.id}.`);
       } else {
         await reviewFaceDetection(item.detection.id, {
@@ -713,6 +910,15 @@ export function PeopleReviewPage() {
       const results = await Promise.allSettled(
         selectedItems.map((item) => {
           if (action === 'confirm') {
+            const faceState = getFaceReviewActionState({
+              detection: item.detection,
+              review: item.review,
+              matchedPerson: item.matchedPerson,
+              suggestedPerson: item.suggestedPerson
+            });
+            if (!faceState.canConfirm) {
+              return Promise.reject(new Error(`Face ${item.detection.id} is already confirmed or has no person to confirm`));
+            }
             const confirmPersonId =
               item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId ?? null;
             if (!confirmPersonId) {
@@ -733,7 +939,7 @@ export function PeopleReviewPage() {
             });
           }
 
-          const ignoredReason = getDraft(item.detection.id).ignoredReason;
+          const ignoredReason = getDraft(item.detection.id, item.detection.ignoredReason).ignoredReason;
           return reviewFaceDetection(item.detection.id, {
             action: 'ignore',
             ignoredReason,
@@ -796,12 +1002,15 @@ export function PeopleReviewPage() {
       }
 
       if (event.key === 'c' || event.key === 'C') {
-        const canConfirm =
-          typeof currentItem.detection.autoMatchCandidatePersonId === 'string' ||
-          typeof currentItem.detection.matchedPersonId === 'string';
-        if (canConfirm) {
+        const faceState = getFaceReviewActionState({
+          detection: currentItem.detection,
+          review: currentItem.review,
+          matchedPerson: currentItem.matchedPerson,
+          suggestedPerson: currentItem.suggestedPerson
+        });
+        if (faceState.canConfirm) {
           event.preventDefault();
-          void runAction(currentItem, { type: 'confirm' });
+          queueConfirmation(currentItem);
         }
         return;
       }
@@ -814,8 +1023,8 @@ export function PeopleReviewPage() {
 
       if (event.key === 'i' || event.key === 'I') {
         event.preventDefault();
-        const draft = getDraft(currentItem.detection.id);
-        void runAction(currentItem, { type: 'ignore', ignoredReason: draft.ignoredReason });
+        const draft = getDraft(currentItem.detection.id, currentItem.detection.ignoredReason);
+        queueIgnore(currentItem, draft.ignoredReason);
         return;
       }
 
@@ -1126,6 +1335,120 @@ export function PeopleReviewPage() {
           </div>
         ) : null}
 
+        {Object.keys(pendingAssignments).length > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginTop: '14px',
+              marginBottom: '14px',
+              padding: '12px',
+              backgroundColor: '#fffdf0',
+              borderColor: '#d4a72c',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ ...inlineRowStyle, justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7a4f00' }}>
+                {Object.keys(pendingAssignments).length} assignment{Object.keys(pendingAssignments).length === 1 ? '' : 's'} queued
+              </div>
+              <div style={inlineRowStyle}>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : applyButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void applyPendingAssignments()}
+                >
+                  Apply Assignments ({Object.keys(pendingAssignments).length})
+                </button>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => setPendingAssignments({})}
+                >
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {Object.keys(pendingConfirmations).length > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginTop: '14px',
+              marginBottom: '14px',
+              padding: '12px',
+              backgroundColor: '#f0faf5',
+              borderColor: '#2e9e68',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ ...inlineRowStyle, justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#15603a' }}>
+                {Object.keys(pendingConfirmations).length} confirmation{Object.keys(pendingConfirmations).length === 1 ? '' : 's'} queued
+              </div>
+              <div style={inlineRowStyle}>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : applyButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void applyPendingConfirmations()}
+                >
+                  Apply Confirmations ({Object.keys(pendingConfirmations).length})
+                </button>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => setPendingConfirmations({})}
+                >
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {Object.keys(pendingIgnores).length > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginTop: '14px',
+              marginBottom: '14px',
+              padding: '12px',
+              backgroundColor: '#f8fafc',
+              borderColor: '#64748b',
+              boxShadow: 'none'
+            }}
+          >
+            <div style={{ ...inlineRowStyle, justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                {Object.keys(pendingIgnores).length} ignore{Object.keys(pendingIgnores).length === 1 ? '' : 's'} queued
+              </div>
+              <div style={inlineRowStyle}>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : applyButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => void applyPendingIgnores()}
+                >
+                  Apply Ignores ({Object.keys(pendingIgnores).length})
+                </button>
+                <button
+                  type="button"
+                  style={busyDetectionId ? disabledButtonStyle : compactButtonStyle}
+                  disabled={Boolean(busyDetectionId)}
+                  onClick={() => setPendingIgnores({})}
+                >
+                  Clear Queue
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {summary ? (
           <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: 0 }}>
             <div style={metaItemStyle}>
@@ -1224,17 +1547,35 @@ export function PeopleReviewPage() {
 
       {!loading
         ? filteredItems.map((item) => {
-            const draft = getDraft(item.detection.id);
+            const draft = getDraft(item.detection.id, item.detection.ignoredReason);
             const isBusy = busyDetectionId === item.detection.id || busyDetectionId === '__batch__';
-            const canConfirm =
-              typeof item.detection.autoMatchCandidatePersonId === 'string' ||
-              typeof item.detection.matchedPersonId === 'string';
+            const faceState = getFaceReviewActionState({
+              detection: item.detection,
+              review: item.review,
+              matchedPerson: item.matchedPerson,
+              suggestedPerson: item.suggestedPerson
+            });
             const enrollPersonId = item.detection.matchedPersonId ?? item.detection.autoMatchCandidatePersonId ?? '';
             const enrollPersonName = item.matchedPerson?.displayName ?? item.suggestedPerson?.displayName ?? '';
-            const confirmActionLabel = getConfirmActionLabel(item);
+            const exampleActionState = getExampleActionState({
+              faceState,
+              detection: item.detection,
+              assignedPersonName: enrollPersonName,
+              examples: item.examples,
+              busy: isBusy
+            });
             const confirmActionHint = getConfirmActionHint(item);
             const isCurrent = currentItem?.detection.id === item.detection.id;
             const isSelected = selectedDetectionIdSet.has(item.detection.id);
+            const pendingAssignment = pendingAssignments[item.detection.id] ?? null;
+            const pendingConfirmation = pendingConfirmations[item.detection.id] ?? null;
+            const pendingIgnore = pendingIgnores[item.detection.id] ?? null;
+            const selectedPersonOption = draft.selectedPersonId
+              ? peopleOptions.find((person) => person.id === draft.selectedPersonId) ?? null
+              : null;
+            const selectedPersonAssignmentState = selectedPersonOption
+              ? getAssignmentActionState({ faceState, person: selectedPersonOption, busy: isBusy })
+              : null;
 
             return (
               <section
@@ -1307,6 +1648,45 @@ export function PeopleReviewPage() {
                     {isCurrent ? <span style={currentBadgeStyle}>Current</span> : null}
                     <span style={badgeStyle}>Face #{item.detection.faceIndex}</span>
                     <span style={badgeStyle}>Asset: {item.asset.id}</span>
+                    {pendingAssignment ? (
+                      <span style={queuedBadgeStyle}>
+                        Queued → {pendingAssignment.personName}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); cancelQueuedAssignment(item.detection.id); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#7a4f00', fontWeight: 700, fontSize: '13px' }}
+                          title="Cancel queued assignment"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : null}
+                    {pendingConfirmation ? (
+                      <span style={queuedConfirmBadgeStyle}>
+                        Queued → Confirm {pendingConfirmation.personName}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); cancelQueuedConfirmation(item.detection.id); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#15603a', fontWeight: 700, fontSize: '13px' }}
+                          title="Cancel queued confirmation"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : null}
+                    {pendingIgnore ? (
+                      <span style={queuedIgnoreBadgeStyle}>
+                        Queued → Ignore ({pendingIgnore.ignoredReason})
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); cancelQueuedIgnore(item.detection.id); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', lineHeight: 1, color: '#334155', fontWeight: 700, fontSize: '13px' }}
+                          title="Cancel queued ignore"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : null}
                   </div>
 
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
@@ -1368,12 +1748,12 @@ export function PeopleReviewPage() {
                     <div style={inlineRowStyle}>
                       <button
                         type="button"
-                        style={isBusy || !canConfirm ? disabledButtonStyle : primaryButtonStyle}
-                        disabled={isBusy || !canConfirm}
-                        onClick={() => void runAction(item, { type: 'confirm' })}
-                        title={confirmActionHint ?? undefined}
+                        style={isBusy || !faceState.canConfirm ? disabledButtonStyle : primaryButtonStyle}
+                        disabled={isBusy || !faceState.canConfirm}
+                        onClick={() => queueConfirmation(item)}
+                        title={faceState.isPassiveConfirmed ? undefined : confirmActionHint ?? undefined}
                       >
-                        {confirmActionLabel}
+                        {faceState.label}
                       </button>
                       <button
                         type="button"
@@ -1399,34 +1779,36 @@ export function PeopleReviewPage() {
                     <div style={inlineRowStyle}>
                       <button
                         type="button"
-                        style={
-                          isBusy || item.detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0
-                            ? disabledButtonStyle
-                            : buttonStyle
-                        }
-                        disabled={isBusy || item.detection.matchStatus !== 'confirmed' || enrollPersonId.length === 0}
+                        style={exampleActionState.canAddAssignedPersonAsExample ? buttonStyle : disabledButtonStyle}
+                        disabled={!exampleActionState.canAddAssignedPersonAsExample}
                         onClick={() => void handleEnroll(item, enrollPersonId)}
                       >
-                        {enrollPersonName ? `Add ${enrollPersonName} As Example` : 'Add As Example'}
+                        {isBusy && !exampleActionState.alreadyExampleForAssignedPerson && enrollPersonName
+                          ? `Adding ${enrollPersonName} As Example...`
+                          : exampleActionState.label}
                       </button>
                     </div>
 
                     {recentPeople.length > 0 ? (
                       <div style={inlineRowStyle}>
-                        {recentPeople.map((person) => (
-                          <button
-                            key={person.id}
-                            type="button"
-                            style={isBusy ? disabledButtonStyle : compactButtonStyle}
-                            disabled={isBusy}
-                            onClick={() => {
-                              updateDraft(item.detection.id, { selectedPersonId: person.id });
-                              void runAction(item, { type: 'assign', personId: person.id });
-                            }}
-                          >
-                            Assign {person.displayName}
-                          </button>
-                        ))}
+                        {recentPeople.map((person) => {
+                          const assignmentState = getAssignmentActionState({ faceState, person, busy: isBusy });
+
+                          return (
+                            <button
+                              key={person.id}
+                              type="button"
+                              style={assignmentState.disabled ? disabledButtonStyle : compactButtonStyle}
+                              disabled={assignmentState.disabled}
+                              onClick={() => {
+                                updateDraft(item.detection.id, { selectedPersonId: person.id });
+                                queueAssignment(item, person.id);
+                              }}
+                            >
+                              {assignmentState.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : null}
 
@@ -1449,11 +1831,21 @@ export function PeopleReviewPage() {
                       </select>
                       <button
                         type="button"
-                        style={isBusy || draft.selectedPersonId.length === 0 ? disabledButtonStyle : buttonStyle}
-                        disabled={isBusy || draft.selectedPersonId.length === 0}
-                        onClick={() => void runAction(item, { type: 'assign', personId: draft.selectedPersonId })}
+                        style={
+                          isBusy ||
+                            draft.selectedPersonId.length === 0 ||
+                            selectedPersonAssignmentState?.isAlreadyAssigned
+                            ? disabledButtonStyle
+                            : buttonStyle
+                        }
+                        disabled={
+                          isBusy ||
+                          draft.selectedPersonId.length === 0 ||
+                          selectedPersonAssignmentState?.isAlreadyAssigned
+                        }
+                        onClick={() => queueAssignment(item, draft.selectedPersonId)}
                       >
-                        Assign Existing
+                        {selectedPersonAssignmentState?.isAlreadyAssigned ? 'Already Assigned' : 'Queue Assignment'}
                       </button>
                     </div>
 
@@ -1505,9 +1897,9 @@ export function PeopleReviewPage() {
                         type="button"
                         style={isBusy ? disabledButtonStyle : buttonStyle}
                         disabled={isBusy}
-                        onClick={() => void runAction(item, { type: 'ignore', ignoredReason: draft.ignoredReason })}
+                        onClick={() => queueIgnore(item, draft.ignoredReason)}
                       >
-                        Ignore Face
+                        Queue Ignore
                       </button>
                     </div>
                   </div>

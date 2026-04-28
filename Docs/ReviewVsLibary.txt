@@ -1,0 +1,101 @@
+ Review vs. Library: User-Facing Differences
+
+  Purpose and default photo states
+
+  Review is the curation workspace. Its default filter shows New and Pending assets — the photos that have not yet been decided on. The intent is that the user works through these assets, assigning Keep, Pending, or
+  Discard.
+
+  Library is the browsing and organisation workspace. Its default filter shows only Keep assets — the photos that have already been approved. The intent is that the user is browsing, organising, and curating their
+  confirmed archive.
+
+  Each area remembers its own photo state filter independently, so checking or unchecking states in one area does not affect the other.
+
+  ---
+  Auto-advance
+
+  Review has an Auto-advance checkbox in the toolbar. When enabled, rating an asset (keyboard or button) automatically moves the selection to the next asset in the list. This supports rapid sequential curation.
+
+  Library has no Auto-advance control. It is never present in the Library toolbar.
+
+  ---
+  Browse sub-modes (Flat / Timeline / Albums)
+
+  Both areas support the same three sub-modes — Flat, Timeline, and Albums — with separate, independently persisted preferences. Review defaults to Albums; Library defaults to Timeline.
+
+  ---
+  Album tree panel
+
+  Both areas show the album tree when in Albums sub-mode, but with one difference: Library adds a "Add top-level group" button to the album panel header. This button is absent in Review. Album editing (creating
+  groups, reordering, moving nodes) is considered a Library activity.
+
+  In Review Albums mode, the album tree is also shown, but only the checked albums filter the visible assets — no editing controls appear.
+
+  ---
+  Slideshow
+
+  Library has a Slide button in the toolbar. Selecting one or more assets and pressing it starts a slideshow.
+
+  Review does not have a slideshow button.
+
+  ---
+  People tools
+
+  Library shows two people-related toolbar controls:
+  - Run People Recognition — triggers face detection on the selected assets
+  - People Scope — opens scoped people tools scoped to the current selection or album
+
+  Review has neither of these buttons.
+
+  In the right-panel Inspector, the people summary (detection count, reviewable count, confirmed people names, and link to people review) is only shown in Library. It is never shown in Review.
+
+  ---
+  Import button
+
+  The Import button is shown in Library (and Search). It is hidden in Review.
+
+  ---
+  Albums sub-mode: presentation options
+
+  In Library Albums mode, the user can switch between Merged (all checked albums shown as one flat list) and Grouped (each checked album shown as a separate section) via the View Options menu. This toggle only applies
+   in Library Albums mode — in Review Albums mode there is only the grouped-by-album presentation with no toggle.
+
+  ---
+  Asset visibility logic in Albums mode
+
+  In Review Albums, an asset is visible if it belongs to at least one checked album and its photo state matches the current filter. The asset set is always grouped by album.
+
+  In Library Albums, the same album-membership filter applies, but the user can additionally choose Merged or Grouped presentation. The merged path deduplicates assets that belong to multiple checked albums.
+
+  ---
+  Right-panel Inspector: people status
+
+  As noted above, the people status block in the Inspector panel is gated on isLibraryArea && selectedAssetIds.length === 1. It never appears in Review.
+
+  ---
+  Summary table
+
+  ┌────────────────────────────────┬───────────────────────────────────┬───────────────────────────────────┐
+  │            Feature             │              Review               │              Library              │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Default photo states           │ New + Pending                     │ Keep                              │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Photo state filter             │ Per-area, persisted independently │ Per-area, persisted independently │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Auto-advance                   │ Yes                               │ No                                │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Default browse sub-mode        │ Albums                            │ Timeline                          │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Album tree editing (Add group) │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Slideshow                      │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Run People Recognition         │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ People Scope tool              │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Inspector people status        │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Import button                  │ No                                │ Yes                               │
+  ├────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
+  │ Album Merged/Grouped toggle    │ No                                │ Yes (Albums mode only)            │
+  └────────────────────────────────┴───────────────────────────────────┴───────────────────────────────────┘

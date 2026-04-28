@@ -17,6 +17,15 @@ function normalizePersonFaceExample(item: PersonFaceExample): PersonFaceExample 
   };
 }
 
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 11000
+  );
+}
+
 export async function syncPersonFaceExampleIndexes(): Promise<void> {
   await PersonFaceExampleModel.syncIndexes();
   log.info('Synchronized personFaceExamples indexes');
@@ -32,6 +41,21 @@ export async function listActivePersonFaceExamplesByPersonId(personId: string): 
 export async function listActivePersonFaceExamplesByDetectionId(faceDetectionId: string): Promise<PersonFaceExample[]> {
   const items = await PersonFaceExampleModel.find({ faceDetectionId, status: 'active' }, { _id: 0 })
     .sort({ createdAt: -1, id: -1 })
+    .lean<PersonFaceExample[]>();
+  return items.map(normalizePersonFaceExample);
+}
+
+export async function listActivePersonFaceExamplesByDetectionIds(faceDetectionIds: string[]): Promise<PersonFaceExample[]> {
+  const normalizedIds = [...new Set(faceDetectionIds.map((id) => id.trim()).filter(Boolean))];
+  if (normalizedIds.length === 0) {
+    return [];
+  }
+
+  const items = await PersonFaceExampleModel.find(
+    { faceDetectionId: { $in: normalizedIds }, status: 'active' },
+    { _id: 0 }
+  )
+    .sort({ faceDetectionId: 1, createdAt: -1, id: -1 })
     .lean<PersonFaceExample[]>();
   return items.map(normalizePersonFaceExample);
 }
@@ -78,17 +102,31 @@ export async function createPersonFaceExample(input: {
   engineExampleId?: string | null;
 }): Promise<PersonFaceExample> {
   const id = randomUUID();
-  await PersonFaceExampleModel.create({
-    id,
-    personId: input.personId,
-    faceDetectionId: input.faceDetectionId,
-    mediaAssetId: input.mediaAssetId,
-    engine: input.engine,
-    subjectKey: input.subjectKey ?? null,
-    engineExampleId: input.engineExampleId ?? null,
-    status: 'active',
-    removedAt: null
-  });
+  try {
+    await PersonFaceExampleModel.create({
+      id,
+      personId: input.personId,
+      faceDetectionId: input.faceDetectionId,
+      mediaAssetId: input.mediaAssetId,
+      engine: input.engine,
+      subjectKey: input.subjectKey ?? null,
+      engineExampleId: input.engineExampleId ?? null,
+      status: 'active',
+      removedAt: null
+    });
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      const existing = await findActivePersonFaceExampleByPersonAndDetection({
+        personId: input.personId,
+        faceDetectionId: input.faceDetectionId
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
+    throw error;
+  }
 
   const item = await findPersonFaceExampleById(id);
   if (!item) {
