@@ -103,8 +103,8 @@ import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleM
 import { PeopleRecognitionRunSummaryDialog } from './components/people/PeopleRecognitionRunSummaryDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import {
-  collectKeywordDescendantIds,
   formatKeywordPathLabel,
+  getKeywordPathLabels,
   sortKeywordsByPath
 } from './utilities/keywords';
 import { prefetchImage } from './utilities/imagePrefetch';
@@ -162,7 +162,9 @@ const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
 const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
-const searchKeywordIdStorageKey = 'tedography.search.keywordId';
+const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
+const searchKeywordIncludeModeStorageKey = 'tedography.search.keyword.includeMode';
+const searchKeywordExcludeStorageKey = 'tedography.search.keyword.exclude';
 const recentKeywordIdsStorageKey = 'tedography.keywords.recent';
 const peopleRunSummaryStorageKey = 'tedography.people.runSummary';
 
@@ -248,6 +250,16 @@ type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 type SearchPeopleMatchMode = 'Any' | 'All';
 
+type KeywordQueryClause = {
+  keywordId: string;
+};
+
+type KeywordQueryState = {
+  include: KeywordQueryClause[];
+  includeMode: 'all' | 'any';
+  exclude: KeywordQueryClause[];
+};
+
 type SearchFilters = {
   photoStates: PhotoState[];
   albumIds: string[];
@@ -260,7 +272,7 @@ type SearchFilters = {
   peopleMatchMode: SearchPeopleMatchMode;
   hasNoPeople: boolean;
   hasReviewableFaces: boolean;
-  keywordId: string | null;
+  keywordQuery: KeywordQueryState;
 };
 
 type AssetsBootstrapScope =
@@ -1974,6 +1986,27 @@ function parseBooleanFromStorage(value: string | null): boolean {
   return value === 'true';
 }
 
+function parseKeywordClausesFromStorage(value: string | null): KeywordQueryClause[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (entry): entry is KeywordQueryClause =>
+        typeof (entry as KeywordQueryClause)?.keywordId === 'string' &&
+        (entry as KeywordQueryClause).keywordId.length > 0
+    );
+  } catch {
+    return [];
+  }
+}
+
 function parseSearchPeopleMatchModeFromStorage(value: string | null): SearchPeopleMatchMode {
   return value === 'All' ? 'All' : 'Any';
 }
@@ -2236,7 +2269,7 @@ function getDefaultSearchFilters(): SearchFilters {
     peopleMatchMode: 'Any',
     hasNoPeople: false,
     hasReviewableFaces: false,
-    keywordId: null
+    keywordQuery: { include: [], includeMode: 'all', exclude: [] }
   };
 }
 
@@ -2257,7 +2290,11 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.peopleMatchMode === right.peopleMatchMode &&
     left.hasNoPeople === right.hasNoPeople &&
     left.hasReviewableFaces === right.hasReviewableFaces &&
-    left.keywordId === right.keywordId
+    left.keywordQuery.includeMode === right.keywordQuery.includeMode &&
+    left.keywordQuery.include.length === right.keywordQuery.include.length &&
+    left.keywordQuery.exclude.length === right.keywordQuery.exclude.length &&
+    left.keywordQuery.include.every((c, i) => c.keywordId === right.keywordQuery.include[i]?.keywordId) &&
+    left.keywordQuery.exclude.every((c, i) => c.keywordId === right.keywordQuery.exclude[i]?.keywordId)
   );
 }
 
@@ -2273,7 +2310,8 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.peopleIds.length > 0 ||
     filters.hasNoPeople ||
     filters.hasReviewableFaces ||
-    filters.keywordId !== null
+    filters.keywordQuery.include.length > 0 ||
+    filters.keywordQuery.exclude.length > 0
   );
 }
 
@@ -3345,16 +3383,25 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasReviewableFacesStorageKey));
   });
-  const [searchKeywordId, setSearchKeywordId] = useState<string | null>(() => {
+  const [searchKeywordInclude, setSearchKeywordInclude] = useState<KeywordQueryClause[]>(() =>
+    typeof window !== 'undefined'
+      ? parseKeywordClausesFromStorage(window.localStorage.getItem(searchKeywordIncludeStorageKey))
+      : []
+  );
+  const [searchKeywordIncludeMode, setSearchKeywordIncludeMode] = useState<'all' | 'any'>(() => {
     if (typeof window === 'undefined') {
-      return null;
+      return 'all';
     }
 
-    const stored = window.localStorage.getItem(searchKeywordIdStorageKey);
-    return typeof stored === 'string' && stored.trim().length > 0 ? stored : null;
+    const stored = window.localStorage.getItem(searchKeywordIncludeModeStorageKey);
+    return stored === 'any' ? 'any' : 'all';
   });
+  const [searchKeywordExclude, setSearchKeywordExclude] = useState<KeywordQueryClause[]>(() =>
+    typeof window !== 'undefined'
+      ? parseKeywordClausesFromStorage(window.localStorage.getItem(searchKeywordExcludeStorageKey))
+      : []
+  );
   const [appliedSearchFilters, setAppliedSearchFilters] = useState<SearchFilters | null>(null);
-  const [searchKeywordQuery, setSearchKeywordQuery] = useState('');
   const [searchPeopleQuery, setSearchPeopleQuery] = useState('');
   const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
@@ -3909,13 +3956,16 @@ export default function App() {
   }, [searchHasReviewableFaces]);
 
   useEffect(() => {
-    if (searchKeywordId) {
-      window.localStorage.setItem(searchKeywordIdStorageKey, searchKeywordId);
-      return;
-    }
+    window.localStorage.setItem(searchKeywordIncludeStorageKey, JSON.stringify(searchKeywordInclude));
+  }, [searchKeywordInclude]);
 
-    window.localStorage.removeItem(searchKeywordIdStorageKey);
-  }, [searchKeywordId]);
+  useEffect(() => {
+    window.localStorage.setItem(searchKeywordIncludeModeStorageKey, searchKeywordIncludeMode);
+  }, [searchKeywordIncludeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchKeywordExcludeStorageKey, JSON.stringify(searchKeywordExclude));
+  }, [searchKeywordExclude]);
 
   useEffect(() => {
     if (assets.length > 0) {
@@ -4500,7 +4550,11 @@ export default function App() {
       peopleMatchMode: searchPeopleMatchMode,
       hasNoPeople: searchHasNoPeople,
       hasReviewableFaces: searchHasReviewableFaces,
-      keywordId: searchKeywordId
+      keywordQuery: {
+        include: searchKeywordInclude,
+        includeMode: searchKeywordIncludeMode,
+        exclude: searchKeywordExclude
+      }
     }),
     [
       searchAlbumIds,
@@ -4511,20 +4565,14 @@ export default function App() {
       searchGroupIds,
       searchHasNoPeople,
       searchHasReviewableFaces,
-      searchKeywordId,
+      searchKeywordInclude,
+      searchKeywordIncludeMode,
+      searchKeywordExclude,
       searchPeopleIds,
       searchPeopleMatchMode,
       searchPhotoStates
     ]
   );
-  const activeSearchKeywordIds = useMemo(() => {
-    if (!appliedSearchFilters?.keywordId) {
-      return null;
-    }
-
-    return collectKeywordDescendantIds(keywords, appliedSearchFilters.keywordId);
-  }, [appliedSearchFilters?.keywordId, keywords]);
-
   const searchResults = useMemo(() => {
     if (primaryArea !== 'Search' || appliedSearchFilters === null) {
       return [];
@@ -4534,6 +4582,7 @@ export default function App() {
     const searchGroupAlbumIdsSet = new Set(
       getDescendantAlbumIdsForGroupIds(albumTreeNodes, appliedSearchFilters.groupIds)
     );
+    const { include, includeMode, exclude } = appliedSearchFilters.keywordQuery;
 
     const filtered = areaPhotoStateVisibleAssets.filter((asset) => {
       const matchesPhotoState =
@@ -4559,9 +4608,16 @@ export default function App() {
         appliedSearchFilters.hasNoPeople,
         appliedSearchFilters.hasReviewableFaces
       );
-      const matchesKeyword =
-        activeSearchKeywordIds === null ||
-        (asset.keywordIds ?? []).some((keywordId) => activeSearchKeywordIds.has(keywordId));
+      const assetKeywordSet = new Set(asset.keywordIds ?? []);
+      let includePass = true;
+      if (include.length > 0) {
+        if (includeMode === 'all') {
+          includePass = include.every((c) => assetKeywordSet.has(c.keywordId));
+        } else {
+          includePass = include.some((c) => assetKeywordSet.has(c.keywordId));
+        }
+      }
+      const matchesKeyword = includePass && !exclude.some((c) => assetKeywordSet.has(c.keywordId));
 
       return (
         matchesPhotoState &&
@@ -4580,7 +4636,6 @@ export default function App() {
     albumTreeNodes,
     areaPhotoStateVisibleAssets,
     primaryArea,
-    activeSearchKeywordIds,
   ]);
 
   const assetsAfterAdditionalFilters = useMemo(() => {
@@ -4994,25 +5049,10 @@ export default function App() {
     () => new Map(yearGroupOptions.map((group) => [group.id, group])),
     [yearGroupOptions]
   );
-  const selectedSearchKeyword = useMemo(
-    () => (searchKeywordId ? keywordsById.get(searchKeywordId) ?? null : null),
-    [keywordsById, searchKeywordId]
-  );
   const activeSmartAlbum = useMemo(
     () => (activeSmartAlbumId ? smartAlbumsById.get(activeSmartAlbumId) ?? null : null),
     [activeSmartAlbumId, smartAlbumsById]
   );
-  const filteredSearchKeywordOptions = useMemo(() => {
-    const query = searchKeywordQuery.trim().toLowerCase();
-
-    if (query.length === 0) {
-      return keywords;
-    }
-
-    return keywords.filter((keyword) =>
-      formatKeywordPathLabel(keyword, keywordsById).toLowerCase().includes(query)
-    );
-  }, [keywords, keywordsById, searchKeywordQuery]);
   function getSmartAlbumFilterSpecForSearchFilters(filters: SearchFilters): SmartAlbumFilterSpec | null {
     const activeUnsupportedFilters =
       filters.albumIds.length > 0 ||
@@ -5044,8 +5084,12 @@ export default function App() {
 
     const firstSearchPhotoState =
       filters.photoStates.length === 1 ? (filters.photoStates[0] ?? null) : null;
+    const singleIncludeKeywordId =
+      filters.keywordQuery.include.length === 1 && filters.keywordQuery.exclude.length === 0
+        ? (filters.keywordQuery.include[0]?.keywordId ?? null)
+        : null;
     const filterSpec = normalizeSmartAlbumFilterSpecForComparison({
-      keywordId: filters.keywordId,
+      keywordId: singleIncludeKeywordId,
       photoState: firstSearchPhotoState,
       yearGroupId
     });
@@ -5072,15 +5116,13 @@ export default function App() {
     [activeSmartAlbum, appliedSearchSmartAlbumFilterSpec, primaryArea]
   );
   useEffect(() => {
-    if (keywordsLoading || keywordsError || !searchKeywordId) {
+    if (keywordsLoading || keywordsError) {
       return;
     }
 
-    if (!keywordsById.has(searchKeywordId)) {
-      setSearchKeywordId(null);
-      setSearchKeywordQuery('');
-    }
-  }, [keywordsById, keywordsError, keywordsLoading, searchKeywordId]);
+    setSearchKeywordInclude((prev) => prev.filter((c) => keywordsById.has(c.keywordId)));
+    setSearchKeywordExclude((prev) => prev.filter((c) => keywordsById.has(c.keywordId)));
+  }, [keywordsById, keywordsError, keywordsLoading]);
   useEffect(() => {
     if (activeSmartAlbumId && !smartAlbumsById.has(activeSmartAlbumId)) {
       setActiveSmartAlbumId(null);
@@ -5229,10 +5271,11 @@ export default function App() {
   const hasPendingSearchChanges = appliedSearchFilters === null
     ? !isPendingSearchDefault
     : !searchFiltersEqual(pendingSearchFilters, appliedSearchFilters);
-  const appliedSearchKeyword = useMemo(
-    () => (appliedSearchFilters?.keywordId ? keywordsById.get(appliedSearchFilters.keywordId) ?? null : null),
-    [appliedSearchFilters?.keywordId, keywordsById]
-  );
+  const appliedKeywordQuery: KeywordQueryState | null = appliedSearchFilters
+    ? appliedSearchFilters.keywordQuery
+    : null;
+  const appliedKeywordQueryActive =
+    (appliedKeywordQuery?.include.length ?? 0) > 0 || (appliedKeywordQuery?.exclude.length ?? 0) > 0;
   const canSaveCurrentSearchAsSmartAlbum =
     appliedSearchSmartAlbumFilterSpec !== null &&
     !hasPendingSearchChanges &&
@@ -5242,18 +5285,6 @@ export default function App() {
     appliedSearchFilters !== null &&
     hasSearchFilters(appliedSearchFilters) &&
     appliedSearchSmartAlbumFilterSpec === null;
-  const hasAdditionalAppliedSearchFiltersBesidesKeyword =
-    appliedSearchFilters !== null &&
-    (appliedSearchFilters.photoStates.length > 0 ||
-      appliedSearchFilters.albumIds.length > 0 ||
-      appliedSearchFilters.groupIds.length > 0 ||
-      appliedSearchFilters.filenamePattern.trim().length > 0 ||
-      appliedSearchFilters.captureDateFrom.length > 0 ||
-      appliedSearchFilters.captureDateTo.length > 0 ||
-      appliedSearchFilters.captureDateAvailability !== 'datedOnly' ||
-      appliedSearchFilters.peopleIds.length > 0 ||
-      appliedSearchFilters.hasNoPeople ||
-      appliedSearchFilters.hasReviewableFaces);
   const hasCheckedAlbums = checkedAlbumIds.length > 0;
   const hasAssetsInCheckedAlbumsAfterFilters = checkedAlbumSections.length > 0;
   const isReviewArea = primaryArea === 'Review';
@@ -7033,7 +7064,9 @@ export default function App() {
     setSearchPeopleMatchMode(filters.peopleMatchMode);
     setSearchHasNoPeople(filters.hasNoPeople);
     setSearchHasReviewableFaces(filters.hasReviewableFaces);
-    setSearchKeywordId(filters.keywordId);
+    setSearchKeywordInclude(filters.keywordQuery.include);
+    setSearchKeywordIncludeMode(filters.keywordQuery.includeMode);
+    setSearchKeywordExclude(filters.keywordQuery.exclude);
   }
 
   function applyPendingSearchFilters(): void {
@@ -7056,7 +7089,6 @@ export default function App() {
   function clearSearchFilters(): void {
     setPendingSearchFilters(getDefaultSearchFilters());
     setAppliedSearchFilters(null);
-    setSearchKeywordQuery('');
     setSearchPeopleQuery('');
     setActiveSmartAlbumId(null);
     setSmartAlbumSaveError(null);
@@ -7068,18 +7100,18 @@ export default function App() {
 
   function applySmartAlbumToSearch(smartAlbum: SmartAlbum): void {
     const filterSpec = normalizeSmartAlbumFilterSpecForComparison(smartAlbum.filterSpec);
-    const keyword = filterSpec.keywordId ? keywordsById.get(filterSpec.keywordId) ?? null : null;
     const nextFilters: SearchFilters = {
       ...getDefaultSearchFilters(),
       photoStates: filterSpec.photoState ? [filterSpec.photoState] : [],
       groupIds: filterSpec.yearGroupId ? [filterSpec.yearGroupId] : [],
-      keywordId: filterSpec.keywordId ?? null
+      keywordQuery: filterSpec.keywordId
+        ? { include: [{ keywordId: filterSpec.keywordId }], includeMode: 'all', exclude: [] }
+        : { include: [], includeMode: 'all', exclude: [] }
     };
 
     setPrimaryArea('Search');
     setPendingSearchFilters(nextFilters);
     setAppliedSearchFilters(nextFilters);
-    setSearchKeywordQuery(keyword ? formatKeywordPathLabel(keyword, keywordsById) : '');
     setSearchPeopleQuery('');
     setActiveSmartAlbumId(smartAlbum.id);
     setSmartAlbumSaveError(null);
@@ -8881,53 +8913,131 @@ export default function App() {
           ) : null}
         </div>
         <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>Keyword</h3>
-          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
-            Find photos tagged with one keyword across the whole library. Parent keywords include their descendants.
-          </div>
-          <div style={filterRowStyle}>
-            <Autocomplete
-              options={filteredSearchKeywordOptions}
-              value={selectedSearchKeyword}
-              inputValue={searchKeywordQuery}
-              onInputChange={(_event, value) => setSearchKeywordQuery(value)}
-              onChange={(_event, value) => {
-                setSearchKeywordId(value?.id ?? null);
-                setSearchKeywordQuery(
-                  value ? formatKeywordPathLabel(value, keywordsById) : ''
-                );
-              }}
-              getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              loading={keywordsLoading}
-              style={{ minWidth: 0, width: '100%' }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  size="small"
-                  label="Keyword"
-                  placeholder="Find keyword"
-                  error={Boolean(keywordsError)}
-                  helperText={keywordsError ?? undefined}
+          {(() => {
+            const includeKeywords = searchKeywordInclude
+              .map((c) => keywordsById.get(c.keywordId))
+              .filter((k): k is Keyword => k !== undefined);
+            const excludeKeywords = searchKeywordExclude
+              .map((c) => keywordsById.get(c.keywordId))
+              .filter((k): k is Keyword => k !== undefined);
+            const conflictIds = new Set(
+              searchKeywordInclude
+                .map((c) => c.keywordId)
+                .filter((id) => searchKeywordExclude.some((e) => e.keywordId === id))
+            );
+            const includeIds = new Set(searchKeywordInclude.map((c) => c.keywordId));
+            const excludeIds = new Set(searchKeywordExclude.map((c) => c.keywordId));
+            const availableForInclude = keywords.filter((k) => !includeIds.has(k.id));
+            const availableForExclude = keywords.filter((k) => !excludeIds.has(k.id));
+
+            return (
+              <>
+                {/* Include row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Include</h3>
+                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                    {(['all', 'any'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setSearchKeywordIncludeMode(mode)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '11px',
+                          fontWeight: searchKeywordIncludeMode === mode ? 700 : 400,
+                          backgroundColor: searchKeywordIncludeMode === mode ? '#dbeafe' : '#f9f9f9',
+                          color: searchKeywordIncludeMode === mode ? '#1d4ed8' : '#555',
+                          border: 'none',
+                          cursor: 'pointer',
+                          borderRight: mode === 'all' ? '1px solid #c8c8c8' : 'none'
+                        }}
+                      >
+                        {mode === 'all' ? 'Match all' : 'Match any'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Autocomplete<Keyword, true, false, false>
+                  multiple
+                  options={availableForInclude}
+                  value={includeKeywords}
+                  onChange={(_event, value) => {
+                    setSearchKeywordInclude(value.map((k) => ({ keywordId: k.id })));
+                  }}
+                  getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={keywordsLoading}
+                  renderOption={(props, option) => {
+                    const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                    const pathLabels = getKeywordPathLabels(option, keywordsById);
+                    const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
+                    const parentPath = pathLabels.slice(0, -1).join(' / ');
+                    return (
+                      <li key={key} {...rest}>
+                        <div style={{ lineHeight: 1.35 }}>
+                          {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                          <div style={{ fontSize: '13px' }}>{leafName}</div>
+                        </div>
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={includeKeywords.length === 0 ? 'Add keywords to include' : ''}
+                      error={Boolean(keywordsError)}
+                    />
+                  )}
                 />
-              )}
-            />
-          </div>
-          {selectedSearchKeyword ? (
-            <div style={searchPeopleChipRowStyle}>
-              <button
-                type="button"
-                style={searchPeopleChipStyle}
-                onClick={() => {
-                  setSearchKeywordId(null);
-                  setSearchKeywordQuery('');
-                }}
-                title={`Remove keyword filter ${selectedSearchKeyword.label}`}
-              >
-                Keyword: {formatKeywordPathLabel(selectedSearchKeyword, keywordsById)} ×
-              </button>
-            </div>
-          ) : null}
+
+                {/* Exclude row */}
+                <h3 style={{ ...filterSubsectionTitleStyle, margin: '4px 0 0 0' }}>Exclude</h3>
+                <Autocomplete<Keyword, true, false, false>
+                  multiple
+                  options={availableForExclude}
+                  value={excludeKeywords}
+                  onChange={(_event, value) => {
+                    setSearchKeywordExclude(value.map((k) => ({ keywordId: k.id })));
+                  }}
+                  getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={keywordsLoading}
+                  renderOption={(props, option) => {
+                    const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                    const pathLabels = getKeywordPathLabels(option, keywordsById);
+                    const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
+                    const parentPath = pathLabels.slice(0, -1).join(' / ');
+                    return (
+                      <li key={key} {...rest}>
+                        <div style={{ lineHeight: 1.35 }}>
+                          {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                          <div style={{ fontSize: '13px' }}>{leafName}</div>
+                        </div>
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={excludeKeywords.length === 0 ? 'Add keywords to exclude' : ''}
+                    />
+                  )}
+                />
+
+                {/* Conflict warning */}
+                {conflictIds.size > 0 ? (
+                  <p style={{ margin: 0, fontSize: '11px', color: '#a12622' }}>
+                    A keyword is both included and excluded. Exclude takes precedence.
+                  </p>
+                ) : null}
+              </>
+            );
+          })()}
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Photo State</h3>
@@ -10190,20 +10300,32 @@ export default function App() {
                       </button>
                     </div>
                   ) : null}
-                  {appliedSearchKeyword ? (
+                  {appliedKeywordQueryActive && appliedKeywordQuery ? (
                     <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
                       <div style={selectionChipStyle}>
-                        Keyword: {formatKeywordPathLabel(appliedSearchKeyword, keywordsById)}
+                        {(() => {
+                          const incLabels = appliedKeywordQuery.include
+                            .map((c) => keywordsById.get(c.keywordId)?.label ?? c.keywordId)
+                            .join(', ');
+                          const excLabels = appliedKeywordQuery.exclude
+                            .map((c) => keywordsById.get(c.keywordId)?.label ?? c.keywordId)
+                            .join(', ');
+                          const incText = incLabels
+                            ? `${appliedKeywordQuery.includeMode === 'all' ? 'All of' : 'Any of'}: ${incLabels}`
+                            : null;
+                          const excText = excLabels ? `Excluding: ${excLabels}` : null;
+                          return [incText, excText].filter(Boolean).join(' · ');
+                        })()}
                       </div>
                       <button
                         type="button"
                         style={compareButtonStyle}
                         onClick={() => {
-                          setSearchKeywordId(null);
-                          setSearchKeywordQuery('');
+                          setSearchKeywordInclude([]);
+                          setSearchKeywordExclude([]);
                         }}
                       >
-                        Clear Keyword
+                        Clear Keywords
                       </button>
                     </div>
                   ) : null}
@@ -10329,10 +10451,6 @@ export default function App() {
                     ? `No photos found for Smart Album "${activeSmartAlbum.label}".`
                     : hasDivergedSmartAlbumSearch && activeSmartAlbum
                     ? `No photos found for Search from Smart Album "${activeSmartAlbum.label}".`
-                    : appliedSearchKeyword
-                    ? `No photos found for keyword "${formatKeywordPathLabel(appliedSearchKeyword, keywordsById)}"${
-                        hasAdditionalAppliedSearchFiltersBesidesKeyword ? ' with the current search filters.' : '.'
-                      }`
                     : 'No photos match the current search filters.'}
                 </p>
                 {hasPendingSearchChanges ? (

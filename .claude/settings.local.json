@@ -9,7 +9,8 @@
       "Bash(sed -n '335,350p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/people/peoplePipelineService.ts)",
       "Bash(sed -n '746,760p' /Users/tedshaffer/Documents/Projects/tedography/apps/api/src/people/peoplePipelineService.ts)",
       "Bash(xargs cat *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx\\)$\")"
     ]
   }
 }
