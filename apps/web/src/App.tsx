@@ -162,6 +162,7 @@ const searchCaptureDateAvailabilityStorageKey = 'tedography.search.captureDateAv
 const searchIncludeNoCaptureDateStorageKey = 'tedography.search.includeNoCaptureDate';
 const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
+const searchExcludedPeopleIdsStorageKey = 'tedography.search.excludedPeopleIds';
 const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
@@ -273,6 +274,7 @@ type SearchFilters = {
   captureDateAvailability: SearchCaptureDateAvailabilityMode;
   peopleIds: string[];
   peopleMatchMode: SearchPeopleMatchMode;
+  excludedPeopleIds: string[];
   hasNoPeople: boolean;
   hasReviewableFaces: boolean;
   keywordQuery: KeywordQueryState;
@@ -2186,6 +2188,7 @@ function doesAssetMatchSearchPeopleFilters(
   asset: MediaAsset,
   peopleIds: string[],
   peopleMatchMode: SearchPeopleMatchMode,
+  excludedPeopleIds: string[],
   hasNoPeople: boolean,
   hasReviewableFaces: boolean
 ): boolean {
@@ -2197,6 +2200,10 @@ function doesAssetMatchSearchPeopleFilters(
   }
 
   if (hasReviewableFaces && reviewableDetectionsCount <= 0) {
+    return false;
+  }
+
+  if (excludedPeopleIds.some((id) => confirmedPeopleIds.has(id))) {
     return false;
   }
 
@@ -2275,6 +2282,7 @@ function getDefaultSearchFilters(): SearchFilters {
     captureDateAvailability: 'datedOnly',
     peopleIds: [],
     peopleMatchMode: 'Any',
+    excludedPeopleIds: [],
     hasNoPeople: false,
     hasReviewableFaces: false,
     keywordQuery: { include: [], includeMode: 'all', exclude: [] }
@@ -2296,6 +2304,7 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.captureDateAvailability === right.captureDateAvailability &&
     arraysEqual(left.peopleIds, right.peopleIds) &&
     left.peopleMatchMode === right.peopleMatchMode &&
+    arraysEqual(left.excludedPeopleIds, right.excludedPeopleIds) &&
     left.hasNoPeople === right.hasNoPeople &&
     left.hasReviewableFaces === right.hasReviewableFaces &&
     left.keywordQuery.includeMode === right.keywordQuery.includeMode &&
@@ -2324,6 +2333,7 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.captureDateTo.length > 0 ||
     filters.captureDateAvailability !== 'datedOnly' ||
     filters.peopleIds.length > 0 ||
+    filters.excludedPeopleIds.length > 0 ||
     filters.hasNoPeople ||
     filters.hasReviewableFaces ||
     filters.keywordQuery.include.length > 0 ||
@@ -3385,6 +3395,11 @@ export default function App() {
 
     return parseSearchPeopleMatchModeFromStorage(window.localStorage.getItem(searchPeopleMatchModeStorageKey));
   });
+  const [searchExcludedPeopleIds, setSearchExcludedPeopleIds] = useState<string[]>(() =>
+    typeof window !== 'undefined'
+      ? parseStringArrayFromStorage(window.localStorage.getItem(searchExcludedPeopleIdsStorageKey))
+      : []
+  );
   const [searchHasNoPeople, setSearchHasNoPeople] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -3962,6 +3977,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(searchPeopleMatchModeStorageKey, searchPeopleMatchMode);
   }, [searchPeopleMatchMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchExcludedPeopleIdsStorageKey, JSON.stringify(searchExcludedPeopleIds));
+  }, [searchExcludedPeopleIds]);
 
   useEffect(() => {
     window.localStorage.setItem(searchHasNoPeopleStorageKey, String(searchHasNoPeople));
@@ -4564,6 +4583,7 @@ export default function App() {
       captureDateAvailability: searchCaptureDateAvailability,
       peopleIds: searchPeopleIds,
       peopleMatchMode: searchPeopleMatchMode,
+      excludedPeopleIds: searchExcludedPeopleIds,
       hasNoPeople: searchHasNoPeople,
       hasReviewableFaces: searchHasReviewableFaces,
       keywordQuery: {
@@ -4579,6 +4599,7 @@ export default function App() {
       searchCaptureDateTo,
       searchFilenamePattern,
       searchGroupIds,
+      searchExcludedPeopleIds,
       searchHasNoPeople,
       searchHasReviewableFaces,
       searchKeywordInclude,
@@ -4628,6 +4649,7 @@ export default function App() {
         asset,
         appliedSearchFilters.peopleIds,
         appliedSearchFilters.peopleMatchMode,
+        appliedSearchFilters.excludedPeopleIds,
         appliedSearchFilters.hasNoPeople,
         appliedSearchFilters.hasReviewableFaces
       );
@@ -5164,6 +5186,13 @@ export default function App() {
         .map((personId) => (searchPeopleById.get(personId) ?? availableSearchPeopleOptions.find((person) => person.id === personId)))
         .filter((person): person is Person => Boolean(person)),
     [availableSearchPeopleOptions, searchPeopleById, searchPeopleIds]
+  );
+  const selectedExcludedPeople = useMemo(
+    () =>
+      searchExcludedPeopleIds
+        .map((personId) => (searchPeopleById.get(personId) ?? availableSearchPeopleOptions.find((person) => person.id === personId)))
+        .filter((person): person is Person => Boolean(person)),
+    [availableSearchPeopleOptions, searchPeopleById, searchExcludedPeopleIds]
   );
   const filteredSearchPeopleOptions = useMemo(() => {
     const query = searchPeopleQuery.trim().toLowerCase();
@@ -5917,6 +5946,7 @@ export default function App() {
             updatedAsset,
             appliedSearchFilters.peopleIds,
             appliedSearchFilters.peopleMatchMode,
+            appliedSearchFilters.excludedPeopleIds,
             appliedSearchFilters.hasNoPeople,
             appliedSearchFilters.hasReviewableFaces
           );
@@ -7092,6 +7122,7 @@ export default function App() {
     setSearchCaptureDateAvailability(filters.captureDateAvailability);
     setSearchPeopleIds(filters.peopleIds);
     setSearchPeopleMatchMode(filters.peopleMatchMode);
+    setSearchExcludedPeopleIds(filters.excludedPeopleIds);
     setSearchHasNoPeople(filters.hasNoPeople);
     setSearchHasReviewableFaces(filters.hasReviewableFaces);
     setSearchKeywordInclude(filters.keywordQuery.include);
@@ -9210,104 +9241,122 @@ export default function App() {
           </div>
         </div>
         <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>People</h3>
-          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
-            People filters match confirmed derived asset people. Reviewable faces are unresolved face detections.
-          </div>
-          <div style={filterRowStyle}>
-            <label style={filterOptionLabelStyle}>
-              Match
-              <select
-                value={searchPeopleMatchMode}
-                onChange={(event) => setSearchPeopleMatchMode(event.target.value as SearchPeopleMatchMode)}
-                style={compactSelectStyle}
-                disabled={searchPeopleIds.length === 0}
-              >
-                <option value="Any">Any</option>
-                <option value="All">All</option>
-              </select>
-            </label>
-          </div>
-          <div style={filterRowStyle}>
-            <label style={{ ...filterOptionLabelStyle, display: 'grid', gap: '4px', width: '100%' }}>
-              Find person
-              <input
-                type="text"
-                value={searchPeopleQuery}
-                onChange={(event) => setSearchPeopleQuery(event.target.value)}
-                placeholder="Filter people list"
-                style={{ minWidth: 0 }}
-              />
-            </label>
-          </div>
-          {selectedSearchPeople.length > 0 ? (
-            <div style={searchPeopleChipRowStyle}>
-              {selectedSearchPeople.map((person) => (
-                <button
-                  key={person.id}
-                  type="button"
-                  style={searchPeopleChipStyle}
-                  onClick={() => toggleSearchPerson(person.id)}
-                  title={`Remove ${person.displayName}`}
-                >
-                  {person.displayName} ×
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <div style={filterGroupStyle}>
-            {searchPeopleError ? (
-              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load people: {searchPeopleError}</p>
-            ) : filteredSearchPeopleOptions.length > 0 ? (
+          {(() => {
+            const includeIds = new Set(searchPeopleIds);
+            const excludeIds = new Set(searchExcludedPeopleIds);
+            const conflictIds = new Set(searchPeopleIds.filter((id) => excludeIds.has(id)));
+            const availableForInclude = availableSearchPeopleOptions.filter((p) => !includeIds.has(p.id));
+            const availableForExclude = availableSearchPeopleOptions.filter((p) => !excludeIds.has(p.id));
+
+            return (
               <>
-                {searchPeopleLoading ? (
-                  <p style={{ margin: 0, color: '#666', fontSize: '12px', width: '100%' }}>
-                    Loading full people list...
+                {/* Include row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>People — Include</h3>
+                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                    {(['Any', 'All'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setSearchPeopleMatchMode(mode)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '11px',
+                          fontWeight: searchPeopleMatchMode === mode ? 700 : 400,
+                          backgroundColor: searchPeopleMatchMode === mode ? '#dbeafe' : '#f9f9f9',
+                          color: searchPeopleMatchMode === mode ? '#1d4ed8' : '#555',
+                          border: 'none',
+                          cursor: 'pointer',
+                          borderRight: mode === 'Any' ? '1px solid #c8c8c8' : 'none'
+                        }}
+                      >
+                        {mode === 'Any' ? 'Match any' : 'Match all'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Autocomplete<Person, true, false, false>
+                  multiple
+                  options={availableForInclude}
+                  value={selectedSearchPeople}
+                  onChange={(_event, value) => {
+                    setSearchHasNoPeople(false);
+                    setSearchPeopleIds(value.map((p) => p.id));
+                  }}
+                  getOptionLabel={(option) => option.displayName}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={searchPeopleLoading}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={selectedSearchPeople.length === 0 ? 'Add people to include' : ''}
+                      error={Boolean(searchPeopleError)}
+                    />
+                  )}
+                />
+
+                {/* Exclude row */}
+                <h3 style={{ ...filterSubsectionTitleStyle, margin: '4px 0 0 0' }}>Exclude</h3>
+                <Autocomplete<Person, true, false, false>
+                  multiple
+                  options={availableForExclude}
+                  value={selectedExcludedPeople}
+                  onChange={(_event, value) => {
+                    setSearchExcludedPeopleIds(value.map((p) => p.id));
+                  }}
+                  getOptionLabel={(option) => option.displayName}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={searchPeopleLoading}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={selectedExcludedPeople.length === 0 ? 'Add people to exclude' : ''}
+                    />
+                  )}
+                />
+
+                {/* Conflict warning */}
+                {conflictIds.size > 0 ? (
+                  <p style={{ margin: 0, fontSize: '11px', color: '#a12622' }}>
+                    A person is both included and excluded. Exclude takes precedence.
                   </p>
                 ) : null}
-                {filteredSearchPeopleOptions.map((person) => (
-                  <label key={person.id} style={filterOptionLabelStyle}>
+
+                {/* Extra filters */}
+                <div style={filterRowStyle}>
+                  <label style={filterOptionLabelStyle}>
                     <input
                       type="checkbox"
-                      checked={searchPeopleIds.includes(person.id)}
-                      onChange={() => toggleSearchPerson(person.id)}
+                      checked={searchHasNoPeople}
+                      onChange={(event) => {
+                        const nextChecked = event.target.checked;
+                        setSearchHasNoPeople(nextChecked);
+                        if (nextChecked) {
+                          setSearchPeopleIds([]);
+                        }
+                      }}
                     />
-                    {person.displayName}
+                    Has no confirmed people
                   </label>
-                ))}
+                </div>
+                <div style={filterRowStyle}>
+                  <label style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchHasReviewableFaces}
+                      onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
+                    />
+                    Has reviewable faces
+                  </label>
+                </div>
               </>
-            ) : availableSearchPeopleOptions.length === 0 ? (
-              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No people exist yet.</p>
-            ) : (
-              <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No people match the current text filter.</p>
-            )}
-          </div>
-          <div style={filterRowStyle}>
-            <label style={filterOptionLabelStyle}>
-              <input
-                type="checkbox"
-                checked={searchHasNoPeople}
-                onChange={(event) => {
-                  const nextChecked = event.target.checked;
-                  setSearchHasNoPeople(nextChecked);
-                  if (nextChecked) {
-                    setSearchPeopleIds([]);
-                  }
-                }}
-              />
-              Has no confirmed people
-            </label>
-          </div>
-          <div style={filterRowStyle}>
-            <label style={filterOptionLabelStyle}>
-              <input
-                type="checkbox"
-                checked={searchHasReviewableFaces}
-                onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
-              />
-              Has reviewable faces
-            </label>
-          </div>
+            );
+          })()}
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>File Name</h3>
