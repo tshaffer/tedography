@@ -23,6 +23,12 @@ function isYearGroupNode(node: AlbumTreeNode | null): boolean {
   return Boolean(node && node.nodeType === 'Group' && /^\d{4}$/.test(node.label.trim()));
 }
 
+function normalizeStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const filtered = value.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  return filtered.length > 0 ? filtered : null;
+}
+
 function normalizeSmartAlbumRecord(item: SmartAlbum): SmartAlbum {
   return {
     ...item,
@@ -35,7 +41,20 @@ function normalizeSmartAlbumRecord(item: SmartAlbum): SmartAlbum {
       yearGroupId:
         typeof item.filterSpec.yearGroupId === 'string' && item.filterSpec.yearGroupId.trim().length > 0
           ? item.filterSpec.yearGroupId.trim()
-          : null
+          : null,
+      peopleIds: normalizeStringArray(item.filterSpec.peopleIds),
+      peopleMatchMode: item.filterSpec.peopleMatchMode === 'All' ? 'All' : (item.filterSpec.peopleIds?.length ? 'Any' : null),
+      excludedPeopleIds: normalizeStringArray(item.filterSpec.excludedPeopleIds),
+      hasNoPeople: item.filterSpec.hasNoPeople === true ? true : null,
+      captureDateFrom:
+        typeof item.filterSpec.captureDateFrom === 'string' && item.filterSpec.captureDateFrom.trim().length > 0
+          ? item.filterSpec.captureDateFrom.trim()
+          : null,
+      captureDateTo:
+        typeof item.filterSpec.captureDateTo === 'string' && item.filterSpec.captureDateTo.trim().length > 0
+          ? item.filterSpec.captureDateTo.trim()
+          : null,
+      captureDateAvailability: item.filterSpec.captureDateAvailability ?? null
     }
   };
 }
@@ -76,16 +95,54 @@ async function normalizeAndValidateFilterSpec(
     }
   }
 
-  if (!keywordId && !photoState && !yearGroupId) {
+  const peopleIds = normalizeStringArray(filterSpec.peopleIds ?? null);
+  const excludedPeopleIds = normalizeStringArray(filterSpec.excludedPeopleIds ?? null);
+  const hasNoPeople = filterSpec.hasNoPeople === true ? true : null;
+  const peopleMatchMode =
+    filterSpec.peopleMatchMode === 'All' ? 'All' : (peopleIds?.length ? 'Any' : null);
+  const captureDateFrom =
+    typeof filterSpec.captureDateFrom === 'string' && filterSpec.captureDateFrom.trim().length > 0
+      ? filterSpec.captureDateFrom.trim()
+      : null;
+  const captureDateTo =
+    typeof filterSpec.captureDateTo === 'string' && filterSpec.captureDateTo.trim().length > 0
+      ? filterSpec.captureDateTo.trim()
+      : null;
+  const validAvailabilityModes = ['datedOnly', 'datedOrUndated', 'undatedOnly'];
+  const captureDateAvailability =
+    typeof filterSpec.captureDateAvailability === 'string' &&
+    validAvailabilityModes.includes(filterSpec.captureDateAvailability)
+      ? filterSpec.captureDateAvailability
+      : null;
+
+  const hasAnyFilter =
+    keywordId ||
+    photoState ||
+    yearGroupId ||
+    (peopleIds?.length ?? 0) > 0 ||
+    (excludedPeopleIds?.length ?? 0) > 0 ||
+    hasNoPeople ||
+    captureDateFrom ||
+    captureDateTo ||
+    (captureDateAvailability && captureDateAvailability !== 'datedOnly');
+
+  if (!hasAnyFilter) {
     throw new SmartAlbumValidationError(
-      'filterSpec must include at least one of keywordId, photoState, or yearGroupId.'
+      'filterSpec must include at least one filter.'
     );
   }
 
   return {
     keywordId,
     photoState,
-    yearGroupId
+    yearGroupId,
+    peopleIds,
+    peopleMatchMode,
+    excludedPeopleIds,
+    hasNoPeople,
+    captureDateFrom,
+    captureDateTo,
+    captureDateAvailability
   };
 }
 

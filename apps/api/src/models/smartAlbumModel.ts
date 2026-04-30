@@ -5,7 +5,14 @@ const smartAlbumFilterSpecSchema = new Schema<SmartAlbumFilterSpec>(
   {
     keywordId: { type: String, default: null, trim: true },
     photoState: { type: String, enum: Object.values(PhotoState), default: null },
-    yearGroupId: { type: String, default: null, trim: true }
+    yearGroupId: { type: String, default: null, trim: true },
+    peopleIds: { type: [String], default: null },
+    peopleMatchMode: { type: String, enum: ['Any', 'All'], default: null },
+    excludedPeopleIds: { type: [String], default: null },
+    hasNoPeople: { type: Boolean, default: null },
+    captureDateFrom: { type: String, default: null, trim: true },
+    captureDateTo: { type: String, default: null, trim: true },
+    captureDateAvailability: { type: String, enum: ['datedOnly', 'datedOrUndated', 'undatedOnly'], default: null }
   },
   {
     _id: false,

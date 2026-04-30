@@ -217,7 +217,20 @@ function normalizeSmartAlbumFilterSpecForComparison(
     yearGroupId:
       typeof filterSpec.yearGroupId === 'string' && filterSpec.yearGroupId.trim().length > 0
         ? filterSpec.yearGroupId.trim()
-        : null
+        : null,
+    peopleIds: filterSpec.peopleIds?.length ? [...filterSpec.peopleIds] : null,
+    peopleMatchMode: filterSpec.peopleMatchMode ?? null,
+    excludedPeopleIds: filterSpec.excludedPeopleIds?.length ? [...filterSpec.excludedPeopleIds] : null,
+    hasNoPeople: filterSpec.hasNoPeople === true ? true : null,
+    captureDateFrom:
+      typeof filterSpec.captureDateFrom === 'string' && filterSpec.captureDateFrom.trim().length > 0
+        ? filterSpec.captureDateFrom.trim()
+        : null,
+    captureDateTo:
+      typeof filterSpec.captureDateTo === 'string' && filterSpec.captureDateTo.trim().length > 0
+        ? filterSpec.captureDateTo.trim()
+        : null,
+    captureDateAvailability: filterSpec.captureDateAvailability ?? null
   };
 }
 
@@ -225,13 +238,22 @@ function smartAlbumFilterSpecsEqual(
   left: SmartAlbumFilterSpec,
   right: SmartAlbumFilterSpec
 ): boolean {
-  const normalizedLeft = normalizeSmartAlbumFilterSpecForComparison(left);
-  const normalizedRight = normalizeSmartAlbumFilterSpecForComparison(right);
+  const l = normalizeSmartAlbumFilterSpecForComparison(left);
+  const r = normalizeSmartAlbumFilterSpecForComparison(right);
 
   return (
-    normalizedLeft.keywordId === normalizedRight.keywordId &&
-    normalizedLeft.photoState === normalizedRight.photoState &&
-    normalizedLeft.yearGroupId === normalizedRight.yearGroupId
+    l.keywordId === r.keywordId &&
+    l.photoState === r.photoState &&
+    l.yearGroupId === r.yearGroupId &&
+    l.peopleMatchMode === r.peopleMatchMode &&
+    l.hasNoPeople === r.hasNoPeople &&
+    l.captureDateFrom === r.captureDateFrom &&
+    l.captureDateTo === r.captureDateTo &&
+    l.captureDateAvailability === r.captureDateAvailability &&
+    (l.peopleIds ?? []).length === (r.peopleIds ?? []).length &&
+    (l.peopleIds ?? []).every((id, i) => id === r.peopleIds?.[i]) &&
+    (l.excludedPeopleIds ?? []).length === (r.excludedPeopleIds ?? []).length &&
+    (l.excludedPeopleIds ?? []).every((id, i) => id === r.excludedPeopleIds?.[i])
   );
 }
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
@@ -5109,11 +5131,6 @@ export default function App() {
     const activeUnsupportedFilters =
       filters.albumIds.length > 0 ||
       filters.filenamePattern.trim().length > 0 ||
-      filters.captureDateFrom.length > 0 ||
-      filters.captureDateTo.length > 0 ||
-      filters.captureDateAvailability !== 'datedOnly' ||
-      filters.peopleIds.length > 0 ||
-      filters.hasNoPeople ||
       filters.hasReviewableFaces ||
       filters.photoStates.length > 1 ||
       filters.groupIds.length > 1;
@@ -5140,13 +5157,32 @@ export default function App() {
       filters.keywordQuery.include.length === 1 && filters.keywordQuery.exclude.length === 0
         ? (filters.keywordQuery.include[0]?.keywordId ?? null)
         : null;
+
     const filterSpec = normalizeSmartAlbumFilterSpecForComparison({
       keywordId: singleIncludeKeywordId,
       photoState: firstSearchPhotoState,
-      yearGroupId
+      yearGroupId,
+      peopleIds: filters.peopleIds.length > 0 ? filters.peopleIds : null,
+      peopleMatchMode: filters.peopleIds.length > 0 ? filters.peopleMatchMode : null,
+      excludedPeopleIds: filters.excludedPeopleIds.length > 0 ? filters.excludedPeopleIds : null,
+      hasNoPeople: filters.hasNoPeople || null,
+      captureDateFrom: filters.captureDateFrom || null,
+      captureDateTo: filters.captureDateTo || null,
+      captureDateAvailability: filters.captureDateAvailability !== 'datedOnly' ? filters.captureDateAvailability : null
     });
 
-    if (!filterSpec.keywordId && !filterSpec.photoState && !filterSpec.yearGroupId) {
+    const hasAnyFilter =
+      filterSpec.keywordId ||
+      filterSpec.photoState ||
+      filterSpec.yearGroupId ||
+      (filterSpec.peopleIds?.length ?? 0) > 0 ||
+      (filterSpec.excludedPeopleIds?.length ?? 0) > 0 ||
+      filterSpec.hasNoPeople ||
+      filterSpec.captureDateFrom ||
+      filterSpec.captureDateTo ||
+      filterSpec.captureDateAvailability;
+
+    if (!hasAnyFilter) {
       return null;
     }
 
@@ -7167,7 +7203,14 @@ export default function App() {
       groupIds: filterSpec.yearGroupId ? [filterSpec.yearGroupId] : [],
       keywordQuery: filterSpec.keywordId
         ? { include: [{ keywordId: filterSpec.keywordId, includeDescendants: false }], includeMode: 'all', exclude: [] }
-        : { include: [], includeMode: 'all', exclude: [] }
+        : { include: [], includeMode: 'all', exclude: [] },
+      peopleIds: filterSpec.peopleIds ?? [],
+      peopleMatchMode: filterSpec.peopleMatchMode ?? 'Any',
+      excludedPeopleIds: filterSpec.excludedPeopleIds ?? [],
+      hasNoPeople: filterSpec.hasNoPeople ?? false,
+      captureDateFrom: filterSpec.captureDateFrom ?? '',
+      captureDateTo: filterSpec.captureDateTo ?? '',
+      captureDateAvailability: filterSpec.captureDateAvailability ?? 'datedOnly'
     };
 
     setPrimaryArea('Search');
@@ -7191,7 +7234,7 @@ export default function App() {
 
     if (!appliedSearchSmartAlbumFilterSpec) {
       setSmartAlbumSaveError(
-        'Smart Albums currently support one keyword, one photo state, and one year group only.'
+        'Smart Albums do not support album, filename, or "has reviewable faces" filters. Clear those to save.'
       );
       setSmartAlbumSaveNotice(null);
       return;
@@ -8951,7 +8994,7 @@ export default function App() {
             </p>
           ) : hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
-              Current Search uses filters that Smart Albums do not support yet. Clear albums, date, filename, or people filters to save this view.
+              Current Search uses filters that Smart Albums do not support. Clear album, filename, or reviewable-faces filters to save this view.
             </p>
           ) : appliedSearchSmartAlbumFilterSpec === null ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
