@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { PhotoState, type Keyword, type SmartAlbum, type SmartAlbumFilterSpec } from '@tedography/domain';
+import { PhotoState, type Keyword, type Person, type SmartAlbum, type SmartAlbumFilterSpec } from '@tedography/domain';
+import type { SearchCaptureDateAvailabilityMode } from '@tedography/domain';
 import { listKeywords } from '../../api/keywordApi';
+import { listPeople } from '../../api/peoplePipelineApi';
 import {
   deleteSmartAlbum,
   listSmartAlbums,
@@ -89,7 +91,9 @@ const detailPanelStyle: CSSProperties = {
   gap: '10px',
   border: '1px solid #ececec',
   borderRadius: '8px',
-  padding: '10px'
+  padding: '10px',
+  overflowY: 'auto',
+  maxHeight: '480px'
 };
 
 const inputStyle: CSSProperties = {
@@ -99,6 +103,12 @@ const inputStyle: CSSProperties = {
   borderRadius: '6px',
   border: '1px solid #c8c8c8',
   fontSize: '13px'
+};
+
+const multiSelectStyle: CSSProperties = {
+  ...inputStyle,
+  height: '90px',
+  padding: '4px 6px'
 };
 
 const buttonStyle: CSSProperties = {
@@ -123,6 +133,63 @@ const controlRowStyle: CSSProperties = {
   flexWrap: 'wrap'
 };
 
+const fieldGroupStyle: CSSProperties = {
+  borderTop: '1px solid #f0f0f0',
+  paddingTop: '8px',
+  display: 'grid',
+  gap: '10px'
+};
+
+const fieldGroupTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: '11px',
+  fontWeight: 600,
+  color: '#888',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em'
+};
+
+const labelRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '6px',
+  marginBottom: '4px',
+  fontSize: '13px'
+};
+
+const matchModeToggleStyle: CSSProperties = {
+  display: 'flex',
+  border: '1px solid #c8c8c8',
+  borderRadius: '4px',
+  overflow: 'hidden',
+  fontSize: '11px'
+};
+
+const matchModeButtonActiveStyle: CSSProperties = {
+  padding: '2px 8px',
+  backgroundColor: '#5c6bc0',
+  color: '#fff',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: '11px'
+};
+
+const matchModeButtonInactiveStyle: CSSProperties = {
+  padding: '2px 8px',
+  backgroundColor: 'transparent',
+  color: '#555',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: '11px'
+};
+
+const dateRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: '8px'
+};
+
 type YearGroupOption = {
   id: string;
   label: string;
@@ -139,6 +206,7 @@ function formatSmartAlbumFilterSummary(input: {
   filterSpec: SmartAlbumFilterSpec;
   keywordMap: Map<string, Keyword>;
   yearGroupById: Map<string, YearGroupOption>;
+  personById: Map<string, Person>;
 }): string {
   const parts: string[] = [];
 
@@ -156,7 +224,43 @@ function formatSmartAlbumFilterSummary(input: {
     parts.push(yearGroup ? yearGroup.label : `Year ${input.filterSpec.yearGroupId}`);
   }
 
+  if (input.filterSpec.peopleIds && input.filterSpec.peopleIds.length > 0) {
+    const names = input.filterSpec.peopleIds.map((id) => {
+      const person = input.personById.get(id);
+      return person ? person.displayName : id;
+    });
+    const mode = input.filterSpec.peopleMatchMode === 'All' ? 'All of' : 'Any of';
+    parts.push(`${mode}: ${names.join(', ')}`);
+  }
+
+  if (input.filterSpec.excludedPeopleIds && input.filterSpec.excludedPeopleIds.length > 0) {
+    parts.push(`Excl. ${input.filterSpec.excludedPeopleIds.length} ${input.filterSpec.excludedPeopleIds.length === 1 ? 'person' : 'people'}`);
+  }
+
+  if (input.filterSpec.hasNoPeople) {
+    parts.push('No people');
+  }
+
+  const from = input.filterSpec.captureDateFrom;
+  const to = input.filterSpec.captureDateTo;
+  if (from && to) {
+    parts.push(`${from} – ${to}`);
+  } else if (from) {
+    parts.push(`From ${from}`);
+  } else if (to) {
+    parts.push(`To ${to}`);
+  }
+
+  if (input.filterSpec.captureDateAvailability && input.filterSpec.captureDateAvailability !== 'datedOnly') {
+    const label = input.filterSpec.captureDateAvailability === 'undatedOnly' ? 'Undated only' : 'Dated or undated';
+    parts.push(label);
+  }
+
   return parts.join(' · ');
+}
+
+function getMultiSelectValues(event: React.ChangeEvent<HTMLSelectElement>): string[] {
+  return Array.from(event.target.selectedOptions).map((opt) => opt.value);
 }
 
 export function SmartAlbumsSection({
@@ -167,6 +271,7 @@ export function SmartAlbumsSection({
 }: SmartAlbumsSectionProps) {
   const [smartAlbums, setSmartAlbums] = useState<SmartAlbum[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSmartAlbumId, setSelectedSmartAlbumId] = useState<string | null>(null);
@@ -174,6 +279,13 @@ export function SmartAlbumsSection({
   const [keywordId, setKeywordId] = useState('__none__');
   const [photoState, setPhotoState] = useState('__none__');
   const [yearGroupId, setYearGroupId] = useState('__none__');
+  const [peopleIds, setPeopleIds] = useState<string[]>([]);
+  const [peopleMatchMode, setPeopleMatchMode] = useState<'Any' | 'All'>('Any');
+  const [excludedPeopleIds, setExcludedPeopleIds] = useState<string[]>([]);
+  const [hasNoPeople, setHasNoPeople] = useState(false);
+  const [captureDateFrom, setCaptureDateFrom] = useState('');
+  const [captureDateTo, setCaptureDateTo] = useState('');
+  const [captureDateAvailability, setCaptureDateAvailability] = useState<'' | SearchCaptureDateAvailabilityMode>('');
   const [actionBusy, setActionBusy] = useState<null | 'save' | 'delete'>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -182,9 +294,14 @@ export function SmartAlbumsSection({
     setError(null);
 
     try {
-      const [smartAlbumResponse, keywordResponse] = await Promise.all([listSmartAlbums(), listKeywords()]);
+      const [smartAlbumResponse, keywordResponse, peopleResponse] = await Promise.all([
+        listSmartAlbums(),
+        listKeywords(),
+        listPeople()
+      ]);
       setSmartAlbums(smartAlbumResponse.items);
       setKeywords(keywordResponse.items);
+      setPeople(peopleResponse.items ?? []);
       setSelectedSmartAlbumId((current) =>
         current && smartAlbumResponse.items.some((item) => item.id === current) ? current : smartAlbumResponse.items[0]?.id ?? null
       );
@@ -208,6 +325,14 @@ export function SmartAlbumsSection({
     () => new Map(yearGroups.map((group) => [group.id, group])),
     [yearGroups]
   );
+  const personById = useMemo(
+    () => new Map(people.map((p) => [p.id, p])),
+    [people]
+  );
+  const visiblePeople = useMemo(
+    () => people.filter((p) => !p.isHidden && !p.isArchived),
+    [people]
+  );
   const selectedSmartAlbum = useMemo(
     () => (selectedSmartAlbumId ? smartAlbums.find((item) => item.id === selectedSmartAlbumId) ?? null : null),
     [selectedSmartAlbumId, smartAlbums]
@@ -220,20 +345,44 @@ export function SmartAlbumsSection({
       setKeywordId('__none__');
       setPhotoState('__none__');
       setYearGroupId('__none__');
+      setPeopleIds([]);
+      setPeopleMatchMode('Any');
+      setExcludedPeopleIds([]);
+      setHasNoPeople(false);
+      setCaptureDateFrom('');
+      setCaptureDateTo('');
+      setCaptureDateAvailability('');
       return;
     }
 
+    const spec = selectedSmartAlbum.filterSpec;
     setLabel(selectedSmartAlbum.label);
-    setKeywordId(selectedSmartAlbum.filterSpec.keywordId ?? '__none__');
-    setPhotoState(selectedSmartAlbum.filterSpec.photoState ?? '__none__');
-    setYearGroupId(selectedSmartAlbum.filterSpec.yearGroupId ?? '__none__');
+    setKeywordId(spec.keywordId ?? '__none__');
+    setPhotoState(spec.photoState ?? '__none__');
+    setYearGroupId(spec.yearGroupId ?? '__none__');
+    setPeopleIds(spec.peopleIds ?? []);
+    setPeopleMatchMode(spec.peopleMatchMode === 'All' ? 'All' : 'Any');
+    setExcludedPeopleIds(spec.excludedPeopleIds ?? []);
+    setHasNoPeople(spec.hasNoPeople === true);
+    setCaptureDateFrom(spec.captureDateFrom ?? '');
+    setCaptureDateTo(spec.captureDateTo ?? '');
+    setCaptureDateAvailability(
+      (spec.captureDateAvailability as SearchCaptureDateAvailabilityMode | null | undefined) ?? ''
+    );
   }, [selectedSmartAlbum]);
 
   function buildFilterSpecFromForm(): SmartAlbumFilterSpec {
     return {
       keywordId: keywordId === '__none__' ? null : keywordId,
       photoState: photoState === '__none__' ? null : (photoState as PhotoState),
-      yearGroupId: yearGroupId === '__none__' ? null : yearGroupId
+      yearGroupId: yearGroupId === '__none__' ? null : yearGroupId,
+      peopleIds: peopleIds.length > 0 ? peopleIds : null,
+      peopleMatchMode: peopleIds.length > 0 ? peopleMatchMode : null,
+      excludedPeopleIds: excludedPeopleIds.length > 0 ? excludedPeopleIds : null,
+      hasNoPeople: hasNoPeople || null,
+      captureDateFrom: captureDateFrom.trim() || null,
+      captureDateTo: captureDateTo.trim() || null,
+      captureDateAvailability: captureDateAvailability || null
     };
   }
 
@@ -326,7 +475,8 @@ export function SmartAlbumsSection({
                       {formatSmartAlbumFilterSummary({
                         filterSpec: item.filterSpec,
                         keywordMap,
-                        yearGroupById
+                        yearGroupById,
+                        personById
                       })}
                     </span>
                   </button>
@@ -355,51 +505,159 @@ export function SmartAlbumsSection({
                     placeholder="Smart Album label"
                   />
                 </label>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  Keyword
-                  <select
-                    value={keywordId}
-                    onChange={(event) => setKeywordId(event.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="__none__">None</option>
-                    {keywords.map((keyword) => (
-                      <option key={keyword.id} value={keyword.id}>
-                        {formatKeywordPathLabel(keyword, keywordMap)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  Photo State
-                  <select
-                    value={photoState}
-                    onChange={(event) => setPhotoState(event.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="__none__">Any</option>
-                    {Object.values(PhotoState).map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ display: 'grid', gap: '4px' }}>
-                  Year Group
-                  <select
-                    value={yearGroupId}
-                    onChange={(event) => setYearGroupId(event.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="__none__">Any</option>
-                    {yearGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+
+                {/* Keyword / Photo State / Year Group */}
+                <div style={fieldGroupStyle}>
+                  <p style={fieldGroupTitleStyle}>Content Filters</p>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    Keyword
+                    <select
+                      value={keywordId}
+                      onChange={(event) => setKeywordId(event.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="__none__">None</option>
+                      {keywords.map((keyword) => (
+                        <option key={keyword.id} value={keyword.id}>
+                          {formatKeywordPathLabel(keyword, keywordMap)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    Photo State
+                    <select
+                      value={photoState}
+                      onChange={(event) => setPhotoState(event.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="__none__">Any</option>
+                      {Object.values(PhotoState).map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    Year Group
+                    <select
+                      value={yearGroupId}
+                      onChange={(event) => setYearGroupId(event.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="__none__">Any</option>
+                      {yearGroups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {/* People Filters */}
+                <div style={fieldGroupStyle}>
+                  <p style={fieldGroupTitleStyle}>People Filters</p>
+                  <div>
+                    <div style={labelRowStyle}>
+                      <span>Include People</span>
+                      <div style={matchModeToggleStyle}>
+                        <button
+                          type="button"
+                          style={peopleMatchMode === 'Any' ? matchModeButtonActiveStyle : matchModeButtonInactiveStyle}
+                          onClick={() => setPeopleMatchMode('Any')}
+                        >
+                          Any
+                        </button>
+                        <button
+                          type="button"
+                          style={peopleMatchMode === 'All' ? matchModeButtonActiveStyle : matchModeButtonInactiveStyle}
+                          onClick={() => setPeopleMatchMode('All')}
+                        >
+                          All
+                        </button>
+                      </div>
+                    </div>
+                    <select
+                      multiple
+                      value={peopleIds}
+                      onChange={(event) => setPeopleIds(getMultiSelectValues(event))}
+                      style={multiSelectStyle}
+                    >
+                      {visiblePeople.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <p style={{ ...mutedTextStyle, marginTop: '3px' }}>Hold Cmd/Ctrl to select multiple</p>
+                  </div>
+                  <div>
+                    <div style={{ ...labelRowStyle, marginBottom: '4px' }}>
+                      <span style={{ fontSize: '13px' }}>Exclude People</span>
+                    </div>
+                    <select
+                      multiple
+                      value={excludedPeopleIds}
+                      onChange={(event) => setExcludedPeopleIds(getMultiSelectValues(event))}
+                      style={multiSelectStyle}
+                    >
+                      {visiblePeople.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="checkbox"
+                      checked={hasNoPeople}
+                      onChange={(event) => setHasNoPeople(event.target.checked)}
+                    />
+                    Has no people
+                  </label>
+                </div>
+
+                {/* Date Filters */}
+                <div style={fieldGroupStyle}>
+                  <p style={fieldGroupTitleStyle}>Date Filters</p>
+                  <div style={dateRowStyle}>
+                    <label style={{ display: 'grid', gap: '4px' }}>
+                      <span style={{ fontSize: '13px' }}>From</span>
+                      <input
+                        type="date"
+                        value={captureDateFrom}
+                        onChange={(event) => setCaptureDateFrom(event.target.value)}
+                        style={inputStyle}
+                      />
+                    </label>
+                    <label style={{ display: 'grid', gap: '4px' }}>
+                      <span style={{ fontSize: '13px' }}>To</span>
+                      <input
+                        type="date"
+                        value={captureDateTo}
+                        onChange={(event) => setCaptureDateTo(event.target.value)}
+                        style={inputStyle}
+                      />
+                    </label>
+                  </div>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    <span style={{ fontSize: '13px' }}>Date Availability</span>
+                    <select
+                      value={captureDateAvailability}
+                      onChange={(event) => setCaptureDateAvailability(event.target.value as '' | SearchCaptureDateAvailabilityMode)}
+                      style={inputStyle}
+                    >
+                      <option value="">Any</option>
+                      <option value="datedOnly">Dated only</option>
+                      <option value="datedOrUndated">Dated or undated</option>
+                      <option value="undatedOnly">Undated only</option>
+                    </select>
+                  </label>
+                </div>
+
                 <div style={controlRowStyle}>
                   <button
                     type="button"
