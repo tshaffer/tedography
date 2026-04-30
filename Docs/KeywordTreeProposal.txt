@@ -1,0 +1,196 @@
+Yes — if Tedography is enforcing global label uniqueness, then having Europe under both Trips and Places would violate it. Good catch. The album/keyword work we discussed earlier already assumes global keyword label uniqueness is enforced on normalized labels, so two separate Europe keyword nodes would be a bad fit.
+
+That is one of the strongest reasons to avoid mixing taxonomy meaning in the same tree.
+
+What I’d do instead is this:
+
+* Keep Europe only once, under Places
+* Do not create a parallel Trips > Europe
+* Let trip-ness be expressed by either:
+    * albums
+    * a separate keyword like Trip
+    * or event/travel-style keywords such as International Travel
+
+So the cleaner structure is more like:
+
+Keywords
+  Places
+    North America
+      United States
+        Alaska
+        Arizona
+          Sedona
+        California
+          Arcata
+          Disneyland
+          Filoli
+          Monterey
+          New Orleans
+          Pt. Lobos
+          San Francisco
+          Santa Barbara
+          SLO
+          Yosemite
+        Hawaii
+          Maui
+        Montana
+        Oregon
+          Bend
+        Utah
+          Park City
+          Zion
+        Washington
+          Bellingham
+          Mt. Baker
+          Olympic Peninsula
+          Seattle
+        Wyoming
+          Jackson Hole
+          Yellowstone
+      Canada
+        British Columbia
+          Fernie
+          Glacier
+          Revelstoke
+          Yoho
+        Canadian Rockies
+      Mexico
+        Baja
+        Cabo
+        Chankanaab
+        Cozumel
+    Europe
+      Belgium
+      Croatia
+      Epernay
+      Edinburgh
+      Iceland
+      Ireland
+      Italy
+      Norway
+      Paris
+      Portugal
+      Spain
+      Switzerland
+    Africa
+      Morocco
+    Asia
+      Southeast Asia
+    Oceania
+      Australia
+      New Zealand
+
+  People
+    Lori
+    Joel
+    Rachel
+    Sam
+    Kristen
+    Morgan
+    Family
+
+  Events
+    Birthday
+    Wedding
+    Engagement
+    Graduation
+    Bar Mitzvah
+    Thanksgiving
+    Jazz Festival
+    Family Camp
+
+  Activities
+    Hiking
+    Mountain Biking
+    Snorkeling
+    Tidepooling
+    Travel
+    Whale Watching
+
+  Subjects
+    Gardens and Flowers
+    Landscapes
+    Lightscapes
+    Mountains
+    Waterfalls
+    Wildlife
+    Whale Sharks
+    Zoo
+    Remodel
+
+    A few notes on how I normalized things:
+
+* I changed things like Lori Birthday, Sam Birthday Celebration, and Joel Birthday Party into the reusable event keyword Birthday. The specific who belongs in People; the specific occasion can stay in albums or captions/notes.  
+* I changed Jorgan Wedding, Manchester Wedding, and Wedding into the reusable event keyword Wedding. The specific wedding identity should usually be represented by album structure, optional event title metadata, or a collection/album, not separate near-duplicate keywords.  
+* I kept Cozumel, Cabo, Baja, Maui, Yosemite, Monterey, Seattle, and similar labels only once, under Places, even though they recur in many albums across years.  
+* I did not include Europe, Australia, PNW Trip, Southwest, Northeast, or year folders as both organizational and semantic keywords. Under a uniqueness constraint, those quickly become messy if used for multiple meanings.  
+
+My recommendation for practical rollout is to start even smaller, with just this phase-1 seed set:
+
+Places
+  United States
+  Canada
+  Mexico
+  Europe
+  Australia
+  New Zealand
+
+People
+  Lori
+  Joel
+  Rachel
+  Sam
+  Morgan
+  Family
+
+Events
+  Birthday
+  Wedding
+  Graduation
+  Thanksgiving
+
+Activities
+  Travel
+  Hiking
+  Snorkeling
+  Tidepooling
+  Whale Watching
+
+Subjects
+  Waterfalls
+  Gardens and Flowers
+  Wildlife
+  Zoo
+  Remodel
+
+  Then add children only when you actually need them.
+
+That is the safest way to avoid building a tree that feels overdesigned too early.
+
+The biggest principle I’d use going forward is:
+
+* albums answer: “which trip / which event / which year / which curated set?”
+* keywords answer: “who / where / what / what kind of thing?”
+
+Because your album tree is heavily organized by year and trip/event containers, the best keyword tree should stay cross-cutting and reusable rather than trying to mirror the album hierarchy.  
+
+The one thing in my rewritten tree I would still consider optional is whether broad regions like Europe and North America should exist as assignable keywords at all, versus being parent-only organizational nodes. My leaning is:
+
+* allow them in the tree
+* but usually assign the most specific child keyword available
+
+So assign Paris or Spain, not just Europe, unless the exact country/city is unknown.
+
+If you want, I can next turn this into a mapping table from existing album labels to proposed keywords.
+
+Below is a practical album-label → proposed-keyword mapping table based on your albumTreeNodes collection. I am treating this as a starting point, not a claim that every album should become keywords one-for-one. In many cases, one album maps to multiple keywords, and in some cases the album should remain album-only.  
+
+Mapping principles
+
+* Geographic album labels usually map to one Place keyword.
+* Event albums usually map to one Event keyword, often plus one or more People keywords.
+* Subject albums usually map to one Subject keyword.
+* Activity albums usually map to one Activity keyword.
+* Operational / curation albums like Unfiled, Miscellany, Unknown Date, Imports from Takeout, dated import buckets, and source-bucket albums should usually map to no normal keywords. 
+
+

@@ -30,8 +30,10 @@ EXPORT_COLLECTIONS=(
   faceDetections
   faceMatchReviews
   imageAnalyses
+  keywords
   people
   personFaceExamples
+  smartAlbums
 )
 
 echo "Backing up Tedography to: $OUTPUT_DIR"

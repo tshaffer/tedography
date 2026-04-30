@@ -1,6 +1,7 @@
 import type {
   CreateKeywordRequest,
   CreateKeywordResponse,
+  DeleteKeywordResponse,
   ListAssetKeywordsResponse,
   ListKeywordsResponse,
   ListKeywordTreeResponse,
@@ -73,6 +74,12 @@ export async function updateKeywordLabel(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(request)
+  });
+}
+
+export async function deleteKeyword(keywordId: string): Promise<DeleteKeywordResponse> {
+  return fetchJson<DeleteKeywordResponse>(`/api/keywords/${encodeURIComponent(keywordId)}`, {
+    method: 'DELETE'
   });
 }
 

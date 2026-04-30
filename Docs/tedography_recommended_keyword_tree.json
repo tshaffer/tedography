@@ -1,0 +1,660 @@
+{
+  "name": "Tedography Recommended Keyword Tree",
+  "version": 1,
+  "notes": [
+    "This keyword tree is designed to be consistent with Tedography's global label uniqueness constraint.",
+    "Person identity keywords such as Joel, Rachel, Sam, Lori, etc. are intentionally omitted as standalone keywords.",
+    "People identity is intended to be handled by the Tedography People system (face/person assignments), not duplicated in keywords.",
+    "Context keywords such as 'Joel Soccer' are included where they add meaning that People + Activity alone cannot express."
+  ],
+  "root": {
+    "label": "Keywords",
+    "assignable": false,
+    "children": [
+      {
+        "label": "Places",
+        "assignable": false,
+        "children": [
+          {
+            "label": "North America",
+            "assignable": false,
+            "children": [
+              {
+                "label": "United States",
+                "assignable": false,
+                "children": [
+                  {
+                    "label": "Alaska",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Arizona",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Sedona",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Waterhole Slot Canyon",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "California",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Arcata",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Disneyland",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Filoli",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Monterey",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Pt. Lobos",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "San Francisco",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Santa Barbara",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Santa Cruz",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "SLO",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Snow Lake",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Yosemite",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Hawaii",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Maui",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Montana",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Oregon",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Bend",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Utah",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Park City",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Zion",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Washington",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Bellingham",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Mt. Baker",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Olympic Peninsula",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Seattle",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Wyoming",
+                    "assignable": false,
+                    "children": [
+                      {
+                        "label": "Jackson Hole",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Yellowstone",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Grand Tetons",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "label": "Canada",
+                "assignable": false,
+                "children": [
+                  {
+                    "label": "British Columbia",
+                    "assignable": true,
+                    "children": [
+                      {
+                        "label": "Fernie",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Glacier",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Revelstoke",
+                        "assignable": true,
+                        "children": []
+                      },
+                      {
+                        "label": "Yoho",
+                        "assignable": true,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "label": "Canadian Rockies",
+                    "assignable": true,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "label": "Mexico",
+                "assignable": false,
+                "children": [
+                  {
+                    "label": "Baja",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Cabo",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Cozumel",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Chankanaab",
+                    "assignable": true,
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "label": "Europe",
+            "assignable": true,
+            "children": [
+              {
+                "label": "Belgium",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Croatia",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Epernay",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Edinburgh",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Iceland",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Ireland",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Italy",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Norway",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Paris",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Portugal",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Spain",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Switzerland",
+                "assignable": true,
+                "children": []
+              }
+            ]
+          },
+          {
+            "label": "Africa",
+            "assignable": false,
+            "children": [
+              {
+                "label": "Morocco",
+                "assignable": true,
+                "children": []
+              }
+            ]
+          },
+          {
+            "label": "Asia",
+            "assignable": false,
+            "children": [
+              {
+                "label": "Southeast Asia",
+                "assignable": true,
+                "children": []
+              }
+            ]
+          },
+          {
+            "label": "Oceania",
+            "assignable": false,
+            "children": [
+              {
+                "label": "Australia",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "New Zealand",
+                "assignable": true,
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Events",
+        "assignable": false,
+        "children": [
+          {
+            "label": "Bar Mitzvah",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Birthday",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Engagement",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Family Camp",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Graduation",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Jazz Festival",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Thanksgiving",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Wedding",
+            "assignable": true,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "Activities",
+        "assignable": false,
+        "children": [
+          {
+            "label": "Hiking",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Snorkeling",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Sports",
+            "assignable": false,
+            "children": [
+              {
+                "label": "Baseball",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Basketball",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Cycling",
+                "assignable": true,
+                "children": [
+                  {
+                    "label": "Mountain Biking",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Road Cycling",
+                    "assignable": true,
+                    "children": []
+                  },
+                  {
+                    "label": "Track Cycling",
+                    "assignable": true,
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "label": "Running",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Soccer",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Softball",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Swimming",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Tennis",
+                "assignable": true,
+                "children": []
+              },
+              {
+                "label": "Volleyball",
+                "assignable": true,
+                "children": []
+              }
+            ]
+          },
+          {
+            "label": "Tidepooling",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Travel",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Whale Watching",
+            "assignable": true,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "Subjects",
+        "assignable": false,
+        "children": [
+          {
+            "label": "Gardens and Flowers",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Landscapes",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Lightscapes",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Mountains",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Remodel",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Waterfalls",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Wildlife",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Whale Sharks",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Zoo",
+            "assignable": true,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "Contexts",
+        "assignable": false,
+        "children": [
+          {
+            "label": "Youth Sports",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Joel Basketball",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Joel Cycling",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Joel Soccer",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Rachel Basketball",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Rachel Cycling",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Rachel Soccer",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Sam Basketball",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Sam Cycling",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Sam Soccer",
+            "assignable": true,
+            "children": []
+          }
+        ]
+      },
+      {
+        "label": "Roles",
+        "assignable": false,
+        "children": [
+          {
+            "label": "Action Shot",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Athlete",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Award Ceremony",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Sideline",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Spectator",
+            "assignable": true,
+            "children": []
+          },
+          {
+            "label": "Team Photo",
+            "assignable": true,
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactElement } f
 import type { Keyword, KeywordTreeNode } from '@tedography/domain';
 import {
   createKeyword,
+  deleteKeyword,
   listKeywordTree,
   listKeywords,
   updateKeywordLabel,
@@ -17,7 +18,11 @@ import {
 const sectionStyle: CSSProperties = {
   borderTop: '1px solid #efefef',
   paddingTop: '12px',
-  marginTop: '12px'
+  marginTop: '12px',
+  flex: 1,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column'
 };
 
 const sectionTitleStyle: CSSProperties = {
@@ -35,54 +40,84 @@ const panelStyle: CSSProperties = {
   border: '1px solid #d8d8d8',
   borderRadius: '10px',
   backgroundColor: '#fff',
-  display: 'grid',
+  display: 'flex',
+  flexDirection: 'column',
   gap: '12px',
-  padding: '12px'
+  padding: '12px',
+  flex: 1,
+  minHeight: 0
 };
 
 const bodyStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1.2fr) minmax(260px, 0.8fr)',
   gap: '12px',
-  minHeight: 0
+  minHeight: 0,
+  flex: 1
 };
 
 const treePanelStyle: CSSProperties = {
   border: '1px solid #ececec',
   borderRadius: '8px',
   padding: '10px',
-  minHeight: '220px',
-  maxHeight: '360px',
   overflow: 'auto'
 };
 
 const treeListStyle: CSSProperties = {
   display: 'grid',
-  gap: '4px'
+  gap: '1px'
 };
 
 const treeRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  minHeight: '30px'
+  minHeight: '12px',
+  gap: '2px'
+};
+
+const expandToggleStyle: CSSProperties = {
+  width: '20px',
+  minWidth: '20px',
+  height: '20px',
+  border: 'none',
+  borderRadius: '4px',
+  backgroundColor: 'transparent',
+  cursor: 'pointer',
+  padding: 0,
+  fontSize: '10px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#888',
+  flexShrink: 0
+};
+
+const expandSpacerStyle: CSSProperties = {
+  width: '20px',
+  minWidth: '20px',
+  flexShrink: 0
 };
 
 const treeButtonStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
   textAlign: 'left',
-  border: '1px solid transparent',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  border: 'none',
+  outline: 'none',
+  boxShadow: 'none',
   borderRadius: '8px',
   backgroundColor: 'transparent',
   cursor: 'pointer',
-  padding: '6px 8px',
+  padding: '3px 8px',
   fontSize: '13px'
 };
 
 const selectedTreeButtonStyle: CSSProperties = {
   ...treeButtonStyle,
   backgroundColor: '#eef4ff',
-  borderColor: '#c7dafd'
+  boxShadow: 'inset 0 0 0 1px #c7dafd'
 };
 
 const controlGroupStyle: CSSProperties = {
@@ -144,18 +179,38 @@ interface KeywordHierarchySectionProps {
   onKeywordsChanged?: (() => void) | undefined;
 }
 
+
 function renderTreeRows(
   nodes: KeywordTreeNode[],
   selectedKeywordId: string | null,
+  expandedIds: Set<string>,
   onSelect: (keywordId: string) => void,
+  onToggleExpand: (keywordId: string) => void,
   depth = 0
 ): ReactElement[] {
   return nodes.flatMap((node) => {
+    const hasChildren = node.children.length > 0;
+    const isExpanded = expandedIds.has(node.id);
+
     const rows: ReactElement[] = [
       <div key={node.id} style={{ ...treeRowStyle, paddingLeft: `${depth * 18}px` }}>
+        {hasChildren ? (
+          <button
+            type="button"
+            style={expandToggleStyle}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onToggleExpand(node.id)}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+          >
+            {isExpanded ? '▾' : '▸'}
+          </button>
+        ) : (
+          <span style={expandSpacerStyle} />
+        )}
         <button
           type="button"
           style={selectedKeywordId === node.id ? selectedTreeButtonStyle : treeButtonStyle}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => onSelect(node.id)}
           title={node.label}
         >
@@ -164,8 +219,8 @@ function renderTreeRows(
       </div>
     ];
 
-    if (node.children.length > 0) {
-      rows.push(...renderTreeRows(node.children, selectedKeywordId, onSelect, depth + 1));
+    if (hasChildren && isExpanded) {
+      rows.push(...renderTreeRows(node.children, selectedKeywordId, expandedIds, onSelect, onToggleExpand, depth + 1));
     }
 
     return rows;
@@ -182,8 +237,23 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
   const [newRootLabel, setNewRootLabel] = useState('');
   const [newChildLabel, setNewChildLabel] = useState('');
   const [pendingParentKeywordId, setPendingParentKeywordId] = useState<string>('__none__');
-  const [actionBusy, setActionBusy] = useState<null | 'rename' | 'create-root' | 'create-child' | 'reparent'>(null);
+  const [actionBusy, setActionBusy] = useState<null | 'rename' | 'create-root' | 'create-child' | 'reparent' | 'delete'>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null);
+
+  function toggleExpand(id: string): void {
+    setExpandedIds((current) => {
+      const base = current ?? new Set<string>();
+      const next = new Set(base);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   async function refreshKeywords(): Promise<void> {
     setLoading(true);
@@ -196,6 +266,9 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
       setKeywords(sortedKeywords);
       setSelectedKeywordId((current) =>
         current && sortedKeywords.some((keyword) => keyword.id === current) ? current : null
+      );
+      setExpandedIds((current) =>
+        current === null ? new Set<string>() : current
       );
     } catch (refreshError) {
       setError(refreshError instanceof Error ? refreshError.message : 'Failed to load keywords');
@@ -228,6 +301,7 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
   useEffect(() => {
     setPendingParentKeywordId(selectedKeyword?.parentKeywordId ?? '__none__');
     setRenameLabel(selectedKeyword?.label ?? '');
+    setConfirmingDelete(false);
   }, [selectedKeyword]);
 
   async function handleRenameKeyword(): Promise<void> {
@@ -285,8 +359,12 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
       return;
     }
 
-    const label = newChildLabel.trim().replace(/\s+/g, ' ');
-    if (label.length === 0) {
+    const labels = newChildLabel
+      .split('\n')
+      .map((line) => line.trim().replace(/\s+/g, ' '))
+      .filter((line) => line.length > 0);
+
+    if (labels.length === 0) {
       return;
     }
 
@@ -295,9 +373,16 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
     setNotice(null);
 
     try {
-      await createKeyword({ label, parentKeywordId: selectedKeyword.id });
+      for (const label of labels) {
+        await createKeyword({ label, parentKeywordId: selectedKeyword.id });
+      }
       setNewChildLabel('');
-      setNotice(`Created "${label}" under ${formatKeywordPathLabel(selectedKeyword, keywordMap)}.`);
+      const parentPath = formatKeywordPathLabel(selectedKeyword, keywordMap);
+      setNotice(
+        labels.length === 1
+          ? `Created "${labels[0]}" under ${parentPath}.`
+          : `Created ${labels.length} keywords under ${parentPath}.`
+      );
       await refreshKeywords();
       onKeywordsChanged?.();
     } catch (createError) {
@@ -335,6 +420,34 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
     }
   }
 
+  async function handleDeleteKeyword(): Promise<void> {
+    if (!selectedKeyword) {
+      return;
+    }
+
+    setActionBusy('delete');
+    setError(null);
+    setNotice(null);
+    setConfirmingDelete(false);
+
+    try {
+      const response = await deleteKeyword(selectedKeyword.id);
+      const count = response.deletedIds.length;
+      setNotice(
+        count === 1
+          ? `Deleted keyword "${selectedKeyword.label}".`
+          : `Deleted "${selectedKeyword.label}" and ${count - 1} descendant${count - 1 === 1 ? '' : 's'}.`
+      );
+      setSelectedKeywordId(null);
+      await refreshKeywords();
+      onKeywordsChanged?.();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete keyword');
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   return (
     <section style={sectionStyle}>
       <h3 style={sectionTitleStyle}>Keyword Hierarchy</h3>
@@ -359,13 +472,102 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
             </div>
             <div style={{ ...treeListStyle, marginTop: '10px' }}>
               {tree.length > 0 ? (
-                renderTreeRows(tree, selectedKeywordId, setSelectedKeywordId)
+                renderTreeRows(tree, selectedKeywordId, expandedIds ?? new Set(), setSelectedKeywordId, toggleExpand)
               ) : (
                 <p style={mutedTextStyle}>No keywords exist yet.</p>
               )}
             </div>
           </div>
-          <div style={{ display: 'grid', gap: '10px', alignContent: 'start' }}>
+          <div style={{ display: 'grid', gap: '10px', alignContent: 'start', overflowY: 'auto' }}>
+            <section style={controlGroupStyle}>
+              <h4 style={{ margin: 0, fontSize: '13px' }}>Create Root Keyword</h4>
+              <input
+                type="text"
+                value={newRootLabel}
+                onChange={(event) => setNewRootLabel(event.target.value)}
+                placeholder="Keyword label"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                style={newRootLabel.trim().length > 0 && actionBusy === null ? buttonStyle : disabledButtonStyle}
+                disabled={newRootLabel.trim().length === 0 || actionBusy !== null}
+                onClick={() => void handleCreateRootKeyword()}
+              >
+                {actionBusy === 'create-root' ? 'Creating...' : 'Create Root Keyword'}
+              </button>
+            </section>
+            <section style={controlGroupStyle}>
+              <h4 style={{ margin: 0, fontSize: '13px' }}>Create Child Keywords</h4>
+              <p style={mutedTextStyle}>
+                {selectedKeyword
+                  ? `Selected parent: ${formatKeywordPathLabel(selectedKeyword, keywordMap)}`
+                  : 'Select a keyword in the tree first.'}
+              </p>
+              <textarea
+                value={newChildLabel}
+                onChange={(event) => setNewChildLabel(event.target.value)}
+                placeholder="One child keyword per line"
+                style={{ ...inputStyle, resize: 'vertical', minHeight: '72px' }}
+                disabled={!selectedKeyword}
+                rows={3}
+              />
+              <button
+                type="button"
+                style={
+                  selectedKeyword && newChildLabel.trim().length > 0 && actionBusy === null
+                    ? buttonStyle
+                    : disabledButtonStyle
+                }
+                disabled={!selectedKeyword || newChildLabel.trim().length === 0 || actionBusy !== null}
+                onClick={() => void handleCreateChildKeyword()}
+              >
+                {actionBusy === 'create-child' ? 'Creating...' : 'Create Child Keywords'}
+              </button>
+            </section>
+            <section style={controlGroupStyle}>
+              <h4 style={{ margin: 0, fontSize: '13px' }}>Delete Selected Keyword</h4>
+              <p style={mutedTextStyle}>
+                {selectedKeyword
+                  ? (() => {
+                      const descendantCount = collectKeywordDescendantIds(keywords, selectedKeyword.id).size - 1;
+                      return descendantCount > 0
+                        ? `Deletes "${selectedKeyword.label}" and its ${descendantCount} descendant${descendantCount === 1 ? '' : 's'}. Also removes the keyword from any tagged assets.`
+                        : `Deletes "${selectedKeyword.label}" and removes it from any tagged assets.`;
+                    })()
+                  : 'Select a keyword in the tree first.'}
+              </p>
+              {confirmingDelete ? (
+                <div style={controlRowStyle}>
+                  <span style={{ ...mutedTextStyle, color: '#b00020' }}>Are you sure?</span>
+                  <button
+                    type="button"
+                    style={actionBusy === null ? { ...buttonStyle, borderColor: '#b00020', color: '#b00020' } : disabledButtonStyle}
+                    disabled={actionBusy !== null}
+                    onClick={() => void handleDeleteKeyword()}
+                  >
+                    {actionBusy === 'delete' ? 'Deleting...' : 'Yes, Delete'}
+                  </button>
+                  <button
+                    type="button"
+                    style={actionBusy === null ? buttonStyle : disabledButtonStyle}
+                    disabled={actionBusy !== null}
+                    onClick={() => setConfirmingDelete(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  style={selectedKeyword && actionBusy === null ? buttonStyle : disabledButtonStyle}
+                  disabled={!selectedKeyword || actionBusy !== null}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  Delete Keyword
+                </button>
+              )}
+            </section>
             <section style={controlGroupStyle}>
               <h4 style={{ margin: 0, fontSize: '13px' }}>Rename Selected Keyword</h4>
               <p style={mutedTextStyle}>
@@ -403,52 +605,6 @@ export function KeywordHierarchySection({ open, onKeywordsChanged }: KeywordHier
                   Cancel
                 </button>
               </div>
-            </section>
-            <section style={controlGroupStyle}>
-              <h4 style={{ margin: 0, fontSize: '13px' }}>Create Root Keyword</h4>
-              <input
-                type="text"
-                value={newRootLabel}
-                onChange={(event) => setNewRootLabel(event.target.value)}
-                placeholder="Keyword label"
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                style={newRootLabel.trim().length > 0 && actionBusy === null ? buttonStyle : disabledButtonStyle}
-                disabled={newRootLabel.trim().length === 0 || actionBusy !== null}
-                onClick={() => void handleCreateRootKeyword()}
-              >
-                {actionBusy === 'create-root' ? 'Creating...' : 'Create Root Keyword'}
-              </button>
-            </section>
-            <section style={controlGroupStyle}>
-              <h4 style={{ margin: 0, fontSize: '13px' }}>Create Child Keyword</h4>
-              <p style={mutedTextStyle}>
-                {selectedKeyword
-                  ? `Selected parent: ${formatKeywordPathLabel(selectedKeyword, keywordMap)}`
-                  : 'Select a keyword in the tree first.'}
-              </p>
-              <input
-                type="text"
-                value={newChildLabel}
-                onChange={(event) => setNewChildLabel(event.target.value)}
-                placeholder="Child keyword label"
-                style={inputStyle}
-                disabled={!selectedKeyword}
-              />
-              <button
-                type="button"
-                style={
-                  selectedKeyword && newChildLabel.trim().length > 0 && actionBusy === null
-                    ? buttonStyle
-                    : disabledButtonStyle
-                }
-                disabled={!selectedKeyword || newChildLabel.trim().length === 0 || actionBusy !== null}
-                onClick={() => void handleCreateChildKeyword()}
-              >
-                {actionBusy === 'create-child' ? 'Creating...' : 'Create Child Keyword'}
-              </button>
             </section>
             <section style={controlGroupStyle}>
               <h4 style={{ margin: 0, fontSize: '13px' }}>Reparent Selected Keyword</h4>

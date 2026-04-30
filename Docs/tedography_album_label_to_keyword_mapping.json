@@ -1,0 +1,1123 @@
+{
+  "name": "Tedography Album Label to Recommended Keyword Mapping",
+  "version": 1,
+  "notes": [
+    "This file maps existing album labels to suggested Tedography keyword labels.",
+    "Keyword labels here are intended to match the recommended keyword tree previously generated.",
+    "Some album labels map to no normal keywords because they are organizational, operational, date-bucket, or source-bucket constructs.",
+    "A single album label may map to multiple keywords.",
+    "This is a starting point for curation and backfill, not a claim that every album should always receive all mapped keywords."
+  ],
+  "mappingCategories": {
+    "direct": "Direct album label to one or more recommended keywords",
+    "normalized": "Album label maps to normalized canonical keyword(s)",
+    "albumOnly": "Album should usually remain album-only and not map to normal keywords"
+  },
+  "entries": [
+    {
+      "albumLabel": "Arcata",
+      "category": "direct",
+      "keywords": [
+        "Arcata"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Maui",
+      "category": "direct",
+      "keywords": [
+        "Maui"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Monterey",
+      "category": "direct",
+      "keywords": [
+        "Monterey"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Snow Lake",
+      "category": "direct",
+      "keywords": [
+        "Snow Lake"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Tidepooling",
+      "category": "direct",
+      "keywords": [
+        "Tidepooling"
+      ],
+      "notes": "Activity"
+    },
+    {
+      "albumLabel": "Yosemite",
+      "category": "direct",
+      "keywords": [
+        "Yosemite"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Yosemite 2024",
+      "category": "normalized",
+      "keywords": [
+        "Yosemite"
+      ],
+      "notes": "Year stays in album"
+    },
+    {
+      "albumLabel": "British Columbia",
+      "category": "direct",
+      "keywords": [
+        "British Columbia"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Fernie",
+      "category": "direct",
+      "keywords": [
+        "Fernie"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Glacier",
+      "category": "direct",
+      "keywords": [
+        "Glacier"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Revelstoke",
+      "category": "direct",
+      "keywords": [
+        "Revelstoke"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Yoho",
+      "category": "direct",
+      "keywords": [
+        "Yoho"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Seattle",
+      "category": "direct",
+      "keywords": [
+        "Seattle"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Sedona",
+      "category": "direct",
+      "keywords": [
+        "Sedona"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Zion",
+      "category": "direct",
+      "keywords": [
+        "Zion"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Waterhole Slot Canyon",
+      "category": "direct",
+      "keywords": [
+        "Waterhole Slot Canyon"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Bend",
+      "category": "direct",
+      "keywords": [
+        "Bend"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Bellingham",
+      "category": "direct",
+      "keywords": [
+        "Bellingham"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Washington",
+      "category": "direct",
+      "keywords": [
+        "Washington"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Ireland",
+      "category": "direct",
+      "keywords": [
+        "Ireland"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Iceland",
+      "category": "direct",
+      "keywords": [
+        "Iceland"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Paris",
+      "category": "direct",
+      "keywords": [
+        "Paris"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Epernay",
+      "category": "direct",
+      "keywords": [
+        "Epernay"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Norway",
+      "category": "direct",
+      "keywords": [
+        "Norway"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Alaska",
+      "category": "direct",
+      "keywords": [
+        "Alaska"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Morocco",
+      "category": "direct",
+      "keywords": [
+        "Morocco"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "New Zealand",
+      "category": "direct",
+      "keywords": [
+        "New Zealand"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Australia",
+      "category": "direct",
+      "keywords": [
+        "Australia"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Cozumel",
+      "category": "direct",
+      "keywords": [
+        "Cozumel"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Chankanaab",
+      "category": "direct",
+      "keywords": [
+        "Chankanaab"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Cabo",
+      "category": "direct",
+      "keywords": [
+        "Cabo"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Baja",
+      "category": "direct",
+      "keywords": [
+        "Baja"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Pt Lobos",
+      "category": "normalized",
+      "keywords": [
+        "Pt. Lobos"
+      ],
+      "notes": "Normalize spelling"
+    },
+    {
+      "albumLabel": "Pt. Lobos",
+      "category": "direct",
+      "keywords": [
+        "Pt. Lobos"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Filoli",
+      "category": "direct",
+      "keywords": [
+        "Filoli"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Disneyland",
+      "category": "direct",
+      "keywords": [
+        "Disneyland"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "San Francisco Feb",
+      "category": "normalized",
+      "keywords": [
+        "San Francisco"
+      ],
+      "notes": "Month stays in album"
+    },
+    {
+      "albumLabel": "SLO",
+      "category": "direct",
+      "keywords": [
+        "SLO"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Mt. Baker",
+      "category": "direct",
+      "keywords": [
+        "Mt. Baker"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Olympic Peninsula",
+      "category": "direct",
+      "keywords": [
+        "Olympic Peninsula"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Jackson Hole",
+      "category": "direct",
+      "keywords": [
+        "Jackson Hole"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Yellowstone and Grand Tetons",
+      "category": "direct",
+      "keywords": [
+        "Yellowstone",
+        "Grand Tetons"
+      ],
+      "notes": "Two places"
+    },
+    {
+      "albumLabel": "Canadian Rockies",
+      "category": "direct",
+      "keywords": [
+        "Canadian Rockies"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Santa Cruz",
+      "category": "direct",
+      "keywords": [
+        "Santa Cruz"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Zoo",
+      "category": "direct",
+      "keywords": [
+        "Zoo"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Waterfalls",
+      "category": "direct",
+      "keywords": [
+        "Waterfalls"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Gardens and Flowers",
+      "category": "direct",
+      "keywords": [
+        "Gardens and Flowers"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Lightscapes",
+      "category": "direct",
+      "keywords": [
+        "Lightscapes"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Whale Sharks",
+      "category": "direct",
+      "keywords": [
+        "Whale Sharks"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Whale Watching",
+      "category": "direct",
+      "keywords": [
+        "Whale Watching"
+      ],
+      "notes": "Activity"
+    },
+    {
+      "albumLabel": "Mystic Snorkeling Trip",
+      "category": "direct",
+      "keywords": [
+        "Snorkeling",
+        "Cozumel"
+      ],
+      "notes": "Activity + place"
+    },
+    {
+      "albumLabel": "Remodel",
+      "category": "direct",
+      "keywords": [
+        "Remodel"
+      ],
+      "notes": "Subject"
+    },
+    {
+      "albumLabel": "Lori Birthday",
+      "category": "normalized",
+      "keywords": [
+        "Birthday"
+      ],
+      "notes": "Event only; people handled by People system"
+    },
+    {
+      "albumLabel": "Sam Birthday Celebration",
+      "category": "normalized",
+      "keywords": [
+        "Birthday"
+      ],
+      "notes": "Event only; people handled by People system"
+    },
+    {
+      "albumLabel": "Joel Birthday Party",
+      "category": "normalized",
+      "keywords": [
+        "Birthday"
+      ],
+      "notes": "Event only; people handled by People system"
+    },
+    {
+      "albumLabel": "Wedding",
+      "category": "direct",
+      "keywords": [
+        "Wedding"
+      ],
+      "notes": "Event"
+    },
+    {
+      "albumLabel": "Jorgan Wedding",
+      "category": "normalized",
+      "keywords": [
+        "Wedding"
+      ],
+      "notes": "Specific wedding identity stays in album"
+    },
+    {
+      "albumLabel": "Manchester Wedding",
+      "category": "normalized",
+      "keywords": [
+        "Wedding"
+      ],
+      "notes": "Specific wedding identity stays in album"
+    },
+    {
+      "albumLabel": "Pre Wedding",
+      "category": "normalized",
+      "keywords": [
+        "Wedding"
+      ],
+      "notes": "Could later add Pre-Wedding if needed"
+    },
+    {
+      "albumLabel": "Sam Kristen Engagement",
+      "category": "normalized",
+      "keywords": [
+        "Engagement"
+      ],
+      "notes": "People handled by People system"
+    },
+    {
+      "albumLabel": "Lehigh Graduation",
+      "category": "normalized",
+      "keywords": [
+        "Graduation"
+      ],
+      "notes": "Event"
+    },
+    {
+      "albumLabel": "Cal Poly Graduation - Joel",
+      "category": "normalized",
+      "keywords": [
+        "Graduation"
+      ],
+      "notes": "Event; person handled by People system"
+    },
+    {
+      "albumLabel": "Joel Bar Mitzvah",
+      "category": "normalized",
+      "keywords": [
+        "Bar Mitzvah"
+      ],
+      "notes": "Event; person handled by People system"
+    },
+    {
+      "albumLabel": "Sam Bar Mitzvah",
+      "category": "normalized",
+      "keywords": [
+        "Bar Mitzvah"
+      ],
+      "notes": "Event; person handled by People system"
+    },
+    {
+      "albumLabel": "Thanksgiving",
+      "category": "direct",
+      "keywords": [
+        "Thanksgiving"
+      ],
+      "notes": "Event"
+    },
+    {
+      "albumLabel": "Thanksgiving Through the Years",
+      "category": "normalized",
+      "keywords": [
+        "Thanksgiving"
+      ],
+      "notes": "Collection-style album"
+    },
+    {
+      "albumLabel": "JazzFest Weekend",
+      "category": "normalized",
+      "keywords": [
+        "Jazz Festival"
+      ],
+      "notes": "Normalize wording"
+    },
+    {
+      "albumLabel": "Jazz Bash Monterey",
+      "category": "normalized",
+      "keywords": [
+        "Jazz Festival",
+        "Monterey"
+      ],
+      "notes": "Event + place"
+    },
+    {
+      "albumLabel": "Santa Barbara Family Camp",
+      "category": "normalized",
+      "keywords": [
+        "Family Camp",
+        "Santa Barbara"
+      ],
+      "notes": "Event-ish + place"
+    },
+    {
+      "albumLabel": "Southwest",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Prefer specific places if known"
+    },
+    {
+      "albumLabel": "Northeast",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Too broad for now"
+    },
+    {
+      "albumLabel": "Europe",
+      "category": "direct",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Broad place keyword"
+    },
+    {
+      "albumLabel": "Europe - multiple countries",
+      "category": "normalized",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Add specific countries if known"
+    },
+    {
+      "albumLabel": "Europe in April",
+      "category": "normalized",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Month stays in album"
+    },
+    {
+      "albumLabel": "Europe in May",
+      "category": "normalized",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Month stays in album"
+    },
+    {
+      "albumLabel": "Europe in July",
+      "category": "normalized",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Month stays in album"
+    },
+    {
+      "albumLabel": "Europe in February",
+      "category": "normalized",
+      "keywords": [
+        "Europe"
+      ],
+      "notes": "Month stays in album"
+    },
+    {
+      "albumLabel": "Paris and Spain",
+      "category": "direct",
+      "keywords": [
+        "Paris",
+        "Spain"
+      ],
+      "notes": "Could optionally also add Europe"
+    },
+    {
+      "albumLabel": "Spain and Portugal",
+      "category": "direct",
+      "keywords": [
+        "Spain",
+        "Portugal"
+      ],
+      "notes": "Two places"
+    },
+    {
+      "albumLabel": "Portugal and Spain",
+      "category": "direct",
+      "keywords": [
+        "Portugal",
+        "Spain"
+      ],
+      "notes": "Two places"
+    },
+    {
+      "albumLabel": "Barcelona and Italy",
+      "category": "direct",
+      "keywords": [
+        "Italy"
+      ],
+      "notes": "Barcelona not in current keyword tree"
+    },
+    {
+      "albumLabel": "Switzerland and Italy",
+      "category": "direct",
+      "keywords": [
+        "Switzerland",
+        "Italy"
+      ],
+      "notes": "Two places"
+    },
+    {
+      "albumLabel": "Croatia and more",
+      "category": "direct",
+      "keywords": [
+        "Croatia"
+      ],
+      "notes": "Add others only if known"
+    },
+    {
+      "albumLabel": "Asia - Lori and Joel",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Asia not included as assignable keyword in current tree; people handled by People system"
+    },
+    {
+      "albumLabel": "Southeast Asia",
+      "category": "direct",
+      "keywords": [
+        "Southeast Asia"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "PNW",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Avoid regional duplicate for now"
+    },
+    {
+      "albumLabel": "PNW Trip",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Trip container"
+    },
+    {
+      "albumLabel": "Bend and Bellingham",
+      "category": "direct",
+      "keywords": [
+        "Bend",
+        "Bellingham"
+      ],
+      "notes": "Two places"
+    },
+    {
+      "albumLabel": "Eastern Sierras",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Candidate future place keyword"
+    },
+    {
+      "albumLabel": "Hawaii",
+      "category": "direct",
+      "keywords": [
+        "Travel"
+      ],
+      "notes": "Broad place represented in tree via Places/North America/United States/Hawaii node, but not a standalone assignable keyword"
+    },
+    {
+      "albumLabel": "New Orleans",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Not currently in keyword tree; add later if useful"
+    },
+    {
+      "albumLabel": "Park City",
+      "category": "direct",
+      "keywords": [
+        "Park City"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Costa Rica",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Not currently in keyword tree; add later if desired"
+    },
+    {
+      "albumLabel": "Belgium",
+      "category": "direct",
+      "keywords": [
+        "Belgium"
+      ],
+      "notes": "Place"
+    },
+    {
+      "albumLabel": "Lori",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "People identity handled by People system"
+    },
+    {
+      "albumLabel": "Guest Photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Source/set distinction"
+    },
+    {
+      "albumLabel": "Professional Photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Better as provenance/source metadata"
+    },
+    {
+      "albumLabel": "Pro Photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Better as provenance/source metadata"
+    },
+    {
+      "albumLabel": "Non Pro Photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Better as provenance/source metadata"
+    },
+    {
+      "albumLabel": "Nikon Photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Better as source/equipment metadata"
+    },
+    {
+      "albumLabel": "Shaffer photos",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Source set"
+    },
+    {
+      "albumLabel": "Shaffer Media",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Source set"
+    },
+    {
+      "albumLabel": "End of year kitties visit",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Could later add Cats if useful"
+    },
+    {
+      "albumLabel": "Kitties June",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Could later add Cats if useful"
+    },
+    {
+      "albumLabel": "Lexus Departure",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Could add Cars later if useful"
+    },
+    {
+      "albumLabel": "2026",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2025",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2024",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2023",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2022",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2021",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2020",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2019",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2018",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2017",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2016",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2015",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2014",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2013",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2012",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2008",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2007",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2006",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2005",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2004",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2003",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2002",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2001",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "2000",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1999",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1998",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1996",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1994",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1993",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1992",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1991",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "1987",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Year bucket"
+    },
+    {
+      "albumLabel": "04_22_2025",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Date bucket"
+    },
+    {
+      "albumLabel": "04_22_2025_no_live",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Workflow/source detail"
+    },
+    {
+      "albumLabel": "04_23_2025",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Date bucket"
+    },
+    {
+      "albumLabel": "04_24_2025_no_live",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Workflow/source detail"
+    },
+    {
+      "albumLabel": "05_01_2025",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Date bucket"
+    },
+    {
+      "albumLabel": "Collections",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Container"
+    },
+    {
+      "albumLabel": "Imports from Takeout",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Operational"
+    },
+    {
+      "albumLabel": "MissingFromImports",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Operational"
+    },
+    {
+      "albumLabel": "Unknown Date",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Operational/metadata state"
+    },
+    {
+      "albumLabel": "Unfiled",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Curation bucket"
+    },
+    {
+      "albumLabel": "Miscellany",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Curation bucket"
+    },
+    {
+      "albumLabel": "Full Set Images",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Source/set bucket"
+    },
+    {
+      "albumLabel": "Featured Collections",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Collection bucket"
+    },
+    {
+      "albumLabel": "photos-1_of_2",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Packaging artifact"
+    },
+    {
+      "albumLabel": "Q1",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Organization bucket"
+    },
+    {
+      "albumLabel": "Pre 1985",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Time bucket"
+    },
+    {
+      "albumLabel": "2022-10 to 2023-01-07",
+      "category": "albumOnly",
+      "keywords": [],
+      "notes": "Import/date bucket"
+    }
+  ]
+}

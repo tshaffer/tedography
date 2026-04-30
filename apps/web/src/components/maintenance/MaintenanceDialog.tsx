@@ -14,7 +14,6 @@ import {
   reimportKnownAssetsInFolder,
   verifyKnownAssetsInFolder
 } from '../../api/importApi';
-import { KeywordHierarchySection } from './KeywordHierarchySection';
 import { SmartAlbumsSection } from './SmartAlbumsSection';
 
 type SourceSelection = {
@@ -257,7 +256,6 @@ interface MaintenanceDialogProps {
   open: boolean;
   onClose: () => void;
   onMaintenanceCompleted?: () => void;
-  onKeywordsChanged?: () => void;
   albumTreeNodes?: AlbumTreeNode[];
   onOpenSmartAlbum?: (smartAlbum: SmartAlbum) => void;
   onSmartAlbumsChanged?: () => void;
@@ -274,7 +272,6 @@ export function MaintenanceDialog({
   open,
   onClose,
   onMaintenanceCompleted,
-  onKeywordsChanged,
   albumTreeNodes = [],
   onOpenSmartAlbum,
   onSmartAlbumsChanged
@@ -780,10 +777,6 @@ export function MaintenanceDialog({
                   </p>
                 )}
               </section>
-              <KeywordHierarchySection
-                open={open}
-                onKeywordsChanged={onKeywordsChanged}
-              />
               <SmartAlbumsSection
                 open={open}
                 yearGroups={yearGroupOptions}

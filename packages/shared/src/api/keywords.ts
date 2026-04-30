@@ -48,6 +48,10 @@ export interface UpdateAssetKeywordsResponse {
   keywordIds: string[];
 }
 
+export interface DeleteKeywordResponse {
+  deletedIds: string[];
+}
+
 export interface ListKeywordAssetsResponse {
   keyword: Keyword;
   items: Array<

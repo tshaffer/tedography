@@ -1,7 +1,7 @@
 import type { Keyword, KeywordTreeNode } from '@tedography/domain';
 import { randomUUID } from 'node:crypto';
 import { KeywordModel } from '../models/keywordModel.js';
-import { findById } from './assetRepository.js';
+import { findById, removeKeywordsGlobally } from './assetRepository.js';
 
 export class KeywordLabelConflictError extends Error {
   constructor(label: string) {
@@ -293,6 +293,22 @@ export async function updateKeywordLabel(
     normalizedLabel,
     updatedAt
   };
+}
+
+export async function deleteKeyword(keywordId: string): Promise<string[]> {
+  const keyword = await getKeywordById(keywordId);
+  if (!keyword) {
+    throw new KeywordNotFoundError(`Keyword "${keywordId}" was not found.`);
+  }
+
+  const allKeywords = await listKeywords();
+  const descendantIds = collectDescendantIds(allKeywords, keywordId);
+  const idsToDelete = [keywordId, ...descendantIds];
+
+  await removeKeywordsGlobally(idsToDelete);
+  await KeywordModel.deleteMany({ id: { $in: idsToDelete } });
+
+  return idsToDelete;
 }
 
 export async function listKeywordsForAsset(assetId: string): Promise<Keyword[] | null> {

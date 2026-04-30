@@ -1,11 +1,14 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import type { Keyword } from '@tedography/domain';
-import { buildKeywordMap, formatKeywordPathLabel } from '../../utilities/keywords';
+import {
+  buildKeywordMap,
+  formatKeywordPathLabel,
+  getKeywordPathLabels
+} from '../../utilities/keywords';
 
 type KeywordEntry = Keyword | string;
 
@@ -35,35 +38,79 @@ const titleStyle: CSSProperties = {
   fontSize: '14px'
 };
 
-const helperTextStyle: CSSProperties = {
-  margin: '0 0 10px',
-  color: '#666',
-  fontSize: '12px',
-  lineHeight: 1.4
+const currentKeywordsZoneStyle: CSSProperties = {
+  minHeight: '28px',
+  marginBottom: '8px'
 };
 
 const chipRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '6px',
-  minHeight: '32px',
-  marginBottom: '10px'
+  gap: '5px'
 };
 
-const addControlsStyle: CSSProperties = {
+const chipParentPathStyle: CSSProperties = {
+  color: '#999',
+  fontSize: '10px',
+  fontWeight: 400
+};
+
+const emptyLabelStyle: CSSProperties = {
+  color: '#aaa',
+  fontSize: '12px'
+};
+
+const dividerStyle: CSSProperties = {
+  borderTop: '1px solid #ececec',
+  margin: '8px 0'
+};
+
+const addRowStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr auto',
-  gap: '8px',
-  alignItems: 'start'
+  gap: '6px',
+  alignItems: 'stretch'
+};
+
+const addButtonStyle: CSSProperties = {
+  padding: '0 12px',
+  fontSize: '12px',
+  backgroundColor: '#f4f4f4',
+  border: '1px solid #c8c8c8',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap'
+};
+
+const addButtonDisabledStyle: CSSProperties = {
+  ...addButtonStyle,
+  opacity: 0.45,
+  cursor: 'not-allowed'
+};
+
+const recentSectionStyle: CSSProperties = {
+  marginTop: '8px'
+};
+
+const recentLabelStyle: CSSProperties = {
+  display: 'block',
+  color: '#999',
+  fontSize: '11px',
+  marginBottom: '5px'
+};
+
+const recentChipsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '5px'
 };
 
 const loadingRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '8px',
-  color: '#666',
-  fontSize: '12px',
-  marginBottom: '10px'
+  gap: '6px',
+  color: '#999',
+  fontSize: '12px'
 };
 
 function normalizeKeywordLabel(label: string): string {
@@ -92,6 +139,24 @@ function dedupeKeywordEntries(entries: KeywordEntry[]): KeywordEntry[] {
   return next;
 }
 
+function KeywordChipLabel({
+  keyword,
+  keywordMap
+}: {
+  keyword: Keyword;
+  keywordMap: Map<string, Keyword>;
+}) {
+  const pathLabels = getKeywordPathLabels(keyword, keywordMap);
+  const leafName = pathLabels[pathLabels.length - 1] ?? keyword.label;
+  const parentPath = pathLabels.slice(0, -1).join(' / ');
+  return (
+    <span>
+      {parentPath ? <span style={chipParentPathStyle}>{parentPath} / </span> : null}
+      {leafName}
+    </span>
+  );
+}
+
 export function AssetKeywordsPanel({
   selectedAssetCount,
   displayedKeywords,
@@ -104,35 +169,35 @@ export function AssetKeywordsPanel({
   onRemoveKeyword
 }: AssetKeywordsPanelProps) {
   const [pendingEntries, setPendingEntries] = useState<KeywordEntry[]>([]);
-  const displayModeLabel = selectedAssetCount > 1 ? 'Common Keywords' : 'Keywords';
-  const helperText =
-    selectedAssetCount === 0
-      ? 'Select one or more photos to view and edit keywords.'
-      : selectedAssetCount === 1
-        ? 'Add keywords to the selected photo, or remove them from the chips below.'
-        : 'Showing only keywords common to all selected photos. Add applies to all selected photos.';
 
-  const addButtonLabel = selectedAssetCount > 1 ? 'Add to Selected' : 'Add Keyword';
-  const emptyStateLabel =
-    selectedAssetCount > 1 ? 'No common keywords' : 'No keywords';
+  const titleLabel = selectedAssetCount > 1 ? 'Common Keywords' : 'Keywords';
+  const emptyStateLabel = selectedAssetCount > 1 ? 'No common keywords' : 'No keywords';
+  const addButtonLabel = selectedAssetCount > 1 ? 'Add to All' : 'Add';
+
   const keywordMap = useMemo(() => buildKeywordMap(allKeywords), [allKeywords]);
+
   const visibleRecentKeywords = useMemo(
     () =>
       recentKeywords.filter(
-        (keyword) => !displayedKeywords.some((displayedKeyword) => displayedKeyword.id === keyword.id)
+        (keyword) => !displayedKeywords.some((d) => d.id === keyword.id)
       ),
     [displayedKeywords, recentKeywords]
   );
+
   const sanitizedPendingEntries = useMemo(
     () => dedupeKeywordEntries(pendingEntries),
     [pendingEntries]
+  );
+
+  const addableKeywords = useMemo(
+    () => allKeywords.filter((k) => !displayedKeywords.some((d) => d.id === k.id)),
+    [allKeywords, displayedKeywords]
   );
 
   async function handleAdd(): Promise<void> {
     if (sanitizedPendingEntries.length === 0 || selectedAssetCount === 0 || updateBusy) {
       return;
     }
-
     const applied = await onAddKeywords(sanitizedPendingEntries);
     if (applied) {
       setPendingEntries([]);
@@ -141,96 +206,134 @@ export function AssetKeywordsPanel({
 
   return (
     <section style={panelStyle}>
-      <h3 style={titleStyle}>{displayModeLabel}</h3>
-      <p style={helperTextStyle}>{helperText}</p>
-      {keywordsLoading ? (
-        <div style={loadingRowStyle}>
-          <CircularProgress size={14} />
-          <span>Loading keywords...</span>
-        </div>
-      ) : null}
+      <h3 style={titleStyle}>{titleLabel}</h3>
+
       {keywordsError ? (
-        <p style={{ ...helperTextStyle, color: '#a12622' }}>{keywordsError}</p>
+        <p style={{ ...emptyLabelStyle, color: '#a12622', marginBottom: '6px' }}>
+          {keywordsError}
+        </p>
       ) : null}
-      {visibleRecentKeywords.length > 0 ? (
-        <>
-          <p style={{ ...helperTextStyle, marginBottom: '6px' }}>Recent Keywords</p>
+
+      {/* Keywords on this photo */}
+      <div style={currentKeywordsZoneStyle}>
+        {keywordsLoading ? (
+          <div style={loadingRowStyle}>
+            <CircularProgress size={12} />
+            <span>Loading...</span>
+          </div>
+        ) : selectedAssetCount === 0 ? (
+          <span style={emptyLabelStyle}>Select a photo to view and edit keywords.</span>
+        ) : displayedKeywords.length > 0 ? (
           <div style={chipRowStyle}>
-            {visibleRecentKeywords.map((keyword) => (
+            {displayedKeywords.map((keyword) => (
               <Chip
                 key={keyword.id}
-                label={formatKeywordPathLabel(keyword, keywordMap)}
+                label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
                 size="small"
-                clickable={selectedAssetCount > 0 && !updateBusy}
-                onClick={
-                  selectedAssetCount > 0 && !updateBusy
-                    ? () => {
-                        void onAddKeywords([keyword]);
-                      }
-                    : undefined
+                title={formatKeywordPathLabel(keyword, keywordMap)}
+                onDelete={
+                  !updateBusy ? () => void onRemoveKeyword(keyword) : undefined
                 }
               />
             ))}
           </div>
-        </>
-      ) : null}
-      <div style={chipRowStyle}>
-        {displayedKeywords.length > 0 ? (
-          displayedKeywords.map((keyword) => (
-            <Chip
-              key={keyword.id}
-              label={formatKeywordPathLabel(keyword, keywordMap)}
-              size="small"
-              onDelete={
-                selectedAssetCount > 0 && !updateBusy
-                  ? () => {
-                      void onRemoveKeyword(keyword);
-                    }
-                  : undefined
-              }
-            />
-          ))
         ) : (
-          <span style={{ color: '#666', fontSize: '12px' }}>{emptyStateLabel}</span>
+          <span style={emptyLabelStyle}>{emptyStateLabel}</span>
         )}
       </div>
-      <div style={addControlsStyle}>
-        <Autocomplete<KeywordEntry, true, false, true>
-          multiple
-          freeSolo
-          disabled={selectedAssetCount === 0 || updateBusy}
-          options={allKeywords}
-          value={pendingEntries}
-          onChange={(_event, value) => {
-            setPendingEntries(dedupeKeywordEntries(value));
-          }}
-          getOptionLabel={(entry) =>
-            typeof entry === 'string' ? entry : formatKeywordPathLabel(entry, keywordMap)
-          }
-          isOptionEqualToValue={(option, value) =>
-            normalizeKeywordLabel(getKeywordEntryLabel(option)) ===
-            normalizeKeywordLabel(getKeywordEntryLabel(value))
-          }
-          filterSelectedOptions
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              size="small"
-              label={selectedAssetCount > 0 ? 'Add Keywords' : 'Select assets first'}
-              placeholder={selectedAssetCount > 0 ? 'Type or select keywords' : ''}
+
+      {selectedAssetCount > 0 ? (
+        <>
+          <div style={dividerStyle} />
+
+          {/* Add keyword input */}
+          <div style={addRowStyle}>
+            <Autocomplete<KeywordEntry, true, false, true>
+              multiple
+              freeSolo
+              disabled={updateBusy}
+              options={addableKeywords}
+              value={pendingEntries}
+              onChange={(_event, value) => {
+                setPendingEntries(dedupeKeywordEntries(value));
+              }}
+              getOptionLabel={(entry) =>
+                typeof entry === 'string' ? entry : formatKeywordPathLabel(entry, keywordMap)
+              }
+              isOptionEqualToValue={(option, value) =>
+                normalizeKeywordLabel(getKeywordEntryLabel(option)) ===
+                normalizeKeywordLabel(getKeywordEntryLabel(value))
+              }
+              filterSelectedOptions
+              renderOption={(props, option) => {
+                const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                if (typeof option === 'string') {
+                  return <li key={key} {...rest}>{option}</li>;
+                }
+                const pathLabels = getKeywordPathLabels(option, keywordMap);
+                const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
+                const parentPath = pathLabels.slice(0, -1).join(' / ');
+                return (
+                  <li key={key} {...rest}>
+                    <div style={{ lineHeight: 1.35 }}>
+                      {parentPath ? (
+                        <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div>
+                      ) : null}
+                      <div style={{ fontSize: '13px' }}>{leafName}</div>
+                    </div>
+                  </li>
+                );
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small"
+                  placeholder="Search or type a keyword"
+                  inputProps={{
+                    ...params.inputProps,
+                    style: { fontSize: '12px' }
+                  }}
+                  sx={{
+                    '& .MuiInputBase-root': { paddingTop: '2px', paddingBottom: '2px' },
+                    '& .MuiInputBase-input': { paddingTop: '2px', paddingBottom: '2px', fontSize: '12px' }
+                  }}
+                />
+              )}
             />
-          )}
-        />
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={() => void handleAdd()}
-          disabled={selectedAssetCount === 0 || updateBusy || sanitizedPendingEntries.length === 0}
-          style={{ minWidth: '124px', height: '40px' }}
-        >
-          {updateBusy ? 'Working...' : addButtonLabel}
-        </Button>
-      </div>
+            <button
+              style={
+                sanitizedPendingEntries.length > 0 && !updateBusy
+                  ? addButtonStyle
+                  : addButtonDisabledStyle
+              }
+              disabled={sanitizedPendingEntries.length === 0 || updateBusy}
+              onClick={() => void handleAdd()}
+            >
+              {updateBusy ? 'Adding…' : addButtonLabel}
+            </button>
+          </div>
+
+          {/* Recently used suggestions */}
+          {visibleRecentKeywords.length > 0 ? (
+            <div style={recentSectionStyle}>
+              <span style={recentLabelStyle}>Recently used</span>
+              <div style={recentChipsStyle}>
+                {visibleRecentKeywords.map((keyword) => (
+                  <Chip
+                    key={keyword.id}
+                    label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
+                    size="small"
+                    variant="outlined"
+                    title={formatKeywordPathLabel(keyword, keywordMap)}
+                    clickable={!updateBusy}
+                    onClick={!updateBusy ? () => void onAddKeywords([keyword]) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </section>
   );
 }

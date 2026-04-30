@@ -3,6 +3,7 @@ import type { ImportApiErrorResponse } from '@tedography/domain';
 import type {
   CreateKeywordRequest,
   CreateKeywordResponse,
+  DeleteKeywordResponse,
   ListAssetKeywordsResponse,
   ListKeywordAssetsResponse,
   ListKeywordsResponse,
@@ -23,6 +24,7 @@ import {
 } from '../repositories/assetRepository.js';
 import {
   createKeyword,
+  deleteKeyword,
   findKeywordsByIds,
   getKeywordById,
   KeywordHierarchyCycleError,
@@ -178,6 +180,21 @@ keywordRoutes.patch('/:keywordId/parent', async (req, res) => {
 
     log.error('Failed to update keyword parent', error);
     res.status(500).json({ error: 'Failed to update keyword parent' } satisfies ImportApiErrorResponse);
+  }
+});
+
+keywordRoutes.delete('/:keywordId', async (req, res) => {
+  try {
+    const deletedIds = await deleteKeyword(req.params.keywordId);
+    res.json({ deletedIds } satisfies DeleteKeywordResponse);
+  } catch (error) {
+    if (error instanceof KeywordNotFoundError) {
+      res.status(404).json({ error: error.message } satisfies ImportApiErrorResponse);
+      return;
+    }
+
+    log.error('Failed to delete keyword', error);
+    res.status(500).json({ error: 'Failed to delete keyword' } satisfies ImportApiErrorResponse);
   }
 });
 

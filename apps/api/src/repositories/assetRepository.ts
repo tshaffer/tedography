@@ -683,6 +683,19 @@ export async function removeKeywordsFromAssets(assetIds: string[], keywordIds: s
   );
 }
 
+export async function removeKeywordsGlobally(keywordIds: string[]): Promise<void> {
+  const normalizedKeywordIds = [...new Set(keywordIds.map((keywordId) => keywordId.trim()).filter(Boolean))];
+  if (normalizedKeywordIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { keywordIds: { $in: normalizedKeywordIds } },
+    { $pull: { keywordIds: { $in: normalizedKeywordIds } } },
+    { runValidators: true }
+  );
+}
+
 export async function listAssetsByKeyword(keywordId: string): Promise<
   Array<
     Pick<

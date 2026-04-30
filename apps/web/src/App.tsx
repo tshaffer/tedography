@@ -96,6 +96,7 @@ import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
 } from './components/import/ImportAssetsDialog';
+import { KeywordManagementDialog } from './components/maintenance/KeywordManagementDialog';
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
 import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
 import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleMaintenanceDialog';
@@ -3208,6 +3209,7 @@ export default function App() {
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
@@ -9720,6 +9722,16 @@ export default function App() {
                     style={toolbarButtonStyle}
                     onClick={() => {
                       setToolbarOverflowOpen(false);
+                      setKeywordManagementDialogOpen(true);
+                    }}
+                  >
+                    Keyword Management
+                  </button>
+                  <button
+                    type="button"
+                    style={toolbarButtonStyle}
+                    onClick={() => {
+                      setToolbarOverflowOpen(false);
                       setMaintenanceDialogOpen(true);
                     }}
                     title="Open maintenance tools"
@@ -10463,6 +10475,13 @@ export default function App() {
           void loadAlbumTreeNodes({ showLoading: false });
         }}
       />
+      <KeywordManagementDialog
+        open={keywordManagementDialogOpen}
+        onClose={() => setKeywordManagementDialogOpen(false)}
+        onKeywordsChanged={() => {
+          void loadKeywords({ showLoading: false });
+        }}
+      />
       <MaintenanceDialog
         open={maintenanceDialogOpen}
         onClose={() => setMaintenanceDialogOpen(false)}
@@ -10477,9 +10496,6 @@ export default function App() {
         }}
         onSmartAlbumsChanged={() => {
           void loadSmartAlbums({ showLoading: false });
-        }}
-        onKeywordsChanged={() => {
-          void loadKeywords({ showLoading: false });
         }}
       />
       <AssetPeopleReviewDialog

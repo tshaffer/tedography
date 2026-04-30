@@ -1,0 +1,1274 @@
+{
+  "name": "Tedography Album Label to Keyword Backfill Plan",
+  "version": 1,
+  "schemaNotes": [
+    "Backfill-ready planning artifact for assigning keywords based on existing album labels.",
+    "Uses canonical keyword labels from the recommended keyword tree.",
+    "People identity keywords are intentionally omitted; identity belongs in the People system.",
+    "action values: autoApply, reviewFirst, skip.",
+    "confidence values: high, medium, low.",
+    "If you later create stable keyword ids, add targetKeywordIds alongside targetKeywordLabels."
+  ],
+  "defaultPolicy": {
+    "missingKeywordBehavior": "do_not_create_automatically"
+  },
+  "entries": [
+    {
+      "albumLabel": "Arcata",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Arcata"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Maui",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Maui"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Monterey",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Monterey"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Snow Lake",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Snow Lake"
+      ],
+      "reason": "Reasonable direct place mapping; verify long-term usefulness"
+    },
+    {
+      "albumLabel": "Tidepooling",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Tidepooling"
+      ],
+      "reason": "Direct activity mapping"
+    },
+    {
+      "albumLabel": "Yosemite",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Yosemite"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Yosemite 2024",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Yosemite"
+      ],
+      "reason": "Normalized place mapping; year remains album-only"
+    },
+    {
+      "albumLabel": "British Columbia",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "British Columbia"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Fernie",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Fernie"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Glacier",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Glacier"
+      ],
+      "reason": "Could be ambiguous outside BC context"
+    },
+    {
+      "albumLabel": "Revelstoke",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Revelstoke"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Yoho",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Yoho"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Seattle",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Seattle"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Sedona",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Sedona"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Zion",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Zion"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Waterhole Slot Canyon",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Waterhole Slot Canyon"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Bend",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Bend"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Bellingham",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Bellingham"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Washington",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Washington"
+      ],
+      "reason": "Broad label; maybe less useful than specific places"
+    },
+    {
+      "albumLabel": "Ireland",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Ireland"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Iceland",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Iceland"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Paris",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Paris"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Epernay",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Epernay"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Norway",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Norway"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Alaska",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Alaska"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Morocco",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Morocco"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "New Zealand",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "New Zealand"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Australia",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Australia"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Cozumel",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Cozumel"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Chankanaab",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Chankanaab"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Cabo",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Cabo"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Baja",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Baja"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Pt Lobos",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Pt. Lobos"
+      ],
+      "reason": "Normalize spelling"
+    },
+    {
+      "albumLabel": "Pt. Lobos",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Pt. Lobos"
+      ],
+      "reason": "Direct canonical place mapping"
+    },
+    {
+      "albumLabel": "Filoli",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Filoli"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Disneyland",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Disneyland"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "San Francisco Feb",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "San Francisco"
+      ],
+      "reason": "Normalized place mapping; month remains album-only"
+    },
+    {
+      "albumLabel": "SLO",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "SLO"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Mt. Baker",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Mt. Baker"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Olympic Peninsula",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Olympic Peninsula"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Jackson Hole",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Jackson Hole"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Yellowstone and Grand Tetons",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Yellowstone",
+        "Grand Tetons"
+      ],
+      "reason": "Strong multi-place mapping; spot-check multi-target backfills"
+    },
+    {
+      "albumLabel": "Canadian Rockies",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Canadian Rockies"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Santa Cruz",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Santa Cruz"
+      ],
+      "reason": "Useful if you want this as a keyword; confirm first"
+    },
+    {
+      "albumLabel": "Zoo",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Zoo"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Waterfalls",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Waterfalls"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Gardens and Flowers",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Gardens and Flowers"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Lightscapes",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Lightscapes"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Whale Sharks",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Whale Sharks"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Whale Watching",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Whale Watching"
+      ],
+      "reason": "Direct activity mapping"
+    },
+    {
+      "albumLabel": "Mystic Snorkeling Trip",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Snorkeling",
+        "Cozumel"
+      ],
+      "reason": "Plausible activity + place mapping; confirm place implication"
+    },
+    {
+      "albumLabel": "Remodel",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Remodel"
+      ],
+      "reason": "Direct subject mapping"
+    },
+    {
+      "albumLabel": "Lori Birthday",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Birthday"
+      ],
+      "reason": "Event normalized; people handled by People system"
+    },
+    {
+      "albumLabel": "Sam Birthday Celebration",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Birthday"
+      ],
+      "reason": "Event normalized; people handled by People system"
+    },
+    {
+      "albumLabel": "Joel Birthday Party",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Birthday"
+      ],
+      "reason": "Event normalized; people handled by People system"
+    },
+    {
+      "albumLabel": "Wedding",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Wedding"
+      ],
+      "reason": "Direct event mapping"
+    },
+    {
+      "albumLabel": "Jorgan Wedding",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Wedding"
+      ],
+      "reason": "Specific wedding identity remains in album"
+    },
+    {
+      "albumLabel": "Manchester Wedding",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Wedding"
+      ],
+      "reason": "Specific wedding identity remains in album"
+    },
+    {
+      "albumLabel": "Pre Wedding",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Wedding"
+      ],
+      "reason": "Likely right broadly, but semantics may differ from wedding-day photos"
+    },
+    {
+      "albumLabel": "Sam Kristen Engagement",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Engagement"
+      ],
+      "reason": "Event normalized; people handled by People system"
+    },
+    {
+      "albumLabel": "Lehigh Graduation",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Graduation"
+      ],
+      "reason": "Direct event normalization"
+    },
+    {
+      "albumLabel": "Cal Poly Graduation - Joel",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Graduation"
+      ],
+      "reason": "Event normalization; person handled by People system"
+    },
+    {
+      "albumLabel": "Joel Bar Mitzvah",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Bar Mitzvah"
+      ],
+      "reason": "Event normalization; person handled by People system"
+    },
+    {
+      "albumLabel": "Sam Bar Mitzvah",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Bar Mitzvah"
+      ],
+      "reason": "Event normalization; person handled by People system"
+    },
+    {
+      "albumLabel": "Thanksgiving",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Thanksgiving"
+      ],
+      "reason": "Direct event mapping"
+    },
+    {
+      "albumLabel": "Thanksgiving Through the Years",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Thanksgiving"
+      ],
+      "reason": "Collection album normalized to core event"
+    },
+    {
+      "albumLabel": "JazzFest Weekend",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Jazz Festival"
+      ],
+      "reason": "Normalized event label"
+    },
+    {
+      "albumLabel": "Jazz Bash Monterey",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Jazz Festival",
+        "Monterey"
+      ],
+      "reason": "Strong event+place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Santa Barbara Family Camp",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Family Camp",
+        "Santa Barbara"
+      ],
+      "reason": "Strong event+place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Europe",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Direct broad place mapping"
+    },
+    {
+      "albumLabel": "Europe - multiple countries",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Normalized broad place mapping"
+    },
+    {
+      "albumLabel": "Europe in April",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Normalized place mapping; month remains album-only"
+    },
+    {
+      "albumLabel": "Europe in May",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Normalized place mapping; month remains album-only"
+    },
+    {
+      "albumLabel": "Europe in July",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Normalized place mapping; month remains album-only"
+    },
+    {
+      "albumLabel": "Europe in February",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Europe"
+      ],
+      "reason": "Normalized place mapping; month remains album-only"
+    },
+    {
+      "albumLabel": "Paris and Spain",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Paris",
+        "Spain"
+      ],
+      "reason": "Strong multi-place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Spain and Portugal",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Spain",
+        "Portugal"
+      ],
+      "reason": "Strong multi-place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Portugal and Spain",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Portugal",
+        "Spain"
+      ],
+      "reason": "Strong multi-place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Barcelona and Italy",
+      "action": "reviewFirst",
+      "confidence": "low",
+      "targetKeywordLabels": [
+        "Italy"
+      ],
+      "reason": "Barcelona is not in current keyword tree; partial mapping only"
+    },
+    {
+      "albumLabel": "Switzerland and Italy",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Switzerland",
+        "Italy"
+      ],
+      "reason": "Strong multi-place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Croatia and more",
+      "action": "reviewFirst",
+      "confidence": "medium",
+      "targetKeywordLabels": [
+        "Croatia"
+      ],
+      "reason": "Partial place mapping only; 'and more' is incomplete"
+    },
+    {
+      "albumLabel": "Southeast Asia",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Southeast Asia"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Bend and Bellingham",
+      "action": "reviewFirst",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Bend",
+        "Bellingham"
+      ],
+      "reason": "Strong multi-place mapping; review multi-target backfill"
+    },
+    {
+      "albumLabel": "Park City",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Park City"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Belgium",
+      "action": "autoApply",
+      "confidence": "high",
+      "targetKeywordLabels": [
+        "Belgium"
+      ],
+      "reason": "Direct place mapping"
+    },
+    {
+      "albumLabel": "Southwest",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Too broad; prefer specific places"
+    },
+    {
+      "albumLabel": "Northeast",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Too broad; region not in current keyword tree"
+    },
+    {
+      "albumLabel": "Asia - Lori and Joel",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "People handled by People system; broad Asia not assignable in current tree"
+    },
+    {
+      "albumLabel": "PNW",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Avoid region duplication unless explicitly added later"
+    },
+    {
+      "albumLabel": "PNW Trip",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Trip container; better expressed by album structure"
+    },
+    {
+      "albumLabel": "Eastern Sierras",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Good candidate future keyword, but not in current tree"
+    },
+    {
+      "albumLabel": "Hawaii",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Represented structurally, but not a standalone assignable keyword in current tree"
+    },
+    {
+      "albumLabel": "New Orleans",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Not currently in keyword tree"
+    },
+    {
+      "albumLabel": "Costa Rica",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Not currently in keyword tree"
+    },
+    {
+      "albumLabel": "Lori",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "People identity handled by People system"
+    },
+    {
+      "albumLabel": "Guest Photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source/set distinction"
+    },
+    {
+      "albumLabel": "Professional Photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source/provenance distinction"
+    },
+    {
+      "albumLabel": "Pro Photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source/provenance distinction"
+    },
+    {
+      "albumLabel": "Non Pro Photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source/provenance distinction"
+    },
+    {
+      "albumLabel": "Nikon Photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Equipment/source distinction"
+    },
+    {
+      "albumLabel": "Shaffer photos",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source set"
+    },
+    {
+      "albumLabel": "Shaffer Media",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source set"
+    },
+    {
+      "albumLabel": "End of year kitties visit",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Could justify a future Cats keyword"
+    },
+    {
+      "albumLabel": "Kitties June",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Could justify a future Cats keyword"
+    },
+    {
+      "albumLabel": "Lexus Departure",
+      "action": "skip",
+      "confidence": "medium",
+      "targetKeywordLabels": [],
+      "reason": "Could justify a future Cars keyword"
+    },
+    {
+      "albumLabel": "2026",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2025",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2024",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2023",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2022",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2021",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2020",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2019",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2018",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2017",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2016",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2015",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2014",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2013",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2012",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2008",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2007",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2006",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2005",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2004",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2003",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2002",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2001",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "2000",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1999",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1998",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1996",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1994",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1993",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1992",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1991",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "1987",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Year bucket"
+    },
+    {
+      "albumLabel": "04_22_2025",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Date bucket"
+    },
+    {
+      "albumLabel": "04_22_2025_no_live",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Workflow/source detail"
+    },
+    {
+      "albumLabel": "04_23_2025",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Date bucket"
+    },
+    {
+      "albumLabel": "04_24_2025_no_live",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Workflow/source detail"
+    },
+    {
+      "albumLabel": "05_01_2025",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Date bucket"
+    },
+    {
+      "albumLabel": "Collections",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Container"
+    },
+    {
+      "albumLabel": "Imports from Takeout",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Operational"
+    },
+    {
+      "albumLabel": "MissingFromImports",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Operational"
+    },
+    {
+      "albumLabel": "Unknown Date",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Operational/metadata state"
+    },
+    {
+      "albumLabel": "Unfiled",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Curation bucket"
+    },
+    {
+      "albumLabel": "Miscellany",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Curation bucket"
+    },
+    {
+      "albumLabel": "Full Set Images",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Source/set bucket"
+    },
+    {
+      "albumLabel": "Featured Collections",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Collection bucket"
+    },
+    {
+      "albumLabel": "photos-1_of_2",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Packaging artifact"
+    },
+    {
+      "albumLabel": "Q1",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Organization bucket"
+    },
+    {
+      "albumLabel": "Pre 1985",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Time bucket"
+    },
+    {
+      "albumLabel": "2022-10 to 2023-01-07",
+      "action": "skip",
+      "confidence": "high",
+      "targetKeywordLabels": [],
+      "reason": "Import/date bucket"
+    }
+  ]
+}
