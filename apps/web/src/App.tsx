@@ -931,6 +931,16 @@ const filterRowStyle: CSSProperties = {
   marginTop: '6px'
 };
 
+const searchStickyHeaderStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 10,
+  backgroundColor: '#fafafa',
+  paddingBottom: '8px',
+  marginBottom: '8px',
+  borderBottom: '1px solid #e9e9e9'
+};
+
 const filterGroupStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -8907,38 +8917,40 @@ export default function App() {
     }
 
     return (
-      <section style={sidePanelSectionStyle}>
-        <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>Search</h2>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            onClick={clearSearchFilters}
-            disabled={!hasActiveSearchFilters && !hasAppliedSearch}
-          >
-            Reset
-          </button>
-        </div>
-        <div style={{ ...filterRowStyle, marginTop: '8px' }}>
-          <button
-            type="button"
-            style={hasPendingSearchChanges ? primarySearchButtonStyle : disabledToolbarActionButtonStyle}
-            onClick={applyPendingSearchFilters}
-            disabled={!hasPendingSearchChanges}
-          >
-            Search
-          </button>
-          {hasPendingSearchChanges ? (
-            <span style={{ color: '#5f6b78', fontSize: '12px' }}>
-              {hasAppliedSearch
-                ? 'Search criteria changed. Click Search to update results.'
-                : 'Set search criteria and click Search.'}
-            </span>
-          ) : hasAppliedSearch ? (
-            <span style={{ color: '#5f6b78', fontSize: '12px' }}>Search results are current.</span>
-          ) : (
-            <span style={{ color: '#5f6b78', fontSize: '12px' }}>Set search criteria and click Search.</span>
-          )}
+      <section style={{ ...sidePanelSectionStyle, borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
+        <div style={searchStickyHeaderStyle}>
+          <div style={sidePanelHeaderStyle}>
+            <h2 style={sidePanelTitleStyle}>Search</h2>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={clearSearchFilters}
+              disabled={!hasActiveSearchFilters && !hasAppliedSearch}
+            >
+              Reset
+            </button>
+          </div>
+          <div style={{ ...filterRowStyle, marginTop: '8px' }}>
+            <button
+              type="button"
+              style={hasPendingSearchChanges ? primarySearchButtonStyle : disabledToolbarActionButtonStyle}
+              onClick={applyPendingSearchFilters}
+              disabled={!hasPendingSearchChanges}
+            >
+              Search
+            </button>
+            {hasPendingSearchChanges ? (
+              <span style={{ color: '#5f6b78', fontSize: '12px' }}>
+                {hasAppliedSearch
+                  ? 'Search criteria changed. Click Search to update results.'
+                  : 'Set search criteria and click Search.'}
+              </span>
+            ) : hasAppliedSearch ? (
+              <span style={{ color: '#5f6b78', fontSize: '12px' }}>Search results are current.</span>
+            ) : (
+              <span style={{ color: '#5f6b78', fontSize: '12px' }}>Set search criteria and click Search.</span>
+            )}
+          </div>
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Smart Album</h3>
