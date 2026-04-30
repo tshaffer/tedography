@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Autocomplete from '@mui/material/Autocomplete';
+import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
@@ -103,6 +104,7 @@ import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleM
 import { PeopleRecognitionRunSummaryDialog } from './components/people/PeopleRecognitionRunSummaryDialog';
 import { sortVisibleAssetsForTimeline } from './utilities/groupAssetsByDate';
 import {
+  collectKeywordDescendantIds,
   formatKeywordPathLabel,
   getKeywordPathLabels,
   sortKeywordsByPath
@@ -252,6 +254,7 @@ type SearchPeopleMatchMode = 'Any' | 'All';
 
 type KeywordQueryClause = {
   keywordId: string;
+  includeDescendants: boolean;
 };
 
 type KeywordQueryState = {
@@ -1997,11 +2000,16 @@ function parseKeywordClausesFromStorage(value: string | null): KeywordQueryClaus
       return [];
     }
 
-    return parsed.filter(
-      (entry): entry is KeywordQueryClause =>
-        typeof (entry as KeywordQueryClause)?.keywordId === 'string' &&
-        (entry as KeywordQueryClause).keywordId.length > 0
-    );
+    return parsed
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          typeof (entry as Record<string, unknown>)?.keywordId === 'string' &&
+          ((entry as Record<string, unknown>).keywordId as string).length > 0
+      )
+      .map((entry) => ({
+        keywordId: entry.keywordId as string,
+        includeDescendants: entry.includeDescendants === true
+      }));
   } catch {
     return [];
   }
@@ -2293,8 +2301,16 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.keywordQuery.includeMode === right.keywordQuery.includeMode &&
     left.keywordQuery.include.length === right.keywordQuery.include.length &&
     left.keywordQuery.exclude.length === right.keywordQuery.exclude.length &&
-    left.keywordQuery.include.every((c, i) => c.keywordId === right.keywordQuery.include[i]?.keywordId) &&
-    left.keywordQuery.exclude.every((c, i) => c.keywordId === right.keywordQuery.exclude[i]?.keywordId)
+    left.keywordQuery.include.every(
+      (c, i) =>
+        c.keywordId === right.keywordQuery.include[i]?.keywordId &&
+        c.includeDescendants === right.keywordQuery.include[i]?.includeDescendants
+    ) &&
+    left.keywordQuery.exclude.every(
+      (c, i) =>
+        c.keywordId === right.keywordQuery.exclude[i]?.keywordId &&
+        c.includeDescendants === right.keywordQuery.exclude[i]?.includeDescendants
+    )
   );
 }
 
@@ -4584,6 +4600,13 @@ export default function App() {
     );
     const { include, includeMode, exclude } = appliedSearchFilters.keywordQuery;
 
+    const includeMatchSets = include.map((c) =>
+      c.includeDescendants ? collectKeywordDescendantIds(keywords, c.keywordId) : new Set([c.keywordId])
+    );
+    const excludeMatchSets = exclude.map((c) =>
+      c.includeDescendants ? collectKeywordDescendantIds(keywords, c.keywordId) : new Set([c.keywordId])
+    );
+
     const filtered = areaPhotoStateVisibleAssets.filter((asset) => {
       const matchesPhotoState =
         appliedSearchFilters.photoStates.length === 0 ||
@@ -4608,16 +4631,22 @@ export default function App() {
         appliedSearchFilters.hasNoPeople,
         appliedSearchFilters.hasReviewableFaces
       );
-      const assetKeywordSet = new Set(asset.keywordIds ?? []);
+      const assetKeywordIds = asset.keywordIds ?? [];
       let includePass = true;
-      if (include.length > 0) {
+      if (includeMatchSets.length > 0) {
         if (includeMode === 'all') {
-          includePass = include.every((c) => assetKeywordSet.has(c.keywordId));
+          includePass = includeMatchSets.every((matchSet) =>
+            assetKeywordIds.some((id) => matchSet.has(id))
+          );
         } else {
-          includePass = include.some((c) => assetKeywordSet.has(c.keywordId));
+          includePass = includeMatchSets.some((matchSet) =>
+            assetKeywordIds.some((id) => matchSet.has(id))
+          );
         }
       }
-      const matchesKeyword = includePass && !exclude.some((c) => assetKeywordSet.has(c.keywordId));
+      const matchesKeyword =
+        includePass &&
+        !excludeMatchSets.some((matchSet) => assetKeywordIds.some((id) => matchSet.has(id)));
 
       return (
         matchesPhotoState &&
@@ -4635,6 +4664,7 @@ export default function App() {
     appliedSearchFilters,
     albumTreeNodes,
     areaPhotoStateVisibleAssets,
+    keywords,
     primaryArea,
   ]);
 
@@ -7105,7 +7135,7 @@ export default function App() {
       photoStates: filterSpec.photoState ? [filterSpec.photoState] : [],
       groupIds: filterSpec.yearGroupId ? [filterSpec.yearGroupId] : [],
       keywordQuery: filterSpec.keywordId
-        ? { include: [{ keywordId: filterSpec.keywordId }], includeMode: 'all', exclude: [] }
+        ? { include: [{ keywordId: filterSpec.keywordId, includeDescendants: false }], includeMode: 'all', exclude: [] }
         : { include: [], includeMode: 'all', exclude: [] }
     };
 
@@ -8963,12 +8993,47 @@ export default function App() {
                   options={availableForInclude}
                   value={includeKeywords}
                   onChange={(_event, value) => {
-                    setSearchKeywordInclude(value.map((k) => ({ keywordId: k.id })));
+                    setSearchKeywordInclude((prev) =>
+                      value.map((k) => {
+                        const existing = prev.find((c) => c.keywordId === k.id);
+                        return existing ?? { keywordId: k.id, includeDescendants: false };
+                      })
+                    );
                   }}
                   getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
                   isOptionEqualToValue={(option, value) => option.id === value.id}
                   filterSelectedOptions
                   loading={keywordsLoading}
+                  renderTags={(tagValue, getTagProps) =>
+                    tagValue.map((keyword, index) => {
+                      const { key, ...tagProps } = getTagProps({ index });
+                      const clause = searchKeywordInclude.find((c) => c.keywordId === keyword.id);
+                      const desc = clause?.includeDescendants ?? false;
+                      return (
+                        <Chip
+                          key={key}
+                          {...tagProps}
+                          size="small"
+                          label={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              {keyword.label}
+                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: desc ? '#dbeafe' : '#e5e7eb', color: desc ? '#1d4ed8' : '#9ca3af' }}>
+                                {desc ? '+desc' : 'only'}
+                              </span>
+                            </span>
+                          }
+                          title={`${formatKeywordPathLabel(keyword, keywordsById)}${desc ? ' — includes descendants' : ' — keyword only'}\nClick to toggle descendant matching`}
+                          onClick={() => {
+                            setSearchKeywordInclude((prev) =>
+                              prev.map((c) =>
+                                c.keywordId === keyword.id ? { ...c, includeDescendants: !c.includeDescendants } : c
+                              )
+                            );
+                          }}
+                        />
+                      );
+                    })
+                  }
                   renderOption={(props, option) => {
                     const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
                     const pathLabels = getKeywordPathLabels(option, keywordsById);
@@ -9000,12 +9065,47 @@ export default function App() {
                   options={availableForExclude}
                   value={excludeKeywords}
                   onChange={(_event, value) => {
-                    setSearchKeywordExclude(value.map((k) => ({ keywordId: k.id })));
+                    setSearchKeywordExclude((prev) =>
+                      value.map((k) => {
+                        const existing = prev.find((c) => c.keywordId === k.id);
+                        return existing ?? { keywordId: k.id, includeDescendants: false };
+                      })
+                    );
                   }}
                   getOptionLabel={(option) => formatKeywordPathLabel(option, keywordsById)}
                   isOptionEqualToValue={(option, value) => option.id === value.id}
                   filterSelectedOptions
                   loading={keywordsLoading}
+                  renderTags={(tagValue, getTagProps) =>
+                    tagValue.map((keyword, index) => {
+                      const { key, ...tagProps } = getTagProps({ index });
+                      const clause = searchKeywordExclude.find((c) => c.keywordId === keyword.id);
+                      const desc = clause?.includeDescendants ?? false;
+                      return (
+                        <Chip
+                          key={key}
+                          {...tagProps}
+                          size="small"
+                          label={
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              {keyword.label}
+                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: desc ? '#fde8e8' : '#e5e7eb', color: desc ? '#b91c1c' : '#9ca3af' }}>
+                                {desc ? '+desc' : 'only'}
+                              </span>
+                            </span>
+                          }
+                          title={`${formatKeywordPathLabel(keyword, keywordsById)}${desc ? ' — excludes descendants' : ' — keyword only'}\nClick to toggle descendant matching`}
+                          onClick={() => {
+                            setSearchKeywordExclude((prev) =>
+                              prev.map((c) =>
+                                c.keywordId === keyword.id ? { ...c, includeDescendants: !c.includeDescendants } : c
+                              )
+                            );
+                          }}
+                        />
+                      );
+                    })
+                  }
                   renderOption={(props, option) => {
                     const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
                     const pathLabels = getKeywordPathLabels(option, keywordsById);
@@ -10304,12 +10404,12 @@ export default function App() {
                     <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
                       <div style={selectionChipStyle}>
                         {(() => {
-                          const incLabels = appliedKeywordQuery.include
-                            .map((c) => keywordsById.get(c.keywordId)?.label ?? c.keywordId)
-                            .join(', ');
-                          const excLabels = appliedKeywordQuery.exclude
-                            .map((c) => keywordsById.get(c.keywordId)?.label ?? c.keywordId)
-                            .join(', ');
+                          const clauseLabel = (c: KeywordQueryClause) => {
+                            const label = keywordsById.get(c.keywordId)?.label ?? c.keywordId;
+                            return c.includeDescendants ? `${label}+` : label;
+                          };
+                          const incLabels = appliedKeywordQuery.include.map(clauseLabel).join(', ');
+                          const excLabels = appliedKeywordQuery.exclude.map(clauseLabel).join(', ');
                           const incText = incLabels
                             ? `${appliedKeywordQuery.includeMode === 'all' ? 'All of' : 'Any of'}: ${incLabels}`
                             : null;
