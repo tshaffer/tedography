@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { PhotoState, normalizePhotoState } from '@tedography/domain';
@@ -27,6 +29,7 @@ import { assetKeywordRoutes, keywordRoutes } from './routes/keywordRoutes.js';
 import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
 import { smartAlbumRoutes } from './routes/smartAlbumRoutes.js';
+import { resolveOriginalAbsolutePathForAsset } from './media/resolveAssetMediaPath.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -308,6 +311,71 @@ export function createServer(): Express {
 
       log.error('Failed to rotate asset 180 degrees', error);
       res.status(500).json({ error: 'Failed to rotate asset' });
+    }
+  });
+
+  const PREVIEW_APPLESCRIPT = `
+on run argv
+  set p to POSIX file (item 1 of argv)
+  tell application "Preview"
+    activate
+    open p
+  end tell
+  delay 0.3
+  tell application "System Events"
+    tell process "Preview"
+      try
+        tell menu bar 1 to tell menu bar item "View" to tell menu 1
+          if exists menu item "Show Markup Toolbar" then click menu item "Show Markup Toolbar"
+        end tell
+      end try
+      try
+        tell menu bar 1 to tell menu bar item "Tools" to tell menu 1
+          if exists menu item "Rectangular Selection" then click menu item "Rectangular Selection"
+        end tell
+      end try
+      keystroke "a" using {command down}
+    end tell
+  end tell
+end run
+`;
+
+  app.post('/api/assets/:id/open-in-preview', async (req, res) => {
+    try {
+      const asset = await findById(req.params.id);
+      if (!asset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      const filePath = resolveOriginalAbsolutePathForAsset(asset);
+      const child = spawn('osascript', ['-e', PREVIEW_APPLESCRIPT, filePath], {
+        stdio: 'ignore',
+        detached: true,
+      });
+      child.unref();
+
+      res.json({ ok: true });
+    } catch (error) {
+      log.error('Failed to open asset in Preview', error);
+      res.status(500).json({ error: 'Failed to open asset in Preview' });
+    }
+  });
+
+  app.get('/api/assets/:id/file-stat', async (req, res) => {
+    try {
+      const asset = await findById(req.params.id);
+      if (!asset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      const filePath = resolveOriginalAbsolutePathForAsset(asset);
+      const stat = await fs.stat(filePath);
+      res.json({ mtimeMs: stat.mtimeMs });
+    } catch (error) {
+      log.error('Failed to stat asset file', error);
+      res.status(500).json({ error: 'Failed to stat asset file' });
     }
   });
 

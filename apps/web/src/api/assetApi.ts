@@ -49,6 +49,16 @@ export async function rotateAsset180(assetId: string): Promise<MediaAsset> {
   });
 }
 
+export async function openAssetInPreview(assetId: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>(`/api/assets/${encodeURIComponent(assetId)}/open-in-preview`, {
+    method: 'POST'
+  });
+}
+
+export async function getAssetFileStat(assetId: string): Promise<{ mtimeMs: number }> {
+  return fetchJson<{ mtimeMs: number }>(`/api/assets/${encodeURIComponent(assetId)}/file-stat`);
+}
+
 export async function updateAssetsCaptureDateTime(request: {
   assetIds: string[];
   captureDateTime?: string | null;

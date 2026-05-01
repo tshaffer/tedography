@@ -61,6 +61,8 @@ import {
   updateAlbumOrderingMode
 } from './api/albumTreeApi';
 import {
+  getAssetFileStat,
+  openAssetInPreview,
   rebuildAssetDerivedFiles,
   reimportAsset,
   rotateAssetClockwise,
@@ -92,6 +94,7 @@ import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
+import { CropWatcher } from './components/assets/CropWatcher';
 import { SetCaptureDateDialog } from './components/assets/SetCaptureDateDialog';
 import {
   ImportAssetsDialog,
@@ -3529,6 +3532,9 @@ export default function App() {
   const [assetMaintenanceBusy, setAssetMaintenanceBusy] = useState<null | 'reimport' | 'rebuild'>(null);
   const [assetMaintenanceMessage, setAssetMaintenanceMessage] = useState<string | null>(null);
   const [assetMaintenanceError, setAssetMaintenanceError] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropAssetId, setCropAssetId] = useState<string | null>(null);
+  const [cropBaselineMtime, setCropBaselineMtime] = useState<number | null>(null);
   const [updatingAssetIds, setUpdatingAssetIds] = useState<Record<string, boolean>>({});
   const [peopleRecognitionBusy, setPeopleRecognitionBusy] = useState(false);
   const [runSummary, setRunSummary] = useState<PeopleRecognitionRunSummary | null>(
@@ -8079,6 +8085,25 @@ export default function App() {
     setSelectedAssetId(assetId);
   }
 
+  async function handleStartCrop(): Promise<void> {
+    if (!selectedAsset) {
+      return;
+    }
+
+    try {
+      const stat = await getAssetFileStat(selectedAsset.id);
+      await openAssetInPreview(selectedAsset.id);
+      setCropAssetId(selectedAsset.id);
+      setCropBaselineMtime(stat.mtimeMs);
+      setIsCropping(true);
+    } catch (error) {
+      setAssetMaintenanceError(true);
+      setAssetMaintenanceMessage(
+        error instanceof Error ? error.message : 'Failed to open asset in Preview'
+      );
+    }
+  }
+
   async function handleReimportSelectedAsset(): Promise<void> {
     if (!selectedAsset) {
       return;
@@ -10458,6 +10483,19 @@ export default function App() {
                     </button>
                   </span>
                 </Tooltip>
+                <Tooltip title={selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
+                  <span>
+                    <button
+                      type="button"
+                      style={selectedAssetIds.length === 1 ? { ...toolbarIconButtonStyle, fontSize: '11px', fontWeight: 'bold' } : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle, fontSize: '11px', fontWeight: 'bold' }}
+                      onClick={() => void handleStartCrop()}
+                      disabled={selectedAssetIds.length !== 1}
+                      aria-label="Crop photo in Preview"
+                    >
+                      Crop
+                    </button>
+                  </span>
+                </Tooltip>
               </>
             ) : null}
           </div>
@@ -10916,6 +10954,18 @@ export default function App() {
           onPrevious={() => handleSelectRelativeInList(immersiveAssets, -1)}
           onNext={() => handleSelectRelativeInList(immersiveAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
+        />
+      ) : null}
+
+      {isCropping && cropAssetId !== null && cropBaselineMtime !== null ? (
+        <CropWatcher
+          assetId={cropAssetId}
+          baselineMtime={cropBaselineMtime}
+          onReimport={() => {
+            setIsCropping(false);
+            void handleReimportSelectedAsset();
+          }}
+          onCancel={() => setIsCropping(false)}
         />
       ) : null}
 
