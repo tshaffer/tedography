@@ -143,12 +143,10 @@ const photoStateFilterOptions: PhotoState[] = [
 ];
 
 const mediaTypeFilterOptions: MediaType[] = [MediaType.Photo, MediaType.Video];
-const advanceAfterRatingStorageKey = 'tedography.advanceAfterRating';
 const checkedAlbumIdsStorageKey = 'tedography.checkedAlbumIds';
 const expandedAlbumTreeGroupIdsStorageKey = 'tedography.expandedAlbumTreeGroupIds';
 const primaryAreaStorageKey = 'tedography.primaryArea';
 const libraryBrowseModeStorageKey = 'tedography.libraryBrowseMode';
-const reviewBrowseModeStorageKey = 'tedography.reviewBrowseMode';
 const timelineNavExpandedYearKeysStorageKey = 'tedography.timelineNavExpandedYears';
 const albumResultsPresentationStorageKey = 'tedography.albumResultsPresentation';
 const albumTreeSortModeStorageKey = 'tedography.albumTreeSortMode';
@@ -259,7 +257,6 @@ function smartAlbumFilterSpecsEqual(
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
 const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 const leftPanelVisibleStorageKey = 'tedography.leftPanelVisible';
-const reviewVisiblePhotoStatesStorageKey = 'tedography.reviewVisiblePhotoStates';
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
@@ -267,9 +264,8 @@ const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
 const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
 const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
 
-type TedographyPrimaryArea = 'Review' | 'Library' | 'Albums' | 'Search' | 'Maintenance';
+type TedographyPrimaryArea = 'Library' | 'Albums' | 'Search' | 'Maintenance';
 type LibraryBrowseMode = 'Flat' | 'Timeline' | 'Albums';
-type ReviewBrowseMode = 'Flat' | 'Timeline' | 'Albums';
 type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
@@ -2071,11 +2067,11 @@ function parseSearchCaptureDateAvailabilityModeFromStorage(
 }
 
 function parsePrimaryAreaFromStorage(value: string | null): TedographyPrimaryArea {
-  if (value === 'Review' || value === 'Library' || value === 'Search') {
+  if (value === 'Library' || value === 'Search') {
     return value;
   }
 
-  return 'Review';
+  return 'Library';
 }
 
 function parseLibraryBrowseModeFromStorage(value: string | null): LibraryBrowseMode {
@@ -2084,14 +2080,6 @@ function parseLibraryBrowseModeFromStorage(value: string | null): LibraryBrowseM
   }
 
   return 'Timeline';
-}
-
-function parseReviewBrowseModeFromStorage(value: string | null): ReviewBrowseMode {
-  if (value === 'Flat' || value === 'Timeline' || value === 'Albums') {
-    return value;
-  }
-
-  return 'Albums';
 }
 
 function parseAlbumResultsPresentationFromStorage(value: string | null): AlbumResultsPresentation {
@@ -2151,7 +2139,7 @@ function getDefaultPhotoStatesForPrimaryArea(area: TedographyPrimaryArea): Photo
     return null;
   }
 
-  return [PhotoState.New, PhotoState.Pending];
+  return [PhotoState.Keep];
 }
 
 function parseLocalDate(value: string): Date | null {
@@ -3340,16 +3328,6 @@ export default function App() {
   );
   const [runSummaryRefreshing, setRunSummaryRefreshing] = useState(false);
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
-  const [reviewVisiblePhotoStates, setReviewVisiblePhotoStates] = useState<PhotoState[]>(() => {
-    if (typeof window === 'undefined') {
-      return [PhotoState.New, PhotoState.Pending];
-    }
-
-    return parsePhotoStatesFromStorage(
-      window.localStorage.getItem(reviewVisiblePhotoStatesStorageKey),
-      [PhotoState.New, PhotoState.Pending]
-    );
-  });
   const [libraryVisiblePhotoStates, setLibraryVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
       return [PhotoState.Keep];
@@ -3496,7 +3474,7 @@ export default function App() {
     ) {
       setPrimaryArea('Search');
       applied = true;
-    } else if (requestedArea === 'Library' || requestedArea === 'Review') {
+    } else if (requestedArea === 'Library') {
       setPrimaryArea(requestedArea);
       applied = true;
     }
@@ -3570,13 +3548,6 @@ export default function App() {
   const [slideshowActive, setSlideshowActive] = useState(false);
   const [slideshowPlaying, setSlideshowPlaying] = useState(false);
   const [slideshowIntervalMs] = useState(5000);
-  const [advanceAfterRating, setAdvanceAfterRating] = useState<boolean>(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
-    return window.localStorage.getItem(advanceAfterRatingStorageKey) === 'true';
-  });
   const [detailsPanelsVisible, setDetailsPanelsVisible] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -3614,7 +3585,7 @@ export default function App() {
   const [toolbarOverflowOpen, setToolbarOverflowOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
-      return 'Review';
+      return 'Library';
     }
 
     return parsePrimaryAreaFromStorage(window.localStorage.getItem(primaryAreaStorageKey));
@@ -3669,15 +3640,6 @@ export default function App() {
 
     return parseLibraryBrowseModeFromStorage(
       window.localStorage.getItem(libraryBrowseModeStorageKey)
-    );
-  });
-  const [reviewBrowseMode, setReviewBrowseMode] = useState<ReviewBrowseMode>(() => {
-    if (typeof window === 'undefined') {
-      return 'Albums';
-    }
-
-    return parseReviewBrowseModeFromStorage(
-      window.localStorage.getItem(reviewBrowseModeStorageKey)
     );
   });
   const [albumResultsPresentation, setAlbumResultsPresentation] =
@@ -3896,17 +3858,6 @@ export default function App() {
   }, [toolbarOverflowOpen]);
 
   useEffect(() => {
-    window.localStorage.setItem(advanceAfterRatingStorageKey, advanceAfterRating ? 'true' : 'false');
-  }, [advanceAfterRating]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      reviewVisiblePhotoStatesStorageKey,
-      JSON.stringify(reviewVisiblePhotoStates)
-    );
-  }, [reviewVisiblePhotoStates]);
-
-  useEffect(() => {
     window.localStorage.setItem(
       libraryVisiblePhotoStatesStorageKey,
       JSON.stringify(libraryVisiblePhotoStates)
@@ -3935,10 +3886,6 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
   }, [primaryArea]);
-
-  useEffect(() => {
-    window.localStorage.setItem(reviewBrowseModeStorageKey, reviewBrowseMode);
-  }, [reviewBrowseMode]);
 
   useEffect(() => {
     window.localStorage.setItem(libraryBrowseModeStorageKey, libraryBrowseMode);
@@ -4510,15 +4457,14 @@ export default function App() {
   );
   const implicitAlbumForMembershipAction = useMemo(
     () =>
-      ((primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
-        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')) &&
+      (primaryArea === 'Library' && libraryBrowseMode === 'Albums') &&
       checkedAlbumIds.length === 1
         ? (() => {
             const candidate = albumNodesById.get(checkedAlbumIds[0] ?? '');
             return candidate?.nodeType === 'Album' ? candidate : null;
           })()
         : null,
-    [albumNodesById, checkedAlbumIds, libraryBrowseMode, primaryArea, reviewBrowseMode]
+    [albumNodesById, checkedAlbumIds, libraryBrowseMode, primaryArea]
   );
   const focusedAlbumForMembershipAction = useMemo(
     () =>
@@ -4581,10 +4527,6 @@ export default function App() {
   );
 
   const currentAreaPhotoStates = useMemo(() => {
-    if (primaryArea === 'Review') {
-      return reviewVisiblePhotoStates;
-    }
-
     if (primaryArea === 'Library') {
       return libraryVisiblePhotoStates;
     }
@@ -4593,8 +4535,7 @@ export default function App() {
   }, [
     areaDefaultPhotoStates,
     libraryVisiblePhotoStates,
-    primaryArea,
-    reviewVisiblePhotoStates
+    primaryArea
   ]);
 
   const areaPhotoStateVisibleAssets = useMemo(
@@ -4740,10 +4681,7 @@ export default function App() {
 
   const checkedAlbumsAssetsById = useMemo(() => {
     if (
-      !(
-        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
-        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
-      ) ||
+      !(primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
       checkedAlbumIds.length === 0
     ) {
       return new Map<string, MediaAsset[]>();
@@ -4769,14 +4707,11 @@ export default function App() {
     }
 
     return byAlbum;
-  }, [assetsAfterAdditionalFilters, checkedAlbumIds, checkedAlbumIdsSet, libraryBrowseMode, primaryArea, reviewBrowseMode]);
+  }, [assetsAfterAdditionalFilters, checkedAlbumIds, checkedAlbumIdsSet, libraryBrowseMode, primaryArea]);
 
   const checkedAlbumSections = useMemo<AlbumAssetSection[]>(() => {
     if (
-      !(
-        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
-        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
-      ) ||
+      !(primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
       checkedAlbumIds.length === 0
     ) {
       return [];
@@ -4804,7 +4739,7 @@ export default function App() {
         };
       })
       .filter((section): section is AlbumAssetSection => section !== null);
-  }, [albumNodesById, checkedAlbumIds, checkedAlbumsAssetsById, libraryBrowseMode, primaryArea, reviewBrowseMode]);
+  }, [albumNodesById, checkedAlbumIds, checkedAlbumsAssetsById, libraryBrowseMode, primaryArea]);
 
   const mergedAlbumAssets = useMemo(() => {
     if (checkedAlbumSections.length === 1) {
@@ -4825,10 +4760,7 @@ export default function App() {
 
   const groupedAlbumNavigationAssets = useMemo(() => {
     if (
-      !(
-        (primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
-        (primaryArea === 'Review' && reviewBrowseMode === 'Albums')
-      ) ||
+      !(primaryArea === 'Library' && libraryBrowseMode === 'Albums') ||
       checkedAlbumSections.length === 0
     ) {
       return [];
@@ -4844,7 +4776,7 @@ export default function App() {
     }
 
     return [...deduped.values()];
-  }, [checkedAlbumSections, libraryBrowseMode, primaryArea, reviewBrowseMode]);
+  }, [checkedAlbumSections, libraryBrowseMode, primaryArea]);
 
   const sortedAssetsAfterAdditionalFilters = useMemo(
     () => sortVisibleAssetsForTimeline(assetsAfterAdditionalFilters),
@@ -4854,18 +4786,6 @@ export default function App() {
   const visibleAssets = useMemo(() => {
     if (primaryArea === 'Search') {
       return searchResults;
-    }
-
-    if (primaryArea === 'Review') {
-      if (reviewBrowseMode === 'Albums' && checkedAlbumIds.length === 0) {
-        return [];
-      }
-
-      if (reviewBrowseMode === 'Albums') {
-        return groupedAlbumNavigationAssets;
-      }
-
-      return sortedAssetsAfterAdditionalFilters;
     }
 
     const isLibraryAlbumsMode = primaryArea === 'Library' && libraryBrowseMode === 'Albums';
@@ -4889,7 +4809,6 @@ export default function App() {
     libraryBrowseMode,
     mergedAlbumAssets,
     primaryArea,
-    reviewBrowseMode,
     searchResults,
     sortedAssetsAfterAdditionalFilters
   ]);
@@ -4906,11 +4825,10 @@ export default function App() {
 
   const timelineMonthGroups = useMemo(
     () =>
-      (primaryArea === 'Library' && libraryBrowseMode === 'Timeline') ||
-      (primaryArea === 'Review' && reviewBrowseMode === 'Timeline')
+      primaryArea === 'Library' && libraryBrowseMode === 'Timeline'
         ? groupAssetsByCaptureMonth(visibleAssets)
         : [],
-    [libraryBrowseMode, primaryArea, reviewBrowseMode, visibleAssets]
+    [libraryBrowseMode, primaryArea, visibleAssets]
   );
 
   const timelineNavigationYears = useMemo<TimelineNavigationYear[]>(
@@ -5392,18 +5310,13 @@ export default function App() {
     appliedSearchSmartAlbumFilterSpec === null;
   const hasCheckedAlbums = checkedAlbumIds.length > 0;
   const hasAssetsInCheckedAlbumsAfterFilters = checkedAlbumSections.length > 0;
-  const isReviewArea = primaryArea === 'Review';
   const isLibraryArea = primaryArea === 'Library';
   const isSearchArea = primaryArea === 'Search';
-  const isReviewTimelineMode = isReviewArea && reviewBrowseMode === 'Timeline';
-  const isReviewAlbumsMode = isReviewArea && reviewBrowseMode === 'Albums';
-  const isTimelineMode =
-    (isLibraryArea && libraryBrowseMode === 'Timeline') || isReviewTimelineMode;
+  const isTimelineMode = isLibraryArea && libraryBrowseMode === 'Timeline';
   const isTimelineGridMode = isTimelineMode && viewerMode === 'Grid';
   const isLibraryAlbumsMode = isLibraryArea && libraryBrowseMode === 'Albums';
-  const isAlbumsMode = isLibraryAlbumsMode || isReviewAlbumsMode;
-  const isFlatBrowseMode =
-    (isReviewArea && reviewBrowseMode === 'Flat') || (isLibraryArea && libraryBrowseMode === 'Flat');
+  const isAlbumsMode = isLibraryAlbumsMode;
+  const isFlatBrowseMode = isLibraryArea && libraryBrowseMode === 'Flat';
   const showsThumbnailSizeControl =
     viewerMode === 'Grid' && (isFlatBrowseMode || isTimelineMode || isAlbumsMode);
   const photoStateSummaryScopeAssets = useMemo(() => {
@@ -5442,7 +5355,7 @@ export default function App() {
   }, [photoStateSummaryScopeAssets]);
   const isGroupedAlbumsPresentation =
     isLibraryAlbumsMode && albumResultsPresentation === 'GroupedByAlbum';
-  const isLoupeMode = viewerMode === 'Loupe' && (isReviewArea || isLibraryArea || isSearchArea);
+  const isLoupeMode = viewerMode === 'Loupe' && (isLibraryArea || isSearchArea);
   const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
@@ -5572,15 +5485,9 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally runs once on mount only
 
-  const mainPaneDescription = isReviewArea
-    ? reviewBrowseMode === 'Albums'
-      ? 'Review: album-scoped curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
-      : reviewBrowseMode === 'Timeline'
-        ? 'Review: timeline curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
-        : 'Review: flat curation. Keys: arrows navigate, Enter/Space full screen, Esc clears selection, S/P/R/U review.'
-    : isLibraryArea
-      ? 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
-      : 'Search: structured photo finding by state, album, and date.';
+  const mainPaneDescription = isLibraryArea
+    ? 'Library: photo-first browsing. Keys: arrows navigate, Enter/Space full screen, Esc clears selection.'
+    : 'Search: structured photo finding by state, album, and date.';
   const isSearchFromSmartAlbum = isSearchArea && activeSmartAlbum !== null;
   const hasPendingSmartAlbumSearchChanges =
     isSearchFromSmartAlbum && isActiveSmartAlbumView && hasPendingSearchChanges;
@@ -6013,19 +5920,9 @@ export default function App() {
         return matchesPhotoStateAfterUpdate && matchesMediaTypeAfterUpdate;
       })();
 
-      if (isActiveAssetUpdate) {
-        if (!remainsVisibleAfterUpdate) {
-          const replacementAssetId = getAdjacentReplacementAssetId(navigationList, assetId);
-          setSelectedAssetId(replacementAssetId);
-        } else if (advanceAfterRating) {
-          const nextAsset =
-            currentIndex >= 0 && currentIndex < navigationList.length - 1
-              ? navigationList[currentIndex + 1]
-              : undefined;
-          if (nextAsset) {
-            setSelectedAssetId(nextAsset.id);
-          }
-        }
+      if (isActiveAssetUpdate && !remainsVisibleAfterUpdate) {
+        const replacementAssetId = getAdjacentReplacementAssetId(navigationList, assetId);
+        setSelectedAssetId(replacementAssetId);
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -7100,11 +6997,6 @@ export default function App() {
   }
 
   function setCurrentAreaPhotoStateVisibility(nextPhotoStates: PhotoState[]): void {
-    if (primaryArea === 'Review') {
-      setReviewVisiblePhotoStates(nextPhotoStates);
-      return;
-    }
-
     if (primaryArea === 'Library') {
       setLibraryVisiblePhotoStates(nextPhotoStates);
     }
@@ -7293,10 +7185,6 @@ export default function App() {
 
   function handleSetLibraryBrowseMode(mode: LibraryBrowseMode): void {
     setLibraryBrowseMode(mode);
-  }
-
-  function handleSetReviewBrowseMode(mode: ReviewBrowseMode): void {
-    setReviewBrowseMode(mode);
   }
 
   function handleSetTimelineZoomLevel(nextLevel: number): void {
@@ -8783,16 +8671,9 @@ export default function App() {
       return null;
     }
 
-    if (isReviewArea && !isReviewAlbumsMode) {
-      return null;
-    }
-
-    const title =
-      isReviewArea
-        ? `Review Albums (${checkedAlbumIds.length} checked)`
-        : isLibraryAlbumsMode
-          ? `Albums (${checkedAlbumIds.length} checked)`
-          : 'Albums';
+    const title = isLibraryAlbumsMode
+      ? `Albums (${checkedAlbumIds.length} checked)`
+      : 'Albums';
 
     return (
       <section style={albumPanelSectionStyle}>
@@ -9499,11 +9380,7 @@ export default function App() {
     );
   }
 
-  const toolbarBrowseMode = isReviewArea
-    ? reviewBrowseMode
-    : isLibraryArea
-      ? libraryBrowseMode
-      : null;
+  const toolbarBrowseMode = isLibraryArea ? libraryBrowseMode : null;
 
   function renderLeftPanel(): ReactElement | null {
     if (!leftPanelVisible) {
@@ -9512,18 +9389,6 @@ export default function App() {
 
     return (
       <aside style={isAlbumsMode ? leftPanelStyle : sidePanelStyle}>
-        {isReviewArea ? (
-          <>
-            <section style={sidePanelSectionStyle}>
-              <div style={sidePanelHeaderStyle}>
-                <h2 style={sidePanelTitleStyle}>Review</h2>
-              </div>
-            </section>
-            {renderVisibilityPanel()}
-            {renderAlbumTreePanel()}
-            {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
-          </>
-        ) : null}
         {isLibraryArea ? (
           <>
             {renderVisibilityPanel()}
@@ -9563,7 +9428,7 @@ export default function App() {
             albumLabels={selectedAssetAlbumLabels}
             albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
             onEditCaptureDate={
-              (isReviewArea || isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
                 ? handleOpenSetCaptureDateDialog
                 : undefined
             }
@@ -9617,14 +9482,6 @@ export default function App() {
             <button
               type="button"
               style={toolbarButtonStyle}
-              data-selected={primaryArea === 'Review' ? 'true' : undefined}
-              onClick={() => setPrimaryArea('Review')}
-            >
-              Review
-            </button>
-            <button
-              type="button"
-              style={toolbarButtonStyle}
               data-selected={primaryArea === 'Library' ? 'true' : undefined}
               onClick={() => setPrimaryArea('Library')}
             >
@@ -9643,15 +9500,13 @@ export default function App() {
             </Link>
           </div>
 
-          {(isReviewArea || isLibraryArea) && toolbarBrowseMode ? (
+          {isLibraryArea && toolbarBrowseMode ? (
             <div style={toolbarGroupStyle}>
               <button
                 type="button"
                 style={toolbarButtonStyle}
                 data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
-                onClick={() =>
-                  isReviewArea ? handleSetReviewBrowseMode('Flat') : handleSetLibraryBrowseMode('Flat')
-                }
+                onClick={() => handleSetLibraryBrowseMode('Flat')}
                 title="Flat presentation"
               >
                 Flat
@@ -9660,11 +9515,7 @@ export default function App() {
                 type="button"
                 style={toolbarButtonStyle}
                 data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
-                onClick={() =>
-                  isReviewArea
-                    ? handleSetReviewBrowseMode('Timeline')
-                    : handleSetLibraryBrowseMode('Timeline')
-                }
+                onClick={() => handleSetLibraryBrowseMode('Timeline')}
                 title="Timeline presentation"
               >
                 Time
@@ -9673,26 +9524,11 @@ export default function App() {
                 type="button"
                 style={toolbarButtonStyle}
                 data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
-                onClick={() =>
-                  isReviewArea ? handleSetReviewBrowseMode('Albums') : handleSetLibraryBrowseMode('Albums')
-                }
+                onClick={() => handleSetLibraryBrowseMode('Albums')}
                 title="Albums presentation"
               >
                 Albums
               </button>
-            </div>
-          ) : null}
-
-          {isReviewArea ? (
-            <div style={toolbarGroupStyle}>
-              <label style={toggleOptionLabelStyle} title="Advance to the next asset after a rating change">
-                <input
-                  type="checkbox"
-                  checked={advanceAfterRating}
-                  onChange={(event) => setAdvanceAfterRating(event.target.checked)}
-                />
-                Auto-advance
-              </label>
             </div>
           ) : null}
 
@@ -9863,18 +9699,16 @@ export default function App() {
             </div>
           ) : null}
 
-          {!isReviewArea ? (
-            <div style={toolbarGroupStyle}>
-              <button
-                type="button"
-                style={compareButtonStyle}
-                onClick={() => handleOpenImportDialog()}
-                title="Import assets"
-              >
-                Import
-              </button>
-            </div>
-          ) : null}
+          <div style={toolbarGroupStyle}>
+            <button
+              type="button"
+              style={compareButtonStyle}
+              onClick={() => handleOpenImportDialog()}
+              title="Import assets"
+            >
+              Import
+            </button>
+          </div>
 
           <div style={toolbarGroupStyle}>
             <Tooltip title={leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}>
@@ -9896,7 +9730,7 @@ export default function App() {
                 </button>
               </span>
             </Tooltip>
-            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            {(isLibraryArea || isSearchArea) ? (
               <Tooltip title={detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}>
                 <span>
                   <button
@@ -10082,7 +9916,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {(isReviewArea || isLibraryArea) ? (
+            {isLibraryArea ? (
               reviewActions.map((state) => (
                 <button
                   key={state}
@@ -10109,7 +9943,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            {(isLibraryArea || isSearchArea) ? (
               <button
                 type="button"
                 style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
@@ -10127,7 +9961,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {(isReviewArea || isLibraryArea) && isAlbumsMode ? (
+            {isLibraryArea && isAlbumsMode ? (
               <>
                 {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
                   <button
@@ -10246,7 +10080,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            {(isLibraryArea || isSearchArea) ? (
               <>
                 <Tooltip title={hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
                   <span>
@@ -10292,7 +10126,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {(isReviewArea || isLibraryArea || isSearchArea) ? (
+            {(isLibraryArea || isSearchArea) ? (
               <>
                 <Tooltip title="Grid">
                   <span>
@@ -10594,7 +10428,7 @@ export default function App() {
                   </section>
                 ))}
               </div>
-            ) : !isLoupeMode && (isGroupedAlbumsPresentation || isReviewAlbumsMode) ? (
+            ) : !isLoupeMode && isGroupedAlbumsPresentation ? (
               <>
                 {checkedAlbumSections.map((section) => (
                   <section key={section.albumId} style={groupSectionStyle}>
@@ -10640,13 +10474,7 @@ export default function App() {
           </>
         ) : (
           <>
-            {isReviewAlbumsMode && !hasCheckedAlbums ? (
-              <p>Check one or more albums to review their photos.</p>
-            ) : isReviewAlbumsMode && !hasAssetsInCheckedAlbumsInAreaScope ? (
-              <p>No photos in the checked albums match the current review visibility.</p>
-            ) : isReviewAlbumsMode && !hasFilteredAssets ? (
-              <p>No photos in the checked albums match the current filters.</p>
-            ) : isLibraryAlbumsMode && !hasCheckedAlbums ? (
+            {isLibraryAlbumsMode && !hasCheckedAlbums ? (
               <p>Check one or more albums to browse their photos.</p>
             ) : isLibraryAlbumsMode && !hasAssetsInCheckedAlbumsInAreaScope ? (
               <p>The checked albums contain no selected photos yet.</p>
@@ -10667,10 +10495,8 @@ export default function App() {
                   </p>
                 ) : null}
               </>
-            ) : primaryArea === 'Review' && !hasAreaScopedAssets ? (
-              <p>No photos need review right now. Switch to Library to browse selected photos.</p>
             ) : primaryArea === 'Library' && !hasAreaScopedAssets ? (
-              <p>No selected photos in the library yet. Mark photos as Keep in Review.</p>
+              <p>No selected photos in the library yet.</p>
             ) : (
               <p>No visible assets match the current filters.</p>
             )}
