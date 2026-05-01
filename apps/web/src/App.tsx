@@ -7029,6 +7029,10 @@ export default function App() {
       return;
     }
 
+    if (selectedAssetIds.length === 1) {
+      setSelectedAssetIds([]);
+    }
+
     setSelectedAssetId(assetId);
     setSlideshowActive(false);
     setSlideshowPlaying(false);
