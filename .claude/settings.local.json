@@ -14,7 +14,8 @@
       "Bash(pnpm --filter @tedography/domain build)",
       "Bash(cat)",
       "Bash(bash /tmp/feature_check.sh)",
-      "Bash(bash /tmp/comprehensive_check.sh)"
+      "Bash(bash /tmp/comprehensive_check.sh)",
+      "Bash(grep -E \"tsx|ts$\")"
     ]
   }
 }
