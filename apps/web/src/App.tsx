@@ -257,6 +257,9 @@ function smartAlbumFilterSpecsEqual(
 const timelineZoomLevelStorageKey = 'tedography.timelineZoomLevel';
 const detailsPanelsVisibleStorageKey = 'tedography.detailsPanelsVisible';
 const leftPanelVisibleStorageKey = 'tedography.leftPanelVisible';
+const slideshowLoopStorageKey = 'tedography.slideshow.loop';
+const slideshowShuffleStorageKey = 'tedography.slideshow.shuffle';
+const slideshowIntervalMsStorageKey = 'tedography.slideshow.intervalMs';
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
@@ -1647,13 +1650,109 @@ const immersiveBottomHintStyle: CSSProperties = {
 };
 
 const slideshowOverlayStyle: CSSProperties = {
-  ...immersiveOverlayStyle,
-  backgroundColor: '#000'
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: '#000',
+  display: 'flex',
+  flexDirection: 'column',
+  zIndex: 1200,
 };
 
-const slideshowTopBarStyle: CSSProperties = {
-  ...immersiveTopBarStyle,
-  paddingBottom: '12px'
+const slideshowImageAreaStyle: CSSProperties = {
+  flex: 1,
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  cursor: 'pointer',
+  minHeight: 0,
+};
+
+const slideshowImageStyle: CSSProperties = {
+  width: 'auto',
+  height: 'auto',
+  maxWidth: '100%',
+  maxHeight: '100%',
+  objectFit: 'contain',
+  display: 'block',
+  userSelect: 'none',
+};
+
+const slideshowInfoOverlayStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  padding: '32px 20px 16px',
+  background: 'linear-gradient(transparent, rgba(0,0,0,0.82))',
+  color: '#f0f0f0',
+  transition: 'opacity 0.3s ease',
+  pointerEvents: 'none',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '3px',
+  fontSize: '13px',
+};
+
+const slideshowControlsBarStyle: CSSProperties = {
+  width: '100%',
+  backgroundColor: '#111',
+  borderTop: '1px solid #2a2a2a',
+  padding: '8px 16px 10px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px',
+  flexShrink: 0,
+};
+
+const slideshowProgressTrackStyle: CSSProperties = {
+  width: '100%',
+  height: '4px',
+  backgroundColor: '#2e2e2e',
+  borderRadius: '2px',
+  overflow: 'hidden',
+};
+
+const slideshowControlsRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '10px',
+  flexWrap: 'wrap',
+};
+
+const slideshowBtnStyle: CSSProperties = {
+  backgroundColor: '#1f1f1f',
+  border: '1px solid #444',
+  color: '#e8e8e8',
+  borderRadius: '5px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  padding: '5px 9px',
+  lineHeight: 1.3,
+};
+
+const slideshowBtnActiveStyle: CSSProperties = {
+  ...slideshowBtnStyle,
+  backgroundColor: '#2d4a6e',
+  borderColor: '#5585b5',
+  color: '#d6eaff',
+};
+
+const slideshowHintStyle: CSSProperties = {
+  color: '#555',
+  fontSize: '11px',
+  margin: 0,
+  userSelect: 'none',
+};
+
+const slideshowSpeedGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  color: '#aaa',
+  fontSize: '12px',
+  marginLeft: 'auto',
 };
 
 const surveyOverlayStyle: CSSProperties = {
@@ -2745,10 +2844,19 @@ type SlideshowViewerProps = {
   index: number;
   total: number;
   isPlaying: boolean;
+  isLooping: boolean;
+  isShuffled: boolean;
+  intervalMs: number;
+  keywordLabels: string[];
   onExit: () => void;
-  onNext: () => void;
+  onFirst: () => void;
   onPrevious: () => void;
+  onNext: () => void;
+  onLast: () => void;
   onTogglePlayPause: () => void;
+  onToggleLoop: () => void;
+  onToggleShuffle: () => void;
+  onSetIntervalMs: (ms: number) => void;
   onActiveImageLoad: (assetId: string) => void;
 };
 
@@ -2757,57 +2865,157 @@ function SlideshowViewer({
   index,
   total,
   isPlaying,
+  isLooping,
+  isShuffled,
+  intervalMs,
+  keywordLabels,
   onExit,
-  onNext,
+  onFirst,
   onPrevious,
+  onNext,
+  onLast,
   onTogglePlayPause,
-  onActiveImageLoad
+  onToggleLoop,
+  onToggleShuffle,
+  onSetIntervalMs,
+  onActiveImageLoad,
 }: SlideshowViewerProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const showOverlay = isHovered || !isPlaying;
   const imageUrl = getAssetDisplayImageUrl(asset);
+  const progressPercent = total > 1 ? (index / (total - 1)) * 100 : 100;
+
+  const locationText =
+    typeof asset.locationLabel === 'string' && asset.locationLabel.trim().length > 0
+      ? asset.locationLabel
+      : typeof asset.locationLatitude === 'number' && typeof asset.locationLongitude === 'number'
+        ? `${asset.locationLatitude.toFixed(4)}, ${asset.locationLongitude.toFixed(4)}`
+        : null;
+
+  const peopleNames = (asset.people ?? []).map((p) => p.displayName);
 
   return (
     <div style={slideshowOverlayStyle}>
-      <section style={{ width: '100%', height: '100%' }}>
-        <div style={slideshowTopBarStyle}>
-          <div style={immersiveInfoStyle}>
-            <strong>{asset.filename}</strong>
-            <span>
-              {index + 1} / {total}
-            </span>
-            <span>{formatCaptureDate(asset.captureDateTime)}</span>
-          </div>
-          <div style={immersiveControlsStyle}>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onTogglePlayPause}>
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onPrevious}>
-              Previous
-            </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onNext}>
-              Next
-            </button>
-            <button type="button" style={immersiveControlButtonStyle} onClick={onExit}>
-              Exit
-            </button>
-          </div>
+      <div
+        style={slideshowImageAreaStyle}
+        onClick={onTogglePlayPause}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        title={isPlaying ? 'Click to pause' : 'Click to play'}
+      >
+        {imageUrl ? (
+          <img
+            key={asset.id}
+            src={imageUrl}
+            alt={asset.filename}
+            style={slideshowImageStyle}
+            draggable={false}
+            onLoad={() => onActiveImageLoad(asset.id)}
+          />
+        ) : (
+          <div style={slideshowImageStyle} />
+        )}
+        <div style={{ ...slideshowInfoOverlayStyle, opacity: showOverlay ? 1 : 0 }}>
+          <strong style={{ fontSize: '14px' }}>{asset.filename}</strong>
+          {asset.captureDateTime ? <span>{formatCaptureDate(asset.captureDateTime)}</span> : null}
+          {locationText ? <span>{locationText}</span> : null}
+          {peopleNames.length > 0 ? <span>People: {peopleNames.join(', ')}</span> : null}
+          {keywordLabels.length > 0 ? <span>Keywords: {keywordLabels.join(', ')}</span> : null}
         </div>
-        <div style={immersiveImageWrapStyle}>
-          {imageUrl ? (
-            <img
-              key={asset.id}
-              src={imageUrl}
-              alt={asset.filename}
-              style={immersiveImageStyle}
-              onLoad={() => onActiveImageLoad(asset.id)}
+      </div>
+
+      <div style={slideshowControlsBarStyle}>
+        <div style={slideshowProgressTrackStyle}>
+          <div
+            style={{
+              height: '100%',
+              width: `${progressPercent}%`,
+              backgroundColor: '#666',
+              borderRadius: '2px',
+              transition: 'width 0.4s ease',
+            }}
+          />
+        </div>
+
+        <div style={slideshowControlsRowStyle}>
+          <button type="button" style={slideshowBtnStyle} onClick={onFirst} title="First (Home)">
+            ⏮
+          </button>
+          <button type="button" style={slideshowBtnStyle} onClick={onPrevious} title="Previous (←)">
+            ◀
+          </button>
+          <button
+            type="button"
+            style={{ ...slideshowBtnStyle, minWidth: '60px' }}
+            onClick={onTogglePlayPause}
+            title="Play / Pause (Space)"
+          >
+            {isPlaying ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <button type="button" style={slideshowBtnStyle} onClick={onNext} title="Next (→)">
+            ▶
+          </button>
+          <button type="button" style={slideshowBtnStyle} onClick={onLast} title="Last (End)">
+            ⏭
+          </button>
+
+          <span style={{ color: '#888', fontSize: '12px', minWidth: '56px' }}>
+            {index + 1} / {total}
+          </span>
+
+          <button
+            type="button"
+            style={isLooping ? slideshowBtnActiveStyle : slideshowBtnStyle}
+            onClick={onToggleLoop}
+            title="Toggle loop"
+          >
+            Loop
+          </button>
+          <button
+            type="button"
+            style={isShuffled ? slideshowBtnActiveStyle : slideshowBtnStyle}
+            onClick={onToggleShuffle}
+            title="Toggle shuffle (S)"
+          >
+            Shuffle
+          </button>
+
+          <div style={slideshowSpeedGroupStyle}>
+            <span>{(intervalMs / 1000).toFixed(intervalMs % 1000 === 0 ? 0 : 1)}s</span>
+            <input
+              type="range"
+              min={2000}
+              max={30000}
+              step={500}
+              value={intervalMs}
+              onChange={(e) => onSetIntervalMs(Number(e.target.value))}
+              list="tdg-slideshow-speed-ticks"
+              style={{ width: '110px', accentColor: '#5585b5' }}
+              title="Slide speed"
             />
-          ) : (
-            <div style={immersiveImageStyle} />
-          )}
+            <datalist id="tdg-slideshow-speed-ticks">
+              <option value={2000} label="2s" />
+              <option value={5000} label="5s" />
+              <option value={10000} label="10s" />
+              <option value={20000} label="20s" />
+              <option value={30000} label="30s" />
+            </datalist>
+          </div>
+
+          <button
+            type="button"
+            style={{ ...slideshowBtnStyle, marginLeft: 'auto' }}
+            onClick={onExit}
+            title="Exit slideshow (Esc)"
+          >
+            Exit
+          </button>
         </div>
-        <p style={immersiveBottomHintStyle}>
-          Keyboard: Space play/pause, Left/Right navigate, Escape exit slideshow.
+
+        <p style={slideshowHintStyle}>
+          Space play/pause · ← → navigate · Home/End first/last · F fullscreen · S shuffle · Esc exit
         </p>
-      </section>
+      </div>
     </div>
   );
 }
@@ -3547,7 +3755,21 @@ export default function App() {
   const [surveyOpen, setSurveyOpen] = useState(false);
   const [slideshowActive, setSlideshowActive] = useState(false);
   const [slideshowPlaying, setSlideshowPlaying] = useState(false);
-  const [slideshowIntervalMs] = useState(5000);
+  const [slideshowIntervalMs, setSlideshowIntervalMs] = useState<number>(() => {
+    if (typeof window === 'undefined') return 5000;
+    const stored = Number(window.localStorage.getItem(slideshowIntervalMsStorageKey));
+    return stored >= 2000 && stored <= 30000 ? stored : 5000;
+  });
+  const [slideshowLoop, setSlideshowLoop] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem(slideshowLoopStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
+  const [slideshowShuffle, setSlideshowShuffle] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(slideshowShuffleStorageKey) === 'true';
+  });
+  const [slideshowShuffledIds, setSlideshowShuffledIds] = useState<string[]>([]);
   const [detailsPanelsVisible, setDetailsPanelsVisible] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -3890,6 +4112,18 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(libraryBrowseModeStorageKey, libraryBrowseMode);
   }, [libraryBrowseMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(slideshowLoopStorageKey, slideshowLoop ? 'true' : 'false');
+  }, [slideshowLoop]);
+
+  useEffect(() => {
+    window.localStorage.setItem(slideshowShuffleStorageKey, slideshowShuffle ? 'true' : 'false');
+  }, [slideshowShuffle]);
+
+  useEffect(() => {
+    window.localStorage.setItem(slideshowIntervalMsStorageKey, String(slideshowIntervalMs));
+  }, [slideshowIntervalMs]);
 
   useEffect(() => {
     window.localStorage.setItem(albumResultsPresentationStorageKey, albumResultsPresentation);
@@ -5234,8 +5468,8 @@ export default function App() {
   );
 
   const slideshowAssets = useMemo(
-    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
-    [compareAssets, visibleAssets]
+    () => (selectedAssetIds.length > 0 ? compareAssets : visibleAssets),
+    [compareAssets, selectedAssetIds.length, visibleAssets]
   );
 
   const loupeAssets = useMemo(
@@ -5267,6 +5501,13 @@ export default function App() {
     () => slideshowAssets.findIndex((asset) => asset.id === selectedAssetId),
     [slideshowAssets, selectedAssetId]
   );
+
+  const slideshowEffectiveIndex = useMemo(() => {
+    if (slideshowShuffle && slideshowShuffledIds.length > 0) {
+      return selectedAssetId ? slideshowShuffledIds.indexOf(selectedAssetId) : -1;
+    }
+    return slideshowSelectedAssetIndex;
+  }, [slideshowShuffle, slideshowShuffledIds, selectedAssetId, slideshowSelectedAssetIndex]);
 
   const surveyFocusedAsset = useMemo(
     () => compareAssets.find((asset) => asset.id === selectedAssetId) ?? compareAssets[0] ?? null,
@@ -5811,25 +6052,30 @@ export default function App() {
       return;
     }
 
+    const navIds =
+      slideshowShuffle && slideshowShuffledIds.length > 0
+        ? slideshowShuffledIds
+        : slideshowAssets.map((a) => a.id);
+
     const timerId = window.setInterval(() => {
       setSelectedAssetId((previous) => {
-        const currentIndex = previous
-          ? slideshowAssets.findIndex((asset) => asset.id === previous)
-          : -1;
-
+        const currentIndex = previous ? navIds.indexOf(previous) : -1;
         if (currentIndex < 0) {
-          return slideshowAssets[0]?.id ?? previous;
+          return navIds[0] ?? previous;
         }
-
-        const nextIndex = (currentIndex + 1) % slideshowAssets.length;
-        return slideshowAssets[nextIndex]?.id ?? previous;
+        const isLast = currentIndex === navIds.length - 1;
+        if (isLast && !slideshowLoop) {
+          return previous;
+        }
+        const nextIndex = (currentIndex + 1) % navIds.length;
+        return navIds[nextIndex] ?? previous;
       });
     }, slideshowIntervalMs);
 
     return () => {
       window.clearInterval(timerId);
     };
-  }, [slideshowActive, slideshowAssets, slideshowIntervalMs, slideshowPlaying]);
+  }, [slideshowActive, slideshowAssets, slideshowIntervalMs, slideshowLoop, slideshowPlaying, slideshowShuffle, slideshowShuffledIds]);
 
   function setAssetUpdating(assetId: string, isUpdating: boolean): void {
     setUpdatingAssetIds((previous) => ({ ...previous, [assetId]: isUpdating }));
@@ -6955,9 +7201,34 @@ export default function App() {
     setSurveyOpen(true);
   }
 
+  function buildShuffledIds(assets: MediaAsset[], currentId: string | null): string[] {
+    const ids = assets.map((a) => a.id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    }
+    if (currentId) {
+      const pos = ids.indexOf(currentId);
+      if (pos > 0) {
+        ids.splice(pos, 1);
+        ids.unshift(currentId);
+      }
+    }
+    return ids;
+  }
+
   function startSlideshow(): void {
     if (slideshowAssets.length === 0) {
       return;
+    }
+
+    const startId =
+      selectedAssetId && slideshowAssets.some((a) => a.id === selectedAssetId)
+        ? selectedAssetId
+        : (slideshowAssets[0]?.id ?? null);
+
+    if (slideshowShuffle) {
+      setSlideshowShuffledIds(buildShuffledIds(slideshowAssets, startId));
     }
 
     setSurveyOpen(false);
@@ -6965,19 +7236,23 @@ export default function App() {
     void exitBrowserFullscreenIfNeeded();
     setSlideshowActive(true);
     setSlideshowPlaying(true);
-
-    if (!selectedAssetId || !slideshowAssets.some((asset) => asset.id === selectedAssetId)) {
-      setSelectedAssetId(slideshowAssets[0]?.id ?? null);
-    }
+    setSelectedAssetId(startId);
   }
 
   function stopSlideshow(): void {
     setSlideshowActive(false);
     setSlideshowPlaying(false);
+    setSlideshowShuffledIds([]);
   }
 
   function toggleSlideshowPlayPause(): void {
     setSlideshowPlaying((previous) => !previous);
+  }
+
+  function getSlideshowNavIds(): string[] {
+    return slideshowShuffle && slideshowShuffledIds.length > 0
+      ? slideshowShuffledIds
+      : slideshowAssets.map((a) => a.id);
   }
 
   function handleSlideshowRelative(offset: number): void {
@@ -6985,14 +7260,46 @@ export default function App() {
       return;
     }
 
+    const navIds = getSlideshowNavIds();
     setSelectedAssetId((previous) => {
-      const currentIndex = previous ? slideshowAssets.findIndex((asset) => asset.id === previous) : -1;
+      const currentIndex = previous ? navIds.indexOf(previous) : -1;
       if (currentIndex < 0) {
-        return slideshowAssets[0]?.id ?? previous;
+        return navIds[0] ?? previous;
       }
+      const next = currentIndex + offset;
+      if (!slideshowLoop && (next < 0 || next >= navIds.length)) {
+        return previous;
+      }
+      const nextIndex = (next + navIds.length) % navIds.length;
+      return navIds[nextIndex] ?? previous;
+    });
+  }
 
-      const nextIndex = (currentIndex + offset + slideshowAssets.length) % slideshowAssets.length;
-      return slideshowAssets[nextIndex]?.id ?? previous;
+  function handleSlideshowFirst(): void {
+    const navIds = getSlideshowNavIds();
+    const first = navIds[0];
+    if (first) setSelectedAssetId(first);
+  }
+
+  function handleSlideshowLast(): void {
+    const navIds = getSlideshowNavIds();
+    const last = navIds[navIds.length - 1];
+    if (last) setSelectedAssetId(last);
+  }
+
+  function handleToggleSlideshowLoop(): void {
+    setSlideshowLoop((prev) => !prev);
+  }
+
+  function handleToggleSlideshowShuffle(): void {
+    setSlideshowShuffle((prev) => {
+      const next = !prev;
+      if (next) {
+        setSlideshowShuffledIds(buildShuffledIds(slideshowAssets, selectedAssetId));
+      } else {
+        setSlideshowShuffledIds([]);
+      }
+      return next;
     });
   }
 
@@ -8039,6 +8346,34 @@ export default function App() {
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           handleSlideshowRelative(-1);
+          return;
+        }
+
+        if (event.key === 'Home') {
+          event.preventDefault();
+          handleSlideshowFirst();
+          return;
+        }
+
+        if (event.key === 'End') {
+          event.preventDefault();
+          handleSlideshowLast();
+          return;
+        }
+
+        if (event.key.toLowerCase() === 'f') {
+          event.preventDefault();
+          if (document.fullscreenElement) {
+            void exitBrowserFullscreenIfNeeded();
+          } else {
+            void requestBrowserFullscreen();
+          }
+          return;
+        }
+
+        if (event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          handleToggleSlideshowShuffle();
           return;
         }
 
@@ -9648,13 +9983,15 @@ export default function App() {
             <div style={toolbarGroupStyle}>
               <button
                 type="button"
-                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
+                style={visibleAssets.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
                 onClick={startSlideshow}
-                disabled={!hasSelectedAssets}
+                disabled={visibleAssets.length === 0}
                 title={
-                  hasSelectedAssets
-                    ? 'Start slideshow from selected visible assets'
-                    : 'Select one or more photos to start a slideshow'
+                  visibleAssets.length > 0
+                    ? hasSelectedAssets
+                      ? 'Start slideshow from selected photos'
+                      : 'Start slideshow from all visible photos'
+                    : 'No photos to show'
                 }
               >
                 Slide
@@ -10543,13 +10880,24 @@ export default function App() {
       {slideshowActive && selectedAsset ? (
         <SlideshowViewer
           asset={selectedAsset}
-          index={slideshowSelectedAssetIndex}
+          index={slideshowEffectiveIndex}
           total={slideshowAssets.length}
           isPlaying={slideshowPlaying}
+          isLooping={slideshowLoop}
+          isShuffled={slideshowShuffle}
+          intervalMs={slideshowIntervalMs}
+          keywordLabels={(selectedAsset.keywordIds ?? [])
+            .map((id) => keywordsById.get(id)?.label ?? null)
+            .filter((label): label is string => label !== null)}
           onExit={stopSlideshow}
+          onFirst={handleSlideshowFirst}
           onPrevious={() => handleSlideshowRelative(-1)}
           onNext={() => handleSlideshowRelative(1)}
+          onLast={handleSlideshowLast}
           onTogglePlayPause={toggleSlideshowPlayPause}
+          onToggleLoop={handleToggleSlideshowLoop}
+          onToggleShuffle={handleToggleSlideshowShuffle}
+          onSetIntervalMs={setSlideshowIntervalMs}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
         />
       ) : null}
