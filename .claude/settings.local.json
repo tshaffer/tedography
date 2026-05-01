@@ -11,7 +11,10 @@
       "Bash(xargs cat *)",
       "Bash(npm run *)",
       "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx\\)$\")",
-      "Bash(pnpm --filter @tedography/domain build)"
+      "Bash(pnpm --filter @tedography/domain build)",
+      "Bash(cat)",
+      "Bash(bash /tmp/feature_check.sh)",
+      "Bash(bash /tmp/comprehensive_check.sh)"
     ]
   }
 }
