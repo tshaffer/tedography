@@ -9314,7 +9314,7 @@ export default function App() {
                           borderRight: mode === 'all' ? '1px solid #c8c8c8' : 'none'
                         }}
                       >
-                        {mode === 'all' ? 'Match all' : 'Match any'}
+                        {mode === 'all' ? 'Match by AND' : 'Match by OR'}
                       </button>
                     ))}
                   </div>
@@ -9571,7 +9571,7 @@ export default function App() {
                           borderRight: mode === 'Any' ? '1px solid #c8c8c8' : 'none'
                         }}
                       >
-                        {mode === 'Any' ? 'Match any' : 'Match all'}
+                        {mode === 'Any' ? 'Match by OR' : 'Match by AND'}
                       </button>
                     ))}
                   </div>
