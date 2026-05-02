@@ -29,10 +29,16 @@ import DeselectIcon from '@mui/icons-material/Deselect';
 import UnfoldLessIcon from '@mui/icons-material/UnfoldLess';
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import TuneIcon from '@mui/icons-material/Tune';
-import PhotoSizeSelectLargeIcon from '@mui/icons-material/PhotoSizeSelectLarge';
-import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CropIcon from '@mui/icons-material/Crop';
+import SwapVertIcon from '@mui/icons-material/SwapVert';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import TagIcon from '@mui/icons-material/Tag';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -1478,6 +1484,15 @@ const disabledToolbarActionButtonStyle: CSSProperties = {
   ...compareButtonStyle
 };
 
+const stateButtonIconLabelStyle: CSSProperties = {
+  ...toolbarButtonStyle,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '3px',
+  height: '32px',
+  whiteSpace: 'nowrap'
+};
+
 const albumTreeLabelButtonStyle: CSSProperties = {
   ...compareButtonStyle,
   flex: '1 1 auto',
@@ -2079,6 +2094,15 @@ const surveyPaneResetButtonStyle: CSSProperties = {
   fontSize: '11px',
   whiteSpace: 'nowrap'
 };
+
+function getPhotoStateIcon(state: PhotoState): ReactElement {
+  switch (state) {
+    case PhotoState.Keep:    return <CheckIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#2da44e' }} />;
+    case PhotoState.Discard: return <CloseIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#cf222e' }} />;
+    case PhotoState.Pending: return <PauseCircleOutlineIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />;
+    case PhotoState.New:     return <RadioButtonUncheckedIcon fontSize="inherit" style={toolbarIconContentStyle} />;
+  }
+}
 
 const reviewActions: PhotoState[] = [
   PhotoState.Keep,
@@ -3941,6 +3965,9 @@ export default function App() {
   const [toolbarOverflowMenuPosition, setToolbarOverflowMenuPosition] = useState<{ top: number; right: number }>({
     top: 0,
     right: 0
+  });
+  const [stateButtonsCompact, setStateButtonsCompact] = useState<boolean>(() => {
+    return localStorage.getItem('tdg-state-buttons-compact') === 'true';
   });
 
   useEffect(() => {
@@ -9853,8 +9880,693 @@ export default function App() {
       <style>{controlStateStyles}</style>
       <div style={topBarsStackStyle}>
         <div style={topBarStyle}>
+          {/* Title */}
           <div style={toolbarGroupStyle}>
             <strong style={toolbarTitleStyle}>Tedography</strong>
+          </div>
+
+          {/* Selection count + Clear */}
+          {hasSelectedAssets ? (
+            <div style={toolbarGroupStyle}>
+              <span style={{ fontSize: '12px', color: '#444', whiteSpace: 'nowrap' }}>
+                {selectionCount} selected
+              </span>
+              <button
+                type="button"
+                style={{ ...toolbarButtonStyle, marginLeft: '4px' }}
+                onClick={() => clearSelection()}
+              >
+                Clear
+              </button>
+            </div>
+          ) : null}
+
+          {/* State buttons: Keep / Discard / Pending / New */}
+          {(isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              {reviewActions.map((state) => {
+                const icon = getPhotoStateIcon(state);
+                const enabled = hasSelectedAssets;
+                return (
+                  <Tooltip
+                    key={state}
+                    title={
+                      enabled
+                        ? `Apply ${state} to the current selection`
+                        : `Select one or more photos to apply ${state}`
+                    }
+                  >
+                    <span>
+                      <button
+                        type="button"
+                        style={
+                          stateButtonsCompact
+                            ? enabled
+                              ? toolbarIconButtonStyle
+                              : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                            : enabled
+                              ? stateButtonIconLabelStyle
+                              : { ...stateButtonIconLabelStyle, ...disabledToolbarActionButtonStyle }
+                        }
+                        onClick={() => {
+                          if (isLoupeMode && selectedAsset) {
+                            void handleSetPhotoState(selectedAsset.id, state);
+                          } else {
+                            void handleApplyPhotoStateToSelectedAssets(state);
+                          }
+                        }}
+                        disabled={!enabled}
+                      >
+                        {icon}
+                        {!stateButtonsCompact ? <span>{state}</span> : null}
+                      </button>
+                    </span>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {/* Actions: Move to Album */}
+          {(isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip title={hasSelectedAssets ? 'Move selected photos to an album' : 'Select one or more photos to move to an album'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => setMoveAssetsDialogOpen(true)}
+                    disabled={!hasSelectedAssets}
+                    aria-label="Move to Album"
+                  >
+                    <ArrowForwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
+          {/* Actions: People Recog, Keywords */}
+          <div style={toolbarGroupStyle}>
+            {isLibraryArea ? (
+              <Tooltip title={!hasSelectedAssets ? 'Select one or more photos to run people recognition' : peopleRecognitionBusy ? 'Running people recognition...' : 'Run people recognition for the current selection'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets && !peopleRecognitionBusy ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
+                    disabled={!hasSelectedAssets || peopleRecognitionBusy}
+                    aria-label="Run People Recognition"
+                  >
+                    <EmojiEmotionsIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#f0a030' }} />
+                  </button>
+                </span>
+              </Tooltip>
+            ) : null}
+            <Tooltip title="Keyword Management">
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  onClick={() => setKeywordManagementDialogOpen(true)}
+                  aria-label="Keyword Management"
+                >
+                  <TagIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                </button>
+              </span>
+            </Tooltip>
+          </div>
+
+          {/* Actions: Import */}
+          <div style={toolbarGroupStyle}>
+            <Tooltip title="Import assets">
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  onClick={() => handleOpenImportDialog()}
+                  aria-label="Import"
+                >
+                  <DownloadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
+                </button>
+              </span>
+            </Tooltip>
+          </div>
+
+          {/* Rotation + Crop */}
+          {(isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => void handleRotateSelectedAssets('counterclockwise')}
+                    disabled={!hasSelectedAssets}
+                    aria-label="Rotate selected photos counterclockwise"
+                  >
+                    <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => void handleRotateSelectedAssets('180')}
+                    disabled={!hasSelectedAssets}
+                    aria-label="Rotate selected photos 180 degrees"
+                  >
+                    <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => void handleRotateSelectedAssets('clockwise')}
+                    disabled={!hasSelectedAssets}
+                    aria-label="Rotate selected photos clockwise"
+                  >
+                    <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip title={selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
+                <span>
+                  <button
+                    type="button"
+                    style={selectedAssetIds.length === 1 ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={() => void handleStartCrop()}
+                    disabled={selectedAssetIds.length !== 1}
+                    aria-label="Crop photo in Preview"
+                  >
+                    <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
+          {/* View modes: Grid, Loupe, Survey, Fullscreen */}
+          {(isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip title="Grid">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    data-selected={viewerMode === 'Grid' ? 'true' : undefined}
+                    onClick={() => setViewerMode('Grid')}
+                    aria-label="Grid"
+                  >
+                    <GridViewIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Loupe">
+                <span>
+                  <button
+                    type="button"
+                    style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
+                    onClick={() => setViewerMode('Loupe')}
+                    disabled={!selectedAsset}
+                    aria-label="Loupe"
+                  >
+                    <ImageSearchIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip
+                title={
+                  compareAssets.length >= 2
+                    ? 'Survey'
+                    : 'Select two or more visible photos to enter Survey'
+                }
+              >
+                <span>
+                  <button
+                    type="button"
+                    style={
+                      compareAssets.length >= 2
+                        ? toolbarIconButtonStyle
+                        : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                    }
+                    data-selected={surveyOpen ? 'true' : undefined}
+                    onClick={openSurveyMode}
+                    disabled={compareAssets.length < 2}
+                    aria-label="Survey"
+                  >
+                    <DashboardCustomizeIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip
+                title={
+                  selectedAsset
+                    ? 'Full Screen'
+                    : 'Select a photo to open full screen'
+                }
+              >
+                <span>
+                  <button
+                    type="button"
+                    style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    data-selected={immersiveOpen ? 'true' : undefined}
+                    onClick={openImmersive}
+                    disabled={!selectedAsset}
+                    aria-label="Full Screen"
+                  >
+                    <FullscreenIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
+          {/* Overflow -- less-frequent actions */}
+          <div style={menuAnchorStyle} id="tdg-toolbar-overflow-root" ref={toolbarOverflowRootRef}>
+            <Tooltip title="More">
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  data-selected={toolbarOverflowOpen ? 'true' : undefined}
+                  onClick={() => setToolbarOverflowOpen((previous) => !previous)}
+                  aria-label="More"
+                >
+                  <MoreHorizIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                </button>
+              </span>
+            </Tooltip>
+            {toolbarOverflowOpen ? (
+              <div
+                style={{
+                  ...optionsMenuStyle,
+                  position: 'fixed',
+                  top: `${toolbarOverflowMenuPosition.top}px`,
+                  right: `${toolbarOverflowMenuPosition.right}px`
+                }}
+              >
+                <button
+                  type="button"
+                  style={toolbarButtonStyle}
+                  onClick={() => {
+                    setToolbarOverflowOpen(false);
+                    setStateButtonsCompact((prev) => {
+                      const next = !prev;
+                      localStorage.setItem('tdg-state-buttons-compact', String(next));
+                      return next;
+                    });
+                  }}
+                >
+                  {stateButtonsCompact ? 'State: Show Labels' : 'State: Icons Only'}
+                </button>
+
+                {showsThumbnailSizeControl ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <div style={menuAnchorStyle} id="tdg-thumbnail-size-root" ref={thumbnailSizeRootRef}>
+                      <button
+                        type="button"
+                        style={toolbarButtonStyle}
+                        data-selected={thumbnailSizeMenuOpen ? 'true' : undefined}
+                        onClick={() => setThumbnailSizeMenuOpen((previous) => !previous)}
+                        aria-label="Thumbnail Size"
+                      >
+                        Thumbnail Size
+                      </button>
+                      {thumbnailSizeMenuOpen ? (
+                        <div
+                          style={{
+                            ...optionsMenuStyle,
+                            position: 'fixed',
+                            top: `${thumbnailSizeMenuPosition.top}px`,
+                            right: `${thumbnailSizeMenuPosition.right}px`
+                          }}
+                        >
+                          {timelineZoomLevels.map((level, index) => (
+                            <button
+                              key={level.label}
+                              type="button"
+                              style={toolbarButtonStyle}
+                              data-selected={timelineZoomLevel === index ? 'true' : undefined}
+                              onClick={() => {
+                                handleSetTimelineZoomLevel(index);
+                                setThumbnailSizeMenuOpen(false);
+                              }}
+                              title={`Thumbnail size ${level.label}`}
+                            >
+                              {level.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+
+                {isLibraryArea && toolbarBrowseMode ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <button
+                      type="button"
+                      style={toolbarButtonStyle}
+                      data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
+                      onClick={() => { handleSetLibraryBrowseMode('Flat'); setToolbarOverflowOpen(false); }}
+                      title="Flat presentation"
+                    >
+                      Flat
+                    </button>
+                    <button
+                      type="button"
+                      style={toolbarButtonStyle}
+                      data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
+                      onClick={() => { handleSetLibraryBrowseMode('Timeline'); setToolbarOverflowOpen(false); }}
+                      title="Timeline presentation"
+                    >
+                      Time
+                    </button>
+                    <button
+                      type="button"
+                      style={toolbarButtonStyle}
+                      data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
+                      onClick={() => { handleSetLibraryBrowseMode('Albums'); setToolbarOverflowOpen(false); }}
+                      title="Albums presentation"
+                    >
+                      Albums
+                    </button>
+                  </>
+                ) : null}
+
+                {(hasSelectedAssets || focusedAlbumForMembershipAction) ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <button
+                      type="button"
+                      style={hasSelectedAssets ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      onClick={() => { void handleAddSelectedToAlbum(); setToolbarOverflowOpen(false); }}
+                      disabled={!hasSelectedAssets}
+                      title={
+                        hasSelectedAssets
+                          ? 'Add current selection to a manual album'
+                          : 'Select one or more photos to add them to a manual album'
+                      }
+                    >
+                      +Album
+                    </button>
+                    {focusedAlbumForMembershipAction ? (
+                      <button
+                        type="button"
+                        style={
+                          selectedAssetsInFocusedAlbum.length > 0
+                            ? toolbarButtonStyle
+                            : { ...toolbarButtonStyle, color: '#a8a8a8' }
+                        }
+                        onClick={() => { void handleRemoveSelectedFromFocusedAlbum(); setToolbarOverflowOpen(false); }}
+                        disabled={selectedAssetsInFocusedAlbum.length === 0}
+                        title={
+                          selectedAssetIdsForAlbumAction.length === 0
+                            ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                            : selectedAssetsInFocusedAlbum.length > 0
+                              ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                              : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                        }
+                      >
+                        {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {(isLibraryArea || isSearchArea) ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <button
+                      type="button"
+                      style={visibleAssets.length > 0 ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      onClick={() => { startSlideshow(); setToolbarOverflowOpen(false); }}
+                      disabled={visibleAssets.length === 0}
+                      title={
+                        visibleAssets.length > 0
+                          ? hasSelectedAssets
+                            ? 'Start slideshow from selected photos'
+                            : 'Start slideshow from all visible photos'
+                          : 'No photos to show'
+                      }
+                    >
+                      Slide
+                    </button>
+                  </>
+                ) : null}
+
+                {(isLibraryArea || isSearchArea) ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <button
+                      type="button"
+                      style={currentScopedPeopleScope ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      onClick={() => { handleOpenScopedPeopleDialog(); setToolbarOverflowOpen(false); }}
+                      disabled={!currentScopedPeopleScope}
+                      title={
+                        currentScopedPeopleScope
+                          ? `Open scoped people tools for ${currentScopedPeopleScope.scopeSourceLabel.toLowerCase()}`
+                          : isLibraryArea
+                            ? 'Select one or more assets to use scoped people tools'
+                            : 'Adjust Search until there are results to use scoped people tools'
+                      }
+                    >
+                      People Scope
+                    </button>
+                  </>
+                ) : null}
+
+                {(isLibraryArea || isSearchArea) ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <button
+                      type="button"
+                      style={hasSelectedAssets ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      onClick={() => { handleOpenSetCaptureDateDialog(); setToolbarOverflowOpen(false); }}
+                      disabled={!hasSelectedAssets}
+                      title={
+                        hasSelectedAssets
+                          ? 'Set or clear capture date/time for the current selection'
+                          : 'Select one or more photos to set capture date/time'
+                      }
+                    >
+                      Set Capture Date...
+                    </button>
+                  </>
+                ) : null}
+
+                {isLibraryArea && isAlbumsMode ? (
+                  <>
+                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
+                      <button
+                        type="button"
+                        style={toolbarButtonStyle}
+                        onClick={() => {
+                          void handleSetSelectedAssetAlbumOrderingMode(selectedAssetAlbumOrderingMode === 'capture-time');
+                          setToolbarOverflowOpen(false);
+                        }}
+                        title={
+                          selectedAssetAlbumOrderingMode === 'manual'
+                            ? 'Use capture-time ordering for the selected photo in this album'
+                            : 'Force the selected photo to use manual ordering in this album'
+                        }
+                      >
+                        {selectedAssetAlbumOrderingMode === 'manual' ? 'Use Capture Time' : 'Use Manual Order'}
+                      </button>
+                    ) : null}
+                    <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move selected manually ordered album photo to the start of the manual section' : 'Select one manually ordered photo in a single checked album to reorder it'}>
+                      <span>
+                        <button
+                          type="button"
+                          style={canMoveCurrentAlbumSelectionToTop ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('top'); setToolbarOverflowOpen(false); }}
+                          disabled={!canMoveCurrentAlbumSelectionToTop}
+                          aria-label="Move selected album photo to top"
+                        >
+                          <VerticalAlignTopIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move selected manually ordered album photo up' : 'Select one manually ordered photo in a single checked album to reorder it'}>
+                      <span>
+                        <button
+                          type="button"
+                          style={canMoveCurrentAlbumSelectionUp ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('up'); setToolbarOverflowOpen(false); }}
+                          disabled={!canMoveCurrentAlbumSelectionUp}
+                          aria-label="Move selected album photo up"
+                        >
+                          <ArrowUpwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move selected manually ordered album photo down' : 'Select one manually ordered photo in a single checked album to reorder it'}>
+                      <span>
+                        <button
+                          type="button"
+                          style={canMoveCurrentAlbumSelectionDown ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('down'); setToolbarOverflowOpen(false); }}
+                          disabled={!canMoveCurrentAlbumSelectionDown}
+                          aria-label="Move selected album photo down"
+                        >
+                          <ArrowDownwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move selected manually ordered album photo to the end of the manual section' : 'Select one manually ordered photo in a single checked album to reorder it'}>
+                      <span>
+                        <button
+                          type="button"
+                          style={canMoveCurrentAlbumSelectionToBottom ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('bottom'); setToolbarOverflowOpen(false); }}
+                          disabled={!canMoveCurrentAlbumSelectionToBottom}
+                          aria-label="Move selected album photo to bottom"
+                        >
+                          <VerticalAlignBottomIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                  </>
+                ) : null}
+
+                <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                <Link
+                  to="/people/dev"
+                  style={toolbarLinkButtonStyle}
+                  onClick={() => setToolbarOverflowOpen(false)}
+                >
+                  People Dev
+                </Link>
+                <button
+                  type="button"
+                  style={toolbarButtonStyle}
+                  onClick={() => {
+                    setToolbarOverflowOpen(false);
+                    setMaintenanceDialogOpen(true);
+                  }}
+                  title="Open maintenance tools"
+                >
+                  Maintenance
+                </button>
+                <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                <button
+                  type="button"
+                  style={toolbarButtonStyle}
+                  onClick={() => { setToolbarOverflowOpen(false); setLeftPanelVisible((previous) => !previous); }}
+                >
+                  {leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
+                </button>
+                {(isLibraryArea || isSearchArea) ? (
+                  <button
+                    type="button"
+                    style={toolbarButtonStyle}
+                    onClick={() => { setToolbarOverflowOpen(false); setDetailsPanelsVisible((previous) => !previous); }}
+                  >
+                    {detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
+                  </button>
+                ) : null}
+                <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
+                  <button
+                    type="button"
+                    style={toolbarButtonStyle}
+                    data-selected={viewOptionsOpen ? 'true' : undefined}
+                    onClick={() => setViewOptionsOpen((previous) => !previous)}
+                    aria-label="View Options"
+                  >
+                    View Options
+                  </button>
+                  {viewOptionsOpen ? (
+                    <div
+                      style={{
+                        ...optionsMenuStyle,
+                        position: 'fixed',
+                        top: `${viewOptionsMenuPosition.top}px`,
+                        right: `${viewOptionsMenuPosition.right}px`
+                      }}
+                    >
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="checkbox"
+                          checked={showFilmstrip}
+                          onChange={(event) => setShowFilmstrip(event.target.checked)}
+                        />
+                        Show filmstrip
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="checkbox"
+                          checked={showThumbnailPhotoStateBadges}
+                          onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
+                        />
+                        Show thumbnail state
+                      </label>
+                      <span style={filterSubsectionTitleStyle}>Album Layout</span>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-results-presentation"
+                          checked={albumResultsPresentation === 'Merged'}
+                          onChange={() => handleSetAlbumResultsPresentation('Merged')}
+                        />
+                        Merged
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-results-presentation"
+                          checked={albumResultsPresentation === 'GroupedByAlbum'}
+                          onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
+                        />
+                        Grouped
+                      </label>
+                      <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-tree-sort-mode"
+                          checked={albumTreeSortMode === 'Custom'}
+                          onChange={() => setAlbumTreeSortMode('Custom')}
+                        />
+                        Custom
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-tree-sort-mode"
+                          checked={albumTreeSortMode === 'Name'}
+                          onChange={() => setAlbumTreeSortMode('Name')}
+                        />
+                        Name
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-tree-sort-mode"
+                          checked={albumTreeSortMode === 'Month/Name'}
+                          onChange={() => setAlbumTreeSortMode('Month/Name')}
+                        />
+                        Month/Name
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div style={topBarSpacerStyle} />
+
+          <div style={topBarSectionStyle}>
             <button
               type="button"
               style={toolbarButtonStyle}
@@ -9875,726 +10587,9 @@ export default function App() {
               People
             </Link>
           </div>
-
-          {isLibraryArea && toolbarBrowseMode ? (
-            <div style={toolbarGroupStyle}>
-              <button
-                type="button"
-                style={toolbarButtonStyle}
-                data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
-                onClick={() => handleSetLibraryBrowseMode('Flat')}
-                title="Flat presentation"
-              >
-                Flat
-              </button>
-              <button
-                type="button"
-                style={toolbarButtonStyle}
-                data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
-                onClick={() => handleSetLibraryBrowseMode('Timeline')}
-                title="Timeline presentation"
-              >
-                Time
-              </button>
-              <button
-                type="button"
-                style={toolbarButtonStyle}
-                data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
-                onClick={() => handleSetLibraryBrowseMode('Albums')}
-                title="Albums presentation"
-              >
-                Albums
-              </button>
-            </div>
-          ) : null}
-
-          <div style={toolbarGroupStyle}>
-            {showsThumbnailSizeControl ? (
-              <div style={menuAnchorStyle} id="tdg-thumbnail-size-root" ref={thumbnailSizeRootRef}>
-                <Tooltip title="Thumbnail Size">
-                  <span>
-                    <button
-                      type="button"
-                      style={toolbarIconButtonStyle}
-                      data-selected={thumbnailSizeMenuOpen ? 'true' : undefined}
-                      onClick={() => setThumbnailSizeMenuOpen((previous) => !previous)}
-                      aria-label="Thumbnail Size"
-                    >
-                      <PhotoSizeSelectLargeIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                {thumbnailSizeMenuOpen ? (
-                  <div
-                    style={{
-                      ...optionsMenuStyle,
-                      position: 'fixed',
-                      top: `${thumbnailSizeMenuPosition.top}px`,
-                      right: `${thumbnailSizeMenuPosition.right}px`
-                    }}
-                  >
-                    {timelineZoomLevels.map((level, index) => (
-                      <button
-                        key={level.label}
-                        type="button"
-                        style={toolbarButtonStyle}
-                        data-selected={timelineZoomLevel === index ? 'true' : undefined}
-                        onClick={() => {
-                          handleSetTimelineZoomLevel(index);
-                          setThumbnailSizeMenuOpen(false);
-                        }}
-                        title={`Thumbnail size ${level.label}`}
-                      >
-                        {level.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          {(hasSelectedAssets || focusedAlbumForMembershipAction) ? (
-            <div style={toolbarGroupStyle}>
-              <button
-                type="button"
-                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={() => void handleAddSelectedToAlbum()}
-                disabled={!hasSelectedAssets}
-                title={
-                  hasSelectedAssets
-                    ? 'Add current selection to a manual album'
-                    : 'Select one or more photos to add them to a manual album'
-                }
-              >
-                +Album
-              </button>
-              {(focusedAlbumForMembershipAction || isSearchArea) ? (
-                <button
-                  type="button"
-                  style={
-                    (isSearchArea
-                      ? hasSelectedAssets
-                      : selectedAssetsInFocusedAlbum.length > 0)
-                      ? compareButtonStyle
-                      : disabledToolbarActionButtonStyle
-                  }
-                  onClick={() => setMoveAssetsDialogOpen(true)}
-                  disabled={isSearchArea ? !hasSelectedAssets : selectedAssetsInFocusedAlbum.length === 0}
-                  title={
-                    isSearchArea
-                      ? hasSelectedAssets
-                        ? 'Move selected search results to a manual album'
-                        : 'Select one or more photos to move them to a manual album'
-                      : selectedAssetIdsForAlbumAction.length === 0
-                        ? `Select one or more photos to move them out of "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                        : selectedAssetsInFocusedAlbum.length > 0
-                          ? `Move selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}" to another album`
-                          : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                  }
-                >
-                  Move to Album...
-                </button>
-              ) : null}
-              {focusedAlbumForMembershipAction ? (
-                <button
-                  type="button"
-                  style={
-                    selectedAssetsInFocusedAlbum.length > 0
-                      ? compareButtonStyle
-                      : disabledToolbarActionButtonStyle
-                  }
-                  onClick={() => void handleRemoveSelectedFromFocusedAlbum()}
-                  disabled={selectedAssetsInFocusedAlbum.length === 0}
-                  title={
-                    selectedAssetIdsForAlbumAction.length === 0
-                      ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                      : selectedAssetsInFocusedAlbum.length > 0
-                        ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                        : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                  }
-                >
-                  {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {isLibraryArea || isSearchArea ? (
-            <div style={toolbarGroupStyle}>
-              <button
-                type="button"
-                style={visibleAssets.length > 0 ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={startSlideshow}
-                disabled={visibleAssets.length === 0}
-                title={
-                  visibleAssets.length > 0
-                    ? hasSelectedAssets
-                      ? 'Start slideshow from selected photos'
-                      : 'Start slideshow from all visible photos'
-                    : 'No photos to show'
-                }
-              >
-                Slide
-              </button>
-            </div>
-          ) : null}
-
-          {(isLibraryArea || isSearchArea) ? (
-            <div style={toolbarGroupStyle}>
-              {isLibraryArea ? (
-                <button
-                  type="button"
-                  style={hasSelectedAssets && !peopleRecognitionBusy ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                  onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
-                  disabled={!hasSelectedAssets || peopleRecognitionBusy}
-                  title={
-                    !hasSelectedAssets
-                      ? 'Select one or more photos to run people recognition'
-                      : peopleRecognitionBusy
-                        ? 'Running people recognition for the current selection'
-                        : 'Run people recognition for the current selection'
-                  }
-                >
-                  {peopleRecognitionBusy ? 'Running People...' : 'Run People Recognition'}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                style={currentScopedPeopleScope ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={handleOpenScopedPeopleDialog}
-                disabled={!currentScopedPeopleScope}
-                title={
-                  currentScopedPeopleScope
-                    ? `Open scoped people tools for ${currentScopedPeopleScope.scopeSourceLabel.toLowerCase()}`
-                    : isLibraryArea
-                      ? 'Select one or more assets to use scoped people tools'
-                      : 'Adjust Search until there are results to use scoped people tools'
-                }
-              >
-                People Scope
-              </button>
-            </div>
-          ) : null}
-
-          <div style={toolbarGroupStyle}>
-            <button
-              type="button"
-              style={compareButtonStyle}
-              onClick={() => handleOpenImportDialog()}
-              title="Import assets"
-            >
-              Import
-            </button>
-          </div>
-
-          <div style={toolbarGroupStyle}>
-            <Tooltip title={leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}>
-              <span>
-                <button
-                  type="button"
-                  style={toolbarIconButtonStyle}
-                  data-selected={leftPanelVisible ? 'true' : undefined}
-                  onClick={() => setLeftPanelVisible((previous) => !previous)}
-                  aria-label={leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
-                >
-                  <ViewSidebarIcon
-                    fontSize="inherit"
-                    style={{
-                      ...toolbarIconContentStyle,
-                      transform: leftPanelVisible ? 'none' : 'scaleX(-1)'
-                    }}
-                  />
-                </button>
-              </span>
-            </Tooltip>
-            {(isLibraryArea || isSearchArea) ? (
-              <Tooltip title={detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}>
-                <span>
-                  <button
-                    type="button"
-                    style={toolbarIconButtonStyle}
-                    data-selected={detailsPanelsVisible ? 'true' : undefined}
-                    onClick={() => setDetailsPanelsVisible((previous) => !previous)}
-                    aria-label={detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
-                  >
-                    <InfoOutlinedIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-            ) : null}
-            <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
-              <Tooltip title="View Options">
-                <span>
-                  <button
-                    type="button"
-                    style={toolbarIconButtonStyle}
-                    data-selected={viewOptionsOpen ? 'true' : undefined}
-                    onClick={() => setViewOptionsOpen((previous) => !previous)}
-                    aria-label="View Options"
-                  >
-                    <TuneIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-              {viewOptionsOpen ? (
-                <div
-                  style={{
-                    ...optionsMenuStyle,
-                    position: 'fixed',
-                    top: `${viewOptionsMenuPosition.top}px`,
-                    right: `${viewOptionsMenuPosition.right}px`
-                  }}
-                >
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={showFilmstrip}
-                      onChange={(event) => setShowFilmstrip(event.target.checked)}
-                    />
-                    Show filmstrip
-                  </label>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={showThumbnailPhotoStateBadges}
-                      onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
-                    />
-                    Show thumbnail state
-                  </label>
-                  <span style={filterSubsectionTitleStyle}>Album Layout</span>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="radio"
-                      name="album-results-presentation"
-                      checked={albumResultsPresentation === 'Merged'}
-                      onChange={() => handleSetAlbumResultsPresentation('Merged')}
-                    />
-                    Merged
-                  </label>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="radio"
-                      name="album-results-presentation"
-                      checked={albumResultsPresentation === 'GroupedByAlbum'}
-                      onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
-                    />
-                    Grouped
-                  </label>
-                  <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="radio"
-                      name="album-tree-sort-mode"
-                      checked={albumTreeSortMode === 'Custom'}
-                      onChange={() => setAlbumTreeSortMode('Custom')}
-                    />
-                    Custom
-                  </label>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="radio"
-                      name="album-tree-sort-mode"
-                      checked={albumTreeSortMode === 'Name'}
-                      onChange={() => setAlbumTreeSortMode('Name')}
-                    />
-                    Name
-                  </label>
-                  <label style={toggleOptionLabelStyle}>
-                    <input
-                      type="radio"
-                      name="album-tree-sort-mode"
-                      checked={albumTreeSortMode === 'Month/Name'}
-                      onChange={() => setAlbumTreeSortMode('Month/Name')}
-                    />
-                    Month/Name
-                  </label>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div style={topBarSpacerStyle} />
-
-          <div style={toolbarTrailingGroupStyle}>
-            <div style={menuAnchorStyle} id="tdg-toolbar-overflow-root" ref={toolbarOverflowRootRef}>
-              <Tooltip title="More">
-                <span>
-                  <button
-                    type="button"
-                    style={toolbarIconButtonStyle}
-                    data-selected={toolbarOverflowOpen ? 'true' : undefined}
-                    onClick={() => setToolbarOverflowOpen((previous) => !previous)}
-                    aria-label="More"
-                  >
-                    <MoreHorizIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-              {toolbarOverflowOpen ? (
-                <div
-                  style={{
-                    ...optionsMenuStyle,
-                    position: 'fixed',
-                    top: `${toolbarOverflowMenuPosition.top}px`,
-                    right: `${toolbarOverflowMenuPosition.right}px`
-                  }}
-                >
-                  <Link
-                    to="/people/dev"
-                    style={toolbarLinkButtonStyle}
-                    onClick={() => setToolbarOverflowOpen(false)}
-                  >
-                    People Dev
-                  </Link>
-                  <button
-                    type="button"
-                    style={toolbarButtonStyle}
-                    onClick={() => {
-                      setToolbarOverflowOpen(false);
-                      setKeywordManagementDialogOpen(true);
-                    }}
-                  >
-                    Keyword Management
-                  </button>
-                  <button
-                    type="button"
-                    style={toolbarButtonStyle}
-                    onClick={() => {
-                      setToolbarOverflowOpen(false);
-                      setMaintenanceDialogOpen(true);
-                    }}
-                    title="Open maintenance tools"
-                  >
-                    Maintenance
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div style={secondaryBarStyle}>
-          <div style={secondaryBarGroupStyle}>
-            {hasSelectedAssets ? (
-              <>
-                <div style={selectionChipStyle}>
-                  <span>{selectionCount} selected</span>
-                </div>
-                <button
-                  type="button"
-                  style={compareButtonStyle}
-                  onClick={clearSelection}
-                  title="Deselect all (Esc)"
-                >
-                  Clear
-                </button>
-              </>
-            ) : null}
-          </div>
-
-          <div style={secondaryBarGroupStyle}>
-            {(isLibraryArea || isSearchArea) ? (
-              reviewActions.map((state) => (
-                <button
-                  key={state}
-                  type="button"
-                  style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                  onClick={() => {
-                    if (isLoupeMode && selectedAsset) {
-                      void handleSetPhotoState(selectedAsset.id, state);
-                    } else {
-                      void handleApplyPhotoStateToSelectedAssets(state);
-                    }
-                  }}
-                  disabled={!hasSelectedAssets}
-                  title={
-                    hasSelectedAssets
-                      ? `Apply ${state} to the current selection`
-                      : `Select one or more photos to apply ${state}`
-                  }
-                >
-                  {state}
-                </button>
-              ))
-            ) : null}
-          </div>
-
-          <div style={secondaryBarGroupStyle}>
-            {(isLibraryArea || isSearchArea) ? (
-              <button
-                type="button"
-                style={hasSelectedAssets ? compareButtonStyle : disabledToolbarActionButtonStyle}
-                onClick={handleOpenSetCaptureDateDialog}
-                disabled={!hasSelectedAssets}
-                title={
-                  hasSelectedAssets
-                    ? 'Set or clear capture date/time for the current selection'
-                    : 'Select one or more photos to set capture date/time'
-                }
-              >
-                Set Capture Date...
-              </button>
-            ) : null}
-          </div>
-
-          <div style={secondaryBarGroupStyle}>
-            {isLibraryArea && isAlbumsMode ? (
-              <>
-                {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
-                  <button
-                    type="button"
-                    style={compareButtonStyle}
-                    onClick={() =>
-                      void handleSetSelectedAssetAlbumOrderingMode(
-                        selectedAssetAlbumOrderingMode === 'capture-time'
-                      )
-                    }
-                    title={
-                      selectedAssetAlbumOrderingMode === 'manual'
-                        ? 'Use capture-time ordering for the selected photo in this album'
-                        : 'Force the selected photo to use manual ordering in this album'
-                    }
-                  >
-                    {selectedAssetAlbumOrderingMode === 'manual'
-                      ? 'Use Capture Time'
-                      : 'Use Manual Order'}
-                  </button>
-                ) : null}
-                <Tooltip
-                  title={
-                    canMoveCurrentAlbumSelectionToTop
-                      ? 'Move selected manually ordered album photo to the start of the manual section'
-                      : 'Select one manually ordered photo in a single checked album to reorder it'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={
-                        canMoveCurrentAlbumSelectionToTop
-                          ? toolbarIconButtonStyle
-                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                      }
-                      onClick={() => void handleMoveSelectedAssetWithinAlbum('top')}
-                      disabled={!canMoveCurrentAlbumSelectionToTop}
-                      aria-label="Move selected album photo to top"
-                    >
-                      <VerticalAlignTopIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip
-                  title={
-                    canMoveCurrentAlbumSelectionUp
-                      ? 'Move selected manually ordered album photo up'
-                      : 'Select one manually ordered photo in a single checked album to reorder it'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={
-                        canMoveCurrentAlbumSelectionUp
-                          ? toolbarIconButtonStyle
-                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                      }
-                      onClick={() => void handleMoveSelectedAssetWithinAlbum('up')}
-                      disabled={!canMoveCurrentAlbumSelectionUp}
-                      aria-label="Move selected album photo up"
-                    >
-                      <ArrowUpwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip
-                  title={
-                    canMoveCurrentAlbumSelectionDown
-                      ? 'Move selected manually ordered album photo down'
-                      : 'Select one manually ordered photo in a single checked album to reorder it'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={
-                        canMoveCurrentAlbumSelectionDown
-                          ? toolbarIconButtonStyle
-                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                      }
-                      onClick={() => void handleMoveSelectedAssetWithinAlbum('down')}
-                      disabled={!canMoveCurrentAlbumSelectionDown}
-                      aria-label="Move selected album photo down"
-                    >
-                      <ArrowDownwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip
-                  title={
-                    canMoveCurrentAlbumSelectionToBottom
-                      ? 'Move selected manually ordered album photo to the end of the manual section'
-                      : 'Select one manually ordered photo in a single checked album to reorder it'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={
-                        canMoveCurrentAlbumSelectionToBottom
-                          ? toolbarIconButtonStyle
-                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                      }
-                      onClick={() => void handleMoveSelectedAssetWithinAlbum('bottom')}
-                      disabled={!canMoveCurrentAlbumSelectionToBottom}
-                      aria-label="Move selected album photo to bottom"
-                    >
-                      <VerticalAlignBottomIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-              </>
-            ) : null}
-          </div>
-
-          <div style={secondaryBarGroupStyle}>
-            {(isLibraryArea || isSearchArea) ? (
-              <>
-                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
-                  <span>
-                    <button
-                      type="button"
-                      style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                      onClick={() => void handleRotateSelectedAssets('counterclockwise')}
-                      disabled={!hasSelectedAssets}
-                      aria-label="Rotate selected photos counterclockwise"
-                    >
-                      <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
-                  <span>
-                    <button
-                      type="button"
-                      style={hasSelectedAssets ? { ...toolbarIconButtonStyle, fontSize: '11px', fontWeight: 'bold' } : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle, fontSize: '11px', fontWeight: 'bold' }}
-                      onClick={() => void handleRotateSelectedAssets('180')}
-                      disabled={!hasSelectedAssets}
-                      aria-label="Rotate selected photos 180 degrees"
-                    >
-                      180°
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
-                  <span>
-                    <button
-                      type="button"
-                      style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                      onClick={() => void handleRotateSelectedAssets('clockwise')}
-                      disabled={!hasSelectedAssets}
-                      aria-label="Rotate selected photos clockwise"
-                    >
-                      <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
-                  <span>
-                    <button
-                      type="button"
-                      style={selectedAssetIds.length === 1 ? { ...toolbarIconButtonStyle, fontSize: '11px', fontWeight: 'bold' } : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle, fontSize: '11px', fontWeight: 'bold' }}
-                      onClick={() => void handleStartCrop()}
-                      disabled={selectedAssetIds.length !== 1}
-                      aria-label="Crop photo in Preview"
-                    >
-                      Crop
-                    </button>
-                  </span>
-                </Tooltip>
-              </>
-            ) : null}
-          </div>
-
-          <div style={secondaryBarGroupStyle}>
-            {(isLibraryArea || isSearchArea) ? (
-              <>
-                <Tooltip title="Grid">
-                  <span>
-                    <button
-                      type="button"
-                      style={toolbarIconButtonStyle}
-                      data-selected={viewerMode === 'Grid' ? 'true' : undefined}
-                      onClick={() => setViewerMode('Grid')}
-                      aria-label="Grid"
-                    >
-                      <GridViewIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Loupe">
-                  <span>
-                    <button
-                      type="button"
-                      style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                      data-selected={viewerMode === 'Loupe' ? 'true' : undefined}
-                      onClick={() => setViewerMode('Loupe')}
-                      disabled={!selectedAsset}
-                      aria-label="Loupe"
-                    >
-                      <ImageSearchIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip
-                  title={
-                    compareAssets.length >= 2
-                      ? 'Survey'
-                      : 'Select two or more visible photos to enter Survey'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={
-                        compareAssets.length >= 2
-                          ? toolbarIconButtonStyle
-                          : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                      }
-                      data-selected={surveyOpen ? 'true' : undefined}
-                      onClick={openSurveyMode}
-                      disabled={compareAssets.length < 2}
-                      aria-label="Survey"
-                    >
-                      <DashboardCustomizeIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-                <Tooltip
-                  title={
-                    selectedAsset
-                      ? 'Full Screen'
-                      : 'Select a photo to open full screen'
-                  }
-                >
-                  <span>
-                    <button
-                      type="button"
-                      style={selectedAsset ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                      data-selected={immersiveOpen ? 'true' : undefined}
-                      onClick={openImmersive}
-                      disabled={!selectedAsset}
-                      aria-label="Full Screen"
-                    >
-                      <FullscreenIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                    </button>
-                  </span>
-                </Tooltip>
-              </>
-            ) : null}
-          </div>
         </div>
       </div>
+
 
       <div style={shellViewportStyle}>
         <div

@@ -16,7 +16,10 @@
       "Bash(bash /tmp/feature_check.sh)",
       "Bash(bash /tmp/comprehensive_check.sh)",
       "Bash(grep -E \"tsx|ts$\")",
-      "Bash(grep -v \"^.*//.*$\")"
+      "Bash(grep -v \"^.*//.*$\")",
+      "mcp__plugin_figma_figma__create_new_file",
+      "mcp__plugin_figma_figma__use_figma",
+      "Bash(python3 *)"
     ]
   }
 }
