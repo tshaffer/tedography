@@ -10294,7 +10294,7 @@ export default function App() {
           </div>
 
           <div style={secondaryBarGroupStyle}>
-            {isLibraryArea ? (
+            {(isLibraryArea || isSearchArea) ? (
               reviewActions.map((state) => (
                 <button
                   key={state}

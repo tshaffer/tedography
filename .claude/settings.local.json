@@ -15,7 +15,8 @@
       "Bash(cat)",
       "Bash(bash /tmp/feature_check.sh)",
       "Bash(bash /tmp/comprehensive_check.sh)",
-      "Bash(grep -E \"tsx|ts$\")"
+      "Bash(grep -E \"tsx|ts$\")",
+      "Bash(grep -v \"^.*//.*$\")"
     ]
   }
 }
