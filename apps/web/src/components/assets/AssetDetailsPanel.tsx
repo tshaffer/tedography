@@ -9,6 +9,8 @@ interface AssetDetailsPanelProps {
   onEditCaptureDate?: (() => void) | undefined;
   onReimportAsset?: () => void;
   onRebuildDerivedFiles?: () => void;
+  /** undefined = hide button; null = show disabled (not in any album); fn = show enabled */
+  onShowInAlbum?: (() => void) | null | undefined;
   assetOperationBusy?: boolean;
   assetOperationMessage?: string | null;
   assetOperationError?: boolean;
@@ -186,6 +188,7 @@ export function AssetDetailsPanel({
   onEditCaptureDate,
   onReimportAsset,
   onRebuildDerivedFiles,
+  onShowInAlbum,
   assetOperationBusy = false,
   assetOperationMessage = null,
   assetOperationError = false,
@@ -264,6 +267,17 @@ export function AssetDetailsPanel({
         >
           {assetOperationBusy ? 'Working...' : 'Rebuild Derived Files'}
         </button>
+        {onShowInAlbum !== undefined ? (
+          <button
+            type="button"
+            style={onShowInAlbum ? buttonStyle : disabledButtonStyle}
+            onClick={onShowInAlbum ?? undefined}
+            disabled={!onShowInAlbum}
+            title={onShowInAlbum ? 'Navigate to the album containing this photo' : 'This photo is not in any album'}
+          >
+            Show in Album
+          </button>
+        ) : null}
       </div>
       {assetOperationMessage ? (
         <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>

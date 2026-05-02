@@ -8160,6 +8160,15 @@ export default function App() {
     }
   }
 
+  function handleShowSelectedAssetInAlbum(): void {
+    if (!selectedAsset) return;
+    const firstAlbumId = selectedAsset.albumIds?.[0];
+    if (!firstAlbumId) return;
+    setCheckedAlbumIds([firstAlbumId]);
+    setLibraryBrowseMode('Albums');
+    setPrimaryArea('Library');
+  }
+
   function handleImmersiveActiveImageLoad(loadedAssetId: string): void {
     if (!immersiveOpen && !slideshowActive) {
       return;
@@ -9794,6 +9803,13 @@ export default function App() {
             }
             onReimportAsset={() => void handleReimportSelectedAsset()}
             onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
+            onShowInAlbum={
+              isSearchArea && selectedAssetIds.length === 1 && selectedAsset
+                ? (selectedAsset.albumIds?.length ?? 0) > 0
+                  ? handleShowSelectedAssetInAlbum
+                  : null
+                : undefined
+            }
             assetOperationBusy={assetMaintenanceBusy !== null}
             assetOperationMessage={assetMaintenanceMessage}
             assetOperationError={assetMaintenanceError}
