@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
+import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import type { Keyword } from '@tedography/domain';
@@ -284,6 +285,22 @@ export function AssetKeywordsPanel({
                   </li>
                 );
               }}
+              renderTags={(value, getTagProps) =>
+                value.map((entry, index) => {
+                  const { key, ...tagProps } = getTagProps({ index });
+                  if (typeof entry === 'string') {
+                    return <Chip key={key} {...tagProps} label={entry} size="small" />;
+                  }
+                  const pathLabels = getKeywordPathLabels(entry, keywordMap);
+                  const leafName = pathLabels[pathLabels.length - 1] ?? entry.label;
+                  const fullPath = formatKeywordPathLabel(entry, keywordMap);
+                  return (
+                    <Tooltip key={key} title={fullPath} placement="top">
+                      <Chip {...tagProps} label={leafName} size="small" />
+                    </Tooltip>
+                  );
+                })
+              }
               renderInput={(params) => (
                 <TextField
                   {...params}
