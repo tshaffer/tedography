@@ -245,5 +245,7 @@ export const config = {
     }
   } satisfies PeoplePipelineConfig,
 
+  openAiApiKey: parseNonEmptyStringEnv(process.env.OPENAI_API_KEY),
+
   port: Number(process.env.PORT ?? 4000),
 };

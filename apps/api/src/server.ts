@@ -16,6 +16,7 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
+import { aiEditAsset, AiEditError } from './import/aiImageEditService.js';
 import {
   findById,
   getAssetPageForLibrary,
@@ -376,6 +377,29 @@ end run
     } catch (error) {
       log.error('Failed to stat asset file', error);
       res.status(500).json({ error: 'Failed to stat asset file' });
+    }
+  });
+
+  app.post('/api/assets/:id/ai-edit', async (req, res) => {
+    try {
+      const prompt = typeof req.body.prompt === 'string' ? req.body.prompt.trim() : '';
+      if (!prompt) {
+        res.status(400).json({ error: 'prompt is required' });
+        return;
+      }
+      const result = await aiEditAsset(req.params.id, prompt);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof AiEditError) {
+        const status =
+          error.code === 'NOT_FOUND' ? 404 :
+          error.code === 'UNSUPPORTED_FORMAT' ? 400 :
+          error.code === 'NOT_CONFIGURED' ? 503 : 500;
+        res.status(status).json({ error: error.message });
+        return;
+      }
+      log.error('Failed to AI edit asset', error);
+      res.status(500).json({ error: 'Failed to AI edit asset' });
     }
   });
 

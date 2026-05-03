@@ -76,6 +76,7 @@ import {
   rotateAsset180,
   updateAssetsCaptureDateTime
 } from './api/assetApi';
+import { aiEditAsset as aiEditAssetRequest } from './api/imageEditApi';
 import {
   addKeywordsToAssets as addKeywordsToAssetsRequest,
   createKeyword as createKeywordRequest,
@@ -96,6 +97,7 @@ import {
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
+import { AiImageEditPanel } from './components/assets/AiImageEditPanel';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
@@ -8187,6 +8189,13 @@ export default function App() {
     }
   }
 
+  async function handleAiEditAsset(assetId: string, prompt: string): Promise<{ asset: MediaAsset; backupPath: string }> {
+    const result = await aiEditAssetRequest(assetId, prompt);
+    await loadAssets({ showLoading: false });
+    setSelectedAssetDetails(result.asset);
+    return result;
+  }
+
   function handleShowSelectedAssetInAlbum(): void {
     if (!selectedAsset) return;
     const firstAlbumId = selectedAsset.albumIds?.[0];
@@ -9869,6 +9878,11 @@ export default function App() {
             updateBusy={keywordUpdateBusy}
             onAddKeywords={handleAddKeywordsToSelectedAssets}
             onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
+          />
+          <AiImageEditPanel
+            asset={selectedAssetIds.length === 1 ? (selectedAssetForDetails ?? null) : null}
+            onEditRequest={handleAiEditAsset}
+            onEditComplete={() => { /* asset already updated via onEditRequest */ }}
           />
         </section>
       </aside>
