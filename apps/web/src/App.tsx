@@ -1398,6 +1398,124 @@ body {
   background-color: #d4e4ff;
   border-color: #155dcb;
 }
+
+/* Overflow menu — flat list style */
+.tdg-overflow-menu {
+  min-width: 240px;
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 4px 0;
+  z-index: 1200;
+}
+
+.tdg-overflow-section {
+  padding: 7px 14px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tdg-overflow-divider {
+  height: 1px;
+  background: #efefef;
+  margin: 4px 0;
+}
+
+.tdg-overflow-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 13px;
+  text-align: left;
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  color: #1f2937;
+  line-height: 1.3;
+  text-decoration: none;
+  transition: background-color 80ms ease !important;
+}
+
+.tdg-overflow-item:hover:not(:disabled) {
+  background-color: #f0f4f8 !important;
+  border-color: transparent !important;
+}
+
+.tdg-overflow-item:active:not(:disabled) {
+  background-color: #e5eaf0 !important;
+  transform: none !important;
+}
+
+.tdg-overflow-item:disabled {
+  color: #b0b8c5 !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
+.tdg-overflow-item[data-selected='true'] {
+  color: #1557cc !important;
+  font-weight: 500;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.tdg-overflow-item[data-selected='true']:hover:not(:disabled) {
+  background-color: #eef3ff !important;
+  border-color: transparent !important;
+}
+
+.tdg-overflow-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px 8px;
+}
+
+.tdg-overflow-icon-btn {
+  width: 32px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f4f4 !important;
+  border: 1px solid #c8c8c8 !important;
+  border-radius: 5px !important;
+  cursor: pointer;
+  color: #374151;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04) !important;
+  transition: background 120ms ease, border-color 120ms ease !important;
+}
+
+.tdg-overflow-icon-btn:hover:not(:disabled) {
+  background-color: #fff !important;
+  border-color: #9cb0cf !important;
+}
+
+.tdg-overflow-icon-btn:active:not(:disabled) {
+  background-color: #e9eef5 !important;
+  transform: translateY(1px) !important;
+}
+
+.tdg-overflow-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
 `;
 
 const detailPanelStyle: CSSProperties = {
@@ -10165,16 +10283,18 @@ export default function App() {
             </Tooltip>
             {toolbarOverflowOpen ? (
               <div
+                className="tdg-overflow-menu"
                 style={{
-                  ...optionsMenuStyle,
                   position: 'fixed',
                   top: `${toolbarOverflowMenuPosition.top}px`,
                   right: `${toolbarOverflowMenuPosition.right}px`
                 }}
               >
+                {/* Display */}
+                <div className="tdg-overflow-section">Display</div>
                 <button
                   type="button"
-                  style={toolbarButtonStyle}
+                  className="tdg-overflow-item"
                   onClick={() => {
                     setToolbarOverflowOpen(false);
                     setStateButtonsCompact((prev) => {
@@ -10184,91 +10304,93 @@ export default function App() {
                     });
                   }}
                 >
-                  {stateButtonsCompact ? 'State: Show Labels' : 'State: Icons Only'}
+                  {stateButtonsCompact ? 'Show State Labels' : 'Show Icons Only'}
                 </button>
 
                 {showsThumbnailSizeControl ? (
-                  <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
-                    <div style={menuAnchorStyle} id="tdg-thumbnail-size-root" ref={thumbnailSizeRootRef}>
-                      <button
-                        type="button"
-                        style={toolbarButtonStyle}
-                        data-selected={thumbnailSizeMenuOpen ? 'true' : undefined}
-                        onClick={() => setThumbnailSizeMenuOpen((previous) => !previous)}
-                        aria-label="Thumbnail Size"
-                      >
-                        Thumbnail Size
-                      </button>
-                      {thumbnailSizeMenuOpen ? (
-                        <div
-                          style={{
-                            ...optionsMenuStyle,
-                            position: 'fixed',
-                            top: `${thumbnailSizeMenuPosition.top}px`,
-                            right: `${thumbnailSizeMenuPosition.right}px`
-                          }}
-                        >
-                          {timelineZoomLevels.map((level, index) => (
-                            <button
-                              key={level.label}
-                              type="button"
-                              style={toolbarButtonStyle}
-                              data-selected={timelineZoomLevel === index ? 'true' : undefined}
-                              onClick={() => {
-                                handleSetTimelineZoomLevel(index);
-                                setThumbnailSizeMenuOpen(false);
-                              }}
-                              title={`Thumbnail size ${level.label}`}
-                            >
-                              {level.label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : null}
-
-                {isLibraryArea && toolbarBrowseMode ? (
-                  <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                  <div style={menuAnchorStyle} id="tdg-thumbnail-size-root" ref={thumbnailSizeRootRef}>
                     <button
                       type="button"
-                      style={toolbarButtonStyle}
+                      className="tdg-overflow-item"
+                      data-selected={thumbnailSizeMenuOpen ? 'true' : undefined}
+                      onClick={() => setThumbnailSizeMenuOpen((previous) => !previous)}
+                      aria-label="Thumbnail Size"
+                    >
+                      Thumbnail Size
+                      <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '11px' }}>›</span>
+                    </button>
+                    {thumbnailSizeMenuOpen ? (
+                      <div
+                        className="tdg-overflow-menu"
+                        style={{
+                          position: 'fixed',
+                          top: `${thumbnailSizeMenuPosition.top}px`,
+                          right: `${thumbnailSizeMenuPosition.right}px`
+                        }}
+                      >
+                        {timelineZoomLevels.map((level, index) => (
+                          <button
+                            key={level.label}
+                            type="button"
+                            className="tdg-overflow-item"
+                            data-selected={timelineZoomLevel === index ? 'true' : undefined}
+                            onClick={() => {
+                              handleSetTimelineZoomLevel(index);
+                              setThumbnailSizeMenuOpen(false);
+                            }}
+                            title={`Thumbnail size ${level.label}`}
+                          >
+                            {timelineZoomLevel === index ? '✓ ' : '   '}{level.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* Browse Mode */}
+                {isLibraryArea && toolbarBrowseMode ? (
+                  <>
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">Browse Mode</div>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
                       data-selected={toolbarBrowseMode === 'Flat' ? 'true' : undefined}
                       onClick={() => { handleSetLibraryBrowseMode('Flat'); setToolbarOverflowOpen(false); }}
                       title="Flat presentation"
                     >
-                      Flat
+                      {toolbarBrowseMode === 'Flat' ? '✓ ' : '   '}Flat
                     </button>
                     <button
                       type="button"
-                      style={toolbarButtonStyle}
+                      className="tdg-overflow-item"
                       data-selected={toolbarBrowseMode === 'Timeline' ? 'true' : undefined}
                       onClick={() => { handleSetLibraryBrowseMode('Timeline'); setToolbarOverflowOpen(false); }}
                       title="Timeline presentation"
                     >
-                      Time
+                      {toolbarBrowseMode === 'Timeline' ? '✓ ' : '   '}Time
                     </button>
                     <button
                       type="button"
-                      style={toolbarButtonStyle}
+                      className="tdg-overflow-item"
                       data-selected={toolbarBrowseMode === 'Albums' ? 'true' : undefined}
                       onClick={() => { handleSetLibraryBrowseMode('Albums'); setToolbarOverflowOpen(false); }}
                       title="Albums presentation"
                     >
-                      Albums
+                      {toolbarBrowseMode === 'Albums' ? '✓ ' : '   '}Albums
                     </button>
                   </>
                 ) : null}
 
+                {/* Albums */}
                 {(hasSelectedAssets || focusedAlbumForMembershipAction) ? (
                   <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">Albums</div>
                     <button
                       type="button"
-                      style={hasSelectedAssets ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      className="tdg-overflow-item"
                       onClick={() => { void handleAddSelectedToAlbum(); setToolbarOverflowOpen(false); }}
                       disabled={!hasSelectedAssets}
                       title={
@@ -10277,16 +10399,12 @@ export default function App() {
                           : 'Select one or more photos to add them to a manual album'
                       }
                     >
-                      +Album
+                      + Add to Album
                     </button>
                     {focusedAlbumForMembershipAction ? (
                       <button
                         type="button"
-                        style={
-                          selectedAssetsInFocusedAlbum.length > 0
-                            ? toolbarButtonStyle
-                            : { ...toolbarButtonStyle, color: '#a8a8a8' }
-                        }
+                        className="tdg-overflow-item"
                         onClick={() => { void handleRemoveSelectedFromFocusedAlbum(); setToolbarOverflowOpen(false); }}
                         disabled={selectedAssetsInFocusedAlbum.length === 0}
                         title={
@@ -10303,12 +10421,14 @@ export default function App() {
                   </>
                 ) : null}
 
+                {/* Actions */}
                 {(isLibraryArea || isSearchArea) ? (
                   <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">Actions</div>
                     <button
                       type="button"
-                      style={visibleAssets.length > 0 ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      className="tdg-overflow-item"
                       onClick={() => { startSlideshow(); setToolbarOverflowOpen(false); }}
                       disabled={visibleAssets.length === 0}
                       title={
@@ -10319,17 +10439,11 @@ export default function App() {
                           : 'No photos to show'
                       }
                     >
-                      Slide
+                      Slideshow
                     </button>
-                  </>
-                ) : null}
-
-                {(isLibraryArea || isSearchArea) ? (
-                  <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
                     <button
                       type="button"
-                      style={currentScopedPeopleScope ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      className="tdg-overflow-item"
                       onClick={() => { handleOpenScopedPeopleDialog(); setToolbarOverflowOpen(false); }}
                       disabled={!currentScopedPeopleScope}
                       title={
@@ -10342,15 +10456,9 @@ export default function App() {
                     >
                       People Scope
                     </button>
-                  </>
-                ) : null}
-
-                {(isLibraryArea || isSearchArea) ? (
-                  <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
                     <button
                       type="button"
-                      style={hasSelectedAssets ? toolbarButtonStyle : { ...toolbarButtonStyle, color: '#a8a8a8' }}
+                      className="tdg-overflow-item"
                       onClick={() => { handleOpenSetCaptureDateDialog(); setToolbarOverflowOpen(false); }}
                       disabled={!hasSelectedAssets}
                       title={
@@ -10359,18 +10467,20 @@ export default function App() {
                           : 'Select one or more photos to set capture date/time'
                       }
                     >
-                      Set Capture Date...
+                      Set Capture Date…
                     </button>
                   </>
                 ) : null}
 
+                {/* Order in Album */}
                 {isLibraryArea && isAlbumsMode ? (
                   <>
-                    <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">Order in Album</div>
                     {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
                       <button
                         type="button"
-                        style={toolbarButtonStyle}
+                        className="tdg-overflow-item"
                         onClick={() => {
                           void handleSetSelectedAssetAlbumOrderingMode(selectedAssetAlbumOrderingMode === 'capture-time');
                           setToolbarOverflowOpen(false);
@@ -10384,72 +10494,76 @@ export default function App() {
                         {selectedAssetAlbumOrderingMode === 'manual' ? 'Use Capture Time' : 'Use Manual Order'}
                       </button>
                     ) : null}
-                    <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move selected manually ordered album photo to the start of the manual section' : 'Select one manually ordered photo in a single checked album to reorder it'}>
-                      <span>
-                        <button
-                          type="button"
-                          style={canMoveCurrentAlbumSelectionToTop ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('top'); setToolbarOverflowOpen(false); }}
-                          disabled={!canMoveCurrentAlbumSelectionToTop}
-                          aria-label="Move selected album photo to top"
-                        >
-                          <VerticalAlignTopIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move selected manually ordered album photo up' : 'Select one manually ordered photo in a single checked album to reorder it'}>
-                      <span>
-                        <button
-                          type="button"
-                          style={canMoveCurrentAlbumSelectionUp ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('up'); setToolbarOverflowOpen(false); }}
-                          disabled={!canMoveCurrentAlbumSelectionUp}
-                          aria-label="Move selected album photo up"
-                        >
-                          <ArrowUpwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move selected manually ordered album photo down' : 'Select one manually ordered photo in a single checked album to reorder it'}>
-                      <span>
-                        <button
-                          type="button"
-                          style={canMoveCurrentAlbumSelectionDown ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('down'); setToolbarOverflowOpen(false); }}
-                          disabled={!canMoveCurrentAlbumSelectionDown}
-                          aria-label="Move selected album photo down"
-                        >
-                          <ArrowDownwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move selected manually ordered album photo to the end of the manual section' : 'Select one manually ordered photo in a single checked album to reorder it'}>
-                      <span>
-                        <button
-                          type="button"
-                          style={canMoveCurrentAlbumSelectionToBottom ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => { void handleMoveSelectedAssetWithinAlbum('bottom'); setToolbarOverflowOpen(false); }}
-                          disabled={!canMoveCurrentAlbumSelectionToBottom}
-                          aria-label="Move selected album photo to bottom"
-                        >
-                          <VerticalAlignBottomIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
+                    <div className="tdg-overflow-icon-row">
+                      <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one manually ordered photo to reorder'}>
+                        <span>
+                          <button
+                            type="button"
+                            className="tdg-overflow-icon-btn"
+                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('top'); setToolbarOverflowOpen(false); }}
+                            disabled={!canMoveCurrentAlbumSelectionToTop}
+                            aria-label="Move to top"
+                          >
+                            <VerticalAlignTopIcon style={{ fontSize: '16px' }} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move up' : 'Select one manually ordered photo to reorder'}>
+                        <span>
+                          <button
+                            type="button"
+                            className="tdg-overflow-icon-btn"
+                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('up'); setToolbarOverflowOpen(false); }}
+                            disabled={!canMoveCurrentAlbumSelectionUp}
+                            aria-label="Move up"
+                          >
+                            <ArrowUpwardIcon style={{ fontSize: '16px' }} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move down' : 'Select one manually ordered photo to reorder'}>
+                        <span>
+                          <button
+                            type="button"
+                            className="tdg-overflow-icon-btn"
+                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('down'); setToolbarOverflowOpen(false); }}
+                            disabled={!canMoveCurrentAlbumSelectionDown}
+                            aria-label="Move down"
+                          >
+                            <ArrowDownwardIcon style={{ fontSize: '16px' }} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move to end of album' : 'Select one manually ordered photo to reorder'}>
+                        <span>
+                          <button
+                            type="button"
+                            className="tdg-overflow-icon-btn"
+                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('bottom'); setToolbarOverflowOpen(false); }}
+                            disabled={!canMoveCurrentAlbumSelectionToBottom}
+                            aria-label="Move to bottom"
+                          >
+                            <VerticalAlignBottomIcon style={{ fontSize: '16px' }} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                    </div>
                   </>
                 ) : null}
 
-                <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+                {/* Tools */}
+                <div className="tdg-overflow-divider" />
+                <div className="tdg-overflow-section">Tools</div>
                 <Link
                   to="/people/dev"
-                  style={toolbarLinkButtonStyle}
+                  className="tdg-overflow-item"
                   onClick={() => setToolbarOverflowOpen(false)}
                 >
                   People Dev
                 </Link>
                 <button
                   type="button"
-                  style={toolbarButtonStyle}
+                  className="tdg-overflow-item"
                   onClick={() => {
                     setToolbarOverflowOpen(false);
                     setMaintenanceDialogOpen(true);
@@ -10458,10 +10572,13 @@ export default function App() {
                 >
                   Maintenance
                 </button>
-                <div style={{ borderTop: '1px solid #efefef', margin: '4px 0' }} />
+
+                {/* Layout */}
+                <div className="tdg-overflow-divider" />
+                <div className="tdg-overflow-section">Layout</div>
                 <button
                   type="button"
-                  style={toolbarButtonStyle}
+                  className="tdg-overflow-item"
                   onClick={() => { setToolbarOverflowOpen(false); setLeftPanelVisible((previous) => !previous); }}
                 >
                   {leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
@@ -10469,7 +10586,7 @@ export default function App() {
                 {(isLibraryArea || isSearchArea) ? (
                   <button
                     type="button"
-                    style={toolbarButtonStyle}
+                    className="tdg-overflow-item"
                     onClick={() => { setToolbarOverflowOpen(false); setDetailsPanelsVisible((previous) => !previous); }}
                   >
                     {detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
@@ -10478,12 +10595,13 @@ export default function App() {
                 <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
                   <button
                     type="button"
-                    style={toolbarButtonStyle}
+                    className="tdg-overflow-item"
                     data-selected={viewOptionsOpen ? 'true' : undefined}
                     onClick={() => setViewOptionsOpen((previous) => !previous)}
                     aria-label="View Options"
                   >
                     View Options
+                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '11px' }}>›</span>
                   </button>
                   {viewOptionsOpen ? (
                     <div
