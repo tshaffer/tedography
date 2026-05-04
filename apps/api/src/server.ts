@@ -23,6 +23,7 @@ import {
   updateCaptureDateTimes,
   updatePhotoState
 } from './repositories/assetRepository.js';
+import { aiQueueRoutes } from './routes/aiQueueRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { assetKeywordRoutes, keywordRoutes } from './routes/keywordRoutes.js';
@@ -103,6 +104,7 @@ export function createServer(): Express {
   app.use('/api/smart-albums', smartAlbumRoutes);
   app.use('/api/assets', assetKeywordRoutes);
   app.use('/api/people-pipeline', peoplePipelineRoutes);
+  app.use('/api/ai-queue', aiQueueRoutes);
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.

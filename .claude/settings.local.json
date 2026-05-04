@@ -19,7 +19,9 @@
       "Bash(grep -v \"^.*//.*$\")",
       "mcp__plugin_figma_figma__create_new_file",
       "mcp__plugin_figma_figma__use_figma",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm run *)"
     ]
   }
 }

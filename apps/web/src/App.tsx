@@ -93,6 +93,15 @@ import {
   processPeopleAsset,
   type PeopleScopedAssetSummaryResponse
 } from './api/peoplePipelineApi';
+import {
+  type AiQueueEntryWithFilename,
+  addToAiQueue,
+  clearAiQueue,
+  exportAiQueue,
+  getAiQueue,
+  removeFromAiQueue,
+} from './api/aiQueueApi';
+import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3645,6 +3654,12 @@ export default function App() {
   const [createTopLevelGroupDialogOpen, setCreateTopLevelGroupDialogOpen] = useState(false);
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
+  const [aiQueueEntries, setAiQueueEntries] = useState<AiQueueEntryWithFilename[]>([]);
+  const [aiQueueLoading, setAiQueueLoading] = useState(false);
+  const [aiQueueError, setAiQueueError] = useState<string | null>(null);
+  const [addToAiQueueDialogOpen, setAddToAiQueueDialogOpen] = useState(false);
+  const [aiQueueExportNotice, setAiQueueExportNotice] = useState<string | null>(null);
+  const [aiQueueExportError, setAiQueueExportError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
@@ -4646,6 +4661,19 @@ export default function App() {
     }
   }
 
+  async function loadAiQueue(): Promise<void> {
+    setAiQueueLoading(true);
+    setAiQueueError(null);
+    try {
+      const entries = await getAiQueue();
+      setAiQueueEntries(entries);
+    } catch (err) {
+      setAiQueueError(err instanceof Error ? err.message : 'Failed to load AI queue');
+    } finally {
+      setAiQueueLoading(false);
+    }
+  }
+
   function rememberRecentKeywordIds(keywordIds: string[]): void {
     if (keywordIds.length === 0) {
       return;
@@ -4687,6 +4715,7 @@ export default function App() {
 
     void loadKeywords({ showLoading: true });
     void loadSmartAlbums({ showLoading: true });
+    void loadAiQueue();
   }, []);
 
   useEffect(() => {
@@ -6579,6 +6608,45 @@ export default function App() {
         error instanceof Error ? error.message : 'Failed to update capture date.';
       setUpdateError(message);
       throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function handleAddToAiQueue(prompt: string): Promise<void> {
+    if (!selectedAsset) return;
+    try {
+      await addToAiQueue(selectedAsset.id, prompt);
+      await loadAiQueue();
+    } catch (err) {
+      console.error('Failed to add to AI queue', err);
+    }
+  }
+
+  async function handleRemoveFromAiQueue(assetId: string): Promise<void> {
+    try {
+      await removeFromAiQueue(assetId);
+      await loadAiQueue();
+    } catch (err) {
+      console.error('Failed to remove from AI queue', err);
+    }
+  }
+
+  async function handleClearAiQueue(): Promise<void> {
+    try {
+      await clearAiQueue();
+      setAiQueueEntries([]);
+    } catch (err) {
+      console.error('Failed to clear AI queue', err);
+    }
+  }
+
+  async function handleExportAiQueue(): Promise<void> {
+    setAiQueueExportNotice(null);
+    setAiQueueExportError(null);
+    try {
+      const result = await exportAiQueue();
+      setAiQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.exportPath}`);
+    } catch (err) {
+      setAiQueueExportError(err instanceof Error ? err.message : 'Export failed');
     }
   }
 
@@ -10017,6 +10085,85 @@ export default function App() {
 
   const toolbarBrowseMode = isLibraryArea ? libraryBrowseMode : null;
 
+  function renderAiQueuePanel(): ReactElement | null {
+    if (aiQueueEntries.length === 0 && !aiQueueLoading && !aiQueueError) return null;
+
+    return (
+      <section style={sidePanelSectionStyle}>
+        <div style={sidePanelHeaderStyle}>
+          <h2 style={sidePanelTitleStyle}>AI Edit Queue {aiQueueEntries.length > 0 ? `(${aiQueueEntries.length})` : ''}</h2>
+        </div>
+        {aiQueueLoading ? (
+          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading...</p>
+        ) : aiQueueError ? (
+          <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{aiQueueError}</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '6px', marginTop: '6px' }}>
+            {aiQueueEntries.map((entry) => (
+              <div
+                key={entry.assetId}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: '#fafafa',
+                  fontSize: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1f2937' }}>
+                    {entry.filename}
+                  </span>
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', padding: '0 2px', flexShrink: 0 }}
+                    onClick={() => void handleRemoveFromAiQueue(entry.assetId)}
+                    title="Remove from queue"
+                  >
+                    ×
+                  </button>
+                </div>
+                {entry.prompt ? (
+                  <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.prompt}</span>
+                ) : (
+                  <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => void handleExportAiQueue()}
+            disabled={aiQueueEntries.length === 0}
+            title="Copy files to export folder and write prompts.txt"
+          >
+            Export Queue
+          </button>
+          <button
+            type="button"
+            style={compareButtonStyle}
+            onClick={() => void handleClearAiQueue()}
+            disabled={aiQueueEntries.length === 0}
+          >
+            Clear
+          </button>
+        </div>
+        {aiQueueExportNotice ? (
+          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{aiQueueExportNotice}</p>
+        ) : null}
+        {aiQueueExportError ? (
+          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{aiQueueExportError}</p>
+        ) : null}
+      </section>
+    );
+  }
+
   function renderLeftPanel(): ReactElement | null {
     if (!leftPanelVisible) {
       return null;
@@ -10032,6 +10179,7 @@ export default function App() {
           </>
         ) : null}
         {isSearchArea ? renderSearchFiltersPanel() : null}
+        {renderAiQueuePanel()}
       </aside>
     );
   }
@@ -10109,6 +10257,38 @@ export default function App() {
             onAddKeywords={handleAddKeywordsToSelectedAssets}
             onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
           />
+          {selectedAssetIds.length === 1 && selectedAsset ? (() => {
+            const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
+            return (
+              <div style={{ borderTop: '1px solid #ececec', paddingTop: '12px', marginTop: '4px', display: 'grid', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937' }}>AI Edit Queue</span>
+                  {queueEntry ? (
+                    <span style={{ fontSize: '11px', color: '#2f6f3e', fontWeight: 500 }}>Queued</span>
+                  ) : null}
+                </div>
+                {queueEntry ? (
+                  <div style={{ display: 'grid', gap: '6px' }}>
+                    <p style={{ margin: 0, fontSize: '12px', color: queueEntry.prompt ? '#333' : '#888', fontStyle: queueEntry.prompt ? 'normal' : 'italic' }}>
+                      {queueEntry.prompt || 'no prompt'}
+                    </p>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button type="button" style={compareButtonStyle} onClick={() => setAddToAiQueueDialogOpen(true)}>
+                        Edit Prompt
+                      </button>
+                      <button type="button" style={compareButtonStyle} onClick={() => void handleRemoveFromAiQueue(selectedAsset.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" style={compareButtonStyle} onClick={() => setAddToAiQueueDialogOpen(true)}>
+                    Add to AI Queue
+                  </button>
+                )}
+              </div>
+            );
+          })() : null}
         </section>
       </aside>
     );
@@ -10590,6 +10770,7 @@ export default function App() {
                     >
                       Set Capture Date…
                     </button>
+
                   </>
                 ) : null}
 
@@ -11261,6 +11442,13 @@ export default function App() {
         initialCaptureDateTime={selectedAssetIds.length === 1 ? selectedAssetForDetails?.captureDateTime ?? null : null}
         onClose={() => setSetCaptureDateDialogOpen(false)}
         onSave={handleUpdateSelectedAssetsCaptureDateTime}
+      />
+      <AddToAiQueueDialog
+        open={addToAiQueueDialogOpen}
+        assetFilename={selectedAsset?.filename ?? ''}
+        existingPrompt={selectedAsset ? (aiQueueEntries.find((e) => e.assetId === selectedAsset.id)?.prompt ?? '') : ''}
+        onClose={() => setAddToAiQueueDialogOpen(false)}
+        onConfirm={(prompt) => void handleAddToAiQueue(prompt)}
       />
 
       <ImportAssetsDialog
