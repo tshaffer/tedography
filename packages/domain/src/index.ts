@@ -1,3 +1,4 @@
+export * from './entities/AiEditQueueEntry.js';
 export * from './entities/Album.js';
 export * from './entities/AlbumTreeNode.js';
 export * from './entities/AssetEvent.js';

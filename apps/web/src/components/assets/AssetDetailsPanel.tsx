@@ -1,4 +1,4 @@
-import { type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { type MediaAsset } from '@tedography/domain';
 
@@ -23,6 +23,7 @@ interface AssetDetailsPanelProps {
     reviewHref?: string;
     onOpenReview?: () => void;
   } | null;
+  keywordsSlot?: ReactNode;
 }
 
 const panelStyle: CSSProperties = {
@@ -62,7 +63,7 @@ const actionsStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: '6px',
-  marginBottom: '10px'
+  marginTop: '10px'
 };
 
 const subSectionStyle: CSSProperties = {
@@ -91,11 +92,24 @@ const disabledButtonStyle: CSSProperties = {
   cursor: 'not-allowed'
 };
 
+const advancedToggleStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '5px',
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '8px 0 2px',
+  fontSize: '12px',
+  color: '#6b7280',
+  width: '100%',
+  textAlign: 'left',
+};
+
 function formatValue(value: string | null | undefined): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return '—';
   }
-
   return value;
 }
 
@@ -103,12 +117,10 @@ function formatDateTime(value: string | null | undefined): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return '—';
   }
-
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
-
   return parsed.toLocaleString();
 }
 
@@ -116,7 +128,6 @@ function formatDimensions(width?: number | null, height?: number | null): string
   if (typeof width === 'number' && typeof height === 'number') {
     return `${width} × ${height}`;
   }
-
   return '—';
 }
 
@@ -133,7 +144,6 @@ function formatAlbumLabels(albumLabels: string[]): string {
   if (albumLabels.length === 0) {
     return '—';
   }
-
   return albumLabels.join(', ');
 }
 
@@ -161,23 +171,18 @@ function formatLocation(
   if (humanLocation.length > 0 && coordinateLabel) {
     return `${humanLocation} (${coordinateLabel})`;
   }
-
   if (humanLocation.length > 0) {
     return humanLocation;
   }
-
   if (fallbackLabel && coordinateLabel) {
     return `${fallbackLabel} (${coordinateLabel})`;
   }
-
   if (fallbackLabel) {
     return fallbackLabel;
   }
-
   if (coordinateLabel) {
     return coordinateLabel;
   }
-
   return '—';
 }
 
@@ -192,8 +197,11 @@ export function AssetDetailsPanel({
   assetOperationBusy = false,
   assetOperationMessage = null,
   assetOperationError = false,
-  peopleStatus = null
+  peopleStatus = null,
+  keywordsSlot
 }: AssetDetailsPanelProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
   if (!asset) {
     return (
       <section style={panelStyle}>
@@ -203,25 +211,11 @@ export function AssetDetailsPanel({
     );
   }
 
-  const rows: Array<{ label: string; value: string }> = [
+  const advancedRows: Array<{ label: string; value: string }> = [
     { label: 'Asset ID', value: formatValue(asset.id) },
-    { label: 'Filename', value: formatValue(asset.filename) },
     { label: 'Photo State', value: formatValue(asset.photoState) },
-    { label: 'Captured', value: formatDateTime(asset.captureDateTime) },
-    ...(albumOrderingModeLabel ? [{ label: 'Order in this Album', value: albumOrderingModeLabel }] : []),
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
-    { label: 'Albums', value: formatAlbumLabels(albumLabels) },
-    {
-      label: 'Location',
-      value: formatLocation(
-        asset.city,
-        asset.state,
-        asset.country,
-        asset.locationLabel,
-        asset.locationLatitude,
-        asset.locationLongitude
-      )
-    },
+    ...(albumOrderingModeLabel ? [{ label: 'Order in this Album', value: albumOrderingModeLabel }] : []),
     { label: 'Original Format', value: formatValue(asset.originalFileFormat) },
     { label: 'Original Root', value: formatValue(asset.originalStorageRootId) },
     { label: 'Original Path', value: formatValue(asset.originalArchivePath) },
@@ -242,6 +236,75 @@ export function AssetDetailsPanel({
   return (
     <section style={panelStyle}>
       <h3 style={titleStyle}>Asset Details</h3>
+
+      {/* Albums */}
+      {renderRow('Albums', formatAlbumLabels(albumLabels))}
+
+      {/* Keywords */}
+      {keywordsSlot}
+
+      {/* People */}
+      {peopleStatus ? (
+        <section style={subSectionStyle}>
+          <h4 style={subSectionTitleStyle}>People</h4>
+          {peopleStatus.loading ? (
+            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>Loading people status...</p>
+          ) : peopleStatus.errorMessage ? (
+            <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
+          ) : peopleStatus.detectionsCount === 0 ? (
+            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>
+              No people data yet. Run People Recognition to detect faces for this asset.
+            </p>
+          ) : (
+            <>
+              {renderRow('Detections', String(peopleStatus.detectionsCount))}
+              {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
+              {renderRow(
+                'Confirmed',
+                peopleStatus.confirmedPeopleNames.length > 0
+                  ? peopleStatus.confirmedPeopleNames.join(', ')
+                  : 'None'
+              )}
+              <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
+                {peopleStatus.reviewableCount > 0
+                  ? 'Reviewable faces still need confirmation before they become derived asset people.'
+                  : peopleStatus.confirmedPeopleNames.length > 0
+                    ? 'Confirmed people here come from reviewed face detections and drive derived asset metadata.'
+                    : 'Detections exist, but nothing is confirmed into derived asset people yet.'}
+              </p>
+            </>
+          )}
+          {peopleStatus.reviewHref ? (
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {peopleStatus.onOpenReview ? (
+                <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
+                  Review Faces
+                </button>
+              ) : null}
+              <Link
+                to={peopleStatus.reviewHref}
+                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+              >
+                Open Full People Review
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* Location */}
+      <div style={{ marginTop: '10px' }}>
+        {renderRow('Location', formatLocation(
+          asset.city,
+          asset.state,
+          asset.country,
+          asset.locationLabel,
+          asset.locationLatitude,
+          asset.locationLongitude
+        ))}
+      </div>
+
+      {/* Action Buttons */}
       <div style={actionsStyle}>
         <button
           type="button"
@@ -273,60 +336,38 @@ export function AssetDetailsPanel({
             style={onShowInAlbum ? buttonStyle : disabledButtonStyle}
             onClick={onShowInAlbum ?? undefined}
             disabled={!onShowInAlbum}
-            title={onShowInAlbum ? 'Navigate to the album containing this photo' : 'This photo is not in any album'}
+            title={
+              onShowInAlbum
+                ? 'Navigate to the album containing this photo'
+                : 'This photo is not in any album'
+            }
           >
             Show in Album
           </button>
         ) : null}
       </div>
       {assetOperationMessage ? (
-        <p style={{ marginTop: 0, color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>
+        <p style={{ marginTop: '6px', color: assetOperationError ? '#b00020' : '#136f2d', fontSize: '12px' }}>
           {assetOperationMessage}
         </p>
       ) : null}
-      {rows.map((row) => renderRow(row.label, row.value))}
-      {peopleStatus ? (
-        <section style={subSectionStyle}>
-          <h4 style={subSectionTitleStyle}>People</h4>
-          {peopleStatus.loading ? (
-            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>Loading people status...</p>
-          ) : peopleStatus.errorMessage ? (
-            <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
-          ) : peopleStatus.detectionsCount === 0 ? (
-            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>
-              No people data yet. Run People Recognition to detect faces for this asset.
-            </p>
-          ) : (
-            <>
-              {renderRow('Detections', String(peopleStatus.detectionsCount))}
-              {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
-              {renderRow(
-                'Confirmed',
-                peopleStatus.confirmedPeopleNames.length > 0 ? peopleStatus.confirmedPeopleNames.join(', ') : 'None'
-              )}
-              <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
-                {peopleStatus.reviewableCount > 0
-                  ? 'Reviewable faces still need confirmation before they become derived asset people.'
-                  : peopleStatus.confirmedPeopleNames.length > 0
-                    ? 'Confirmed people here come from reviewed face detections and drive derived asset metadata.'
-                    : 'Detections exist, but nothing is confirmed into derived asset people yet.'}
-              </p>
-            </>
-          )}
-          {peopleStatus.reviewHref ? (
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {peopleStatus.onOpenReview ? (
-                <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
-                  Review Faces
-                </button>
-              ) : null}
-              <Link to={peopleStatus.reviewHref} style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}>
-                Open Full People Review
-              </Link>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+
+      {/* Advanced Details (collapsed by default) */}
+      <div style={{ borderTop: '1px solid #efefef', marginTop: '10px' }}>
+        <button
+          type="button"
+          style={advancedToggleStyle}
+          onClick={() => setAdvancedOpen((prev) => !prev)}
+        >
+          <span style={{ fontSize: '9px' }}>{advancedOpen ? '▼' : '▶'}</span>
+          Advanced Details
+        </button>
+        {advancedOpen ? (
+          <div style={{ marginTop: '4px' }}>
+            {advancedRows.map((row) => renderRow(row.label, row.value))}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

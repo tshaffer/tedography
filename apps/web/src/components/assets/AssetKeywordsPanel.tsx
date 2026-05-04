@@ -18,6 +18,7 @@ interface AssetKeywordsPanelProps {
   displayedKeywords: Keyword[];
   allKeywords: Keyword[];
   recentKeywords: Keyword[];
+  embedded?: boolean;
   keywordsLoading?: boolean;
   keywordsError?: string | null;
   updateBusy?: boolean;
@@ -163,6 +164,7 @@ export function AssetKeywordsPanel({
   displayedKeywords,
   allKeywords,
   recentKeywords,
+  embedded = false,
   keywordsLoading = false,
   keywordsError = null,
   updateBusy = false,
@@ -203,6 +205,148 @@ export function AssetKeywordsPanel({
     if (applied) {
       setPendingEntries([]);
     }
+  }
+
+  const embeddedStyle: CSSProperties = {
+    borderTop: '1px solid #efefef',
+    marginTop: '10px',
+    paddingTop: '10px',
+  };
+
+  const embeddedTitleStyle: CSSProperties = {
+    margin: '0 0 8px',
+    fontSize: '13px',
+    fontWeight: 600,
+  };
+
+  if (embedded) {
+    return (
+      <div style={embeddedStyle}>
+        <h4 style={embeddedTitleStyle}>{titleLabel}</h4>
+        {keywordsError ? (
+          <p style={{ ...emptyLabelStyle, color: '#a12622', marginBottom: '6px' }}>
+            {keywordsError}
+          </p>
+        ) : null}
+        <div style={currentKeywordsZoneStyle}>
+          {keywordsLoading ? (
+            <div style={loadingRowStyle}>
+              <CircularProgress size={12} />
+              <span>Loading...</span>
+            </div>
+          ) : selectedAssetCount === 0 ? (
+            <span style={emptyLabelStyle}>Select a photo to view and edit keywords.</span>
+          ) : displayedKeywords.length > 0 ? (
+            <div style={chipRowStyle}>
+              {displayedKeywords.map((keyword) => (
+                <Chip
+                  key={keyword.id}
+                  label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
+                  size="small"
+                  title={formatKeywordPathLabel(keyword, keywordMap)}
+                  onDelete={!updateBusy ? () => void onRemoveKeyword(keyword) : undefined}
+                />
+              ))}
+            </div>
+          ) : (
+            <span style={emptyLabelStyle}>{emptyStateLabel}</span>
+          )}
+        </div>
+        {selectedAssetCount > 0 ? (
+          <>
+            <div style={dividerStyle} />
+            <div style={addRowStyle}>
+              <Autocomplete<KeywordEntry, true, false, true>
+                multiple
+                freeSolo
+                disabled={updateBusy}
+                options={addableKeywords}
+                value={pendingEntries}
+                onChange={(_event, value) => { setPendingEntries(dedupeKeywordEntries(value)); }}
+                getOptionLabel={(entry) =>
+                  typeof entry === 'string' ? entry : formatKeywordPathLabel(entry, keywordMap)
+                }
+                isOptionEqualToValue={(option, value) =>
+                  normalizeKeywordLabel(getKeywordEntryLabel(option)) ===
+                  normalizeKeywordLabel(getKeywordEntryLabel(value))
+                }
+                filterSelectedOptions
+                renderOption={(props, option) => {
+                  const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                  if (typeof option === 'string') {
+                    return <li key={key} {...rest}>{option}</li>;
+                  }
+                  const pathLabels = getKeywordPathLabels(option, keywordMap);
+                  const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
+                  const parentPath = pathLabels.slice(0, -1).join(' / ');
+                  return (
+                    <li key={key} {...rest}>
+                      <div style={{ lineHeight: 1.35 }}>
+                        {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                        <div style={{ fontSize: '13px' }}>{leafName}</div>
+                      </div>
+                    </li>
+                  );
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((entry, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    if (typeof entry === 'string') {
+                      return <Chip key={key} {...tagProps} label={entry} size="small" />;
+                    }
+                    const pathLabels = getKeywordPathLabels(entry, keywordMap);
+                    const leafName = pathLabels[pathLabels.length - 1] ?? entry.label;
+                    const fullPath = formatKeywordPathLabel(entry, keywordMap);
+                    return (
+                      <Tooltip key={key} title={fullPath} placement="top">
+                        <Chip {...tagProps} label={leafName} size="small" />
+                      </Tooltip>
+                    );
+                  })
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    size="small"
+                    placeholder="Search or type a keyword"
+                    inputProps={{ ...params.inputProps, style: { fontSize: '12px' } }}
+                    sx={{
+                      '& .MuiInputBase-root': { paddingTop: '2px', paddingBottom: '2px' },
+                      '& .MuiInputBase-input': { paddingTop: '2px', paddingBottom: '2px', fontSize: '12px' }
+                    }}
+                  />
+                )}
+              />
+              <button
+                style={sanitizedPendingEntries.length > 0 && !updateBusy ? addButtonStyle : addButtonDisabledStyle}
+                disabled={sanitizedPendingEntries.length === 0 || updateBusy}
+                onClick={() => void handleAdd()}
+              >
+                {updateBusy ? 'Adding…' : addButtonLabel}
+              </button>
+            </div>
+            {visibleRecentKeywords.length > 0 ? (
+              <div style={recentSectionStyle}>
+                <span style={recentLabelStyle}>Recently used</span>
+                <div style={recentChipsStyle}>
+                  {visibleRecentKeywords.map((keyword) => (
+                    <Chip
+                      key={keyword.id}
+                      label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
+                      size="small"
+                      variant="outlined"
+                      title={formatKeywordPathLabel(keyword, keywordMap)}
+                      clickable={!updateBusy}
+                      onClick={!updateBusy ? () => void onAddKeywords([keyword]) : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+    );
   }
 
   return (

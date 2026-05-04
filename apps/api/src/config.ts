@@ -246,4 +246,5 @@ export const config = {
   } satisfies PeoplePipelineConfig,
 
   port: Number(process.env.PORT ?? 4000),
+  aiQueueExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
 };
