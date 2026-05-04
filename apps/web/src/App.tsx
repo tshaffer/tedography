@@ -831,7 +831,7 @@ const contextSummaryBadgeStyle: CSSProperties = {
   backgroundColor: '#fff',
   color: '#4b5563',
   padding: '2px 8px',
-  fontSize: '11px',
+  fontSize: '12px',
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.03em'
@@ -997,7 +997,7 @@ const filterSubsectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: '12px',
   fontWeight: 700,
-  color: '#4f5965',
+  color: '#1f2937',
   textTransform: 'uppercase',
   letterSpacing: '0.03em'
 };
@@ -1045,7 +1045,7 @@ const photoStateCountBadgeStyle: CSSProperties = {
   minWidth: '28px',
   borderRadius: '999px',
   padding: '2px 8px',
-  fontSize: '11px',
+  fontSize: '12px',
   border: '1px solid #d7d7d7',
   backgroundColor: '#fafafa',
   color: '#555'
@@ -1224,7 +1224,7 @@ const cardHoverLabelStyle: CSSProperties = {
   color: '#fff',
   borderRadius: '6px',
   padding: '4px 6px',
-  fontSize: '11px',
+  fontSize: '12px',
   lineHeight: 1.2,
   whiteSpace: 'nowrap',
   overflow: 'hidden',
@@ -1327,7 +1327,7 @@ const stickySearchSummaryBlockStyle: CSSProperties = {
 
 const compactPaneMetaTextStyle: CSSProperties = {
   color: '#6b7280',
-  fontSize: '11px',
+  fontSize: '12px',
   margin: '0 0 4px 0'
 };
 
@@ -1640,7 +1640,7 @@ const albumTreeCountStatusBadgeBaseStyle: CSSProperties = {
   flex: '0 0 auto',
   borderRadius: '999px',
   padding: '1px 6px',
-  fontSize: '11px',
+  fontSize: '12px',
   fontWeight: 600,
   lineHeight: 1.4,
   border: '1px solid transparent'
@@ -1877,7 +1877,7 @@ const slideshowBtnActiveStyle: CSSProperties = {
 
 const slideshowHintStyle: CSSProperties = {
   color: '#555',
-  fontSize: '11px',
+  fontSize: '12px',
   margin: 0,
   userSelect: 'none',
 };
@@ -2013,7 +2013,7 @@ const surveySegmentButtonStyle: CSSProperties = {
   backgroundColor: 'transparent',
   color: '#b7b7b7',
   cursor: 'pointer',
-  fontSize: '11px',
+  fontSize: '12px',
   fontWeight: 600,
   padding: '6px 10px'
 };
@@ -2036,7 +2036,7 @@ const surveyActionButtonStyle: CSSProperties = {
   backgroundColor: '#161616',
   border: '1px solid #303030',
   padding: '5px 8px',
-  fontSize: '11px'
+  fontSize: '12px'
 };
 
 const surveyWorkspaceStyle: CSSProperties = {
@@ -2209,7 +2209,7 @@ const surveyPaneResetButtonStyle: CSSProperties = {
   ...surveyPaneZoomButtonStyle,
   width: 'auto',
   padding: '0 9px',
-  fontSize: '11px',
+  fontSize: '12px',
   whiteSpace: 'nowrap'
 };
 
@@ -3803,6 +3803,29 @@ export default function App() {
   const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
   const [searchPeopleError, setSearchPeopleError] = useState<string | null>(null);
+  const [searchKeywordsSectionCollapsed, setSearchKeywordsSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-keywords-collapsed') === 'true'
+  );
+  const [searchPeopleSectionCollapsed, setSearchPeopleSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-people-collapsed') === 'true'
+  );
+  const [searchDateRangeSectionCollapsed, setSearchDateRangeSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-date-range-collapsed') === 'true'
+  );
+  const [searchPhotoStateSectionCollapsed, setSearchPhotoStateSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-photo-state-collapsed') === 'true'
+  );
+  const [searchFileNameSectionCollapsed, setSearchFileNameSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-file-name-collapsed') === 'true'
+  );
+  const [searchAlbumsSectionCollapsed, setSearchAlbumsSectionCollapsed] = useState(() => {
+    const stored = localStorage.getItem('tdg-search-section-albums-collapsed');
+    return stored === null ? true : stored === 'true';
+  });
+  const [searchGroupsSectionCollapsed, setSearchGroupsSectionCollapsed] = useState(() => {
+    const stored = localStorage.getItem('tdg-search-section-groups-collapsed');
+    return stored === null ? true : stored === 'true';
+  });
   const searchPeopleAttemptedRef = useRef(false);
   useEffect(() => {
     if (!location.search) {
@@ -9319,7 +9342,14 @@ export default function App() {
       <section style={{ ...sidePanelSectionStyle, borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
         <div style={searchStickyHeaderStyle}>
           <div style={sidePanelHeaderStyle}>
-            <h2 style={sidePanelTitleStyle}>Search</h2>
+            <button
+              type="button"
+              style={hasPendingSearchChanges ? primarySearchButtonStyle : disabledToolbarActionButtonStyle}
+              onClick={applyPendingSearchFilters}
+              disabled={!hasPendingSearchChanges}
+            >
+              Search
+            </button>
             <button
               type="button"
               style={compareButtonStyle}
@@ -9329,33 +9359,9 @@ export default function App() {
               Reset
             </button>
           </div>
-          <div style={{ ...filterRowStyle, marginTop: '8px' }}>
-            <button
-              type="button"
-              style={hasPendingSearchChanges ? primarySearchButtonStyle : disabledToolbarActionButtonStyle}
-              onClick={applyPendingSearchFilters}
-              disabled={!hasPendingSearchChanges}
-            >
-              Search
-            </button>
-            {hasPendingSearchChanges ? (
-              <span style={{ color: '#5f6b78', fontSize: '12px' }}>
-                {hasAppliedSearch
-                  ? 'Search criteria changed. Click Search to update results.'
-                  : 'Set search criteria and click Search.'}
-              </span>
-            ) : hasAppliedSearch ? (
-              <span style={{ color: '#5f6b78', fontSize: '12px' }}>Search results are current.</span>
-            ) : (
-              <span style={{ color: '#5f6b78', fontSize: '12px' }}>Set search criteria and click Search.</span>
-            )}
-          </div>
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Smart Album</h3>
-          <div style={{ fontSize: '12px', color: '#5f6b78' }}>
-            Save a reusable derived view from the current Search filters. This first slice supports one keyword, one photo state, and one year group.
-          </div>
           {isSearchFromSmartAlbum && activeSmartAlbum ? (
             <div style={{ ...searchPeopleChipRowStyle, marginTop: '8px' }}>
               <div style={smartAlbumChipStyle}>
@@ -9399,17 +9405,9 @@ export default function App() {
               {smartAlbumSaveBusy ? 'Saving...' : 'Save as Smart Album'}
             </button>
           </div>
-          {hasPendingSearchChanges ? (
-            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
-              Run Search before saving a Smart Album.
-            </p>
-          ) : hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
+          {hasUnsupportedActiveSearchFiltersForSmartAlbums ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
               Current Search uses filters that Smart Albums do not support. Clear album, filename, or reviewable-faces filters to save this view.
-            </p>
-          ) : appliedSearchSmartAlbumFilterSpec === null ? (
-            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>
-              Choose at least one supported filter before saving a Smart Album.
             </p>
           ) : null}
           {smartAlbumSaveError ? (
@@ -9428,7 +9426,21 @@ export default function App() {
           ) : null}
         </div>
         <div style={filterSubsectionStyle}>
-          {(() => {
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Keywords</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchKeywordsSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-keywords-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchKeywordsSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchKeywordsSectionCollapsed ? (() => {
             const includeKeywords = searchKeywordInclude
               .map((c) => keywordsById.get(c.keywordId))
               .filter((k): k is Keyword => k !== undefined);
@@ -9449,7 +9461,7 @@ export default function App() {
               <>
                 {/* Include row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Include</h3>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748' }}>Include</span>
                   <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
                     {(['all', 'any'] as const).map((mode) => (
                       <button
@@ -9459,7 +9471,7 @@ export default function App() {
                         onClick={() => setSearchKeywordIncludeMode(mode)}
                         style={{
                           padding: '2px 8px',
-                          fontSize: '11px',
+                          fontSize: '12px',
                           fontWeight: searchKeywordIncludeMode === mode ? 700 : 400,
                           backgroundColor: searchKeywordIncludeMode === mode ? '#dbeafe' : '#f9f9f9',
                           color: searchKeywordIncludeMode === mode ? '#1d4ed8' : '#555',
@@ -9468,7 +9480,7 @@ export default function App() {
                           borderRight: mode === 'all' ? '1px solid #c8c8c8' : 'none'
                         }}
                       >
-                        {mode === 'all' ? 'Match by AND' : 'Match by OR'}
+                        {mode === 'all' ? 'AND' : 'OR'}
                       </button>
                     ))}
                   </div>
@@ -9489,6 +9501,10 @@ export default function App() {
                   isOptionEqualToValue={(option, value) => option.id === value.id}
                   filterSelectedOptions
                   loading={keywordsLoading}
+                  sx={{
+                    '& .MuiAutocomplete-endAdornment': { top: '6px' },
+                    '& .MuiInputBase-input': { fontSize: '13px' },
+                  }}
                   renderTags={(tagValue, getTagProps) =>
                     tagValue.map((keyword, index) => {
                       const { key, ...tagProps } = getTagProps({ index });
@@ -9502,9 +9518,11 @@ export default function App() {
                           label={
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                               {keyword.label}
-                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: desc ? '#dbeafe' : '#e5e7eb', color: desc ? '#1d4ed8' : '#9ca3af' }}>
-                                {desc ? '+desc' : 'only'}
-                              </span>
+                              {desc ? (
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: '#dbeafe', color: '#1d4ed8' }}>
+                                  +desc
+                                </span>
+                              ) : null}
                             </span>
                           }
                           title={`${formatKeywordPathLabel(keyword, keywordsById)}${desc ? ' — includes descendants' : ' — keyword only'}\nClick to toggle descendant matching`}
@@ -9527,7 +9545,7 @@ export default function App() {
                     return (
                       <li key={key} {...rest}>
                         <div style={{ lineHeight: 1.35 }}>
-                          {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                          {parentPath ? <div style={{ fontSize: '12px', color: '#aaa' }}>{parentPath}</div> : null}
                           <div style={{ fontSize: '13px' }}>{leafName}</div>
                         </div>
                       </li>
@@ -9544,7 +9562,7 @@ export default function App() {
                 />
 
                 {/* Exclude row */}
-                <h3 style={{ ...filterSubsectionTitleStyle, margin: '4px 0 0 0' }}>Exclude</h3>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748', display: 'block', marginTop: '6px' }}>Exclude</span>
                 <Autocomplete<Keyword, true, false, false>
                   multiple
                   options={availableForExclude}
@@ -9561,6 +9579,10 @@ export default function App() {
                   isOptionEqualToValue={(option, value) => option.id === value.id}
                   filterSelectedOptions
                   loading={keywordsLoading}
+                  sx={{
+                    '& .MuiAutocomplete-endAdornment': { top: '6px' },
+                    '& .MuiInputBase-input': { fontSize: '13px' },
+                  }}
                   renderTags={(tagValue, getTagProps) =>
                     tagValue.map((keyword, index) => {
                       const { key, ...tagProps } = getTagProps({ index });
@@ -9574,9 +9596,11 @@ export default function App() {
                           label={
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                               {keyword.label}
-                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: desc ? '#fde8e8' : '#e5e7eb', color: desc ? '#b91c1c' : '#9ca3af' }}>
-                                {desc ? '+desc' : 'only'}
-                              </span>
+                              {desc ? (
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '0 3px', borderRadius: '3px', lineHeight: '14px', background: '#fde8e8', color: '#b91c1c' }}>
+                                  +desc
+                                </span>
+                              ) : null}
                             </span>
                           }
                           title={`${formatKeywordPathLabel(keyword, keywordsById)}${desc ? ' — excludes descendants' : ' — keyword only'}\nClick to toggle descendant matching`}
@@ -9599,7 +9623,7 @@ export default function App() {
                     return (
                       <li key={key} {...rest}>
                         <div style={{ lineHeight: 1.35 }}>
-                          {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                          {parentPath ? <div style={{ fontSize: '12px', color: '#aaa' }}>{parentPath}</div> : null}
                           <div style={{ fontSize: '13px' }}>{leafName}</div>
                         </div>
                       </li>
@@ -9616,35 +9640,171 @@ export default function App() {
 
                 {/* Conflict warning */}
                 {conflictIds.size > 0 ? (
-                  <p style={{ margin: 0, fontSize: '11px', color: '#a12622' }}>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#a12622' }}>
                     A keyword is both included and excluded. Exclude takes precedence.
                   </p>
                 ) : null}
               </>
             );
-          })()}
+          })() : null}
         </div>
         <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>Photo State</h3>
-          <div style={filterRowStyle}>
-            <div style={filterGroupStyle}>
-              {photoStateFilterOptions.map((option) => (
-                <label key={option} style={filterOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={searchPhotoStates.includes(option)}
-                    onChange={() => toggleSearchPhotoState(option)}
-                  />
-                  {option}
-                </label>
-              ))}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>People</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchPeopleSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-people-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchPeopleSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
           </div>
+          {!searchPeopleSectionCollapsed ? (() => {
+            const includeIds = new Set(searchPeopleIds);
+            const excludeIds = new Set(searchExcludedPeopleIds);
+            const conflictIds = new Set(searchPeopleIds.filter((id) => excludeIds.has(id)));
+            const availableForInclude = availableSearchPeopleOptions.filter((p) => !includeIds.has(p.id));
+            const availableForExclude = availableSearchPeopleOptions.filter((p) => !excludeIds.has(p.id));
+
+            return (
+              <>
+                {/* Include row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748' }}>Include</span>
+                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                    {(['Any', 'All'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setSearchPeopleMatchMode(mode)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '12px',
+                          fontWeight: searchPeopleMatchMode === mode ? 700 : 400,
+                          backgroundColor: searchPeopleMatchMode === mode ? '#dbeafe' : '#f9f9f9',
+                          color: searchPeopleMatchMode === mode ? '#1d4ed8' : '#555',
+                          border: 'none',
+                          cursor: 'pointer',
+                          borderRight: mode === 'Any' ? '1px solid #c8c8c8' : 'none'
+                        }}
+                      >
+                        {mode === 'Any' ? 'OR' : 'AND'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Autocomplete<Person, true, false, false>
+                  multiple
+                  options={availableForInclude}
+                  value={selectedSearchPeople}
+                  onChange={(_event, value) => {
+                    setSearchHasNoPeople(false);
+                    setSearchPeopleIds(value.map((p) => p.id));
+                  }}
+                  getOptionLabel={(option) => option.displayName}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={searchPeopleLoading}
+                  sx={{
+                    '& .MuiAutocomplete-endAdornment': { top: '6px' },
+                    '& .MuiInputBase-input': { fontSize: '13px' },
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={selectedSearchPeople.length === 0 ? 'Add people to include' : ''}
+                      error={Boolean(searchPeopleError)}
+                    />
+                  )}
+                />
+
+                {/* Exclude row */}
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748', display: 'block', marginTop: '6px' }}>Exclude</span>
+                <Autocomplete<Person, true, false, false>
+                  multiple
+                  options={availableForExclude}
+                  value={selectedExcludedPeople}
+                  onChange={(_event, value) => {
+                    setSearchExcludedPeopleIds(value.map((p) => p.id));
+                  }}
+                  getOptionLabel={(option) => option.displayName}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  filterSelectedOptions
+                  loading={searchPeopleLoading}
+                  sx={{
+                    '& .MuiAutocomplete-endAdornment': { top: '6px' },
+                    '& .MuiInputBase-input': { fontSize: '13px' },
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      size="small"
+                      placeholder={selectedExcludedPeople.length === 0 ? 'Add people to exclude' : ''}
+                    />
+                  )}
+                />
+
+                {/* Conflict warning */}
+                {conflictIds.size > 0 ? (
+                  <p style={{ margin: 0, fontSize: '12px', color: '#a12622' }}>
+                    A person is both included and excluded. Exclude takes precedence.
+                  </p>
+                ) : null}
+
+                {/* Extra filters */}
+                <div style={{ ...filterRowStyle, marginTop: 0 }}>
+                  <label style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchHasNoPeople}
+                      onChange={(event) => {
+                        const nextChecked = event.target.checked;
+                        setSearchHasNoPeople(nextChecked);
+                        if (nextChecked) {
+                          setSearchPeopleIds([]);
+                        }
+                      }}
+                    />
+                    Has no confirmed people
+                  </label>
+                </div>
+                <div style={{ ...filterRowStyle, marginTop: 0 }}>
+                  <label style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchHasReviewableFaces}
+                      onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
+                    />
+                    Has reviewable faces
+                  </label>
+                </div>
+              </>
+            );
+          })() : null}
         </div>
         <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>Date Range</h3>
-          <div style={filterRowStyle}>
-            <label style={filterOptionLabelStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Date Range</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchDateRangeSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-date-range-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchDateRangeSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchDateRangeSectionCollapsed ? <><div style={{ display: 'grid', gap: '4px', marginTop: '6px' }}>
+            <label style={{ display: 'grid', gridTemplateColumns: '36px 1fr', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
               From
               <input
                 type="date"
@@ -9653,7 +9813,7 @@ export default function App() {
                 onChange={(event) => setSearchCaptureDateFrom(event.target.value)}
               />
             </label>
-            <label style={filterOptionLabelStyle}>
+            <label style={{ display: 'grid', gridTemplateColumns: '36px 1fr', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
               To
               <input
                 type="date"
@@ -9668,7 +9828,7 @@ export default function App() {
                   setSearchCaptureDateFrom('');
                   setSearchCaptureDateTo('');
                 }}
-                style={{ alignSelf: 'flex-end', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+                style={{ justifySelf: 'start', fontSize: '12px', padding: '2px 6px', cursor: 'pointer', marginTop: '2px' }}
                 title="Clear date range"
               >
                 Clear
@@ -9692,129 +9852,54 @@ export default function App() {
                 <option value="undatedOnly">Only assets with no date</option>
               </select>
             </label>
+          </div></> : null}
+        </div>
+        <div style={filterSubsectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Photo State</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchPhotoStateSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-photo-state-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchPhotoStateSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
           </div>
+          {!searchPhotoStateSectionCollapsed ? <div style={filterRowStyle}>
+            <div style={filterGroupStyle}>
+              {photoStateFilterOptions.map((option) => (
+                <label key={option} style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={searchPhotoStates.includes(option)}
+                    onChange={() => toggleSearchPhotoState(option)}
+                  />
+                  {option}
+                </label>
+              ))}
+            </div>
+          </div> : null}
         </div>
         <div style={filterSubsectionStyle}>
-          {(() => {
-            const includeIds = new Set(searchPeopleIds);
-            const excludeIds = new Set(searchExcludedPeopleIds);
-            const conflictIds = new Set(searchPeopleIds.filter((id) => excludeIds.has(id)));
-            const availableForInclude = availableSearchPeopleOptions.filter((p) => !includeIds.has(p.id));
-            const availableForExclude = availableSearchPeopleOptions.filter((p) => !excludeIds.has(p.id));
-
-            return (
-              <>
-                {/* Include row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>People — Include</h3>
-                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
-                    {(['Any', 'All'] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => setSearchPeopleMatchMode(mode)}
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '11px',
-                          fontWeight: searchPeopleMatchMode === mode ? 700 : 400,
-                          backgroundColor: searchPeopleMatchMode === mode ? '#dbeafe' : '#f9f9f9',
-                          color: searchPeopleMatchMode === mode ? '#1d4ed8' : '#555',
-                          border: 'none',
-                          cursor: 'pointer',
-                          borderRight: mode === 'Any' ? '1px solid #c8c8c8' : 'none'
-                        }}
-                      >
-                        {mode === 'Any' ? 'Match by OR' : 'Match by AND'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Autocomplete<Person, true, false, false>
-                  multiple
-                  options={availableForInclude}
-                  value={selectedSearchPeople}
-                  onChange={(_event, value) => {
-                    setSearchHasNoPeople(false);
-                    setSearchPeopleIds(value.map((p) => p.id));
-                  }}
-                  getOptionLabel={(option) => option.displayName}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  filterSelectedOptions
-                  loading={searchPeopleLoading}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      size="small"
-                      placeholder={selectedSearchPeople.length === 0 ? 'Add people to include' : ''}
-                      error={Boolean(searchPeopleError)}
-                    />
-                  )}
-                />
-
-                {/* Exclude row */}
-                <h3 style={{ ...filterSubsectionTitleStyle, margin: '4px 0 0 0' }}>Exclude</h3>
-                <Autocomplete<Person, true, false, false>
-                  multiple
-                  options={availableForExclude}
-                  value={selectedExcludedPeople}
-                  onChange={(_event, value) => {
-                    setSearchExcludedPeopleIds(value.map((p) => p.id));
-                  }}
-                  getOptionLabel={(option) => option.displayName}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  filterSelectedOptions
-                  loading={searchPeopleLoading}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      size="small"
-                      placeholder={selectedExcludedPeople.length === 0 ? 'Add people to exclude' : ''}
-                    />
-                  )}
-                />
-
-                {/* Conflict warning */}
-                {conflictIds.size > 0 ? (
-                  <p style={{ margin: 0, fontSize: '11px', color: '#a12622' }}>
-                    A person is both included and excluded. Exclude takes precedence.
-                  </p>
-                ) : null}
-
-                {/* Extra filters */}
-                <div style={filterRowStyle}>
-                  <label style={filterOptionLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={searchHasNoPeople}
-                      onChange={(event) => {
-                        const nextChecked = event.target.checked;
-                        setSearchHasNoPeople(nextChecked);
-                        if (nextChecked) {
-                          setSearchPeopleIds([]);
-                        }
-                      }}
-                    />
-                    Has no confirmed people
-                  </label>
-                </div>
-                <div style={filterRowStyle}>
-                  <label style={filterOptionLabelStyle}>
-                    <input
-                      type="checkbox"
-                      checked={searchHasReviewableFaces}
-                      onChange={(event) => setSearchHasReviewableFaces(event.target.checked)}
-                    />
-                    Has reviewable faces
-                  </label>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-        <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>File Name</h3>
-          <div style={filterRowStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>File Name</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchFileNameSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-file-name-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchFileNameSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchFileNameSectionCollapsed ? <div style={filterRowStyle}>
             <label style={{ ...filterOptionLabelStyle, display: 'grid', gap: '4px', width: '100%' }}>
               Pattern
               <input
@@ -9825,21 +9910,57 @@ export default function App() {
                 style={{ minWidth: 0 }}
               />
             </label>
+          </div> : null}
+        </div>
+        <div style={filterSubsectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>
+              Albums{searchAlbumIds.length > 0 ? ` (${searchAlbumIds.length})` : ''}
+            </h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchAlbumsSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-albums-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchAlbumsSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
           </div>
+          {!searchAlbumsSectionCollapsed ? (
+            <>
+              {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading albums...</p> : null}
+              {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
+              {!albumTreeLoading ? renderAlbumTreeRows(searchAlbumIds, toggleSearchAlbum) : null}
+            </>
+          ) : null}
         </div>
         <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>Albums</h3>
-          {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading albums...</p> : null}
-          {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
-          {!albumTreeLoading ? renderAlbumTreeRows(searchAlbumIds, toggleSearchAlbum) : null}
-        </div>
-        <div style={filterSubsectionStyle}>
-          <h3 style={filterSubsectionTitleStyle}>
-            GROUPS{searchGroupIds.length > 0 ? ` (${searchGroupIds.length} selected)` : ''}
-          </h3>
-          {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading groups...</p> : null}
-          {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
-          {!albumTreeLoading ? renderSearchGroupTreeRows() : null}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>
+              GROUPS{searchGroupIds.length > 0 ? ` (${searchGroupIds.length} selected)` : ''}
+            </h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchGroupsSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-groups-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchGroupsSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchGroupsSectionCollapsed ? (
+            <>
+              {albumTreeLoading ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading groups...</p> : null}
+              {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
+              {!albumTreeLoading ? renderSearchGroupTreeRows() : null}
+            </>
+          ) : null}
         </div>
       </section>
     );
@@ -10317,7 +10438,7 @@ export default function App() {
                       aria-label="Thumbnail Size"
                     >
                       Thumbnail Size
-                      <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '11px' }}>›</span>
+                      <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '12px' }}>›</span>
                     </button>
                     {thumbnailSizeMenuOpen ? (
                       <div
@@ -10601,7 +10722,7 @@ export default function App() {
                     aria-label="View Options"
                   >
                     View Options
-                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '11px' }}>›</span>
+                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '12px' }}>›</span>
                   </button>
                   {viewOptionsOpen ? (
                     <div
