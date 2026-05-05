@@ -2914,14 +2914,7 @@ function AssetDetailPanel({ asset }: AssetDetailPanelProps) {
         <strong>Filename:</strong> {asset.filename}
       </p>
       <p>
-        <strong>Photo state:</strong> {asset.photoState}
-      </p>
-      <p>
         <strong>Captured:</strong> {formatCaptureDate(asset.captureDateTime)}
-      </p>
-      <p>
-        <strong>Dimensions:</strong>{' '}
-        {asset.width && asset.height ? `${asset.width} x ${asset.height}` : 'Unknown'}
       </p>
     </section>
   );
@@ -10246,17 +10239,20 @@ export default function App() {
                   }
                 : null
             }
-          />
-          <AssetKeywordsPanel
-            selectedAssetCount={selectedAssetsForKeywordEditing.length}
-            displayedKeywords={displayedKeywordsForSelection}
-            allKeywords={keywords}
-            recentKeywords={recentKeywords}
-            keywordsLoading={keywordsLoading}
-            keywordsError={keywordsError}
-            updateBusy={keywordUpdateBusy}
-            onAddKeywords={handleAddKeywordsToSelectedAssets}
-            onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
+            keywordsSlot={
+              <AssetKeywordsPanel
+                embedded
+                selectedAssetCount={selectedAssetsForKeywordEditing.length}
+                displayedKeywords={displayedKeywordsForSelection}
+                allKeywords={keywords}
+                recentKeywords={recentKeywords}
+                keywordsLoading={keywordsLoading}
+                keywordsError={keywordsError}
+                updateBusy={keywordUpdateBusy}
+                onAddKeywords={handleAddKeywordsToSelectedAssets}
+                onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
+              />
+            }
           />
         </section>
       </aside>
