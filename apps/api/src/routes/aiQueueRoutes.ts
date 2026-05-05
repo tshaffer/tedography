@@ -3,7 +3,10 @@ import path from 'node:path';
 import { Router, type Router as RouterType } from 'express';
 import { config } from '../config.js';
 import { log } from '../logger.js';
-import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
+import {
+  resolveDisplayAbsolutePathForAsset,
+  resolveOriginalAbsolutePathForAsset,
+} from '../media/resolveAssetMediaPath.js';
 import { findById } from '../repositories/assetRepository.js';
 import {
   clearQueue,
@@ -73,10 +76,16 @@ aiQueueRoutes.post('/export', async (_req, res) => {
       const asset = await findById(entry.assetId);
       if (!asset) continue;
       try {
-        const srcPath = resolveOriginalAbsolutePathForAsset(asset);
-        const destPath = path.join(exportPath, asset.filename);
+        const isHeic = /^hei[cf]$/i.test(asset.originalFileFormat);
+        const srcPath = isHeic
+          ? resolveDisplayAbsolutePathForAsset(asset)
+          : resolveOriginalAbsolutePathForAsset(asset);
+        const exportFilename = isHeic
+          ? asset.filename.replace(/\.hei[cf]$/i, '.jpg')
+          : asset.filename;
+        const destPath = path.join(exportPath, exportFilename);
         await fs.copyFile(srcPath, destPath);
-        lines.push(`${asset.filename}: ${entry.prompt || '(no prompt)'}`);
+        lines.push(`${exportFilename}: ${entry.prompt || '(no prompt)'}`);
       } catch (err) {
         log.error(`Failed to copy asset ${entry.assetId}`, err);
         lines.push(`${asset.filename ?? entry.assetId}: ERROR - could not copy file`);
