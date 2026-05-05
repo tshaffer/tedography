@@ -102,6 +102,7 @@ import {
   removeFromAiQueue,
 } from './api/aiQueueApi';
 import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
+import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3658,6 +3659,7 @@ export default function App() {
   const [aiQueueLoading, setAiQueueLoading] = useState(false);
   const [aiQueueError, setAiQueueError] = useState<string | null>(null);
   const [addToAiQueueDialogOpen, setAddToAiQueueDialogOpen] = useState(false);
+  const [aiQueueDialogOpen, setAiQueueDialogOpen] = useState(false);
   const [aiQueueExportNotice, setAiQueueExportNotice] = useState<string | null>(null);
   const [aiQueueExportError, setAiQueueExportError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
@@ -10179,7 +10181,6 @@ export default function App() {
           </>
         ) : null}
         {isSearchArea ? renderSearchFiltersPanel() : null}
-        {renderAiQueuePanel()}
       </aside>
     );
   }
@@ -10257,38 +10258,6 @@ export default function App() {
             onAddKeywords={handleAddKeywordsToSelectedAssets}
             onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
           />
-          {selectedAssetIds.length === 1 && selectedAsset ? (() => {
-            const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
-            return (
-              <div style={{ borderTop: '1px solid #ececec', paddingTop: '12px', marginTop: '4px', display: 'grid', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937' }}>AI Edit Queue</span>
-                  {queueEntry ? (
-                    <span style={{ fontSize: '11px', color: '#2f6f3e', fontWeight: 500 }}>Queued</span>
-                  ) : null}
-                </div>
-                {queueEntry ? (
-                  <div style={{ display: 'grid', gap: '6px' }}>
-                    <p style={{ margin: 0, fontSize: '12px', color: queueEntry.prompt ? '#333' : '#888', fontStyle: queueEntry.prompt ? 'normal' : 'italic' }}>
-                      {queueEntry.prompt || 'no prompt'}
-                    </p>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button type="button" style={compareButtonStyle} onClick={() => setAddToAiQueueDialogOpen(true)}>
-                        Edit Prompt
-                      </button>
-                      <button type="button" style={compareButtonStyle} onClick={() => void handleRemoveFromAiQueue(selectedAsset.id)}>
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button type="button" style={compareButtonStyle} onClick={() => setAddToAiQueueDialogOpen(true)}>
-                    Add to AI Queue
-                  </button>
-                )}
-              </div>
-            );
-          })() : null}
         </section>
       </aside>
     );
@@ -10771,6 +10740,70 @@ export default function App() {
                       Set Capture Date…
                     </button>
 
+                  </>
+                ) : null}
+
+                {/* AI Edit Queue */}
+                {(selectedAssetIds.length === 1 && selectedAsset) || aiQueueEntries.length > 0 ? (
+                  <>
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">
+                      AI Edit Queue{aiQueueEntries.length > 0 ? ` (${aiQueueEntries.length})` : ''}
+                    </div>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { setAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
+                    >
+                      View Queue
+                    </button>
+                    {selectedAssetIds.length === 1 && selectedAsset ? (() => {
+                      const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
+                      return queueEntry ? (
+                        <>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => { setAddToAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
+                          >
+                            Edit Prompt
+                          </button>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => { void handleRemoveFromAiQueue(selectedAsset.id); setToolbarOverflowOpen(false); }}
+                          >
+                            Remove from Queue
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => { setAddToAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
+                        >
+                          Add to AI Queue
+                        </button>
+                      );
+                    })() : null}
+                    {aiQueueEntries.length > 0 ? (
+                      <>
+                        <button
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => { void handleExportAiQueue(); setToolbarOverflowOpen(false); }}
+                        >
+                          Export AI Queue
+                        </button>
+                        <button
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => { void handleClearAiQueue(); setToolbarOverflowOpen(false); }}
+                        >
+                          Clear AI Queue
+                        </button>
+                      </>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -11449,6 +11482,18 @@ export default function App() {
         existingPrompt={selectedAsset ? (aiQueueEntries.find((e) => e.assetId === selectedAsset.id)?.prompt ?? '') : ''}
         onClose={() => setAddToAiQueueDialogOpen(false)}
         onConfirm={(prompt) => void handleAddToAiQueue(prompt)}
+      />
+      <AiQueueDialog
+        open={aiQueueDialogOpen}
+        entries={aiQueueEntries}
+        loading={aiQueueLoading}
+        error={aiQueueError}
+        exportNotice={aiQueueExportNotice}
+        exportError={aiQueueExportError}
+        onClose={() => setAiQueueDialogOpen(false)}
+        onRemove={(assetId) => void handleRemoveFromAiQueue(assetId)}
+        onExport={() => void handleExportAiQueue()}
+        onClear={() => void handleClearAiQueue()}
       />
 
       <ImportAssetsDialog

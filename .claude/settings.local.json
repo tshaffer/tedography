@@ -21,7 +21,9 @@
       "mcp__plugin_figma_figma__use_figma",
       "Bash(python3 *)",
       "Bash(pnpm add *)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "Bash(xargs kill -9)",
+      "Bash(pnpm --filter @tedography/web build)"
     ]
   }
 }
