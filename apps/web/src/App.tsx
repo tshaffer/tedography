@@ -10232,6 +10232,9 @@ export default function App() {
                         detection.matchStatus === 'autoMatched'
                       ).length ?? 0,
                     confirmedPeopleNames: (selectedAssetPeopleStatus?.people ?? []).map((person) => person.displayName),
+                    recognitionRanAt: selectedAssetPeopleStatus?.peopleRecognitionRanAt ?? null,
+                    recognitionBusy: peopleRecognitionBusy,
+                    onRunRecognition: handleRunPeopleRecognitionForSelectedAssets,
                     loading: selectedAssetPeopleStatusLoading,
                     errorMessage: selectedAssetPeopleStatusError,
                     reviewHref: `/people/review?assetId=${encodeURIComponent(selectedAsset.id)}`,

@@ -643,6 +643,14 @@ export async function updateMediaAssetPeople(
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function setAssetPeopleRecognitionRanAt(id: string, ranAt: string): Promise<void> {
+  await MediaAssetModel.findOneAndUpdate(
+    { id },
+    { $set: { peopleRecognitionRanAt: ranAt } },
+    { runValidators: true }
+  );
+}
+
 export async function addAssetsToAlbum(assetIds: string[], albumId: string): Promise<void> {
   if (assetIds.length === 0) {
     return;

@@ -66,6 +66,7 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       required: false,
       default: []
     },
+    peopleRecognitionRanAt: { type: String, required: false, trim: true },
     people: {
       type: [
         new Schema(

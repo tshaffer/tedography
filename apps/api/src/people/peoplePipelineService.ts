@@ -22,7 +22,7 @@ import type {
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
 import { config } from '../config.js';
-import { findById, findByIds, updateMediaAssetPeople } from '../repositories/assetRepository.js';
+import { findById, findByIds, setAssetPeopleRecognitionRanAt, updateMediaAssetPeople } from '../repositories/assetRepository.js';
 import {
   countFaceDetectionsByStatus,
   findFaceDetectionById,
@@ -223,7 +223,8 @@ async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetF
     detections,
     reviews,
     examples,
-    people: asset?.people ?? []
+    people: asset?.people ?? [],
+    peopleRecognitionRanAt: asset?.peopleRecognitionRanAt ?? null
   };
 }
 
@@ -588,6 +589,8 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
     reviews: reviewSpecs
   });
   const derivedPeople = await recomputeMediaAssetPeople(asset.id);
+  const ranAt = new Date().toISOString();
+  await setAssetPeopleRecognitionRanAt(asset.id, ranAt);
 
   return {
     assetId: asset.id,
@@ -597,7 +600,8 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
     detectionsCreated: detections.length,
     detections,
     reviews,
-    people: derivedPeople
+    people: derivedPeople,
+    peopleRecognitionRanAt: ranAt
   };
 }
 

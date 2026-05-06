@@ -119,6 +119,7 @@ export interface ListAssetFaceDetectionsResponse {
   reviews: FaceMatchReview[];
   examples: PersonFaceExample[];
   people: MediaAssetPerson[];
+  peopleRecognitionRanAt?: string | null;
 }
 
 export interface PeopleReviewQueueItem {
@@ -207,6 +208,7 @@ export interface ProcessPeopleAssetResponse {
   detections: FaceDetection[];
   reviews: FaceMatchReview[];
   people: MediaAssetPerson[];
+  peopleRecognitionRanAt?: string | null;
 }
 
 export type ReviewFaceDetectionAction =
