@@ -172,6 +172,7 @@ export function AssetKeywordsPanel({
   onRemoveKeyword
 }: AssetKeywordsPanelProps) {
   const [pendingEntries, setPendingEntries] = useState<KeywordEntry[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
 
   const titleLabel = selectedAssetCount > 1 ? 'Common Keywords' : 'Keywords';
   const emptyStateLabel = selectedAssetCount > 1 ? 'No common keywords' : 'No keywords';
@@ -253,97 +254,120 @@ export function AssetKeywordsPanel({
           )}
         </div>
         {selectedAssetCount > 0 ? (
-          <>
-            <div style={dividerStyle} />
-            <div style={addRowStyle}>
-              <Autocomplete<KeywordEntry, true, false, true>
-                multiple
-                freeSolo
-                disabled={updateBusy}
-                options={addableKeywords}
-                value={pendingEntries}
-                onChange={(_event, value) => { setPendingEntries(dedupeKeywordEntries(value)); }}
-                getOptionLabel={(entry) =>
-                  typeof entry === 'string' ? entry : formatKeywordPathLabel(entry, keywordMap)
-                }
-                isOptionEqualToValue={(option, value) =>
-                  normalizeKeywordLabel(getKeywordEntryLabel(option)) ===
-                  normalizeKeywordLabel(getKeywordEntryLabel(value))
-                }
-                filterSelectedOptions
-                renderOption={(props, option) => {
-                  const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
-                  if (typeof option === 'string') {
-                    return <li key={key} {...rest}>{option}</li>;
-                  }
-                  const pathLabels = getKeywordPathLabels(option, keywordMap);
-                  const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
-                  const parentPath = pathLabels.slice(0, -1).join(' / ');
-                  return (
-                    <li key={key} {...rest}>
-                      <div style={{ lineHeight: 1.35 }}>
-                        {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
-                        <div style={{ fontSize: '13px' }}>{leafName}</div>
-                      </div>
-                    </li>
-                  );
-                }}
-                renderTags={(value, getTagProps) =>
-                  value.map((entry, index) => {
-                    const { key, ...tagProps } = getTagProps({ index });
-                    if (typeof entry === 'string') {
-                      return <Chip key={key} {...tagProps} label={entry} size="small" />;
+          <div style={{ borderTop: '1px solid #efefef', marginTop: '6px' }}>
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px 0 2px',
+                fontSize: '12px',
+                color: '#6b7280',
+                width: '100%',
+                textAlign: 'left',
+              }}
+              onClick={() => setAddOpen((prev) => !prev)}
+            >
+              <span style={{ fontSize: '9px' }}>{addOpen ? '▼' : '▶'}</span>
+              Add Keywords
+            </button>
+            {addOpen ? (
+              <>
+                <div style={addRowStyle}>
+                  <Autocomplete<KeywordEntry, true, false, true>
+                    multiple
+                    freeSolo
+                    disabled={updateBusy}
+                    options={addableKeywords}
+                    value={pendingEntries}
+                    onChange={(_event, value) => { setPendingEntries(dedupeKeywordEntries(value)); }}
+                    getOptionLabel={(entry) =>
+                      typeof entry === 'string' ? entry : formatKeywordPathLabel(entry, keywordMap)
                     }
-                    const pathLabels = getKeywordPathLabels(entry, keywordMap);
-                    const leafName = pathLabels[pathLabels.length - 1] ?? entry.label;
-                    const fullPath = formatKeywordPathLabel(entry, keywordMap);
-                    return (
-                      <Tooltip key={key} title={fullPath} placement="top">
-                        <Chip {...tagProps} label={leafName} size="small" />
-                      </Tooltip>
-                    );
-                  })
-                }
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    size="small"
-                    placeholder="Search or type a keyword"
-                    inputProps={{ ...params.inputProps, style: { fontSize: '12px' } }}
-                    sx={{
-                      '& .MuiInputBase-root': { paddingTop: '2px', paddingBottom: '2px' },
-                      '& .MuiInputBase-input': { paddingTop: '2px', paddingBottom: '2px', fontSize: '12px' }
+                    isOptionEqualToValue={(option, value) =>
+                      normalizeKeywordLabel(getKeywordEntryLabel(option)) ===
+                      normalizeKeywordLabel(getKeywordEntryLabel(value))
+                    }
+                    filterSelectedOptions
+                    renderOption={(props, option) => {
+                      const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
+                      if (typeof option === 'string') {
+                        return <li key={key} {...rest}>{option}</li>;
+                      }
+                      const pathLabels = getKeywordPathLabels(option, keywordMap);
+                      const leafName = pathLabels[pathLabels.length - 1] ?? option.label;
+                      const parentPath = pathLabels.slice(0, -1).join(' / ');
+                      return (
+                        <li key={key} {...rest}>
+                          <div style={{ lineHeight: 1.35 }}>
+                            {parentPath ? <div style={{ fontSize: '11px', color: '#aaa' }}>{parentPath}</div> : null}
+                            <div style={{ fontSize: '13px' }}>{leafName}</div>
+                          </div>
+                        </li>
+                      );
                     }}
+                    renderTags={(value, getTagProps) =>
+                      value.map((entry, index) => {
+                        const { key, ...tagProps } = getTagProps({ index });
+                        if (typeof entry === 'string') {
+                          return <Chip key={key} {...tagProps} label={entry} size="small" />;
+                        }
+                        const pathLabels = getKeywordPathLabels(entry, keywordMap);
+                        const leafName = pathLabels[pathLabels.length - 1] ?? entry.label;
+                        const fullPath = formatKeywordPathLabel(entry, keywordMap);
+                        return (
+                          <Tooltip key={key} title={fullPath} placement="top">
+                            <Chip {...tagProps} label={leafName} size="small" />
+                          </Tooltip>
+                        );
+                      })
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        size="small"
+                        placeholder="Search or type a keyword"
+                        inputProps={{ ...params.inputProps, style: { fontSize: '12px' } }}
+                        sx={{
+                          '& .MuiInputBase-root': { paddingTop: '2px', paddingBottom: '2px' },
+                          '& .MuiInputBase-input': { paddingTop: '2px', paddingBottom: '2px', fontSize: '12px' }
+                        }}
+                      />
+                    )}
                   />
-                )}
-              />
-              <button
-                style={sanitizedPendingEntries.length > 0 && !updateBusy ? addButtonStyle : addButtonDisabledStyle}
-                disabled={sanitizedPendingEntries.length === 0 || updateBusy}
-                onClick={() => void handleAdd()}
-              >
-                {updateBusy ? 'Adding…' : addButtonLabel}
-              </button>
-            </div>
-            {visibleRecentKeywords.length > 0 ? (
-              <div style={recentSectionStyle}>
-                <span style={recentLabelStyle}>Recently used</span>
-                <div style={recentChipsStyle}>
-                  {visibleRecentKeywords.map((keyword) => (
-                    <Chip
-                      key={keyword.id}
-                      label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
-                      size="small"
-                      variant="outlined"
-                      title={formatKeywordPathLabel(keyword, keywordMap)}
-                      clickable={!updateBusy}
-                      onClick={!updateBusy ? () => void onAddKeywords([keyword]) : undefined}
-                    />
-                  ))}
+                  <button
+                    style={sanitizedPendingEntries.length > 0 && !updateBusy ? addButtonStyle : addButtonDisabledStyle}
+                    disabled={sanitizedPendingEntries.length === 0 || updateBusy}
+                    onClick={() => void handleAdd()}
+                  >
+                    {updateBusy ? 'Adding…' : addButtonLabel}
+                  </button>
                 </div>
-              </div>
+                {visibleRecentKeywords.length > 0 ? (
+                  <div style={recentSectionStyle}>
+                    <span style={recentLabelStyle}>Recently used</span>
+                    <div style={recentChipsStyle}>
+                      {visibleRecentKeywords.map((keyword) => (
+                        <Chip
+                          key={keyword.id}
+                          label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
+                          size="small"
+                          variant="outlined"
+                          title={formatKeywordPathLabel(keyword, keywordMap)}
+                          clickable={!updateBusy}
+                          onClick={!updateBusy ? () => void onAddKeywords([keyword]) : undefined}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             ) : null}
-          </>
+          </div>
         ) : null}
       </div>
     );
