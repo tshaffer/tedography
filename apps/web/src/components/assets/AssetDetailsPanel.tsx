@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { type MediaAsset } from '@tedography/domain';
+import Chip from '@mui/material/Chip';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 
 interface AssetDetailsPanelProps {
@@ -205,6 +206,7 @@ export function AssetDetailsPanel({
   keywordsSlot
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [peopleDetailsOpen, setPeopleDetailsOpen] = useState(false);
 
   if (!asset) {
     return (
@@ -250,14 +252,38 @@ export function AssetDetailsPanel({
       {/* People */}
       {peopleStatus ? (
         <section style={subSectionStyle}>
-          <h4 style={subSectionTitleStyle}>People</h4>
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>People</h4>
+            {peopleStatus.detectionsCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setPeopleDetailsOpen((prev) => !prev)}
+                title={peopleDetailsOpen ? 'Hide details' : 'Show details'}
+                style={{
+                  background: 'none',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: peopleDetailsOpen ? '#6b7280' : '#374151',
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  padding: '1px 6px',
+                }}
+              >
+                {peopleDetailsOpen ? '×' : '⋯'}
+              </button>
+            ) : null}
+          </div>
+
+          {/* Primary view */}
           {peopleStatus.loading ? (
-            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>Loading people status...</p>
+            <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading people status...</p>
           ) : peopleStatus.errorMessage ? (
-            <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
+            <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
           ) : peopleStatus.detectionsCount === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 6px' }}>
-              <span style={{ color: '#666', fontSize: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: '#aaa', fontSize: '12px' }}>
                 {peopleStatus.recognitionRanAt ? 'No people detected.' : 'No people detected yet.'}
               </span>
               {!peopleStatus.recognitionRanAt && peopleStatus.onRunRecognition ? (
@@ -266,14 +292,25 @@ export function AssetDetailsPanel({
                   onClick={peopleStatus.onRunRecognition}
                   disabled={peopleStatus.recognitionBusy}
                   title={peopleStatus.recognitionBusy ? 'Running people recognition…' : 'Run people recognition for this photo'}
-                  style={{ background: 'none', border: 'none', padding: '0', cursor: peopleStatus.recognitionBusy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', opacity: peopleStatus.recognitionBusy ? 0.4 : 1 }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: peopleStatus.recognitionBusy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', opacity: peopleStatus.recognitionBusy ? 0.4 : 1 }}
                 >
                   <EmojiEmotionsIcon style={{ fontSize: '16px', color: '#f0a030' }} />
                 </button>
               ) : null}
             </div>
+          ) : peopleStatus.confirmedPeopleNames.length > 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {peopleStatus.confirmedPeopleNames.map((name) => (
+                <Chip key={name} label={name} size="small" />
+              ))}
+            </div>
           ) : (
-            <>
+            <span style={{ color: '#aaa', fontSize: '12px' }}>None confirmed yet.</span>
+          )}
+
+          {/* Expanded details */}
+          {peopleStatus.detectionsCount > 0 && peopleDetailsOpen ? (
+            <div style={{ marginTop: '8px' }}>
               {renderRow('Detections', String(peopleStatus.detectionsCount))}
               {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
               {renderRow(
@@ -289,21 +326,21 @@ export function AssetDetailsPanel({
                     : 'Detections exist, nothing confirmed.'}
                 </p>
               ) : null}
-            </>
-          )}
-          {peopleStatus.reviewHref && peopleStatus.detectionsCount > 0 ? (
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {peopleStatus.onOpenReview ? (
-                <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
-                  Review Faces
-                </button>
+              {peopleStatus.reviewHref ? (
+                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {peopleStatus.onOpenReview ? (
+                    <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
+                      Review Faces
+                    </button>
+                  ) : null}
+                  <Link
+                    to={peopleStatus.reviewHref}
+                    style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
+                  >
+                    Open Full People Review
+                  </Link>
+                </div>
               ) : null}
-              <Link
-                to={peopleStatus.reviewHref}
-                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-              >
-                Open Full People Review
-              </Link>
             </div>
           ) : null}
         </section>
