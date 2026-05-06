@@ -443,6 +443,7 @@ export function PeopleReviewPage() {
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const assignSelectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
   const createInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const hasAutoAdjustedFiltersRef = useRef(false);
 
   function rememberRecentPerson(personId: string | null | undefined): void {
     if (!personId) {
@@ -480,6 +481,18 @@ export function PeopleReviewPage() {
       ]);
       setItems(queueResponse.items);
       setCounts(queueResponse.counts);
+
+      if (!hasAutoAdjustedFiltersRef.current && queueResponse.items.length === 0) {
+        const selectedSet = new Set(selectedStatuses);
+        const unselectedWithItems = (Object.entries(queueResponse.counts) as [FaceDetectionMatchStatus, number][])
+          .filter(([status, count]) => count > 0 && !selectedSet.has(status))
+          .map(([status]) => status);
+        if (unselectedWithItems.length > 0) {
+          hasAutoAdjustedFiltersRef.current = true;
+          setSelectedStatuses((prev) => [...prev, ...unselectedWithItems]);
+        }
+      }
+
       setPeopleOptions(
         peopleResponse.items.map((person) => ({ id: person.id, displayName: person.displayName }))
       );

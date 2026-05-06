@@ -66,6 +66,7 @@ export interface MediaAsset {
   detectionsCount?: number;
   reviewableDetectionsCount?: number;
   confirmedDetectionsCount?: number;
+  peopleRecognitionRanAt?: string | null;
 
   // Optional capture location metadata when available.
   locationLabel?: string | null;

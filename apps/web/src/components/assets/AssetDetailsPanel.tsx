@@ -18,6 +18,7 @@ interface AssetDetailsPanelProps {
     detectionsCount: number;
     reviewableCount: number;
     confirmedPeopleNames: string[];
+    recognitionRanAt?: string | null;
     loading?: boolean;
     errorMessage?: string | null;
     reviewHref?: string;
@@ -253,7 +254,9 @@ export function AssetDetailsPanel({
             <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
           ) : peopleStatus.detectionsCount === 0 ? (
             <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>
-              No people data yet. Run People Recognition to detect faces for this asset.
+              {peopleStatus.recognitionRanAt
+                ? 'No people detected.'
+                : 'No people detected yet.'}
             </p>
           ) : (
             <>
@@ -265,16 +268,16 @@ export function AssetDetailsPanel({
                   ? peopleStatus.confirmedPeopleNames.join(', ')
                   : 'None'
               )}
-              <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
-                {peopleStatus.reviewableCount > 0
-                  ? 'Reviewable faces still need confirmation before they become derived asset people.'
-                  : peopleStatus.confirmedPeopleNames.length > 0
-                    ? 'Confirmed people here come from reviewed face detections and drive derived asset metadata.'
-                    : 'Detections exist, but nothing is confirmed into derived asset people yet.'}
-              </p>
+              {peopleStatus.reviewableCount > 0 || peopleStatus.confirmedPeopleNames.length === 0 ? (
+                <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
+                  {peopleStatus.reviewableCount > 0
+                    ? 'Reviewable faces still need confirmation before they become derived asset people.'
+                    : 'Detections exist, nothing confirmed.'}
+                </p>
+              ) : null}
             </>
           )}
-          {peopleStatus.reviewHref ? (
+          {peopleStatus.reviewHref && peopleStatus.detectionsCount > 0 ? (
             <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {peopleStatus.onOpenReview ? (
                 <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
