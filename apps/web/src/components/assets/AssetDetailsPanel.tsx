@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { type MediaAsset } from '@tedography/domain';
+import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
@@ -19,6 +20,8 @@ interface AssetDetailsPanelProps {
     reviewableCount: number;
     confirmedPeopleNames: string[];
     recognitionRanAt?: string | null;
+    recognitionBusy?: boolean;
+    onRunRecognition?: () => void;
     loading?: boolean;
     errorMessage?: string | null;
     reviewHref?: string;
@@ -253,11 +256,22 @@ export function AssetDetailsPanel({
           ) : peopleStatus.errorMessage ? (
             <p style={{ margin: '0 0 6px', color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
           ) : peopleStatus.detectionsCount === 0 ? (
-            <p style={{ margin: '0 0 6px', color: '#666', fontSize: '12px' }}>
-              {peopleStatus.recognitionRanAt
-                ? 'No people detected.'
-                : 'No people detected yet.'}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 6px' }}>
+              <span style={{ color: '#666', fontSize: '12px' }}>
+                {peopleStatus.recognitionRanAt ? 'No people detected.' : 'No people detected yet.'}
+              </span>
+              {!peopleStatus.recognitionRanAt && peopleStatus.onRunRecognition ? (
+                <button
+                  type="button"
+                  onClick={peopleStatus.onRunRecognition}
+                  disabled={peopleStatus.recognitionBusy}
+                  title={peopleStatus.recognitionBusy ? 'Running people recognition…' : 'Run people recognition for this photo'}
+                  style={{ background: 'none', border: 'none', padding: '0', cursor: peopleStatus.recognitionBusy ? 'default' : 'pointer', display: 'flex', alignItems: 'center', opacity: peopleStatus.recognitionBusy ? 0.4 : 1 }}
+                >
+                  <EmojiEmotionsIcon style={{ fontSize: '16px', color: '#f0a030' }} />
+                </button>
+              ) : null}
+            </div>
           ) : (
             <>
               {renderRow('Detections', String(peopleStatus.detectionsCount))}
