@@ -223,13 +223,34 @@ export function AssetKeywordsPanel({
   if (embedded) {
     return (
       <div style={embeddedStyle}>
-        <h4 style={embeddedTitleStyle}>{titleLabel}</h4>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h4 style={{ ...embeddedTitleStyle, margin: 0 }}>{titleLabel}</h4>
+          {selectedAssetCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setAddOpen((prev) => !prev)}
+              title={addOpen ? 'Close add keywords' : 'Add keywords'}
+              style={{
+                background: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: addOpen ? '#6b7280' : '#374151',
+                fontSize: '14px',
+                lineHeight: 1,
+                padding: '1px 6px',
+              }}
+            >
+              {addOpen ? '×' : '+'}
+            </button>
+          ) : null}
+        </div>
         {keywordsError ? (
           <p style={{ ...emptyLabelStyle, color: '#a12622', marginBottom: '6px' }}>
             {keywordsError}
           </p>
         ) : null}
-        <div style={currentKeywordsZoneStyle}>
+        <div style={displayedKeywords.length > 0 || keywordsLoading ? currentKeywordsZoneStyle : { marginBottom: '8px' }}>
           {keywordsLoading ? (
             <div style={loadingRowStyle}>
               <CircularProgress size={12} />
@@ -253,31 +274,9 @@ export function AssetKeywordsPanel({
             <span style={emptyLabelStyle}>{emptyStateLabel}</span>
           )}
         </div>
-        {selectedAssetCount > 0 ? (
-          <div style={{ borderTop: '1px solid #efefef', marginTop: '6px' }}>
-            <button
-              type="button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '6px 0 2px',
-                fontSize: '12px',
-                color: '#6b7280',
-                width: '100%',
-                textAlign: 'left',
-              }}
-              onClick={() => setAddOpen((prev) => !prev)}
-            >
-              <span style={{ fontSize: '9px' }}>{addOpen ? '▼' : '▶'}</span>
-              Add Keywords
-            </button>
-            {addOpen ? (
-              <>
-                <div style={addRowStyle}>
+        {selectedAssetCount > 0 && addOpen ? (
+          <div style={{ borderTop: '1px solid #efefef', marginTop: '6px', paddingTop: '6px' }}>
+            <div style={addRowStyle}>
                   <Autocomplete<KeywordEntry, true, false, true>
                     multiple
                     freeSolo
@@ -365,8 +364,6 @@ export function AssetKeywordsPanel({
                     </div>
                   </div>
                 ) : null}
-              </>
-            ) : null}
           </div>
         ) : null}
       </div>
