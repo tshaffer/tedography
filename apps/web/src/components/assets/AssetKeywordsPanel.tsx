@@ -4,7 +4,7 @@ import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
-import type { Keyword } from '@tedography/domain';
+import type { AssetKeywordAssignmentStatus, Keyword } from '@tedography/domain';
 import {
   buildKeywordMap,
   formatKeywordPathLabel,
@@ -22,8 +22,10 @@ interface AssetKeywordsPanelProps {
   keywordsLoading?: boolean;
   keywordsError?: string | null;
   updateBusy?: boolean;
+  keywordAssignmentStatus?: AssetKeywordAssignmentStatus | null;
   onAddKeywords: (entries: KeywordEntry[]) => Promise<boolean>;
   onRemoveKeyword: (keyword: Keyword) => Promise<void>;
+  onSetKeywordAssignmentStatus?: (status: AssetKeywordAssignmentStatus | null) => Promise<void>;
 }
 
 const panelStyle: CSSProperties = {
@@ -115,6 +117,34 @@ const loadingRowStyle: CSSProperties = {
   fontSize: '12px'
 };
 
+const statusRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  marginTop: '6px'
+};
+
+const statusButtonBaseStyle: CSSProperties = {
+  padding: '2px 8px',
+  fontSize: '11px',
+  borderRadius: '4px',
+  border: '1px solid #d1d5db',
+  cursor: 'pointer',
+  background: '#f9fafb',
+  color: '#374151'
+};
+
+const statusButtonActiveStyle: CSSProperties = {
+  ...statusButtonBaseStyle,
+  fontWeight: 600
+};
+
+const assetKeywordStatusColors: Record<AssetKeywordAssignmentStatus, string> = {
+  'not-started': '#9ca3af',
+  'in-progress': '#d97706',
+  'complete': '#16a34a'
+};
+
 function normalizeKeywordLabel(label: string): string {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -168,8 +198,10 @@ export function AssetKeywordsPanel({
   keywordsLoading = false,
   keywordsError = null,
   updateBusy = false,
+  keywordAssignmentStatus = null,
   onAddKeywords,
-  onRemoveKeyword
+  onRemoveKeyword,
+  onSetKeywordAssignmentStatus
 }: AssetKeywordsPanelProps) {
   const [pendingEntries, setPendingEntries] = useState<KeywordEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -274,6 +306,30 @@ export function AssetKeywordsPanel({
             <span style={emptyLabelStyle}>{emptyStateLabel}</span>
           )}
         </div>
+        {selectedAssetCount > 0 && onSetKeywordAssignmentStatus ? (
+          <div style={statusRowStyle}>
+            <span style={{ fontSize: '11px', color: '#6b7280', marginRight: '2px' }}>Keywords:</span>
+            {(['not-started', 'in-progress', 'complete'] as AssetKeywordAssignmentStatus[]).map((status) => {
+              const isActive = keywordAssignmentStatus === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  disabled={updateBusy}
+                  style={{
+                    ...( isActive ? statusButtonActiveStyle : statusButtonBaseStyle),
+                    borderColor: isActive ? assetKeywordStatusColors[status] : '#d1d5db',
+                    color: isActive ? assetKeywordStatusColors[status] : '#374151'
+                  }}
+                  title={`Mark keyword assignment as ${status}`}
+                  onClick={() => void onSetKeywordAssignmentStatus(isActive ? null : status)}
+                >
+                  {status === 'not-started' ? 'Not started' : status === 'in-progress' ? 'In progress' : 'Complete'}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         {selectedAssetCount > 0 && addOpen ? (
           <div style={{ borderTop: '1px solid #efefef', marginTop: '6px', paddingTop: '6px' }}>
             <div style={addRowStyle}>

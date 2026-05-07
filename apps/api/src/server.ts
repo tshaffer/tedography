@@ -23,6 +23,7 @@ import {
   updateCaptureDateTimes,
   updatePhotoState
 } from './repositories/assetRepository.js';
+import { listAssetIdsWithReviewableDetections } from './repositories/faceDetectionRepository.js';
 import { aiQueueRoutes } from './routes/aiQueueRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
@@ -136,6 +137,16 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to read assets', error);
       res.status(500).json({ error: 'Failed to load assets' });
+    }
+  });
+
+  app.get('/api/assets/reviewable-detections', async (_req, res) => {
+    try {
+      const assetIds = await listAssetIdsWithReviewableDetections();
+      res.json({ assetIds });
+    } catch (error) {
+      log.error('Failed to list assets with reviewable detections', error);
+      res.status(500).json({ error: 'Failed to list assets with reviewable detections' });
     }
   });
 

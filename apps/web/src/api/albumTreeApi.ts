@@ -1,4 +1,9 @@
-import { type AlbumTreeChildOrderMode, type AlbumTreeNode, type MediaAsset } from '@tedography/domain';
+import {
+  type AlbumKeywordAssignmentStatus,
+  type AlbumTreeChildOrderMode,
+  type AlbumTreeNode,
+  type MediaAsset
+} from '@tedography/domain';
 
 type AlbumMembershipRequest = {
   assetIds: string[];
@@ -236,4 +241,25 @@ export async function updateAlbumOrderingMode(
   }
 
   return (await response.json()) as MediaAsset;
+}
+
+export async function setAlbumKeywordAssignmentStatus(
+  albumId: string,
+  status: AlbumKeywordAssignmentStatus | null
+): Promise<AlbumTreeNode> {
+  const response = await fetch(
+    `/api/album-tree/${encodeURIComponent(albumId)}/keyword-assignment-status`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    }
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
 }

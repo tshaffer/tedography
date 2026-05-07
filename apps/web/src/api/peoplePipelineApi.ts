@@ -258,6 +258,11 @@ export async function reviewFaceDetection(
   );
 }
 
+export async function listAssetIdsWithReviewableDetections(): Promise<string[]> {
+  const response = await fetchJson<{ assetIds: string[] }>('/api/assets/reviewable-detections');
+  return response.assetIds;
+}
+
 export async function enrollPersonFromDetection(
   personId: string,
   request: EnrollPersonFromDetectionRequest

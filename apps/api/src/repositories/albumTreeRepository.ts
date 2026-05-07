@@ -1,4 +1,5 @@
 import {
+  type AlbumKeywordAssignmentStatus,
   type AlbumTreeChildOrderMode,
   type AlbumTreeNode,
   type AlbumTreeNodeType
@@ -357,4 +358,17 @@ export async function reorderAlbumTreeNodeWithinSiblings(
 export async function deleteAlbumTreeNode(nodeId: string): Promise<boolean> {
   const result = await AlbumTreeNodeModel.deleteOne({ id: nodeId });
   return result.deletedCount > 0;
+}
+
+export async function setAlbumKeywordAssignmentStatus(
+  albumId: string,
+  status: AlbumKeywordAssignmentStatus | null
+): Promise<AlbumTreeNode | null> {
+  const doc = await AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId },
+    { $set: { keywordAssignmentStatus: status ?? null } },
+    { new: true, runValidators: true }
+  ).lean<AlbumTreeNode>();
+
+  return doc ?? null;
 }

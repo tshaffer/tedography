@@ -1,13 +1,16 @@
 import { Router } from 'express';
-import type { ImportApiErrorResponse } from '@tedography/domain';
+import type { AssetKeywordAssignmentStatus, ImportApiErrorResponse } from '@tedography/domain';
 import type {
   CreateKeywordRequest,
   CreateKeywordResponse,
   DeleteKeywordResponse,
   ListAssetKeywordsResponse,
   ListKeywordAssetsResponse,
+  ListKeywordChangesResponse,
   ListKeywordsResponse,
   ListKeywordTreeResponse,
+  SetAssetKeywordAssignmentStatusRequest,
+  SetAssetKeywordAssignmentStatusResponse,
   UpdateKeywordLabelRequest,
   UpdateKeywordLabelResponse,
   UpdateKeywordParentRequest,
@@ -20,7 +23,8 @@ import {
   addKeywordsToAssets,
   findByIds,
   listAssetsByKeyword,
-  removeKeywordsFromAssets
+  removeKeywordsFromAssets,
+  setKeywordAssignmentStatusForAssets
 } from '../repositories/assetRepository.js';
 import {
   createKeyword,
@@ -38,6 +42,7 @@ import {
   updateKeywordLabel,
   updateKeywordParent
 } from '../repositories/keywordRepository.js';
+import { listKeywordChangesSince } from '../repositories/keywordChangeEventRepository.js';
 
 export const keywordRoutes: Router = Router();
 
@@ -292,5 +297,70 @@ assetKeywordRoutes.post('/keywords/remove', async (req, res) => {
   } catch (error) {
     log.error('Failed to remove keywords from assets', error);
     res.status(500).json({ error: 'Failed to remove keywords from assets' } satisfies ImportApiErrorResponse);
+  }
+});
+
+const validAssetKeywordAssignmentStatuses: AssetKeywordAssignmentStatus[] = [
+  'not-started',
+  'in-progress',
+  'complete'
+];
+
+assetKeywordRoutes.patch('/keywords/assignment-status', async (req, res) => {
+  const body = req.body as Partial<SetAssetKeywordAssignmentStatusRequest> | undefined;
+  const assetIds = parseIdArray(body?.assetIds);
+  const rawStatus = body?.status;
+
+  if (!assetIds) {
+    res.status(400).json({
+      error: 'assetIds must be a non-empty string array'
+    } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  if (
+    rawStatus !== null &&
+    rawStatus !== undefined &&
+    !(
+      typeof rawStatus === 'string' &&
+      validAssetKeywordAssignmentStatuses.includes(rawStatus as AssetKeywordAssignmentStatus)
+    )
+  ) {
+    res.status(400).json({
+      error: 'status must be "not-started", "in-progress", "complete", or null'
+    } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  const status = (rawStatus ?? null) as AssetKeywordAssignmentStatus | null;
+
+  try {
+    await setKeywordAssignmentStatusForAssets(assetIds, status);
+    res.json({ assetIds, status } satisfies SetAssetKeywordAssignmentStatusResponse);
+  } catch (error) {
+    log.error('Failed to set keyword assignment status for assets', error);
+    res.status(500).json({ error: 'Failed to set keyword assignment status' } satisfies ImportApiErrorResponse);
+  }
+});
+
+keywordRoutes.get('/changes', async (req, res) => {
+  const sinceRaw = req.query['since'];
+  if (typeof sinceRaw !== 'string' || sinceRaw.trim().length === 0) {
+    res.status(400).json({ error: 'since query parameter is required (ISO timestamp)' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  const since = sinceRaw.trim();
+  if (Number.isNaN(Date.parse(since))) {
+    res.status(400).json({ error: 'since must be a valid ISO timestamp' } satisfies ImportApiErrorResponse);
+    return;
+  }
+
+  try {
+    const items = await listKeywordChangesSince(since);
+    res.json({ since, items } satisfies ListKeywordChangesResponse);
+  } catch (error) {
+    log.error('Failed to list keyword changes', error);
+    res.status(500).json({ error: 'Failed to list keyword changes' } satisfies ImportApiErrorResponse);
   }
 });

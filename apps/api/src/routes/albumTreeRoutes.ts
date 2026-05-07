@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type {
+  AlbumKeywordAssignmentStatus,
   AlbumTreeChildOrderMode,
   AlbumTreeNode,
   AlbumTreeNodeType
@@ -23,6 +24,7 @@ import {
   moveAlbumTreeNode,
   reorderAlbumTreeNodeWithinSiblings,
   renameAlbumTreeNode,
+  setAlbumKeywordAssignmentStatus,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 
@@ -659,6 +661,50 @@ albumMembershipRoutes.post('/:id/ordering-mode', async (req, res) => {
   } catch {
     const errorResponse: AlbumTreeErrorResponse = {
       error: 'Failed to update album ordering mode'
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+const validAlbumKeywordAssignmentStatuses: AlbumKeywordAssignmentStatus[] = [
+  'not-started',
+  'in-progress',
+  'complete'
+];
+
+albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
+  const body = req.body as { status?: unknown } | undefined;
+  const rawStatus = body?.status;
+
+  if (
+    rawStatus !== null &&
+    rawStatus !== undefined &&
+    !(
+      typeof rawStatus === 'string' &&
+      validAlbumKeywordAssignmentStatuses.includes(rawStatus as AlbumKeywordAssignmentStatus)
+    )
+  ) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'status must be "not-started", "in-progress", "complete", or null'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const status = (rawStatus ?? null) as AlbumKeywordAssignmentStatus | null;
+
+  try {
+    const updated = await setAlbumKeywordAssignmentStatus(req.params.id, status);
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'Failed to update keyword assignment status'
     };
     res.status(500).json(errorResponse);
   }

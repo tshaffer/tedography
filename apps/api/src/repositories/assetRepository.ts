@@ -2,6 +2,7 @@ import {
   MediaType,
   PhotoState,
   normalizePhotoState,
+  type AssetKeywordAssignmentStatus,
   type MediaAssetAlbumMembership,
   type MediaAssetPerson,
   type DisplayStorageType,
@@ -10,6 +11,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
+import { recordKeywordChanges } from './keywordChangeEventRepository.js';
 
 export async function syncMediaAssetIndexes(): Promise<void> {
   await MediaAssetModel.syncIndexes();
@@ -92,6 +94,7 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           displayFileFormat: 1,
           albumIds: 1,
           keywordIds: 1,
+          keywordAssignmentStatus: 1,
           albumMemberships: 1,
           people: 1
         }
@@ -146,6 +149,7 @@ export async function getAssetPageForLibrary(input?: {
           displayFileFormat: 1,
           albumIds: 1,
           keywordIds: 1,
+          keywordAssignmentStatus: 1,
           albumMemberships: 1,
           people: 1
         }
@@ -675,6 +679,7 @@ export async function addKeywordsToAssets(assetIds: string[], keywordIds: string
     { $addToSet: { keywordIds: { $each: normalizedKeywordIds } } },
     { runValidators: true }
   );
+  await recordKeywordChanges(normalizedAssetIds, normalizedKeywordIds, 'added');
 }
 
 export async function removeKeywordsFromAssets(assetIds: string[], keywordIds: string[]): Promise<void> {
@@ -687,6 +692,23 @@ export async function removeKeywordsFromAssets(assetIds: string[], keywordIds: s
   await MediaAssetModel.updateMany(
     { id: { $in: normalizedAssetIds } },
     { $pull: { keywordIds: { $in: normalizedKeywordIds } } },
+    { runValidators: true }
+  );
+  await recordKeywordChanges(normalizedAssetIds, normalizedKeywordIds, 'removed');
+}
+
+export async function setKeywordAssignmentStatusForAssets(
+  assetIds: string[],
+  status: AssetKeywordAssignmentStatus | null
+): Promise<void> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    { $set: { keywordAssignmentStatus: status ?? null } },
     { runValidators: true }
   );
 }

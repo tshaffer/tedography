@@ -52,6 +52,12 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       required: true,
       default: []
     },
+    keywordAssignmentStatus: {
+      type: String,
+      required: false,
+      enum: ['not-started', 'in-progress', 'complete'],
+      default: null
+    },
     albumMemberships: {
       type: [
         new Schema(

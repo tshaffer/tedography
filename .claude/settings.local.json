@@ -24,7 +24,9 @@
       "Bash(pnpm run *)",
       "Bash(xargs kill -9)",
       "Bash(pnpm --filter @tedography/web build)",
-      "Bash(pnpm --filter @tedography/web typecheck)"
+      "Bash(pnpm --filter @tedography/web typecheck)",
+      "Bash(pnpm build *)",
+      "Bash(grep -n \"hasNoPeople: searchHasNoPeople\\\\|hasReviewableFaces: searchHasReviewableFaces\\\\|searchHasNoPeople,\\\\s*$\\\\|searchHasReviewableFaces,\\\\s*$\" /Users/tedshaffer/Documents/Projects/tedography/apps/web/src/App.tsx)"
     ]
   }
 }

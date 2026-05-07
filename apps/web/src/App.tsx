@@ -45,7 +45,9 @@ import {
   type Person,
   PhotoState,
   normalizePhotoState,
+  type AlbumKeywordAssignmentStatus,
   type AlbumTreeNode,
+  type AssetKeywordAssignmentStatus,
   type Keyword,
   type MediaAsset,
   type SmartAlbum,
@@ -62,6 +64,7 @@ import {
   reorderAlbumTreeNode,
   removeAssetsFromAlbum,
   renameAlbumTreeNode,
+  setAlbumKeywordAssignmentStatus as setAlbumKeywordAssignmentStatusRequest,
   updateAlbumTreeChildOrderMode,
   updateAlbumManualOrder,
   updateAlbumOrderingMode
@@ -80,7 +83,8 @@ import {
   addKeywordsToAssets as addKeywordsToAssetsRequest,
   createKeyword as createKeywordRequest,
   listKeywords as listKeywordsRequest,
-  removeKeywordsFromAssets as removeKeywordsFromAssetsRequest
+  removeKeywordsFromAssets as removeKeywordsFromAssetsRequest,
+  setAssetKeywordAssignmentStatus as setAssetKeywordAssignmentStatusRequest
 } from './api/keywordApi';
 import {
   createSmartAlbum as createSmartAlbumRequest,
@@ -89,6 +93,7 @@ import {
 import {
   getPeoplePipelineAssetState,
   getPeopleScopedAssetSummary,
+  listAssetIdsWithReviewableDetections,
   listPeople,
   processPeopleAsset,
   type PeopleScopedAssetSummaryResponse
@@ -181,7 +186,9 @@ const searchPeopleIdsStorageKey = 'tedography.search.peopleIds';
 const searchPeopleMatchModeStorageKey = 'tedography.search.peopleMatchMode';
 const searchExcludedPeopleIdsStorageKey = 'tedography.search.excludedPeopleIds';
 const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
+const searchHasConfirmedPeopleStorageKey = 'tedography.search.hasConfirmedPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
+const searchHasKeywordsStorageKey = 'tedography.search.hasKeywords';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
 const searchKeywordIncludeModeStorageKey = 'tedography.search.keyword.includeMode';
 const searchKeywordExcludeStorageKey = 'tedography.search.keyword.exclude';
@@ -282,6 +289,8 @@ const slideshowIntervalMsStorageKey = 'tedography.slideshow.intervalMs';
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
+const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
+const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
 const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
 const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
@@ -316,7 +325,9 @@ type SearchFilters = {
   peopleMatchMode: SearchPeopleMatchMode;
   excludedPeopleIds: string[];
   hasNoPeople: boolean;
+  hasConfirmedPeople: boolean;
   hasReviewableFaces: boolean;
+  hasKeywords: boolean;
   keywordQuery: KeywordQueryState;
 };
 
@@ -1197,6 +1208,18 @@ const cardPhotoStateBadgeStyle: CSSProperties = {
   pointerEvents: 'none'
 };
 
+const cardKeywordBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '8px',
+  right: '8px',
+  zIndex: 2,
+  width: '10px',
+  height: '10px',
+  borderRadius: '50%',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+  pointerEvents: 'none'
+};
+
 const cardSelectedBadgeStyle: CSSProperties = {
   position: 'absolute',
   top: '8px',
@@ -1705,6 +1728,24 @@ function getAlbumAssetCountStatusBadgeStyle(status: AlbumAssetCountStatus): CSSP
     color: '#92400e',
     borderColor: '#f5d38c'
   };
+}
+
+function getAlbumKeywordStatusDotColor(status: AlbumKeywordAssignmentStatus): string {
+  if (status === 'complete') return '#16a34a';
+  if (status === 'in-progress') return '#d97706';
+  return '#9ca3af';
+}
+
+function getAlbumKeywordStatusTitle(status: AlbumKeywordAssignmentStatus): string {
+  if (status === 'complete') return 'Keywords: complete';
+  if (status === 'in-progress') return 'Keywords: in progress';
+  return 'Keywords: not started';
+}
+
+function getAssetKeywordStatusDotColor(status: AssetKeywordAssignmentStatus): string {
+  if (status === 'complete') return '#16a34a';
+  if (status === 'in-progress') return '#d97706';
+  return '#9ca3af';
 }
 
 const emptyStateStyle: CSSProperties = {
@@ -2464,16 +2505,21 @@ function doesAssetMatchSearchPeopleFilters(
   peopleMatchMode: SearchPeopleMatchMode,
   excludedPeopleIds: string[],
   hasNoPeople: boolean,
-  hasReviewableFaces: boolean
+  hasConfirmedPeople: boolean,
+  hasReviewableFaces: boolean,
+  reviewableAssetIds: Set<string> | null
 ): boolean {
   const confirmedPeopleIds = new Set((asset.people ?? []).map((person) => person.personId));
-  const reviewableDetectionsCount = (asset as MediaAsset & { reviewableDetectionsCount?: number }).reviewableDetectionsCount ?? 0;
 
   if (hasNoPeople && confirmedPeopleIds.size > 0) {
     return false;
   }
 
-  if (hasReviewableFaces && reviewableDetectionsCount <= 0) {
+  if (hasConfirmedPeople && confirmedPeopleIds.size === 0) {
+    return false;
+  }
+
+  if (hasReviewableFaces && (reviewableAssetIds === null || !reviewableAssetIds.has(asset.id))) {
     return false;
   }
 
@@ -2558,7 +2604,9 @@ function getDefaultSearchFilters(): SearchFilters {
     peopleMatchMode: 'Any',
     excludedPeopleIds: [],
     hasNoPeople: false,
+    hasConfirmedPeople: false,
     hasReviewableFaces: false,
+    hasKeywords: false,
     keywordQuery: { include: [], includeMode: 'all', exclude: [] }
   };
 }
@@ -2580,7 +2628,9 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.peopleMatchMode === right.peopleMatchMode &&
     arraysEqual(left.excludedPeopleIds, right.excludedPeopleIds) &&
     left.hasNoPeople === right.hasNoPeople &&
+    left.hasConfirmedPeople === right.hasConfirmedPeople &&
     left.hasReviewableFaces === right.hasReviewableFaces &&
+    left.hasKeywords === right.hasKeywords &&
     left.keywordQuery.includeMode === right.keywordQuery.includeMode &&
     left.keywordQuery.include.length === right.keywordQuery.include.length &&
     left.keywordQuery.exclude.length === right.keywordQuery.exclude.length &&
@@ -2609,7 +2659,9 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.peopleIds.length > 0 ||
     filters.excludedPeopleIds.length > 0 ||
     filters.hasNoPeople ||
+    filters.hasConfirmedPeople ||
     filters.hasReviewableFaces ||
+    filters.hasKeywords ||
     filters.keywordQuery.include.length > 0 ||
     filters.keywordQuery.exclude.length > 0
   );
@@ -2772,6 +2824,7 @@ type AssetCardProps = {
   isActive: boolean;
   isUpdating: boolean;
   showPhotoStateBadge: boolean;
+  showKeywordAssignmentBadge: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
 };
@@ -2782,6 +2835,7 @@ function AssetCard({
   isActive,
   isUpdating,
   showPhotoStateBadge,
+  showKeywordAssignmentBadge,
   onCardClick,
   onCardDoubleClick
 }: AssetCardProps) {
@@ -2866,6 +2920,15 @@ function AssetCard({
           <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
             {photoStateLabel}
           </span>
+        ) : null}
+        {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
+          <span
+            style={{
+              ...cardKeywordBadgeStyle,
+              backgroundColor: getAssetKeywordStatusDotColor(asset.keywordAssignmentStatus)
+            }}
+            title={`Keywords: ${asset.keywordAssignmentStatus}`}
+          />
         ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
@@ -3660,6 +3723,7 @@ export default function App() {
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
+  const [albumTreeKeywordStatusSubmenuOpen, setAlbumTreeKeywordStatusSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -3783,6 +3847,13 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasNoPeopleStorageKey));
   });
+  const [searchHasConfirmedPeople, setSearchHasConfirmedPeople] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return parseBooleanFromStorage(window.localStorage.getItem(searchHasConfirmedPeopleStorageKey));
+  });
   const [searchHasReviewableFaces, setSearchHasReviewableFaces] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -3790,6 +3861,14 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasReviewableFacesStorageKey));
   });
+  const [searchHasKeywords, setSearchHasKeywords] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return parseBooleanFromStorage(window.localStorage.getItem(searchHasKeywordsStorageKey));
+  });
+  const [reviewableDetectionAssetIds, setReviewableDetectionAssetIds] = useState<Set<string> | null>(null);
   const [searchKeywordInclude, setSearchKeywordInclude] = useState<KeywordQueryClause[]>(() =>
     typeof window !== 'undefined'
       ? parseKeywordClausesFromStorage(window.localStorage.getItem(searchKeywordIncludeStorageKey))
@@ -3983,6 +4062,20 @@ export default function App() {
     const stored = window.localStorage.getItem(showThumbnailPhotoStateBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showThumbnailKeywordBadges, setShowThumbnailKeywordBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showThumbnailKeywordBadgesStorageKey) === 'true';
+  });
+  const [showAlbumKeywordBadges, setShowAlbumKeywordBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true';
+  });
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [thumbnailSizeMenuOpen, setThumbnailSizeMenuOpen] = useState(false);
   const [toolbarOverflowOpen, setToolbarOverflowOpen] = useState(false);
@@ -4105,17 +4198,19 @@ export default function App() {
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const timelineScrollMemoryRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const pendingTimelineZoomAnchorKeyRef = useRef<string | null>(null);
-  const [viewOptionsMenuPosition, setViewOptionsMenuPosition] = useState<{ top: number; right: number }>({
+  const [viewOptionsMenuPosition, setViewOptionsMenuPosition] = useState<{ top: number; right: number; maxHeight: number }>({
     top: 0,
-    right: 0
+    right: 0,
+    maxHeight: 400
   });
   const [thumbnailSizeMenuPosition, setThumbnailSizeMenuPosition] = useState<{ top: number; right: number }>({
     top: 0,
     right: 0
   });
-  const [toolbarOverflowMenuPosition, setToolbarOverflowMenuPosition] = useState<{ top: number; right: number }>({
+  const [toolbarOverflowMenuPosition, setToolbarOverflowMenuPosition] = useState<{ top: number; right: number; maxHeight: number }>({
     top: 0,
-    right: 0
+    right: 0,
+    maxHeight: 600
   });
   const [stateButtonsCompact, setStateButtonsCompact] = useState<boolean>(() => {
     return localStorage.getItem('tdg-state-buttons-compact') === 'true';
@@ -4145,10 +4240,23 @@ export default function App() {
         return;
       }
 
-      setViewOptionsMenuPosition({
-        top: rect.bottom + 6,
-        right: Math.max(window.innerWidth - rect.right, 8)
-      });
+      const spaceBelow = window.innerHeight - rect.bottom - 14;
+      const spaceAbove = rect.top - 14;
+      const right = Math.max(window.innerWidth - rect.right, 8);
+      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
+        setViewOptionsMenuPosition({
+          top: rect.bottom + 6,
+          right,
+          maxHeight: Math.max(spaceBelow, 120)
+        });
+      } else {
+        const clampedHeight = Math.min(spaceAbove, 400);
+        setViewOptionsMenuPosition({
+          top: Math.max(rect.top - clampedHeight - 6, 8),
+          right,
+          maxHeight: Math.max(spaceAbove, 120)
+        });
+      }
     }
 
     updateViewOptionsMenuPosition();
@@ -4233,7 +4341,8 @@ export default function App() {
 
       setToolbarOverflowMenuPosition({
         top: rect.bottom + 6,
-        right: Math.max(window.innerWidth - rect.right, 8)
+        right: Math.max(window.innerWidth - rect.right, 8),
+        maxHeight: Math.max(window.innerHeight - rect.bottom - 14, 120)
       });
     }
 
@@ -4288,6 +4397,20 @@ export default function App() {
       showThumbnailPhotoStateBadges ? 'true' : 'false'
     );
   }, [showThumbnailPhotoStateBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailKeywordBadgesStorageKey,
+      showThumbnailKeywordBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailKeywordBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showAlbumKeywordBadgesStorageKey,
+      showAlbumKeywordBadges ? 'true' : 'false'
+    );
+  }, [showAlbumKeywordBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
@@ -4384,7 +4507,25 @@ export default function App() {
   }, [searchHasNoPeople]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchHasConfirmedPeopleStorageKey, String(searchHasConfirmedPeople));
+  }, [searchHasConfirmedPeople]);
+
+  useEffect(() => {
     window.localStorage.setItem(searchHasReviewableFacesStorageKey, String(searchHasReviewableFaces));
+  }, [searchHasReviewableFaces]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasKeywordsStorageKey, String(searchHasKeywords));
+  }, [searchHasKeywords]);
+
+  useEffect(() => {
+    if (!searchHasReviewableFaces) {
+      setReviewableDetectionAssetIds(null);
+      return;
+    }
+    listAssetIdsWithReviewableDetections()
+      .then((ids) => { setReviewableDetectionAssetIds(new Set(ids)); })
+      .catch(() => { setReviewableDetectionAssetIds(new Set()); });
   }, [searchHasReviewableFaces]);
 
   useEffect(() => {
@@ -4990,7 +5131,9 @@ export default function App() {
       peopleMatchMode: searchPeopleMatchMode,
       excludedPeopleIds: searchExcludedPeopleIds,
       hasNoPeople: searchHasNoPeople,
+      hasConfirmedPeople: searchHasConfirmedPeople,
       hasReviewableFaces: searchHasReviewableFaces,
+      hasKeywords: searchHasKeywords,
       keywordQuery: {
         include: searchKeywordInclude,
         includeMode: searchKeywordIncludeMode,
@@ -5006,7 +5149,9 @@ export default function App() {
       searchGroupIds,
       searchExcludedPeopleIds,
       searchHasNoPeople,
+      searchHasConfirmedPeople,
       searchHasReviewableFaces,
+      searchHasKeywords,
       searchKeywordInclude,
       searchKeywordIncludeMode,
       searchKeywordExclude,
@@ -5056,7 +5201,9 @@ export default function App() {
         appliedSearchFilters.peopleMatchMode,
         appliedSearchFilters.excludedPeopleIds,
         appliedSearchFilters.hasNoPeople,
-        appliedSearchFilters.hasReviewableFaces
+        appliedSearchFilters.hasConfirmedPeople,
+        appliedSearchFilters.hasReviewableFaces,
+        reviewableDetectionAssetIds
       );
       const assetKeywordIds = asset.keywordIds ?? [];
       let includePass = true;
@@ -5072,6 +5219,7 @@ export default function App() {
         }
       }
       const matchesKeyword =
+        (!appliedSearchFilters.hasKeywords || assetKeywordIds.length > 0) &&
         includePass &&
         !excludeMatchSets.some((matchSet) => assetKeywordIds.some((id) => matchSet.has(id)));
 
@@ -5093,6 +5241,7 @@ export default function App() {
     areaPhotoStateVisibleAssets,
     keywords,
     primaryArea,
+    reviewableDetectionAssetIds,
   ]);
 
   const assetsAfterAdditionalFilters = useMemo(() => {
@@ -5417,6 +5566,17 @@ export default function App() {
         .filter((keyword): keyword is Keyword => keyword !== null)
     );
   }, [keywordsById, selectedAssetsForKeywordEditing]);
+  const sharedKeywordAssignmentStatus = useMemo((): AssetKeywordAssignmentStatus | null => {
+    if (selectedAssetsForKeywordEditing.length === 0) {
+      return null;
+    }
+
+    const first = selectedAssetsForKeywordEditing[0]?.keywordAssignmentStatus ?? null;
+    const allMatch = selectedAssetsForKeywordEditing.every(
+      (asset) => (asset.keywordAssignmentStatus ?? null) === first
+    );
+    return allMatch ? first : null;
+  }, [selectedAssetsForKeywordEditing]);
   const selectedAssetsForAlbumMembershipAction = useMemo(
     () =>
       selectedAssetIdsForAlbumAction
@@ -6345,7 +6505,9 @@ export default function App() {
             appliedSearchFilters.peopleMatchMode,
             appliedSearchFilters.excludedPeopleIds,
             appliedSearchFilters.hasNoPeople,
-            appliedSearchFilters.hasReviewableFaces
+            appliedSearchFilters.hasConfirmedPeople,
+            appliedSearchFilters.hasReviewableFaces,
+            reviewableDetectionAssetIds
           );
 
           return (
@@ -6542,6 +6704,50 @@ export default function App() {
       );
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to remove keyword');
+    } finally {
+      setKeywordUpdateBusy(false);
+    }
+  }
+
+  async function handleSetAlbumKeywordAssignmentStatus(
+    albumId: string,
+    status: AlbumKeywordAssignmentStatus | null
+  ): Promise<void> {
+    closeAlbumTreeContextMenu();
+    try {
+      const updatedNode = await setAlbumKeywordAssignmentStatusRequest(albumId, status);
+      setAlbumTreeNodes((previous) =>
+        previous.map((node) => (node.id === updatedNode.id ? updatedNode : node))
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to update keyword assignment status.');
+    }
+  }
+
+  async function handleSetAssetKeywordAssignmentStatus(
+    status: AssetKeywordAssignmentStatus | null
+  ): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    setKeywordUpdateBusy(true);
+    try {
+      await setAssetKeywordAssignmentStatusRequest({ assetIds, status });
+      const assetIdSet = new Set(assetIds);
+      setAssets((previous) =>
+        previous.map((asset) =>
+          assetIdSet.has(asset.id) ? { ...asset, keywordAssignmentStatus: status ?? null } : asset
+        )
+      );
+      setSelectedAssetDetails((previous) =>
+        previous && assetIdSet.has(previous.id)
+          ? { ...previous, keywordAssignmentStatus: status ?? null }
+          : previous
+      );
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to update keyword assignment status');
     } finally {
       setKeywordUpdateBusy(false);
     }
@@ -7610,7 +7816,9 @@ export default function App() {
     setSearchPeopleMatchMode(filters.peopleMatchMode);
     setSearchExcludedPeopleIds(filters.excludedPeopleIds);
     setSearchHasNoPeople(filters.hasNoPeople);
+    setSearchHasConfirmedPeople(filters.hasConfirmedPeople);
     setSearchHasReviewableFaces(filters.hasReviewableFaces);
+    setSearchHasKeywords(filters.hasKeywords);
     setSearchKeywordInclude(filters.keywordQuery.include);
     setSearchKeywordIncludeMode(filters.keywordQuery.includeMode);
     setSearchKeywordExclude(filters.keywordQuery.exclude);
@@ -7917,6 +8125,7 @@ export default function App() {
 
   function closeAlbumTreeContextMenu(): void {
     setAlbumTreeOrderSubmenuOpen(false);
+    setAlbumTreeKeywordStatusSubmenuOpen(false);
     setAlbumTreeContextMenu(null);
   }
 
@@ -8976,6 +9185,19 @@ export default function App() {
                         {getAlbumAssetCountStatusLabel(countStatus)}
                       </span>
                     ) : null}
+                    {!isGroup && showAlbumKeywordBadges && node.keywordAssignmentStatus ? (
+                      <span
+                        title={getAlbumKeywordStatusTitle(node.keywordAssignmentStatus)}
+                        style={{
+                          flex: '0 0 auto',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: getAlbumKeywordStatusDotColor(node.keywordAssignmentStatus),
+                          display: 'inline-block'
+                        }}
+                      />
+                    ) : null}
                   </span>
                 </button>
               </div>
@@ -9240,6 +9462,47 @@ export default function App() {
             >
               Move Down
             </button>
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreeKeywordStatusSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreeKeywordStatusSubmenuOpen(false)}
+            >
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreeKeywordStatusSubmenuOpen((prev) => !prev)}
+                title="Set keyword assignment status for this album"
+              >
+                <span>Keyword Status</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreeKeywordStatusSubmenuOpen && selectedTreeNode ? (
+                <div style={contextMenuSubmenuStyle}>
+                  {(['not-started', 'in-progress', 'complete'] as AlbumKeywordAssignmentStatus[]).map(
+                    (status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        style={contextMenuItemStyle}
+                        onClick={() => void handleSetAlbumKeywordAssignmentStatus(selectedTreeNode.id, status)}
+                      >
+                        {selectedTreeNode.keywordAssignmentStatus === status ? '✓ ' : ''}
+                        {status === 'not-started' ? 'Not Started' : status === 'in-progress' ? 'In Progress' : 'Complete'}
+                      </button>
+                    )
+                  )}
+                  {selectedTreeNode.keywordAssignmentStatus ? (
+                    <button
+                      type="button"
+                      style={contextMenuItemStyle}
+                      onClick={() => void handleSetAlbumKeywordAssignmentStatus(selectedTreeNode.id, null)}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               style={contextMenuItemStyle}
@@ -9707,6 +9970,16 @@ export default function App() {
                     A keyword is both included and excluded. Exclude takes precedence.
                   </p>
                 ) : null}
+                <div style={{ ...filterRowStyle, marginTop: '4px' }}>
+                  <label style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={searchHasKeywords}
+                      onChange={(event) => setSearchHasKeywords(event.target.checked)}
+                    />
+                    Has keywords
+                  </label>
+                </div>
               </>
             );
           })() : null}
@@ -9825,11 +10098,28 @@ export default function App() {
                   <label style={filterOptionLabelStyle}>
                     <input
                       type="checkbox"
+                      checked={searchHasConfirmedPeople}
+                      onChange={(event) => {
+                        const nextChecked = event.target.checked;
+                        setSearchHasConfirmedPeople(nextChecked);
+                        if (nextChecked) {
+                          setSearchHasNoPeople(false);
+                        }
+                      }}
+                    />
+                    Has confirmed people
+                  </label>
+                </div>
+                <div style={{ ...filterRowStyle, marginTop: 0 }}>
+                  <label style={filterOptionLabelStyle}>
+                    <input
+                      type="checkbox"
                       checked={searchHasNoPeople}
                       onChange={(event) => {
                         const nextChecked = event.target.checked;
                         setSearchHasNoPeople(nextChecked);
                         if (nextChecked) {
+                          setSearchHasConfirmedPeople(false);
                           setSearchPeopleIds([]);
                         }
                       }}
@@ -10252,8 +10542,10 @@ export default function App() {
                 keywordsLoading={keywordsLoading}
                 keywordsError={keywordsError}
                 updateBusy={keywordUpdateBusy}
+                keywordAssignmentStatus={sharedKeywordAssignmentStatus}
                 onAddKeywords={handleAddKeywordsToSelectedAssets}
                 onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
+                onSetKeywordAssignmentStatus={handleSetAssetKeywordAssignmentStatus}
               />
             }
           />
@@ -10556,7 +10848,9 @@ export default function App() {
                 style={{
                   position: 'fixed',
                   top: `${toolbarOverflowMenuPosition.top}px`,
-                  right: `${toolbarOverflowMenuPosition.right}px`
+                  right: `${toolbarOverflowMenuPosition.right}px`,
+                  maxHeight: `${toolbarOverflowMenuPosition.maxHeight}px`,
+                  overflowY: 'auto'
                 }}
               >
                 {/* Display */}
@@ -10943,7 +11237,9 @@ export default function App() {
                         ...optionsMenuStyle,
                         position: 'fixed',
                         top: `${viewOptionsMenuPosition.top}px`,
-                        right: `${viewOptionsMenuPosition.right}px`
+                        right: `${viewOptionsMenuPosition.right}px`,
+                        maxHeight: `${viewOptionsMenuPosition.maxHeight}px`,
+                        overflowY: 'auto'
                       }}
                     >
                       <label style={toggleOptionLabelStyle}>
@@ -10961,6 +11257,22 @@ export default function App() {
                           onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
                         />
                         Show thumbnail state
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="checkbox"
+                          checked={showThumbnailKeywordBadges}
+                          onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
+                        />
+                        Show photo keyword status
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="checkbox"
+                          checked={showAlbumKeywordBadges}
+                          onChange={(event) => setShowAlbumKeywordBadges(event.target.checked)}
+                        />
+                        Show album keyword status
                       </label>
                       <span style={filterSubsectionTitleStyle}>Album Layout</span>
                       <label style={toggleOptionLabelStyle}>
@@ -11258,6 +11570,7 @@ export default function App() {
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
+                          showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                         />
@@ -11285,6 +11598,7 @@ export default function App() {
                           isActive={selectedAssetId === asset.id}
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
+                          showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                         />
@@ -11303,6 +11617,7 @@ export default function App() {
                     isActive={selectedAssetId === asset.id}
                     isUpdating={updatingAssetIds[asset.id] === true}
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
+                    showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
                   />

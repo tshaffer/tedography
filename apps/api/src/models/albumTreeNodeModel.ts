@@ -14,6 +14,12 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
       enum: ['Custom', 'Name', 'NumericThenName'],
       default: null
     },
+    keywordAssignmentStatus: {
+      type: String,
+      required: false,
+      enum: ['not-started', 'in-progress', 'complete'],
+      default: null
+    },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },
