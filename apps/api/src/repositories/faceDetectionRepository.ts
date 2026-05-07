@@ -200,6 +200,13 @@ export async function summarizeFaceDetectionsByAssetIds(mediaAssetIds: string[])
   return summaries;
 }
 
+export async function listAssetIdsWithReviewableDetections(): Promise<string[]> {
+  const results = await FaceDetectionModel.distinct('mediaAssetId', {
+    matchStatus: { $in: ['unmatched', 'suggested', 'autoMatched'] }
+  }).exec();
+  return results as string[];
+}
+
 export async function findFaceDetectionById(id: string): Promise<FaceDetection | null> {
   const detection = await FaceDetectionModel.findOne({ id }, { _id: 0 }).lean<FaceDetection | null>();
   return detection ? normalizeFaceDetection(detection) : null;

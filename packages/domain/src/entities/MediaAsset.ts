@@ -1,5 +1,6 @@
 import { MediaType } from '../enums/MediaType.js';
 import { PhotoState } from '../enums/PhotoState.js';
+import type { AssetKeywordAssignmentStatus } from '../enums/KeywordAssignmentStatus.js';
 
 export type DisplayStorageType = 'archive-root' | 'derived-root';
 
@@ -58,6 +59,7 @@ export interface MediaAsset {
   albumIds?: string[];
   albumMemberships?: MediaAssetAlbumMembership[];
   keywordIds?: string[];
+  keywordAssignmentStatus?: AssetKeywordAssignmentStatus | null;
 
   // Derived convenience field populated from confirmed person assignments.
   people?: MediaAssetPerson[];

@@ -1,4 +1,10 @@
-import type { Keyword, KeywordTreeNode, MediaAsset } from '@tedography/domain';
+import type {
+  AssetKeywordAssignmentStatus,
+  Keyword,
+  KeywordChangeEvent,
+  KeywordTreeNode,
+  MediaAsset
+} from '@tedography/domain';
 
 export interface CreateKeywordRequest {
   label: string;
@@ -50,6 +56,21 @@ export interface UpdateAssetKeywordsResponse {
 
 export interface DeleteKeywordResponse {
   deletedIds: string[];
+}
+
+export interface SetAssetKeywordAssignmentStatusRequest {
+  assetIds: string[];
+  status: AssetKeywordAssignmentStatus | null;
+}
+
+export interface SetAssetKeywordAssignmentStatusResponse {
+  assetIds: string[];
+  status: AssetKeywordAssignmentStatus | null;
+}
+
+export interface ListKeywordChangesResponse {
+  since: string;
+  items: KeywordChangeEvent[];
 }
 
 export interface ListKeywordAssetsResponse {

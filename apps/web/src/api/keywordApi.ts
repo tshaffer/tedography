@@ -3,8 +3,11 @@ import type {
   CreateKeywordResponse,
   DeleteKeywordResponse,
   ListAssetKeywordsResponse,
+  ListKeywordChangesResponse,
   ListKeywordsResponse,
   ListKeywordTreeResponse,
+  SetAssetKeywordAssignmentStatusRequest,
+  SetAssetKeywordAssignmentStatusResponse,
   UpdateKeywordLabelRequest,
   UpdateKeywordLabelResponse,
   UpdateKeywordParentRequest,
@@ -105,4 +108,20 @@ export async function removeKeywordsFromAssets(
     },
     body: JSON.stringify(request)
   });
+}
+
+export async function setAssetKeywordAssignmentStatus(
+  request: SetAssetKeywordAssignmentStatusRequest
+): Promise<SetAssetKeywordAssignmentStatusResponse> {
+  return fetchJson<SetAssetKeywordAssignmentStatusResponse>('/api/assets/keywords/assignment-status', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function listKeywordChangesSince(since: string): Promise<ListKeywordChangesResponse> {
+  return fetchJson<ListKeywordChangesResponse>(
+    `/api/keywords/changes?since=${encodeURIComponent(since)}`
+  );
 }
