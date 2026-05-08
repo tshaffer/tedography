@@ -8,8 +8,10 @@ import {
 } from '@tedography/domain';
 import {
   createMediaAsset,
+  findById,
   findByOriginalStorageRootAndArchivePaths
 } from '../repositories/assetRepository.js';
+import { linkGeneratedAsset } from '../repositories/aiEditHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
@@ -23,6 +25,31 @@ import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUti
 import { getMediaSupport } from './supportedMedia.js';
 import { generateJpegThumbnail } from './thumbnailGeneration.js';
 import { schedulePeoplePipelineForAsset } from '../people/peoplePipelineService.js';
+
+interface AiSidecar {
+  sourceAssetId: string;
+  generatedBy: string;
+  prompt: string;
+}
+
+async function readAiSidecar(imageAbsolutePath: string): Promise<AiSidecar | null> {
+  const sidecarPath = imageAbsolutePath.replace(/\.[^.]+$/, '.json');
+  try {
+    const raw = await fs.readFile(sidecarPath, 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'sourceAssetId' in parsed &&
+      typeof (parsed as Record<string, unknown>).sourceAssetId === 'string'
+    ) {
+      return parsed as AiSidecar;
+    }
+  } catch {
+    // No sidecar or unreadable — treat as normal import
+  }
+  return null;
+}
 
 export type RegisterErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'UNAVAILABLE';
 
@@ -239,20 +266,33 @@ export async function registerImportedFiles(input: {
       const metadata = await extractImportMetadata(absolutePath, { includeReverseGeocode: true });
       const importedAt = new Date();
 
+      const sidecar = await readAiSidecar(absolutePath);
+      const sourceAsset = sidecar ? await findById(sidecar.sourceAssetId) : null;
+
       const createdAsset = await createMediaAsset({
         filename: normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
         mediaType: mediaSupport.mediaType === 'Unknown' ? MediaType.Photo : mediaSupport.mediaType,
         photoState: PhotoState.New,
-        captureDateTime: metadata.captureDateTime,
+        captureDateTime: sourceAsset?.captureDateTime
+          ? new Date(sourceAsset.captureDateTime)
+          : metadata.captureDateTime,
         width: metadata.width,
         height: metadata.height,
-        locationLabel: metadata.locationLabel,
-        locationLatitude: metadata.locationLatitude,
-        locationLongitude: metadata.locationLongitude,
-        city: metadata.city,
-        state: metadata.state,
-        country: metadata.country,
+        locationLabel: sourceAsset?.locationLabel ?? metadata.locationLabel,
+        locationLatitude: sourceAsset?.locationLatitude ?? metadata.locationLatitude,
+        locationLongitude: sourceAsset?.locationLongitude ?? metadata.locationLongitude,
+        city: sourceAsset?.city ?? metadata.city,
+        state: sourceAsset?.state ?? metadata.state,
+        country: sourceAsset?.country ?? metadata.country,
         importedAt,
+        sourceAssetId: sourceAsset?.id ?? null,
+        keywordIds: sourceAsset?.keywordIds ?? [],
+        albumIds: sourceAsset?.albumIds ?? [],
+        albumMemberships: (sourceAsset?.albumMemberships ?? []).map((m) => ({
+          albumId: m.albumId,
+          manualSortOrdinal: null,
+          forceManualOrder: null,
+        })),
         originalStorageRootId: root.id,
         originalArchivePath: normalizedRelativePath,
         originalFileSizeBytes: fileStat.size,
@@ -271,6 +311,9 @@ export async function registerImportedFiles(input: {
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);
       schedulePeoplePipelineForAsset(createdAsset.id);
+      if (sourceAsset) {
+        void linkGeneratedAsset(sourceAsset.id, createdAsset.filename, createdAsset.id);
+      }
 
       results.push({
         relativePath: normalizedRelativePath,

@@ -33,6 +33,25 @@ export function clearAiQueue(): Promise<void> {
   return fetchJson<void>('/api/ai-queue', { method: 'DELETE' });
 }
 
-export function exportAiQueue(): Promise<{ exportPath: string; count: number }> {
-  return fetchJson<{ exportPath: string; count: number }>('/api/ai-queue/export', { method: 'POST' });
+export function exportAiQueue(assetIds: string[]): Promise<{ exportPath: string; count: number }> {
+  return fetchJson<{ exportPath: string; count: number }>('/api/ai-queue/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assetIds }),
+  });
+}
+
+export interface GeminiEditResult {
+  assetId: string;
+  filename: string;
+  outputPath: string | null;
+  error: string | null;
+}
+
+export function processAiQueueWithGemini(assetIds: string[]): Promise<{ results: GeminiEditResult[] }> {
+  return fetchJson<{ results: GeminiEditResult[] }>('/api/ai-queue/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assetIds }),
+  });
 }

@@ -24,6 +24,7 @@ import {
   updatePhotoState
 } from './repositories/assetRepository.js';
 import { listAssetIdsWithReviewableDetections } from './repositories/faceDetectionRepository.js';
+import { aiHistoryRoutes } from './routes/aiHistoryRoutes.js';
 import { aiQueueRoutes } from './routes/aiQueueRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
@@ -106,6 +107,7 @@ export function createServer(): Express {
   app.use('/api/assets', assetKeywordRoutes);
   app.use('/api/people-pipeline', peoplePipelineRoutes);
   app.use('/api/ai-queue', aiQueueRoutes);
+  app.use('/api/ai-history', aiHistoryRoutes);
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.

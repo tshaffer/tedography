@@ -341,6 +341,7 @@ export interface CreateMediaAssetInput {
   albumIds?: string[];
   keywordIds?: string[];
   albumMemberships?: MediaAssetAlbumMembership[];
+  sourceAssetId?: string | null;
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
@@ -374,7 +375,8 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     albumIds: input.albumIds ?? [],
     keywordIds: input.keywordIds ?? [],
     albumMemberships: input.albumMemberships ?? [],
-    people: []
+    people: [],
+    ...(input.sourceAssetId != null && { sourceAssetId: input.sourceAssetId }),
   };
 
   if (input.thumbnailStorageType) {
