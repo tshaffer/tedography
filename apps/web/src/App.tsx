@@ -104,6 +104,7 @@ import {
   clearAiQueue,
   exportAiQueue,
   getAiQueue,
+  processAiQueueWithGemini,
   removeFromAiQueue,
 } from './api/aiQueueApi';
 import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
@@ -3718,6 +3719,9 @@ export default function App() {
   const [aiQueueDialogOpen, setAiQueueDialogOpen] = useState(false);
   const [aiQueueExportNotice, setAiQueueExportNotice] = useState<string | null>(null);
   const [aiQueueExportError, setAiQueueExportError] = useState<string | null>(null);
+  const [aiQueueProcessNotice, setAiQueueProcessNotice] = useState<string | null>(null);
+  const [aiQueueProcessError, setAiQueueProcessError] = useState<string | null>(null);
+  const [aiQueueProcessing, setAiQueueProcessing] = useState(false);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
@@ -6848,6 +6852,28 @@ export default function App() {
       setAiQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.exportPath}`);
     } catch (err) {
       setAiQueueExportError(err instanceof Error ? err.message : 'Export failed');
+    }
+  }
+
+  async function handleProcessAiQueue(): Promise<void> {
+    setAiQueueProcessNotice(null);
+    setAiQueueProcessError(null);
+    setAiQueueProcessing(true);
+    try {
+      const { results } = await processAiQueueWithGemini();
+      const succeeded = results.filter((r) => r.outputPath !== null).length;
+      const failed = results.filter((r) => r.error !== null).length;
+      if (failed === 0) {
+        setAiQueueProcessNotice(`Processed ${succeeded} image${succeeded !== 1 ? 's' : ''} with Gemini`);
+      } else {
+        setAiQueueProcessNotice(`${succeeded} succeeded, ${failed} failed`);
+        const firstError = results.find((r) => r.error)?.error ?? 'Unknown error';
+        setAiQueueProcessError(firstError);
+      }
+    } catch (err) {
+      setAiQueueProcessError(err instanceof Error ? err.message : 'Processing failed');
+    } finally {
+      setAiQueueProcessing(false);
     }
   }
 
@@ -10423,6 +10449,15 @@ export default function App() {
         <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
+            style={aiQueueEntries.length === 0 || aiQueueProcessing ? { ...compareButtonStyle, opacity: 0.5, cursor: 'default' } : { ...compareButtonStyle, backgroundColor: '#1a56db', color: '#fff', borderColor: '#1a56db' }}
+            onClick={() => void handleProcessAiQueue()}
+            disabled={aiQueueEntries.length === 0 || aiQueueProcessing}
+            title="Send each queued photo to Gemini and save the edited result"
+          >
+            {aiQueueProcessing ? 'Processing…' : 'Process with Gemini'}
+          </button>
+          <button
+            type="button"
             style={compareButtonStyle}
             onClick={() => void handleExportAiQueue()}
             disabled={aiQueueEntries.length === 0}
@@ -10439,6 +10474,12 @@ export default function App() {
             Clear
           </button>
         </div>
+        {aiQueueProcessNotice ? (
+          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{aiQueueProcessNotice}</p>
+        ) : null}
+        {aiQueueProcessError ? (
+          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{aiQueueProcessError}</p>
+        ) : null}
         {aiQueueExportNotice ? (
           <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{aiQueueExportNotice}</p>
         ) : null}
@@ -11804,9 +11845,13 @@ export default function App() {
         error={aiQueueError}
         exportNotice={aiQueueExportNotice}
         exportError={aiQueueExportError}
+        processNotice={aiQueueProcessNotice}
+        processError={aiQueueProcessError}
+        processing={aiQueueProcessing}
         onClose={() => setAiQueueDialogOpen(false)}
         onRemove={(assetId) => void handleRemoveFromAiQueue(assetId)}
         onExport={() => void handleExportAiQueue()}
+        onProcess={() => void handleProcessAiQueue()}
         onClear={() => void handleClearAiQueue()}
       />
 

@@ -36,3 +36,14 @@ export function clearAiQueue(): Promise<void> {
 export function exportAiQueue(): Promise<{ exportPath: string; count: number }> {
   return fetchJson<{ exportPath: string; count: number }>('/api/ai-queue/export', { method: 'POST' });
 }
+
+export interface GeminiEditResult {
+  assetId: string;
+  filename: string;
+  outputPath: string | null;
+  error: string | null;
+}
+
+export function processAiQueueWithGemini(): Promise<{ results: GeminiEditResult[] }> {
+  return fetchJson<{ results: GeminiEditResult[] }>('/api/ai-queue/process', { method: 'POST' });
+}

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router, type Router as RouterType } from 'express';
 import { config } from '../config.js';
+import { editImageWithGemini } from '../import/aiImageEditService.js';
 import { log } from '../logger.js';
 import {
   resolveDisplayAbsolutePathForAsset,
@@ -59,6 +60,36 @@ aiQueueRoutes.delete('/:assetId', async (req, res) => {
   } catch (error) {
     log.error('Failed to remove from AI queue', error);
     res.status(500).json({ error: 'Failed to remove from AI queue' });
+  }
+});
+
+aiQueueRoutes.post('/process', async (_req, res) => {
+  const exportPath = config.aiQueueExportPath;
+  if (!exportPath) {
+    res.status(400).json({ error: 'TEDOGRAPHY_AI_QUEUE_EXPORT_PATH is not configured in .env' });
+    return;
+  }
+  if (!config.googleApiKey) {
+    res.status(400).json({ error: 'GOOGLE_API_KEY is not configured in .env' });
+    return;
+  }
+  try {
+    await fs.mkdir(exportPath, { recursive: true });
+    const entries = await getQueueEntries();
+    const results = [];
+    for (const entry of entries) {
+      const asset = await findById(entry.assetId);
+      if (!asset) {
+        results.push({ assetId: entry.assetId, filename: '', outputPath: null, error: 'Asset not found' });
+        continue;
+      }
+      const result = await editImageWithGemini(asset, entry.prompt, exportPath);
+      results.push(result);
+    }
+    res.json({ results });
+  } catch (error) {
+    log.error('Failed to process AI queue with Gemini', error);
+    res.status(500).json({ error: 'Failed to process AI queue with Gemini' });
   }
 });
 

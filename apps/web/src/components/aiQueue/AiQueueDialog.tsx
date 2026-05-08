@@ -8,9 +8,13 @@ interface AiQueueDialogProps {
   error: string | null;
   exportNotice: string | null;
   exportError: string | null;
+  processNotice: string | null;
+  processError: string | null;
+  processing: boolean;
   onClose: () => void;
   onRemove: (assetId: string) => void;
   onExport: () => void;
+  onProcess: () => void;
   onClear: () => void;
 }
 
@@ -113,9 +117,13 @@ export function AiQueueDialog({
   error,
   exportNotice,
   exportError,
+  processNotice,
+  processError,
+  processing,
   onClose,
   onRemove,
   onExport,
+  onProcess,
   onClear,
 }: AiQueueDialogProps): ReactElement | null {
   if (!open) return null;
@@ -166,6 +174,15 @@ export function AiQueueDialog({
         <div style={footerStyle}>
           <button
             type="button"
+            style={entries.length === 0 || processing ? disabledButtonStyle : { ...actionButtonStyle, backgroundColor: '#1a56db', color: '#fff', borderColor: '#1a56db' }}
+            onClick={onProcess}
+            disabled={entries.length === 0 || processing}
+            title="Send each queued photo to Gemini and save the edited result"
+          >
+            {processing ? 'Processing…' : 'Process with Gemini'}
+          </button>
+          <button
+            type="button"
             style={entries.length === 0 ? disabledButtonStyle : actionButtonStyle}
             onClick={onExport}
             disabled={entries.length === 0}
@@ -181,6 +198,12 @@ export function AiQueueDialog({
           >
             Clear
           </button>
+          {processNotice ? (
+            <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{processNotice}</span>
+          ) : null}
+          {processError ? (
+            <span style={{ fontSize: '12px', color: '#b00020' }}>{processError}</span>
+          ) : null}
           {exportNotice ? (
             <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{exportNotice}</span>
           ) : null}
