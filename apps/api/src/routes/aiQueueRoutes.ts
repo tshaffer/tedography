@@ -21,7 +21,13 @@ export const aiQueueRoutes: RouterType = Router();
 aiQueueRoutes.get('/', async (_req, res) => {
   try {
     const entries = await getQueueEntries();
-    res.json(entries);
+    const withFilenames = await Promise.all(
+      entries.map(async (entry) => {
+        const asset = await findById(entry.assetId);
+        return { ...entry, filename: asset?.filename ?? entry.assetId };
+      })
+    );
+    res.json(withFilenames);
   } catch (error) {
     log.error('Failed to get AI queue', error);
     res.status(500).json({ error: 'Failed to get AI queue' });
@@ -77,14 +83,14 @@ aiQueueRoutes.post('/process', async (_req, res) => {
     await fs.mkdir(exportPath, { recursive: true });
     const entries = await getQueueEntries();
     const results = [];
-    for (const entry of entries) {
-      const asset = await findById(entry.assetId);
+    const firstEntry = entries[0];
+    if (firstEntry !== undefined) {
+      const asset = await findById(firstEntry.assetId);
       if (!asset) {
-        results.push({ assetId: entry.assetId, filename: '', outputPath: null, error: 'Asset not found' });
-        continue;
+        results.push({ assetId: firstEntry.assetId, filename: '', outputPath: null, error: 'Asset not found' });
+      } else {
+        results.push(await editImageWithGemini(asset, firstEntry.prompt, exportPath));
       }
-      const result = await editImageWithGemini(asset, entry.prompt, exportPath);
-      results.push(result);
     }
     res.json({ results });
   } catch (error) {

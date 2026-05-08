@@ -28,14 +28,13 @@ The **AI Edit Queue** panel appears in the left sidebar whenever there are items
 
 ### 3. Process with Gemini
 
-Click **Process with Gemini** in the queue panel. Tedography will:
+Click **Process with Gemini** in the queue panel. Tedography will process the **first entry in the queue**:
 
-1. Iterate through each queued entry in order
-2. Read the photo from disk and base64-encode it
-3. Send the image and prompt to the Gemini API (`gemini-2.5-flash-preview-05-20`)
-4. Save the returned edited image as `<original-filename>_gemini.jpg` in the configured output folder
+1. Read the photo from disk and base64-encode it
+2. Send the image and prompt to the Gemini API (`gemini-2.5-flash-preview-05-20`)
+3. Save the returned edited image as `<original-filename>_gemini.jpg` in the configured output folder
 
-When processing completes, the panel shows a summary: how many images succeeded and how many failed. If any failed, the first error message is displayed.
+When processing completes, the panel shows whether it succeeded or failed. If it failed, the error message is displayed. Click **Process with Gemini** again to process the next entry in the queue.
 
 HEIC/HEIF originals are automatically converted — Tedography sends the JPEG display version to Gemini rather than the raw HEIC file.
 
@@ -92,7 +91,7 @@ TEDOGRAPHY_AI_QUEUE_EXPORT_PATH=/Users/yourname/Desktop/AI-Queue
 
 ### Gemini integration
 
-`POST /api/ai-queue/process` iterates all queue entries and calls `editImageWithGemini()` for each one sequentially. The function:
+`POST /api/ai-queue/process` processes only the **first queue entry** and calls `editImageWithGemini()` for it. The function:
 
 1. Resolves the source file path — display JPEG for HEIC originals, original file otherwise
 2. Reads the file and encodes it as base64
@@ -108,7 +107,7 @@ The SDK used is `@google/genai` v2 (`GoogleGenAI` class, `models.generateContent
 
 - **Originals are never modified.** Gemini output is always saved as a new file.
 - **Output filenames**: `photo.jpg` → `photo_gemini.jpg`. If two queued photos from different folders share the same filename, the second will overwrite the first in the output folder.
-- **Processing is sequential.** Each image waits for the previous to complete before sending. Large queues may take a while depending on image sizes and API latency.
+- **One at a time.** Each click of **Process with Gemini** sends only the first queued entry. Click again to process the next.
 - **Prompts persist.** Queue entries are stored in MongoDB and survive app restarts.
 - **Partial failures.** If some images fail and others succeed, the panel reports both counts and shows the first error. Successfully processed images are still saved.
 - **Model.** The current model is `gemini-2.5-flash-preview-05-20`. To change it, update the model string in `apps/api/src/import/aiImageEditService.ts`.
