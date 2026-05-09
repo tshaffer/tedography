@@ -31,7 +31,7 @@ The **AI Edit Queue** panel appears in the left sidebar whenever there are items
 Click **Process with Gemini** in the queue panel. Tedography will process the **first entry in the queue**:
 
 1. Read the photo from disk and base64-encode it
-2. Send the image and prompt to the Gemini API (`gemini-2.5-flash-preview-05-20`)
+2. Send the image and prompt to the Gemini API (`gemini-2.5-flash-image`)
 3. Save the returned edited image as `<original-filename>_gemini.jpg` in the configured output folder
 
 When processing completes, the panel shows whether it succeeded or failed. If it failed, the error message is displayed. Click **Process with Gemini** again to process the next entry in the queue.
@@ -110,4 +110,4 @@ The SDK used is `@google/genai` v2 (`GoogleGenAI` class, `models.generateContent
 - **One at a time.** Each click of **Process with Gemini** sends only the first queued entry. Click again to process the next.
 - **Prompts persist.** Queue entries are stored in MongoDB and survive app restarts.
 - **Partial failures.** If some images fail and others succeed, the panel reports both counts and shows the first error. Successfully processed images are still saved.
-- **Model.** The current model is `gemini-2.5-flash-preview-05-20`. To change it, update the model string in `apps/api/src/import/aiImageEditService.ts`.
+- **Model.** The current model is `gemini-2.5-flash-image`. To change it, update the model string in `apps/api/src/import/aiImageEditService.ts`.

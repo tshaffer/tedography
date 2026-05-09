@@ -28,7 +28,11 @@
       "Bash(pnpm build *)",
       "Bash(grep -n \"hasNoPeople: searchHasNoPeople\\\\|hasReviewableFaces: searchHasReviewableFaces\\\\|searchHasNoPeople,\\\\s*$\\\\|searchHasReviewableFaces,\\\\s*$\" /Users/tedshaffer/Documents/Projects/tedography/apps/web/src/App.tsx)",
       "Bash(pnpm --filter @tedography/api add @google/genai)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(grep -v \"^--$\")",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(npm view *)"
     ]
   }
 }
