@@ -3,7 +3,7 @@ import path from 'node:path';
 import { GoogleGenAI, type Content } from '@google/genai';
 import type { MediaAsset } from '@tedography/domain';
 import { config } from '../config.js';
-import { resolveDisplayAbsolutePathForAsset, resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
+import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
 
 export interface GeminiEditResult {
   assetId: string;
@@ -16,6 +16,7 @@ function mimeTypeForFormat(format: string): string {
   const f = format.toLowerCase();
   if (f === 'png') return 'image/png';
   if (f === 'webp') return 'image/webp';
+  if (f === 'heic' || f === 'heif') return 'image/heic';
   return 'image/jpeg';
 }
 
@@ -29,10 +30,7 @@ export async function editImageWithGemini(
     return { assetId: asset.id, filename: asset.filename, outputPath: null, error: 'GOOGLE_API_KEY is not configured' };
   }
 
-  const isHeic = /^hei[cf]$/i.test(asset.originalFileFormat);
-  const srcPath = isHeic
-    ? resolveDisplayAbsolutePathForAsset(asset)
-    : resolveOriginalAbsolutePathForAsset(asset);
+  const srcPath = resolveOriginalAbsolutePathForAsset(asset);
 
   const baseName = asset.filename.replace(/\.[^.]+$/, '');
   const outputFilename = `${baseName}_gemini.jpg`;
@@ -41,7 +39,7 @@ export async function editImageWithGemini(
   try {
     const imageBuffer = await fs.readFile(srcPath);
     const base64Image = imageBuffer.toString('base64');
-    const mimeType = isHeic ? 'image/jpeg' : mimeTypeForFormat(asset.originalFileFormat);
+    const mimeType = mimeTypeForFormat(asset.originalFileFormat);
 
     const genAI = new GoogleGenAI({ apiKey });
 

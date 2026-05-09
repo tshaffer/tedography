@@ -36,7 +36,7 @@ Click **Process with Gemini** in the queue panel. Tedography will process the **
 
 When processing completes, the panel shows whether it succeeded or failed. If it failed, the error message is displayed. Click **Process with Gemini** again to process the next entry in the queue.
 
-HEIC/HEIF originals are automatically converted — Tedography sends the JPEG display version to Gemini rather than the raw HEIC file.
+HEIC/HEIF originals are sent directly to Gemini — no conversion needed, as Gemini natively supports HEIC.
 
 ### 4. Review the results
 
