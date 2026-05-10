@@ -64,6 +64,8 @@ export async function editImageWithGemini(
       if (part.inlineData?.data) {
         const outputBuffer = Buffer.from(part.inlineData.data, 'base64');
         await fs.writeFile(outputPath, outputBuffer);
+        const sidecarPath = outputPath.replace(/\.[^.]+$/, '.json');
+        await fs.writeFile(sidecarPath, JSON.stringify({ sourceAssetId: asset.id, generatedBy: 'gemini', prompt }, null, 2), 'utf-8');
         return { assetId: asset.id, filename: asset.filename, outputPath, error: null };
       }
     }

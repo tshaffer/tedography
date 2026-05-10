@@ -70,6 +70,9 @@ export interface MediaAsset {
   confirmedDetectionsCount?: number;
   peopleRecognitionRanAt?: string | null;
 
+  // When this asset was generated from another asset (e.g. AI editing), the source asset's id.
+  sourceAssetId?: string | null;
+
   // Optional capture location metadata when available.
   locationLabel?: string | null;
   locationLatitude?: number | null;
