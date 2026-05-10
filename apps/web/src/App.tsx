@@ -6844,23 +6844,23 @@ export default function App() {
     }
   }
 
-  async function handleExportAiQueue(): Promise<void> {
+  async function handleExportAiQueue(assetIds: string[]): Promise<void> {
     setAiQueueExportNotice(null);
     setAiQueueExportError(null);
     try {
-      const result = await exportAiQueue();
+      const result = await exportAiQueue(assetIds);
       setAiQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.exportPath}`);
     } catch (err) {
       setAiQueueExportError(err instanceof Error ? err.message : 'Export failed');
     }
   }
 
-  async function handleProcessAiQueue(): Promise<void> {
+  async function handleProcessAiQueue(assetIds: string[]): Promise<void> {
     setAiQueueProcessNotice(null);
     setAiQueueProcessError(null);
     setAiQueueProcessing(true);
     try {
-      const { results } = await processAiQueueWithGemini();
+      const { results } = await processAiQueueWithGemini(assetIds);
       const succeeded = results.filter((r) => r.outputPath !== null).length;
       const failed = results.filter((r) => r.error !== null).length;
       if (failed === 0) {
@@ -6875,6 +6875,11 @@ export default function App() {
     } finally {
       setAiQueueProcessing(false);
     }
+  }
+
+  async function handleSaveAiQueuePrompt(assetId: string, prompt: string): Promise<void> {
+    await addToAiQueue(assetId, prompt);
+    await loadAiQueue();
   }
 
   async function handleMoveSelectedAssetWithinAlbum(
@@ -10450,7 +10455,7 @@ export default function App() {
           <button
             type="button"
             style={aiQueueEntries.length === 0 || aiQueueProcessing ? { ...compareButtonStyle, opacity: 0.5, cursor: 'default' } : { ...compareButtonStyle, backgroundColor: '#1a56db', color: '#fff', borderColor: '#1a56db' }}
-            onClick={() => void handleProcessAiQueue()}
+            onClick={() => void handleProcessAiQueue(aiQueueEntries.map((e) => e.assetId))}
             disabled={aiQueueEntries.length === 0 || aiQueueProcessing}
             title="Send each queued photo to Gemini and save the edited result"
           >
@@ -10459,7 +10464,7 @@ export default function App() {
           <button
             type="button"
             style={compareButtonStyle}
-            onClick={() => void handleExportAiQueue()}
+            onClick={() => void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId))}
             disabled={aiQueueEntries.length === 0}
             title="Copy files to export folder and write prompts.txt"
           >
@@ -11125,7 +11130,7 @@ export default function App() {
                         <button
                           type="button"
                           className="tdg-overflow-item"
-                          onClick={() => { void handleExportAiQueue(); setToolbarOverflowOpen(false); }}
+                          onClick={() => { void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId)); setToolbarOverflowOpen(false); }}
                         >
                           Export AI Queue
                         </button>
@@ -11850,9 +11855,10 @@ export default function App() {
         processing={aiQueueProcessing}
         onClose={() => setAiQueueDialogOpen(false)}
         onRemove={(assetId) => void handleRemoveFromAiQueue(assetId)}
-        onExport={() => void handleExportAiQueue()}
-        onProcess={() => void handleProcessAiQueue()}
+        onExport={(assetIds) => void handleExportAiQueue(assetIds)}
+        onProcess={(assetIds) => void handleProcessAiQueue(assetIds)}
         onClear={() => void handleClearAiQueue()}
+        onSavePrompt={(assetId, prompt) => handleSaveAiQueuePrompt(assetId, prompt)}
       />
 
       <ImportAssetsDialog

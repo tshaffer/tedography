@@ -66,7 +66,7 @@ aiQueueRoutes.delete('/:assetId', async (req, res) => {
   }
 });
 
-aiQueueRoutes.post('/process', async (_req, res) => {
+aiQueueRoutes.post('/process', async (req, res) => {
   const exportPath = config.aiQueueExportPath;
   if (!exportPath) {
     res.status(400).json({ error: 'TEDOGRAPHY_AI_QUEUE_EXPORT_PATH is not configured in .env' });
@@ -76,17 +76,27 @@ aiQueueRoutes.post('/process', async (_req, res) => {
     res.status(400).json({ error: 'GOOGLE_API_KEY is not configured in .env' });
     return;
   }
+  const { assetIds } = req.body as { assetIds?: string[] };
+  if (!Array.isArray(assetIds) || assetIds.length === 0) {
+    res.status(400).json({ error: 'assetIds must be a non-empty array' });
+    return;
+  }
   try {
     await fs.mkdir(exportPath, { recursive: true });
     const entries = await getQueueEntries();
+    const entryMap = new Map(entries.map((e) => [e.assetId, e]));
     const results = [];
-    const firstEntry = entries[0];
-    if (firstEntry !== undefined) {
-      const asset = await findById(firstEntry.assetId);
+    for (const assetId of assetIds) {
+      const entry = entryMap.get(assetId);
+      if (!entry) {
+        results.push({ assetId, filename: '', outputPath: null, error: 'Not found in queue' });
+        continue;
+      }
+      const asset = await findById(assetId);
       if (!asset) {
-        results.push({ assetId: firstEntry.assetId, filename: '', outputPath: null, error: 'Asset not found' });
+        results.push({ assetId, filename: '', outputPath: null, error: 'Asset not found' });
       } else {
-        results.push(await editImageWithGemini(asset, firstEntry.prompt, exportPath));
+        results.push(await editImageWithGemini(asset, entry.prompt, exportPath));
       }
     }
     res.json({ results });
@@ -96,18 +106,26 @@ aiQueueRoutes.post('/process', async (_req, res) => {
   }
 });
 
-aiQueueRoutes.post('/export', async (_req, res) => {
+aiQueueRoutes.post('/export', async (req, res) => {
   const exportPath = config.aiQueueExportPath;
   if (!exportPath) {
     res.status(400).json({ error: 'TEDOGRAPHY_AI_QUEUE_EXPORT_PATH is not configured in .env' });
     return;
   }
+  const { assetIds } = req.body as { assetIds?: string[] };
+  if (!Array.isArray(assetIds) || assetIds.length === 0) {
+    res.status(400).json({ error: 'assetIds must be a non-empty array' });
+    return;
+  }
   try {
     await fs.mkdir(exportPath, { recursive: true });
     const entries = await getQueueEntries();
+    const entryMap = new Map(entries.map((e) => [e.assetId, e]));
     const lines: string[] = [];
-    for (const entry of entries) {
-      const asset = await findById(entry.assetId);
+    for (const assetId of assetIds) {
+      const entry = entryMap.get(assetId);
+      if (!entry) continue;
+      const asset = await findById(assetId);
       if (!asset) continue;
       try {
         const srcPath = resolveOriginalAbsolutePathForAsset(asset);
@@ -115,12 +133,12 @@ aiQueueRoutes.post('/export', async (_req, res) => {
         await fs.copyFile(srcPath, destPath);
         lines.push(`${asset.filename}: ${entry.prompt || '(no prompt)'}`);
       } catch (err) {
-        log.error(`Failed to copy asset ${entry.assetId}`, err);
-        lines.push(`${asset.filename ?? entry.assetId}: ERROR - could not copy file`);
+        log.error(`Failed to copy asset ${assetId}`, err);
+        lines.push(`${asset.filename}: ERROR - could not copy file`);
       }
     }
     await fs.writeFile(path.join(exportPath, 'prompts.txt'), lines.join('\n') + '\n', 'utf-8');
-    res.json({ exportPath, count: entries.length });
+    res.json({ exportPath, count: assetIds.length });
   } catch (error) {
     log.error('Failed to export AI queue', error);
     res.status(500).json({ error: 'Failed to export AI queue' });
