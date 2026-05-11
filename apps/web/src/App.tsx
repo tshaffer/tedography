@@ -108,7 +108,9 @@ import {
   removeFromAiQueue,
 } from './api/aiQueueApi';
 import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
+import { AiHistoryDialog } from './components/aiQueue/AiHistoryDialog';
 import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
+import { getAiHistory } from './api/aiHistoryApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3722,6 +3724,10 @@ export default function App() {
   const [aiQueueProcessNotice, setAiQueueProcessNotice] = useState<string | null>(null);
   const [aiQueueProcessError, setAiQueueProcessError] = useState<string | null>(null);
   const [aiQueueProcessing, setAiQueueProcessing] = useState(false);
+  const [aiHistoryDialogOpen, setAiHistoryDialogOpen] = useState(false);
+  const [aiHistoryEntries, setAiHistoryEntries] = useState<import('@tedography/domain').AiEditHistoryEntry[]>([]);
+  const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
+  const [aiHistoryError, setAiHistoryError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
@@ -6880,6 +6886,20 @@ export default function App() {
   async function handleSaveAiQueuePrompt(assetId: string, prompt: string): Promise<void> {
     await addToAiQueue(assetId, prompt);
     await loadAiQueue();
+  }
+
+  async function handleOpenAiHistory(): Promise<void> {
+    setAiHistoryDialogOpen(true);
+    setAiHistoryLoading(true);
+    setAiHistoryError(null);
+    try {
+      const entries = await getAiHistory();
+      setAiHistoryEntries(entries);
+    } catch (err) {
+      setAiHistoryError(err instanceof Error ? err.message : 'Failed to load history');
+    } finally {
+      setAiHistoryLoading(false);
+    }
   }
 
   async function handleMoveSelectedAssetWithinAlbum(
@@ -11096,6 +11116,13 @@ export default function App() {
                     >
                       View Queue
                     </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleOpenAiHistory(); setToolbarOverflowOpen(false); }}
+                    >
+                      View AI History
+                    </button>
                     {selectedAssetIds.length === 1 && selectedAsset ? (() => {
                       const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
                       return queueEntry ? (
@@ -11859,6 +11886,13 @@ export default function App() {
         onProcess={(assetIds) => void handleProcessAiQueue(assetIds)}
         onClear={() => void handleClearAiQueue()}
         onSavePrompt={(assetId, prompt) => handleSaveAiQueuePrompt(assetId, prompt)}
+      />
+      <AiHistoryDialog
+        open={aiHistoryDialogOpen}
+        entries={aiHistoryEntries}
+        loading={aiHistoryLoading}
+        error={aiHistoryError}
+        onClose={() => setAiHistoryDialogOpen(false)}
       />
 
       <ImportAssetsDialog

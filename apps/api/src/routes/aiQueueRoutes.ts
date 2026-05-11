@@ -6,6 +6,7 @@ import { editImageWithGemini } from '../import/aiImageEditService.js';
 import { log } from '../logger.js';
 import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
 import { findById } from '../repositories/assetRepository.js';
+import { createHistoryEntry } from '../repositories/aiEditHistoryRepository.js';
 import {
   clearQueue,
   getQueueEntries,
@@ -95,8 +96,18 @@ aiQueueRoutes.post('/process', async (req, res) => {
       const asset = await findById(assetId);
       if (!asset) {
         results.push({ assetId, filename: '', outputPath: null, error: 'Asset not found' });
+        await createHistoryEntry({ sourceAssetId: assetId, sourceFilename: entry.assetId, prompt: entry.prompt, generatedFilename: '', status: 'failed', errorMessage: 'Asset not found' });
       } else {
-        results.push(await editImageWithGemini(asset, entry.prompt, exportPath));
+        const result = await editImageWithGemini(asset, entry.prompt, exportPath);
+        results.push(result);
+        await createHistoryEntry({
+          sourceAssetId: asset.id,
+          sourceFilename: asset.filename,
+          prompt: entry.prompt,
+          generatedFilename: result.outputPath ? path.basename(result.outputPath) : '',
+          status: result.error ? 'failed' : 'succeeded',
+          errorMessage: result.error,
+        });
       }
     }
     res.json({ results });

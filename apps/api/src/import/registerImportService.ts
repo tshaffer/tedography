@@ -11,6 +11,7 @@ import {
   findById,
   findByOriginalStorageRootAndArchivePaths
 } from '../repositories/assetRepository.js';
+import { linkGeneratedAsset } from '../repositories/aiEditHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
@@ -310,6 +311,9 @@ export async function registerImportedFiles(input: {
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);
       schedulePeoplePipelineForAsset(createdAsset.id);
+      if (sourceAsset) {
+        void linkGeneratedAsset(sourceAsset.id, createdAsset.filename, createdAsset.id);
+      }
 
       results.push({
         relativePath: normalizedRelativePath,
