@@ -7,6 +7,7 @@ type AwsSdkModule = {
     send(command: object): Promise<unknown>;
   };
   DetectFacesCommand: new (input: object) => object;
+  DetectLabelsCommand: new (input: object) => object;
   SearchUsersByImageCommand: new (input: object) => object;
   DescribeCollectionCommand: new (input: object) => object;
   CreateCollectionCommand: new (input: object) => object;
@@ -250,6 +251,13 @@ export interface RekognitionEnrollmentResult {
   faceIds: string[];
 }
 
+export interface RekognitionDetectedLabel {
+  name: string;
+  confidence: number;
+  categories: string[];
+  parents: string[];
+}
+
 export class RekognitionClient {
   private clientPromise: Promise<{ send(command: object): Promise<unknown> }> | null = null;
   private collectionReadyPromise: Promise<void> | null = null;
@@ -298,7 +306,7 @@ export class RekognitionClient {
   }
 
   private async sendImageCommandWithPreparedBytes<T>(input: {
-    commandName: 'DetectFacesCommand' | 'SearchUsersByImageCommand' | 'IndexFacesCommand';
+    commandName: 'DetectFacesCommand' | 'DetectLabelsCommand' | 'SearchUsersByImageCommand' | 'IndexFacesCommand';
     imagePath: string;
     buildInput: (bytes: Uint8Array) => object;
     fallbackMessage: string;
@@ -534,6 +542,38 @@ export class RekognitionClient {
       userId: input.userId,
       faceIds
     };
+  }
+
+  public async detectLabels(imagePath: string, options: { maxLabels?: number; minConfidence?: number } = {}): Promise<RekognitionDetectedLabel[]> {
+    type LabelCategory = { Name?: string };
+    type LabelParent = { Name?: string };
+    type DetectedLabel = {
+      Name?: string;
+      Confidence?: number;
+      Categories?: LabelCategory[];
+      Parents?: LabelParent[];
+    };
+
+    const response = await this.sendImageCommandWithPreparedBytes<{ Labels?: DetectedLabel[] }>({
+      commandName: 'DetectLabelsCommand',
+      imagePath,
+      buildInput: (bytes) => ({
+        Image: { Bytes: bytes },
+        MaxLabels: options.maxLabels ?? 50,
+        MinConfidence: options.minConfidence ?? 70,
+      }),
+      fallbackMessage: 'Rekognition DetectLabels request failed.',
+    });
+
+    return (response.Labels ?? []).flatMap((item) => {
+      if (typeof item.Name !== 'string' || typeof item.Confidence !== 'number') return [];
+      return [{
+        name: item.Name,
+        confidence: Math.round(item.Confidence * 10) / 10,
+        categories: (item.Categories ?? []).flatMap((c) => typeof c.Name === 'string' ? [c.Name] : []),
+        parents: (item.Parents ?? []).flatMap((p) => typeof p.Name === 'string' ? [p.Name] : []),
+      }];
+    });
   }
 
   public async removeUserFaceExample(input: {

@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2026-05-11T14:34:48.605Z",
+  "assetCount": 22,
+  "minConfidence": 70,
+  "files": [
+    {
+      "assetId": "0b345b1a-f542-4940-8378-d588146be466",
+      "filename": "IMG_8936.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "1372d51c-0cfa-4359-a787-6ad64113153b",
+      "filename": "IMG_8963.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "2060cb52-d509-4e92-a85b-2508c914ef65",
+      "filename": "IMG_8961.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "27dbb7fd-f5aa-43ec-8d2e-d802f0b479d3",
+      "filename": "IMG_8628_gemini.png",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "28dba438-6162-4534-9d39-991663aa05dc",
+      "filename": "IMG_8944.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "340afb2a-e6f3-4a5b-97ad-09d1df9f9751",
+      "filename": "IMG_8697.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "4311d2da-4d41-446f-ba90-a79bebaf24e3",
+      "filename": "IMG_3414.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "4fe148ec-64e8-40e9-ad7b-38db135da0a8",
+      "filename": "IMG_3410.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "59870cca-0146-4bc5-ae71-19888d9a6491",
+      "filename": "IMG_8949.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "599cee50-45f3-4f15-9394-0f5f6990a185",
+      "filename": "IMG_8964.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "6c615181-5b3f-449a-bc5d-09ca23caf947",
+      "filename": "IMG_8962.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "96a08f8f-a9df-4e0b-9faa-7eabc426add6",
+      "filename": "IMG_8935.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "aa814a87-c065-4a6f-9d01-c742ba939923",
+      "filename": "IMG_3412.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "ad238c95-5b50-4ca4-9f2b-9030206d7823",
+      "filename": "IMG_8696.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "b03b590e-4379-48fb-8580-72e252a813a9",
+      "filename": "IMG_8943.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "d809eecb-fb39-4762-9cc8-085946465b2a",
+      "filename": "IMG_3413.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "df2ac08d-d898-4362-aea2-3b2e9ece3965",
+      "filename": "IMG_8695.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "e03cc2b7-11fe-4e12-8e8a-798bd7572ff8",
+      "filename": "IMG_8628.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "e500f5c2-4c42-4525-a3ce-4ab39a400589",
+      "filename": "IMG_0899.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "f603fc37-0fa1-459a-9e13-40221f4a3f3f",
+      "filename": "IMG_8933.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "f7c81589-3da9-4752-bdf8-b4ed1365dfe4",
+      "filename": "IMG_3412_gemini.jpg",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    },
+    {
+      "assetId": "fb372ae2-e332-41b2-9e79-71e897a13ad0",
+      "filename": "IMG_8687.HEIC",
+      "labels": [],
+      "error": "User: arn:aws:iam::493991097222:user/rekognition-dev is not authorized to perform: rekognition:DetectLabels because no identity-based policy allows the rekognition:DetectLabels action"
+    }
+  ]
+}

@@ -111,6 +111,7 @@ import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
 import { AiHistoryDialog } from './components/aiQueue/AiHistoryDialog';
 import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
 import { getAiHistory } from './api/aiHistoryApi';
+import { runLabelDetection } from './api/labelDetectionApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3728,6 +3729,9 @@ export default function App() {
   const [aiHistoryEntries, setAiHistoryEntries] = useState<import('@tedography/domain').AiEditHistoryEntry[]>([]);
   const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
   const [aiHistoryError, setAiHistoryError] = useState<string | null>(null);
+  const [labelDetectionRunning, setLabelDetectionRunning] = useState(false);
+  const [labelDetectionNotice, setLabelDetectionNotice] = useState<string | null>(null);
+  const [labelDetectionError, setLabelDetectionError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
@@ -6886,6 +6890,22 @@ export default function App() {
   async function handleSaveAiQueuePrompt(assetId: string, prompt: string): Promise<void> {
     await addToAiQueue(assetId, prompt);
     await loadAiQueue();
+  }
+
+  async function handleDetectLabels(assetIds: string[]): Promise<void> {
+    setLabelDetectionNotice(null);
+    setLabelDetectionError(null);
+    setLabelDetectionRunning(true);
+    try {
+      const result = await runLabelDetection(assetIds);
+      setLabelDetectionNotice(
+        `Labels detected for ${result.labelledCount} of ${result.assetCount} photo${result.assetCount !== 1 ? 's' : ''}. Report saved to ${result.outputPath}`
+      );
+    } catch (err) {
+      setLabelDetectionError(err instanceof Error ? err.message : 'Label detection failed');
+    } finally {
+      setLabelDetectionRunning(false);
+    }
   }
 
   async function handleOpenAiHistory(): Promise<void> {
@@ -11102,6 +11122,22 @@ export default function App() {
                   </>
                 ) : null}
 
+                {/* Label Detection */}
+                {selectedAssetIds.length > 0 ? (
+                  <>
+                    <div className="tdg-overflow-divider" />
+                    <div className="tdg-overflow-section">Rekognition</div>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      disabled={labelDetectionRunning}
+                      onClick={() => { void handleDetectLabels(selectedAssetIds); setToolbarOverflowOpen(false); }}
+                    >
+                      {labelDetectionRunning ? 'Detecting…' : `Detect Labels (${selectedAssetIds.length})`}
+                    </button>
+                  </>
+                ) : null}
+
                 {/* AI Edit Queue */}
                 {(selectedAssetIds.length === 1 && selectedAsset) || aiQueueEntries.length > 0 ? (
                   <>
@@ -11459,6 +11495,8 @@ export default function App() {
       {assetsLoading ? <p>Loading assets...</p> : null}
       {assetsError ? <p>Failed to load assets: {assetsError}</p> : null}
       {updateError ? <p>{updateError}</p> : null}
+      {labelDetectionNotice ? <p style={{ color: '#136f2d', fontSize: '12px', margin: '0 0 8px 0' }}>{labelDetectionNotice}</p> : null}
+      {labelDetectionError ? <p style={{ color: '#b00020', fontSize: '12px', margin: '0 0 8px 0' }}>{labelDetectionError}</p> : null}
       {albumMembershipNotice ? (
         <p
           style={{
