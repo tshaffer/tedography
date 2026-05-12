@@ -9594,23 +9594,6 @@ export default function App() {
         <div style={albumPanelHeaderStyle}>
           <h2 style={sidePanelTitleStyle}>{title}</h2>
           <div style={albumPanelUtilityRowStyle}>
-            <Tooltip title="Reveal checked albums">
-              <span>
-                <button
-                  type="button"
-                  style={
-                    checkedAlbumIds.length > 0
-                      ? toolbarIconButtonStyle
-                      : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
-                  }
-                  onClick={revealCheckedAlbums}
-                  disabled={checkedAlbumIds.length === 0}
-                  aria-label="Reveal checked albums"
-                >
-                  <VisibilityIcon sx={{ fontSize: 18 }} />
-                </button>
-              </span>
-            </Tooltip>
             <Tooltip title="Clear checked albums">
               <span>
                 <button
@@ -9625,6 +9608,23 @@ export default function App() {
                   aria-label="Clear checked albums"
                 >
                   <DeselectIcon sx={{ fontSize: 18 }} />
+                </button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Reveal checked albums">
+              <span>
+                <button
+                  type="button"
+                  style={
+                    checkedAlbumIds.length > 0
+                      ? toolbarIconButtonStyle
+                      : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                  }
+                  onClick={revealCheckedAlbums}
+                  disabled={checkedAlbumIds.length === 0}
+                  aria-label="Reveal checked albums"
+                >
+                  <VisibilityIcon sx={{ fontSize: 18 }} />
                 </button>
               </span>
             </Tooltip>
