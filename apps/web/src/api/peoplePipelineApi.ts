@@ -22,7 +22,7 @@ import type {
   ReviewFaceDetectionRequest,
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
-import type { FaceDetectionMatchStatus } from '@tedography/domain';
+import type { FaceDetectionMatchStatus, MediaAssetPerson } from '@tedography/domain';
 
 type AssetIdsScopeRequest = {
   assetIds: string[];
@@ -261,6 +261,22 @@ export async function reviewFaceDetection(
 export async function listAssetIdsWithReviewableDetections(): Promise<string[]> {
   const response = await fetchJson<{ assetIds: string[] }>('/api/assets/reviewable-detections');
   return response.assetIds;
+}
+
+export async function addManualPersonTag(assetId: string, personId: string): Promise<MediaAssetPerson[]> {
+  const response = await fetchJson<{ people: MediaAssetPerson[] }>(
+    `/api/people-pipeline/assets/${encodeURIComponent(assetId)}/manual-people`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ personId }) }
+  );
+  return response.people;
+}
+
+export async function removeManualPersonTag(assetId: string, personId: string): Promise<MediaAssetPerson[]> {
+  const response = await fetchJson<{ people: MediaAssetPerson[] }>(
+    `/api/people-pipeline/assets/${encodeURIComponent(assetId)}/manual-people/${encodeURIComponent(personId)}`,
+    { method: 'DELETE' }
+  );
+  return response.people;
 }
 
 export async function enrollPersonFromDetection(

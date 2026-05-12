@@ -166,7 +166,15 @@ function determineIgnoredReason(input: {
 }
 
 async function recomputeMediaAssetPeople(assetId: string): Promise<MediaAssetPerson[]> {
-  const detections = await listFaceDetectionsByAssetId(assetId);
+  const [detections, asset] = await Promise.all([
+    listFaceDetectionsByAssetId(assetId),
+    findById(assetId)
+  ]);
+
+  const manualTags: MediaAssetPerson[] = (asset?.people ?? []).filter(
+    (p) => p.source === 'manual-asset-tag'
+  );
+
   const confirmedDetections = detections.filter(
     (detection) => detection.matchStatus === 'confirmed' && typeof detection.matchedPersonId === 'string'
   );
@@ -176,7 +184,7 @@ async function recomputeMediaAssetPeople(assetId: string): Promise<MediaAssetPer
   const people = await findPeopleByIds(matchedPersonIds);
   const peopleById = new Map(people.map((person) => [person.id, person]));
 
-  const derivedPeople: MediaAssetPerson[] = [];
+  const detectionPeople: MediaAssetPerson[] = [];
 
   for (const personId of matchedPersonIds) {
     const person = peopleById.get(personId);
@@ -191,7 +199,7 @@ async function recomputeMediaAssetPeople(assetId: string): Promise<MediaAssetPer
         .filter((value): value is string => typeof value === 'string')
         .sort((left, right) => left.localeCompare(right))[0] ?? null;
 
-    derivedPeople.push({
+    detectionPeople.push({
       personId,
       displayName: person.displayName,
       source: 'confirmed-face-detection',
@@ -199,15 +207,53 @@ async function recomputeMediaAssetPeople(assetId: string): Promise<MediaAssetPer
     });
   }
 
-  derivedPeople
-    .sort((left, right) =>
-      left.displayName === right.displayName
-        ? left.personId.localeCompare(right.personId)
-        : left.displayName.localeCompare(right.displayName)
-    );
+  const detectionPersonIds = new Set(detectionPeople.map((p) => p.personId));
+  const mergedPeople = [
+    ...detectionPeople,
+    ...manualTags.filter((p) => !detectionPersonIds.has(p.personId))
+  ].sort((left, right) =>
+    left.displayName === right.displayName
+      ? left.personId.localeCompare(right.personId)
+      : left.displayName.localeCompare(right.displayName)
+  );
 
-  await updateMediaAssetPeople(assetId, derivedPeople);
-  return derivedPeople;
+  await updateMediaAssetPeople(assetId, mergedPeople);
+  return mergedPeople;
+}
+
+export async function addManualPersonTag(assetId: string, personId: string): Promise<MediaAssetPerson[]> {
+  const [asset, person] = await Promise.all([findById(assetId), findPersonById(personId)]);
+  if (!asset) {
+    throw Object.assign(new Error('Asset not found'), { code: 'NOT_FOUND' });
+  }
+  if (!person) {
+    throw Object.assign(new Error('Person not found'), { code: 'NOT_FOUND' });
+  }
+
+  const existing = (asset.people ?? []).find((p) => p.personId === personId);
+  if (existing) {
+    return asset.people ?? [];
+  }
+
+  const updated: MediaAssetPerson[] = [
+    ...(asset.people ?? []),
+    { personId, displayName: person.displayName, source: 'manual-asset-tag', confirmedAt: new Date().toISOString() }
+  ];
+  const result = await updateMediaAssetPeople(assetId, updated);
+  return result?.people ?? updated;
+}
+
+export async function removeManualPersonTag(assetId: string, personId: string): Promise<MediaAssetPerson[]> {
+  const asset = await findById(assetId);
+  if (!asset) {
+    throw Object.assign(new Error('Asset not found'), { code: 'NOT_FOUND' });
+  }
+
+  const updated = (asset.people ?? []).filter(
+    (p) => !(p.personId === personId && p.source === 'manual-asset-tag')
+  );
+  const result = await updateMediaAssetPeople(assetId, updated);
+  return result?.people ?? updated;
 }
 
 async function loadPeoplePipelineAssetState(assetId: string): Promise<ListAssetFaceDetectionsResponse> {

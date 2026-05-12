@@ -17,6 +17,7 @@ import { resolveDerivedAbsolutePath } from '../import/derivedStorage.js';
 import { findFaceDetectionById } from '../repositories/faceDetectionRepository.js';
 import { summarizeFaceDetectionsByAssetIds } from '../repositories/faceDetectionRepository.js';
 import {
+  addManualPersonTag,
   enrollPersonFromDetection,
   getPeoplePipelineSummary,
   getPeopleScopedAssetSummary,
@@ -24,6 +25,7 @@ import {
   listPeopleReviewQueue,
   mergePersonIntoTarget,
   removePersonFaceExample,
+  removeManualPersonTag,
   processPeoplePipelineForAsset,
   splitPersonFromConfirmedFaces,
   reviewFaceDetection
@@ -385,6 +387,39 @@ peoplePipelineRoutes.get('/detections/:detectionId/preview', async (req, res) =>
   } catch (error) {
     log.error('Failed to serve face preview', error);
     res.status(404).json({ error: 'Face preview not available' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.post('/assets/:assetId/manual-people', async (req, res) => {
+  const { personId } = req.body as { personId?: string };
+  if (typeof personId !== 'string' || personId.trim().length === 0) {
+    res.status(400).json({ error: 'personId is required' } satisfies ImportApiErrorResponse);
+    return;
+  }
+  try {
+    const people = await addManualPersonTag(req.params.assetId, personId);
+    res.json({ people });
+  } catch (error) {
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'NOT_FOUND') {
+      res.status(404).json({ error: error.message } satisfies ImportApiErrorResponse);
+      return;
+    }
+    log.error('Failed to add manual person tag', error);
+    res.status(500).json({ error: 'Failed to add manual person tag' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.delete('/assets/:assetId/manual-people/:personId', async (req, res) => {
+  try {
+    const people = await removeManualPersonTag(req.params.assetId, req.params.personId);
+    res.json({ people });
+  } catch (error) {
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'NOT_FOUND') {
+      res.status(404).json({ error: error.message } satisfies ImportApiErrorResponse);
+      return;
+    }
+    log.error('Failed to remove manual person tag', error);
+    res.status(500).json({ error: 'Failed to remove manual person tag' } satisfies ImportApiErrorResponse);
   }
 });
 

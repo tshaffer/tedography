@@ -1,8 +1,12 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { type MediaAsset } from '@tedography/domain';
+import { type MediaAsset, type MediaAssetPerson, type Person } from '@tedography/domain';
 import Chip from '@mui/material/Chip';
+import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
+import TextField from '@mui/material/TextField';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import { listPeople } from '../../api/peoplePipelineApi';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
@@ -19,7 +23,7 @@ interface AssetDetailsPanelProps {
   peopleStatus?: {
     detectionsCount: number;
     reviewableCount: number;
-    confirmedPeopleNames: string[];
+    people: MediaAssetPerson[];
     recognitionRanAt?: string | null;
     recognitionBusy?: boolean;
     onRunRecognition?: () => void;
@@ -28,6 +32,8 @@ interface AssetDetailsPanelProps {
     reviewHref?: string;
     onOpenReview?: () => void;
   } | null;
+  onAddManualPerson?: ((personId: string) => Promise<void>) | undefined;
+  onRemoveManualPerson?: ((personId: string) => Promise<void>) | undefined;
   keywordsSlot?: ReactNode;
 }
 
@@ -191,6 +197,67 @@ function formatLocation(
   return '—';
 }
 
+function PersonPicker({
+  assignedPersonIds,
+  busy,
+  onPick
+}: {
+  assignedPersonIds: Set<string>;
+  busy: boolean;
+  onPick: (personId: string) => void;
+}) {
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void listPeople()
+      .then((response) => { if (!cancelled) { setAllPeople(response.items); } })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) { setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const options = useMemo(
+    () => allPeople.filter((p) => !assignedPersonIds.has(p.id)),
+    [allPeople, assignedPersonIds]
+  );
+
+  return (
+    <div style={{ marginBottom: '8px' }}>
+      <Autocomplete<Person>
+        options={options}
+        loading={loading}
+        getOptionLabel={(p) => p.displayName}
+        disabled={busy}
+        size="small"
+        onChange={(_e, value) => { if (value) { onPick(value.id); } }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder="Search people…"
+            inputProps={{ ...params.inputProps, style: { fontSize: '12px' } }}
+            InputProps={{
+              ...params.InputProps,
+              endAdornment: (
+                <>
+                  {loading ? <CircularProgress size={14} /> : null}
+                  {params.InputProps.endAdornment}
+                </>
+              )
+            }}
+            sx={{
+              '& .MuiInputBase-root': { paddingTop: '2px', paddingBottom: '2px' },
+              '& .MuiInputBase-input': { fontSize: '12px' }
+            }}
+          />
+        )}
+      />
+    </div>
+  );
+}
+
 export function AssetDetailsPanel({
   asset,
   albumLabels = [],
@@ -203,10 +270,14 @@ export function AssetDetailsPanel({
   assetOperationMessage = null,
   assetOperationError = false,
   peopleStatus = null,
+  onAddManualPerson,
+  onRemoveManualPerson,
   keywordsSlot
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [peopleDetailsOpen, setPeopleDetailsOpen] = useState(false);
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
+  const [personPickerBusy, setPersonPickerBusy] = useState(false);
 
   if (!asset) {
     return (
@@ -255,33 +326,71 @@ export function AssetDetailsPanel({
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>People</h4>
-            {peopleStatus.detectionsCount > 0 ? (
-              <button
-                type="button"
-                onClick={() => setPeopleDetailsOpen((prev) => !prev)}
-                title={peopleDetailsOpen ? 'Hide details' : 'Show details'}
-                style={{
-                  background: 'none',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  color: peopleDetailsOpen ? '#6b7280' : '#374151',
-                  fontSize: '14px',
-                  lineHeight: 1,
-                  padding: '1px 6px',
-                }}
-              >
-                {peopleDetailsOpen ? '×' : '⋯'}
-              </button>
-            ) : null}
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {onAddManualPerson ? (
+                <button
+                  type="button"
+                  onClick={() => setPersonPickerOpen((prev) => !prev)}
+                  title={personPickerOpen ? 'Cancel' : 'Tag a person'}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    color: personPickerOpen ? '#6b7280' : '#374151',
+                    fontSize: '14px',
+                    lineHeight: 1,
+                    padding: '1px 6px',
+                  }}
+                >
+                  {personPickerOpen ? '×' : '+'}
+                </button>
+              ) : null}
+              {peopleStatus.detectionsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setPeopleDetailsOpen((prev) => !prev)}
+                  title={peopleDetailsOpen ? 'Hide details' : 'Show details'}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    color: peopleDetailsOpen ? '#6b7280' : '#374151',
+                    fontSize: '14px',
+                    lineHeight: 1,
+                    padding: '1px 6px',
+                  }}
+                >
+                  {peopleDetailsOpen ? '×' : '⋯'}
+                </button>
+              ) : null}
+            </div>
           </div>
+
+          {/* Person picker */}
+          {personPickerOpen && onAddManualPerson ? (
+            <PersonPicker
+              assignedPersonIds={new Set((peopleStatus.people ?? []).map((p) => p.personId))}
+              busy={personPickerBusy}
+              onPick={async (personId) => {
+                setPersonPickerBusy(true);
+                try {
+                  await onAddManualPerson(personId);
+                  setPersonPickerOpen(false);
+                } finally {
+                  setPersonPickerBusy(false);
+                }
+              }}
+            />
+          ) : null}
 
           {/* Primary view */}
           {peopleStatus.loading ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading people status...</p>
           ) : peopleStatus.errorMessage ? (
             <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{peopleStatus.errorMessage}</p>
-          ) : peopleStatus.detectionsCount === 0 ? (
+          ) : peopleStatus.people.length === 0 && peopleStatus.detectionsCount === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ color: '#aaa', fontSize: '12px' }}>
                 {peopleStatus.recognitionRanAt ? 'No people detected.' : 'No people detected yet.'}
@@ -298,10 +407,21 @@ export function AssetDetailsPanel({
                 </button>
               ) : null}
             </div>
-          ) : peopleStatus.confirmedPeopleNames.length > 0 ? (
+          ) : peopleStatus.people.length > 0 ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-              {peopleStatus.confirmedPeopleNames.map((name) => (
-                <Chip key={name} label={name} size="small" />
+              {peopleStatus.people.map((person) => (
+                <Chip
+                  key={person.personId}
+                  label={person.displayName}
+                  size="small"
+                  variant={person.source === 'manual-asset-tag' ? 'outlined' : 'filled'}
+                  title={person.source === 'manual-asset-tag' ? 'Manually tagged' : 'Face detected'}
+                  onDelete={
+                    person.source === 'manual-asset-tag' && onRemoveManualPerson
+                      ? () => void onRemoveManualPerson(person.personId)
+                      : undefined
+                  }
+                />
               ))}
             </div>
           ) : (
@@ -315,11 +435,11 @@ export function AssetDetailsPanel({
               {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
               {renderRow(
                 'Confirmed',
-                peopleStatus.confirmedPeopleNames.length > 0
-                  ? peopleStatus.confirmedPeopleNames.join(', ')
+                peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').length > 0
+                  ? peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').map((p) => p.displayName).join(', ')
                   : 'None'
               )}
-              {peopleStatus.reviewableCount > 0 || peopleStatus.confirmedPeopleNames.length === 0 ? (
+              {peopleStatus.reviewableCount > 0 || peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').length === 0 ? (
                 <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
                   {peopleStatus.reviewableCount > 0
                     ? 'Reviewable faces still need confirmation before they become derived asset people.'

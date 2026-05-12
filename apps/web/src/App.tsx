@@ -91,11 +91,13 @@ import {
   listSmartAlbums as listSmartAlbumsRequest
 } from './api/smartAlbumApi';
 import {
+  addManualPersonTag,
   getPeoplePipelineAssetState,
   getPeopleScopedAssetSummary,
   listAssetIdsWithReviewableDetections,
   listPeople,
   processPeopleAsset,
+  removeManualPersonTag,
   type PeopleScopedAssetSummaryResponse
 } from './api/peoplePipelineApi';
 import {
@@ -4921,10 +4923,6 @@ export default function App() {
   }, [primaryArea, selectedAssetId, selectedAssetIds.length]);
 
   useEffect(() => {
-    if (primaryArea !== 'Search') {
-      return;
-    }
-
     if (searchPeopleOptions.length > 0 || searchPeopleLoading || searchPeopleAttemptedRef.current) {
       return;
     }
@@ -4970,7 +4968,7 @@ export default function App() {
       window.clearTimeout(timeoutId);
       abortController.abort();
     };
-  }, [primaryArea, searchPeopleLoading, searchPeopleOptions.length]);
+  }, [searchPeopleLoading, searchPeopleOptions.length]);
 
   useEffect(() => {
     if (albumTreeLoading) {
@@ -7122,6 +7120,40 @@ export default function App() {
     } finally {
       setPeopleRecognitionBusy(false);
     }
+  }
+
+  async function handleAddManualPersonTag(personId: string): Promise<void> {
+    if (!selectedAssetId) {
+      return;
+    }
+    const assetId = selectedAssetId;
+    const updatedPeople = await addManualPersonTag(assetId, personId);
+    setAssets((previous) =>
+      previous.map((asset) => asset.id === assetId ? { ...asset, people: updatedPeople } : asset)
+    );
+    setSelectedAssetDetails((current) =>
+      current?.id === assetId ? { ...current, people: updatedPeople } : current
+    );
+    setSelectedAssetPeopleStatus((current) =>
+      current ? { ...current, people: updatedPeople } : current
+    );
+  }
+
+  async function handleRemoveManualPersonTag(personId: string): Promise<void> {
+    if (!selectedAssetId) {
+      return;
+    }
+    const assetId = selectedAssetId;
+    const updatedPeople = await removeManualPersonTag(assetId, personId);
+    setAssets((previous) =>
+      previous.map((asset) => asset.id === assetId ? { ...asset, people: updatedPeople } : asset)
+    );
+    setSelectedAssetDetails((current) =>
+      current?.id === assetId ? { ...current, people: updatedPeople } : current
+    );
+    setSelectedAssetPeopleStatus((current) =>
+      current ? { ...current, people: updatedPeople } : current
+    );
   }
 
   async function loadScopedPeopleSummary(assetIds: string[]): Promise<void> {
@@ -10590,7 +10622,7 @@ export default function App() {
                         detection.matchStatus === 'suggested' ||
                         detection.matchStatus === 'autoMatched'
                       ).length ?? 0,
-                    confirmedPeopleNames: (selectedAssetPeopleStatus?.people ?? []).map((person) => person.displayName),
+                    people: selectedAssetPeopleStatus?.people ?? selectedAsset.people ?? [],
                     recognitionRanAt: selectedAssetPeopleStatus?.peopleRecognitionRanAt ?? null,
                     recognitionBusy: peopleRecognitionBusy,
                     onRunRecognition: handleRunPeopleRecognitionForSelectedAssets,
@@ -10600,6 +10632,16 @@ export default function App() {
                     onOpenReview: handleOpenAssetPeopleReviewDialog
                   }
                 : null
+            }
+            onAddManualPerson={
+              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+                ? handleAddManualPersonTag
+                : undefined
+            }
+            onRemoveManualPerson={
+              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+                ? handleRemoveManualPersonTag
+                : undefined
             }
             keywordsSlot={
               <AssetKeywordsPanel

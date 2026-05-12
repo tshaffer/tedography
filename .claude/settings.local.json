@@ -40,7 +40,10 @@
       "Read(//Users/tedshaffer/Library/Application Support/Claude/claude-code-vm/2.1.119/**)",
       "Read(//Users/tedshaffer/.nvm/versions/node/v24.11.0/lib/node_modules/@anthropic-ai/claude-code/bin/**)",
       "Read(//Users/tedshaffer/.local/bin/**)",
-      "Read(//Users/tedshaffer/.claude/plugins/cache/claude-plugins-official/figma/2.1.30/bin/**)"
+      "Read(//Users/tedshaffer/.claude/plugins/cache/claude-plugins-official/figma/2.1.30/bin/**)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(curl -s http://localhost:3001/api/people-pipeline/people)",
+      "Bash(curl -s http://localhost:3000/api/people-pipeline/people)"
     ]
   }
 }
