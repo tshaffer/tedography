@@ -136,10 +136,10 @@ function formatDimensions(width?: number | null, height?: number | null): string
   return '—';
 }
 
-function renderRow(label: string, value: string) {
+function renderRow(label: string, value: string, labelFontSize?: string) {
   return (
     <div style={rowStyle} key={label}>
-      <span style={labelStyle}>{label}</span>
+      <span style={labelFontSize ? { ...labelStyle, fontSize: labelFontSize } : labelStyle}>{label}</span>
       <span style={valueStyle}>{value}</span>
     </div>
   );
@@ -244,7 +244,7 @@ export function AssetDetailsPanel({
       <h3 style={titleStyle}>Asset Details</h3>
 
       {/* Albums */}
-      {renderRow('Albums', formatAlbumLabels(albumLabels))}
+      {renderRow('Albums', formatAlbumLabels(albumLabels), '13px')}
 
       {/* Keywords */}
       {keywordsSlot}
@@ -347,7 +347,7 @@ export function AssetDetailsPanel({
       ) : null}
 
       {/* Location */}
-      <div style={{ marginTop: '10px' }}>
+      <div style={subSectionStyle}>
         {renderRow('Location', formatLocation(
           asset.city,
           asset.state,
@@ -355,7 +355,7 @@ export function AssetDetailsPanel({
           asset.locationLabel,
           asset.locationLatitude,
           asset.locationLongitude
-        ))}
+        ), '13px')}
       </div>
 
       {/* Action Buttons */}
