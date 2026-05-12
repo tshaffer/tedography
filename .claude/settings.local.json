@@ -32,7 +32,15 @@
       "Bash(grep -v \"^--$\")",
       "WebSearch",
       "WebFetch(domain:ai.google.dev)",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "Bash(claude doctor *)",
+      "Bash(npx claude *)",
+      "Bash(~/.claude/local/claude doctor *)",
+      "Read(//Users/tedshaffer/Library/Application Support/Claude/claude-code/2.1.128/claude.app/Contents/MacOS/**)",
+      "Read(//Users/tedshaffer/Library/Application Support/Claude/claude-code-vm/2.1.119/**)",
+      "Read(//Users/tedshaffer/.nvm/versions/node/v24.11.0/lib/node_modules/@anthropic-ai/claude-code/bin/**)",
+      "Read(//Users/tedshaffer/.local/bin/**)",
+      "Read(//Users/tedshaffer/.claude/plugins/cache/claude-plugins-official/figma/2.1.30/bin/**)"
     ]
   }
 }

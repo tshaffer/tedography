@@ -306,30 +306,6 @@ export function AssetKeywordsPanel({
             <span style={emptyLabelStyle}>{emptyStateLabel}</span>
           )}
         </div>
-        {selectedAssetCount > 0 && onSetKeywordAssignmentStatus ? (
-          <div style={statusRowStyle}>
-            <span style={{ fontSize: '11px', color: '#6b7280', marginRight: '2px' }}>Keywords:</span>
-            {(['not-started', 'in-progress', 'complete'] as AssetKeywordAssignmentStatus[]).map((status) => {
-              const isActive = keywordAssignmentStatus === status;
-              return (
-                <button
-                  key={status}
-                  type="button"
-                  disabled={updateBusy}
-                  style={{
-                    ...( isActive ? statusButtonActiveStyle : statusButtonBaseStyle),
-                    borderColor: isActive ? assetKeywordStatusColors[status] : '#d1d5db',
-                    color: isActive ? assetKeywordStatusColors[status] : '#374151'
-                  }}
-                  title={`Mark keyword assignment as ${status}`}
-                  onClick={() => void onSetKeywordAssignmentStatus(isActive ? null : status)}
-                >
-                  {status === 'not-started' ? 'Not started' : status === 'in-progress' ? 'In progress' : 'Complete'}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
         {selectedAssetCount > 0 && addOpen ? (
           <div style={{ borderTop: '1px solid #efefef', marginTop: '6px', paddingTop: '6px' }}>
             <div style={addRowStyle}>
@@ -406,7 +382,7 @@ export function AssetKeywordsPanel({
                   <div style={recentSectionStyle}>
                     <span style={recentLabelStyle}>Recently used</span>
                     <div style={recentChipsStyle}>
-                      {visibleRecentKeywords.map((keyword) => (
+                      {visibleRecentKeywords.slice(0, 4).map((keyword) => (
                         <Chip
                           key={keyword.id}
                           label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
@@ -420,6 +396,30 @@ export function AssetKeywordsPanel({
                     </div>
                   </div>
                 ) : null}
+          </div>
+        ) : null}
+        {selectedAssetCount > 0 && onSetKeywordAssignmentStatus ? (
+          <div style={statusRowStyle}>
+            <span style={{ fontSize: '11px', color: '#6b7280', marginRight: '2px' }}>Keywords:</span>
+            {(['not-started', 'in-progress', 'complete'] as AssetKeywordAssignmentStatus[]).map((status) => {
+              const isActive = keywordAssignmentStatus === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  disabled={updateBusy}
+                  style={{
+                    ...(isActive ? statusButtonActiveStyle : statusButtonBaseStyle),
+                    borderColor: isActive ? assetKeywordStatusColors[status] : '#d1d5db',
+                    color: isActive ? assetKeywordStatusColors[status] : '#374151'
+                  }}
+                  title={`Mark keyword assignment as ${status}`}
+                  onClick={() => void onSetKeywordAssignmentStatus(isActive ? null : status)}
+                >
+                  {status === 'not-started' ? 'Not started' : status === 'in-progress' ? 'In progress' : 'Complete'}
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>
