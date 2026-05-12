@@ -1,0 +1,75 @@
+Food
+        Beverages
+        Burritos
+        Ice Cream
+        Pizza
+
+  Activities
+        Cycling
+                Mountain Biking
+        Hiking
+        Kayaking
+        Snorkeling
+
+  Events
+        Bar and Bat Mitzvahs
+        Jazz Bash
+        Thanksgiving
+        Weddings
+
+  Places
+        Baja
+                Cabo
+                La Paz
+                Todos Santos
+        Bellingham
+        Bend
+        Bryce
+        Disneyland
+        Maui
+        Monterey
+        Museums
+                British Museum
+                Louvre
+        Paris
+        Santa Barbara
+                Family Camp
+        Sedona
+        Yosemite
+        Zion
+        Zoo
+
+  Subjects
+        Animals
+                Kitties
+                        Pepper or Jack
+                        Sonia
+                        Stanley
+                Silas
+        Architecture
+                Buildings
+                        Sydney Opera House
+                Structures
+                        Bridges
+        Art
+        Flowers
+        Gardens
+                Filoli
+        Landscapes & Nature
+                Beach
+                Coastline
+                Fall Foliage
+                Forest
+                Geologic Formations
+                Lakes
+                Mountains
+                Ocean
+                Rainbows
+                Rivers
+                Sunsets / Sunrises
+                Vistas
+                Waterfalls
+        Photo Qualities
+                Magic Hour
+                Reflections
+        Signs
