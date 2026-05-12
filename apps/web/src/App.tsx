@@ -2982,6 +2982,9 @@ function AssetDetailPanel({ asset }: AssetDetailPanelProps) {
       <p>
         <strong>Captured:</strong> {formatCaptureDate(asset.captureDateTime)}
       </p>
+      <p>
+        <strong>Photo State:</strong> {asset.photoState}
+      </p>
     </section>
   );
 }
