@@ -9734,7 +9734,7 @@ export default function App() {
     return (
       <section style={sidePanelSectionStyle}>
         <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>Visibility</h2>
+          <h2 style={sidePanelTitleStyle}>Review Status</h2>
           <button type="button" style={compareButtonStyle} onClick={clearFilters} disabled={!hasActiveFilters}>
             Reset
           </button>
@@ -11387,7 +11387,7 @@ export default function App() {
                           checked={showVisibilityPanel}
                           onChange={(event) => setShowVisibilityPanel(event.target.checked)}
                         />
-                        Show visibility panel
+                        Show review status panel
                       </label>
                       <label style={toggleOptionLabelStyle}>
                         <input
