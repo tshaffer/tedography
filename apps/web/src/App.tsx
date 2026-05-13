@@ -46,6 +46,7 @@ import {
   PhotoState,
   normalizePhotoState,
   type AlbumKeywordAssignmentStatus,
+  type AlbumReviewAssignmentStatus,
   type AlbumTreeNode,
   type AssetKeywordAssignmentStatus,
   type Keyword,
@@ -65,6 +66,7 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode,
   setAlbumKeywordAssignmentStatus as setAlbumKeywordAssignmentStatusRequest,
+  setAlbumReviewAssignmentStatus as setAlbumReviewAssignmentStatusRequest,
   updateAlbumTreeChildOrderMode,
   updateAlbumManualOrder,
   updateAlbumOrderingMode
@@ -296,6 +298,7 @@ const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
+const albumStatusBadgeModeStorageKey = 'tedography.albumStatusBadgeMode';
 const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
 const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
@@ -1746,6 +1749,18 @@ function getAlbumKeywordStatusTitle(status: AlbumKeywordAssignmentStatus): strin
   if (status === 'complete') return 'Keywords: complete';
   if (status === 'in-progress') return 'Keywords: in progress';
   return 'Keywords: not started';
+}
+
+function getAlbumReviewStatusDotColor(status: AlbumReviewAssignmentStatus): string {
+  if (status === 'complete') return '#16a34a';
+  if (status === 'in-progress') return '#d97706';
+  return '#9ca3af';
+}
+
+function getAlbumReviewStatusTitle(status: AlbumReviewAssignmentStatus): string {
+  if (status === 'complete') return 'Review: complete';
+  if (status === 'in-progress') return 'Review: in progress';
+  return 'Review: not started';
 }
 
 function getAssetKeywordStatusDotColor(status: AssetKeywordAssignmentStatus): string {
@@ -3740,6 +3755,7 @@ export default function App() {
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
   const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
   const [albumTreeKeywordStatusSubmenuOpen, setAlbumTreeKeywordStatusSubmenuOpen] = useState(false);
+  const [albumTreeReviewStatusSubmenuOpen, setAlbumTreeReviewStatusSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -4085,12 +4101,15 @@ export default function App() {
 
     return window.localStorage.getItem(showThumbnailKeywordBadgesStorageKey) === 'true';
   });
-  const [showAlbumKeywordBadges, setShowAlbumKeywordBadges] = useState<boolean>(() => {
+  const [albumStatusBadgeMode, setAlbumStatusBadgeMode] = useState<'none' | 'keyword' | 'review'>(() => {
     if (typeof window === 'undefined') {
-      return false;
+      return 'none';
     }
-
-    return window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true';
+    const stored = window.localStorage.getItem(albumStatusBadgeModeStorageKey);
+    if (stored === 'keyword' || stored === 'review') return stored;
+    // migrate legacy showAlbumKeywordBadges setting
+    if (stored === null && window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true') return 'keyword';
+    return 'none';
   });
   const [showVisibilityPanel, setShowVisibilityPanel] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
@@ -4430,11 +4449,8 @@ export default function App() {
   }, [showThumbnailKeywordBadges]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      showAlbumKeywordBadgesStorageKey,
-      showAlbumKeywordBadges ? 'true' : 'false'
-    );
-  }, [showAlbumKeywordBadges]);
+    window.localStorage.setItem(albumStatusBadgeModeStorageKey, albumStatusBadgeMode);
+  }, [albumStatusBadgeMode]);
 
   useEffect(() => {
     window.localStorage.setItem(showVisibilityPanelStorageKey, showVisibilityPanel ? 'true' : 'false');
@@ -6745,6 +6761,21 @@ export default function App() {
       );
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Failed to update keyword assignment status.');
+    }
+  }
+
+  async function handleSetAlbumReviewAssignmentStatus(
+    albumId: string,
+    status: AlbumReviewAssignmentStatus | null
+  ): Promise<void> {
+    closeAlbumTreeContextMenu();
+    try {
+      const updatedNode = await setAlbumReviewAssignmentStatusRequest(albumId, status);
+      setAlbumTreeNodes((previous) =>
+        previous.map((node) => (node.id === updatedNode.id ? updatedNode : node))
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to update review assignment status.');
     }
   }
 
@@ -9284,7 +9315,7 @@ export default function App() {
                         {getAlbumAssetCountStatusLabel(countStatus)}
                       </span>
                     ) : null}
-                    {!isGroup && showAlbumKeywordBadges && node.keywordAssignmentStatus ? (
+                    {!isGroup && albumStatusBadgeMode === 'keyword' && node.keywordAssignmentStatus ? (
                       <span
                         title={getAlbumKeywordStatusTitle(node.keywordAssignmentStatus)}
                         style={{
@@ -9293,6 +9324,19 @@ export default function App() {
                           height: '8px',
                           borderRadius: '50%',
                           backgroundColor: getAlbumKeywordStatusDotColor(node.keywordAssignmentStatus),
+                          display: 'inline-block'
+                        }}
+                      />
+                    ) : null}
+                    {!isGroup && albumStatusBadgeMode === 'review' && node.reviewAssignmentStatus ? (
+                      <span
+                        title={getAlbumReviewStatusTitle(node.reviewAssignmentStatus)}
+                        style={{
+                          flex: '0 0 auto',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: getAlbumReviewStatusDotColor(node.reviewAssignmentStatus),
                           display: 'inline-block'
                         }}
                       />
@@ -9595,6 +9639,47 @@ export default function App() {
                       type="button"
                       style={contextMenuItemStyle}
                       onClick={() => void handleSetAlbumKeywordAssignmentStatus(selectedTreeNode.id, null)}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreeReviewStatusSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreeReviewStatusSubmenuOpen(false)}
+            >
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev)}
+                title="Set review assignment status for this album"
+              >
+                <span>Review Status</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreeReviewStatusSubmenuOpen && selectedTreeNode ? (
+                <div style={contextMenuSubmenuStyle}>
+                  {(['not-started', 'in-progress', 'complete'] as AlbumReviewAssignmentStatus[]).map(
+                    (status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        style={contextMenuItemStyle}
+                        onClick={() => void handleSetAlbumReviewAssignmentStatus(selectedTreeNode.id, status)}
+                      >
+                        {selectedTreeNode.reviewAssignmentStatus === status ? '✓ ' : ''}
+                        {status === 'not-started' ? 'Not Started' : status === 'in-progress' ? 'In Progress' : 'Complete'}
+                      </button>
+                    )
+                  )}
+                  {selectedTreeNode.reviewAssignmentStatus ? (
+                    <button
+                      type="button"
+                      style={contextMenuItemStyle}
+                      onClick={() => void handleSetAlbumReviewAssignmentStatus(selectedTreeNode.id, null)}
                     >
                       Clear
                     </button>
@@ -11405,13 +11490,33 @@ export default function App() {
                         />
                         Show photo keyword status
                       </label>
+                      <span style={filterSubsectionTitleStyle}>Album Status Badge</span>
                       <label style={toggleOptionLabelStyle}>
                         <input
-                          type="checkbox"
-                          checked={showAlbumKeywordBadges}
-                          onChange={(event) => setShowAlbumKeywordBadges(event.target.checked)}
+                          type="radio"
+                          name="album-status-badge-mode"
+                          checked={albumStatusBadgeMode === 'none'}
+                          onChange={() => setAlbumStatusBadgeMode('none')}
                         />
-                        Show album keyword status
+                        None
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-status-badge-mode"
+                          checked={albumStatusBadgeMode === 'keyword'}
+                          onChange={() => setAlbumStatusBadgeMode('keyword')}
+                        />
+                        Keyword status
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="radio"
+                          name="album-status-badge-mode"
+                          checked={albumStatusBadgeMode === 'review'}
+                          onChange={() => setAlbumStatusBadgeMode('review')}
+                        />
+                        Review status
                       </label>
                       <span style={filterSubsectionTitleStyle}>Album Layout</span>
                       <label style={toggleOptionLabelStyle}>

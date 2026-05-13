@@ -1,4 +1,4 @@
-import type { AlbumKeywordAssignmentStatus } from '../enums/KeywordAssignmentStatus.js';
+import type { AlbumKeywordAssignmentStatus, AlbumReviewAssignmentStatus } from '../enums/KeywordAssignmentStatus.js';
 
 export type AlbumTreeNodeType = 'Group' | 'Album';
 export type AlbumTreeChildOrderMode = 'Custom' | 'Name' | 'NumericThenName';
@@ -11,6 +11,7 @@ export interface AlbumTreeNode {
   sortOrder: number;
   childOrderMode?: AlbumTreeChildOrderMode | null;
   keywordAssignmentStatus?: AlbumKeywordAssignmentStatus | null;
+  reviewAssignmentStatus?: AlbumReviewAssignmentStatus | null;
   createdAt: string;
   updatedAt: string;
 }

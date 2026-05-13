@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type {
   AlbumKeywordAssignmentStatus,
+  AlbumReviewAssignmentStatus,
   AlbumTreeChildOrderMode,
   AlbumTreeNode,
   AlbumTreeNodeType
@@ -25,6 +26,7 @@ import {
   reorderAlbumTreeNodeWithinSiblings,
   renameAlbumTreeNode,
   setAlbumKeywordAssignmentStatus,
+  setAlbumReviewAssignmentStatus,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 
@@ -672,6 +674,12 @@ const validAlbumKeywordAssignmentStatuses: AlbumKeywordAssignmentStatus[] = [
   'complete'
 ];
 
+const validAlbumReviewAssignmentStatuses: AlbumReviewAssignmentStatus[] = [
+  'not-started',
+  'in-progress',
+  'complete'
+];
+
 albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
   const body = req.body as { status?: unknown } | undefined;
   const rawStatus = body?.status;
@@ -705,6 +713,44 @@ albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
   } catch {
     const errorResponse: AlbumTreeErrorResponse = {
       error: 'Failed to update keyword assignment status'
+    };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.patch('/:id/review-assignment-status', async (req, res) => {
+  const body = req.body as { status?: unknown } | undefined;
+  const rawStatus = body?.status;
+
+  if (
+    rawStatus !== null &&
+    rawStatus !== undefined &&
+    !(
+      typeof rawStatus === 'string' &&
+      validAlbumReviewAssignmentStatuses.includes(rawStatus as AlbumReviewAssignmentStatus)
+    )
+  ) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'status must be "not-started", "in-progress", "complete", or null'
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const status = (rawStatus ?? null) as AlbumReviewAssignmentStatus | null;
+
+  try {
+    const updated = await setAlbumReviewAssignmentStatus(req.params.id, status);
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: 'Failed to update review assignment status'
     };
     res.status(500).json(errorResponse);
   }

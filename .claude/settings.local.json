@@ -44,7 +44,11 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(curl -s http://localhost:3001/api/people-pipeline/people)",
       "Bash(curl -s http://localhost:3000/api/people-pipeline/people)",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(pnpm --filter @tedography/domain exec tsc -p tsconfig.json)"
     ]
   }
 }
