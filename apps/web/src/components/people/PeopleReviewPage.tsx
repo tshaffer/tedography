@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
@@ -141,6 +141,249 @@ const previewColumnStyle: CSSProperties = {
   display: 'grid',
   gap: '10px'
 };
+
+const assetGroupStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px'
+};
+
+const assetThumbnailHeaderStyle: CSSProperties = {
+  padding: '10px 14px',
+  backgroundColor: '#f1f5f9',
+  borderRadius: '8px',
+  border: '1px solid #d7dce2'
+};
+
+const sourcePreviewFigureStyle: CSSProperties = {
+  border: '1px solid #d7dce2',
+  borderRadius: '12px',
+  overflow: 'hidden',
+  backgroundColor: '#eef2f7',
+  position: 'relative'
+};
+
+const sourcePreviewImageStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  height: 'auto',
+  maxHeight: '40vh',
+  objectFit: 'contain',
+  backgroundColor: '#dbe2ea'
+};
+
+const overlaySurfaceStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  pointerEvents: 'none'
+};
+
+const overlayBoxBaseStyle: CSSProperties = {
+  position: 'absolute',
+  borderRadius: '8px',
+  border: '2px solid #0f5f73',
+  backgroundColor: 'rgba(15, 95, 115, 0.08)',
+  pointerEvents: 'none'
+};
+
+const overlayLabelStyle: CSSProperties = {
+  position: 'absolute',
+  top: '0',
+  left: '0',
+  transform: 'translateY(calc(-100% - 4px))',
+  maxWidth: '100%',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#fff',
+  backgroundColor: 'rgba(15, 23, 42, 0.88)',
+  borderRadius: '999px',
+  padding: '2px 8px'
+};
+
+function getDetectionOverlayLabel(
+  status: FaceDetectionMatchStatus,
+  suggestedPersonName: string,
+  matchedPersonName: string
+): string {
+  switch (status) {
+    case 'confirmed': return matchedPersonName ? `Confirmed: ${matchedPersonName}` : 'Confirmed';
+    case 'autoMatched': return suggestedPersonName ? `Auto: ${suggestedPersonName}` : 'Auto Matched';
+    case 'suggested': return suggestedPersonName ? `Suggested: ${suggestedPersonName}` : 'Suggested';
+    case 'rejected': return 'Rejected';
+    case 'ignored': return 'Ignored';
+    default: return 'Unmatched';
+  }
+}
+
+function getDetectionOverlayPalette(status: FaceDetectionMatchStatus, isCurrent: boolean): CSSProperties {
+  const paletteByStatus: Record<FaceDetectionMatchStatus, { border: string; background: string }> = {
+    confirmed: { border: '#1d8348', background: 'rgba(29, 131, 72, 0.18)' },
+    suggested: { border: '#0f5f73', background: 'rgba(15, 95, 115, 0.14)' },
+    autoMatched: { border: '#6d28d9', background: 'rgba(109, 40, 217, 0.14)' },
+    unmatched: { border: '#475569', background: 'rgba(71, 85, 105, 0.12)' },
+    rejected: { border: '#b45309', background: 'rgba(180, 83, 9, 0.14)' },
+    ignored: { border: '#64748b', background: 'rgba(100, 116, 139, 0.12)' }
+  };
+  const palette = paletteByStatus[status];
+  return {
+    borderColor: palette.border,
+    backgroundColor: palette.background,
+    zIndex: isCurrent ? 2 : 1,
+    boxShadow: isCurrent ? `0 0 0 2px ${palette.border}, 0 0 0 4px rgba(255, 255, 255, 0.6)` : undefined
+  };
+}
+
+const overlayLegendStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  fontSize: '12px',
+  color: '#556677'
+};
+
+const sourcePreviewLayoutStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.2fr) minmax(240px, 0.8fr)',
+  gap: '16px',
+  alignItems: 'start'
+};
+
+interface AssetThumbnailWithFaceBoxesProps {
+  assetId: string;
+  filename: string;
+  items: PeopleReviewQueueItem[];
+  showFaceBoxes: boolean;
+  onShowFaceBoxesChange: (value: boolean) => void;
+  currentDetectionId: string | null;
+}
+
+function AssetThumbnailWithFaceBoxes({
+  assetId,
+  filename,
+  items,
+  showFaceBoxes,
+  onShowFaceBoxesChange,
+  currentDetectionId
+}: AssetThumbnailWithFaceBoxesProps) {
+  const [imageLayout, setImageLayout] = useState<{
+    offsetLeftFrac: number;
+    offsetTopFrac: number;
+    scaleX: number;
+    scaleY: number;
+  } | null>(null);
+
+  const handleImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>): void => {
+    const img = event.currentTarget;
+    const cw = img.clientWidth;
+    const ch = img.clientHeight;
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!cw || !ch || !nw || !nh) { setImageLayout(null); return; }
+    const containerAspect = cw / ch;
+    const imageAspect = nw / nh;
+    let displayedWidth: number, displayedHeight: number;
+    if (imageAspect >= containerAspect) {
+      displayedWidth = cw;
+      displayedHeight = cw / imageAspect;
+    } else {
+      displayedHeight = ch;
+      displayedWidth = ch * imageAspect;
+    }
+    setImageLayout({
+      offsetLeftFrac: (cw - displayedWidth) / 2 / cw,
+      offsetTopFrac: (ch - displayedHeight) / 2 / ch,
+      scaleX: displayedWidth / cw,
+      scaleY: displayedHeight / ch
+    });
+  }, []);
+
+  const currentItem = items.find((item) => item.detection.id === currentDetectionId) ?? null;
+
+  return (
+    <div style={assetThumbnailHeaderStyle}>
+      <div style={sourcePreviewLayoutStyle}>
+        <div>
+          <div style={{ ...inlineRowStyle, justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700 }}>Source asset context</div>
+            <label style={{ ...inlineRowStyle, gap: '6px', fontSize: '13px', color: '#163246', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showFaceBoxes}
+                onChange={(event) => onShowFaceBoxesChange(event.target.checked)}
+              />
+              Show Face Boxes
+            </label>
+          </div>
+          <div style={sourcePreviewFigureStyle}>
+            <img
+              src={getThumbnailMediaUrl(assetId)}
+              alt={`${filename} source thumbnail`}
+              style={sourcePreviewImageStyle}
+              onLoad={handleImageLoad}
+            />
+            {showFaceBoxes ? (
+              <div style={overlaySurfaceStyle}>
+                {items.map((item) => {
+                  const suggestedPersonName = item.suggestedPerson?.displayName ?? '';
+                  const matchedPersonName = item.matchedPerson?.displayName ?? '';
+                  const { boundingBox, matchStatus, faceIndex } = item.detection;
+                  const isCurrent = item.detection.id === currentDetectionId;
+                  return (
+                    <div
+                      key={item.detection.id}
+                      style={{
+                        ...overlayBoxBaseStyle,
+                        ...getDetectionOverlayPalette(matchStatus, isCurrent),
+                        left: imageLayout
+                          ? `${(imageLayout.offsetLeftFrac + boundingBox.left * imageLayout.scaleX) * 100}%`
+                          : `${boundingBox.left * 100}%`,
+                        top: imageLayout
+                          ? `${(imageLayout.offsetTopFrac + boundingBox.top * imageLayout.scaleY) * 100}%`
+                          : `${boundingBox.top * 100}%`,
+                        width: imageLayout
+                          ? `${boundingBox.width * imageLayout.scaleX * 100}%`
+                          : `${boundingBox.width * 100}%`,
+                        height: imageLayout
+                          ? `${boundingBox.height * imageLayout.scaleY * 100}%`
+                          : `${boundingBox.height * 100}%`
+                      }}
+                      title={`${getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)} • Face #${faceIndex}`}
+                    >
+                      <span style={overlayLabelStyle}>
+                        {getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          <div style={{ fontSize: '13px', color: '#475569' }}>
+            Face boxes are optional and use the same detection statuses as the review controls below.
+          </div>
+          <div style={overlayLegendStyle}>
+            <span>Confirmed = green</span>
+            <span>Suggested = teal</span>
+            <span>Auto Matched = purple</span>
+            <span>Unmatched = slate</span>
+            <span>Rejected = amber</span>
+            <span>Ignored = gray</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#475569' }}>
+            {currentItem
+              ? `Current face #${currentItem.detection.faceIndex} is highlighted on the image and in the review list.`
+              : 'The current face is highlighted with a white outline.'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const inlineRowStyle: CSSProperties = {
   display: 'flex',
@@ -407,6 +650,17 @@ function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
 
 export function PeopleReviewPage() {
   const [searchParams] = useSearchParams();
+  const [simplifiedView] = useState<boolean>(() => {
+    const stored = window.localStorage.getItem('tedography.peopleReview.simplifiedView');
+    return stored === null ? true : stored === 'true';
+  });
+  const [showFaceBoxes, setShowFaceBoxes] = useState<boolean>(() => {
+    return window.localStorage.getItem('tedography.people.assetReviewDialog.showFaceBoxes') === 'true';
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem('tedography.people.assetReviewDialog.showFaceBoxes', showFaceBoxes ? 'true' : 'false');
+  }, [showFaceBoxes]);
   const [items, setItems] = useState<PeopleReviewQueueItem[]>([]);
   const [counts, setCounts] = useState<Record<FaceDetectionMatchStatus, number>>({
     unmatched: 0,
@@ -580,6 +834,20 @@ export function PeopleReviewPage() {
   }, [items, personFilterId]);
 
   const filteredItemIds = useMemo(() => filteredItems.map((item) => item.detection.id), [filteredItems]);
+  const groupedItems = useMemo(() => {
+    const groups: { assetId: string; asset: PeopleReviewQueueItem['asset']; items: PeopleReviewQueueItem[] }[] = [];
+    const indexByAssetId = new Map<string, number>();
+    for (const item of filteredItems) {
+      const existing = indexByAssetId.get(item.asset.id);
+      if (existing !== undefined) {
+        groups[existing]!.items.push(item);
+      } else {
+        indexByAssetId.set(item.asset.id, groups.length);
+        groups.push({ assetId: item.asset.id, asset: item.asset, items: [item] });
+      }
+    }
+    return groups;
+  }, [filteredItems]);
   const selectedDetectionIdSet = useMemo(() => new Set(selectedDetectionIds), [selectedDetectionIds]);
   const visibleSelectedCount = useMemo(
     () => filteredItemIds.filter((id) => selectedDetectionIdSet.has(id)).length,
@@ -1072,77 +1340,10 @@ export function PeopleReviewPage() {
 
       <section style={panelStyle}>
         <h1 style={{ margin: '0 0 10px', fontSize: '32px' }}>People Review</h1>
-        <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
-          Minimal review workbench for persisted face detections and derived <code>mediaAsset.people</code>.
-        </p>
-
-        {trimmedAssetIdFilter ? (
-          <div
-            style={{
-              ...panelStyle,
-              marginBottom: '14px',
-              padding: '10px 12px',
-              backgroundColor: '#eef7fb',
-              borderColor: '#bfd6e0',
-              boxShadow: 'none'
-            }}
-          >
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
-              Filtered to asset {trimmedAssetIdFilter}
-            </div>
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
-              Review actions here affect this asset only. Confirmed matches are what drive derived <code>mediaAsset.people</code>.
-            </div>
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Link
-                to="/"
-                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-              >
-                Back to Library
-              </Link>
-              <button
-                type="button"
-                style={buttonStyle}
-                onClick={() => setAssetIdFilter('')}
-              >
-                Clear Asset Filter
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {!trimmedAssetIdFilter && scopedAssetIdsState && scopedAssetIdsState.assetIds.length > 0 ? (
-          <div
-            style={{
-              ...panelStyle,
-              marginBottom: '14px',
-              padding: '10px 12px',
-              backgroundColor: '#eef7fb',
-              borderColor: '#bfd6e0',
-              boxShadow: 'none'
-            }}
-          >
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#163246' }}>
-              {scopedAssetIdsState.scopeType} scope ({scopedAssetIdsState.assetIds.length} assets)
-            </div>
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#566577' }}>
-              {scopedAssetIdsState.scopeLabel}. This queue is limited to the saved scope: {scopedAssetIdsState.scopeSourceLabel}.
-            </div>
-            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <Link
-                to="/"
-                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-              >
-                Back to Library
-              </Link>
-              <Link
-                to="/people/review"
-                style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-              >
-                Clear Scoped Filter
-              </Link>
-            </div>
-          </div>
+        {!simplifiedView ? (
+          <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
+            Minimal review workbench for persisted face detections and derived <code>mediaAsset.people</code>.
+          </p>
         ) : null}
 
         {!trimmedAssetIdFilter && !scopedAssetIdsState && trimmedPersonIdFilter ? (
@@ -1180,7 +1381,7 @@ export function PeopleReviewPage() {
           </div>
         ) : null}
 
-        <div style={controlsGridStyle}>
+        {!simplifiedView ? <div style={controlsGridStyle}>
           <div>
             <span style={labelStyle}>Asset ID Filter</span>
             <input
@@ -1267,9 +1468,9 @@ export function PeopleReviewPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div> : null}
 
-        <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: '14px' }}>
+        {!simplifiedView ? <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: '14px' }}>
           <div style={metaItemStyle}>
             <span style={labelStyle}>Current Item</span>
             {currentItem ? `${currentItemIndex + 1} of ${filteredItems.length}` : 'None'}
@@ -1293,7 +1494,7 @@ export function PeopleReviewPage() {
             <span style={labelStyle}>Shortcuts</span>
             <span>J/K or arrows next/previous, C confirm, X reject, I ignore, A assign, N create</span>
           </div>
-        </div>
+        </div> : null}
 
         {visibleSelectedCount > 0 ? (
           <div
@@ -1462,7 +1663,7 @@ export function PeopleReviewPage() {
           </div>
         ) : null}
 
-        {summary ? (
+        {!simplifiedView && summary ? (
           <div style={{ ...metaGridStyle, marginTop: '14px', marginBottom: 0 }}>
             <div style={metaItemStyle}>
               <span style={labelStyle}>Active Engine</span>
@@ -1559,7 +1760,17 @@ export function PeopleReviewPage() {
       ) : null}
 
       {!loading
-        ? filteredItems.map((item) => {
+        ? groupedItems.map((group) => (
+          <div key={group.assetId} style={assetGroupStyle}>
+            <AssetThumbnailWithFaceBoxes
+              assetId={group.assetId}
+              filename={group.asset.filename}
+              items={group.items}
+              showFaceBoxes={showFaceBoxes}
+              onShowFaceBoxesChange={setShowFaceBoxes}
+              currentDetectionId={currentItem?.detection.id ?? null}
+            />
+            {group.items.map((item) => {
             const draft = getDraft(item.detection.id, item.detection.ignoredReason);
             const isBusy = busyDetectionId === item.detection.id || busyDetectionId === '__batch__';
             const faceState = getFaceReviewActionState({
@@ -1618,25 +1829,9 @@ export function PeopleReviewPage() {
                         )}
                       </div>
                       <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
-                        {item.detection.previewPath || item.detection.cropPath
-                          ? 'Detected face crop preview'
-                          : 'Source asset thumbnail'}
+                        Detected face crop preview
                       </div>
                     </div>
-                    {item.detection.previewPath || item.detection.cropPath ? (
-                      <div>
-                        <div style={previewBoxStyle}>
-                          <img
-                            src={getThumbnailMediaUrl(item.asset.id)}
-                            alt={`${item.asset.filename} source thumbnail`}
-                            style={previewImageStyle}
-                          />
-                        </div>
-                        <div style={{ marginTop: '10px', fontSize: '12px', color: '#566577' }}>
-                          Source asset thumbnail
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
                 </div>
 
@@ -1706,56 +1901,58 @@ export function PeopleReviewPage() {
                     {getMatchStatusSummary(item)}
                   </div>
 
-                  <div style={metaGridStyle}>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Filename</span>
-                      {item.asset.filename}
+                  {!simplifiedView ? (
+                    <div style={metaGridStyle}>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Filename</span>
+                        {item.asset.filename}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Archive Path</span>
+                        {item.asset.originalArchivePath}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Captured</span>
+                        {formatDateTime(item.asset.captureDateTime)}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Detection Confidence</span>
+                        {formatConfidence(item.detection.detectionConfidence)}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Suggested Person</span>
+                        {item.suggestedPerson?.displayName ?? '—'}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Suggested Confidence</span>
+                        {formatConfidence(item.detection.autoMatchCandidateConfidence)}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Assigned Person</span>
+                        {item.matchedPerson?.displayName ?? '—'}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Ignored Reason</span>
+                        {item.detection.ignoredReason ?? '—'}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Engine</span>
+                        {[item.detection.engine, item.detection.engineVersion].filter(Boolean).join(' / ')}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Pipeline Version</span>
+                        {item.detection.pipelineVersion}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Review Decision</span>
+                        {item.review?.decision ?? '—'}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Derived Asset People</span>
+                        {formatPeopleList(item.asset.people ?? [])}
+                      </div>
                     </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Archive Path</span>
-                      {item.asset.originalArchivePath}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Captured</span>
-                      {formatDateTime(item.asset.captureDateTime)}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Detection Confidence</span>
-                      {formatConfidence(item.detection.detectionConfidence)}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Suggested Person</span>
-                      {item.suggestedPerson?.displayName ?? '—'}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Suggested Confidence</span>
-                      {formatConfidence(item.detection.autoMatchCandidateConfidence)}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Assigned Person</span>
-                      {item.matchedPerson?.displayName ?? '—'}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Ignored Reason</span>
-                      {item.detection.ignoredReason ?? '—'}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Engine</span>
-                      {[item.detection.engine, item.detection.engineVersion].filter(Boolean).join(' / ')}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Pipeline Version</span>
-                      {item.detection.pipelineVersion}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Review Decision</span>
-                      {item.review?.decision ?? '—'}
-                    </div>
-                    <div style={metaItemStyle}>
-                      <span style={labelStyle}>Derived Asset People</span>
-                      {formatPeopleList(item.asset.people ?? [])}
-                    </div>
-                  </div>
+                  ) : null}
 
                   <div style={actionsSectionStyle}>
                     <div style={inlineRowStyle}>
@@ -1919,7 +2116,9 @@ export function PeopleReviewPage() {
                 </div>
               </section>
             );
-          })
+          })}
+          </div>
+        ))
         : null}
     </div>
   );

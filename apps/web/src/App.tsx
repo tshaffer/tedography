@@ -297,8 +297,10 @@ const slideshowShuffleStorageKey = 'tedography.slideshow.shuffle';
 const slideshowIntervalMsStorageKey = 'tedography.slideshow.intervalMs';
 const libraryVisiblePhotoStatesStorageKey = 'tedography.libraryVisiblePhotoStates';
 const showFilmstripStorageKey = 'tedography.showFilmstrip';
+const peopleReviewSimplifiedViewStorageKey = 'tedography.peopleReview.simplifiedView';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
+const showThumbnailAiQueueBadgesStorageKey = 'tedography.showThumbnailAiQueueBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const albumStatusBadgeModeStorageKey = 'tedography.albumStatusBadgeMode';
 const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
@@ -1229,6 +1231,20 @@ const cardKeywordBadgeStyle: CSSProperties = {
   borderRadius: '50%',
   boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
   pointerEvents: 'none'
+};
+
+const cardAiQueueBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '5px',
+  zIndex: 2,
+  width: '16px',
+  height: '16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#9333ea',
+  pointerEvents: 'none',
+  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
 };
 
 const cardSelectedBadgeStyle: CSSProperties = {
@@ -2848,6 +2864,8 @@ type AssetCardProps = {
   isUpdating: boolean;
   showPhotoStateBadge: boolean;
   showKeywordAssignmentBadge: boolean;
+  showAiQueueBadge: boolean;
+  isInAiQueue: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
 };
@@ -2859,6 +2877,8 @@ function AssetCard({
   isUpdating,
   showPhotoStateBadge,
   showKeywordAssignmentBadge,
+  showAiQueueBadge,
+  isInAiQueue,
   onCardClick,
   onCardDoubleClick
 }: AssetCardProps) {
@@ -2952,6 +2972,17 @@ function AssetCard({
             }}
             title={`Keywords: ${asset.keywordAssignmentStatus}`}
           />
+        ) : null}
+        {showAiQueueBadge && isInAiQueue ? (
+          <span
+            style={{
+              ...cardAiQueueBadgeStyle,
+              right: showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? '22px' : '8px'
+            }}
+            title="In AI queue"
+          >
+            <PsychologyIcon style={{ fontSize: '14px' }} />
+          </span>
         ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
@@ -4080,6 +4111,10 @@ export default function App() {
     const stored = window.localStorage.getItem(leftPanelVisibleStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [peopleReviewSimplifiedView, setPeopleReviewSimplifiedView] = useState<boolean>(() => {
+    const stored = window.localStorage.getItem(peopleReviewSimplifiedViewStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
   const [showFilmstrip, setShowFilmstrip] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -4102,6 +4137,14 @@ export default function App() {
     }
 
     return window.localStorage.getItem(showThumbnailKeywordBadgesStorageKey) === 'true';
+  });
+  const [showThumbnailAiQueueBadges, setShowThumbnailAiQueueBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(showThumbnailAiQueueBadgesStorageKey);
+    return stored === null ? true : stored === 'true';
   });
   const [albumStatusBadgeMode, setAlbumStatusBadgeMode] = useState<'none' | 'keyword' | 'review'>(() => {
     if (typeof window === 'undefined') {
@@ -4516,6 +4559,10 @@ export default function App() {
   }, [showFilmstrip]);
 
   useEffect(() => {
+    window.localStorage.setItem(peopleReviewSimplifiedViewStorageKey, peopleReviewSimplifiedView ? 'true' : 'false');
+  }, [peopleReviewSimplifiedView]);
+
+  useEffect(() => {
     window.localStorage.setItem(
       showThumbnailPhotoStateBadgesStorageKey,
       showThumbnailPhotoStateBadges ? 'true' : 'false'
@@ -4528,6 +4575,13 @@ export default function App() {
       showThumbnailKeywordBadges ? 'true' : 'false'
     );
   }, [showThumbnailKeywordBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailAiQueueBadgesStorageKey,
+      showThumbnailAiQueueBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailAiQueueBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(albumStatusBadgeModeStorageKey, albumStatusBadgeMode);
@@ -5144,6 +5198,10 @@ export default function App() {
         assets.map((asset) => [asset.id, asset])
       ),
     [assets]
+  );
+  const aiQueueAssetIdSet = useMemo(
+    () => new Set<string>(aiQueueEntries.map((e) => e.assetId)),
+    [aiQueueEntries]
   );
   const selectedTreeNode = useMemo(
     () => (selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) ?? null : null),
@@ -11263,6 +11321,15 @@ export default function App() {
                 <label style={toggleOptionLabelStyle}>
                   <input
                     type="checkbox"
+                    checked={peopleReviewSimplifiedView}
+                    onChange={(event) => setPeopleReviewSimplifiedView(event.target.checked)}
+                  />
+                  People Review: simplified view
+                </label>
+                <div className="tdg-overflow-divider" />
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
                     checked={showFilmstrip}
                     onChange={(event) => setShowFilmstrip(event.target.checked)}
                   />
@@ -11291,6 +11358,14 @@ export default function App() {
                     onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
                   />
                   Show photo keyword status
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailAiQueueBadges}
+                    onChange={(event) => setShowThumbnailAiQueueBadges(event.target.checked)}
+                  />
+                  Show AI queue indicator
                 </label>
                 <span style={filterSubsectionTitleStyle}>Album Status Badge</span>
                 <label style={toggleOptionLabelStyle}>
@@ -11952,6 +12027,8 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                          showAiQueueBadge={showThumbnailAiQueueBadges}
+                          isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                         />
@@ -11980,6 +12057,8 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                          showAiQueueBadge={showThumbnailAiQueueBadges}
+                          isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                         />
@@ -11999,6 +12078,8 @@ export default function App() {
                     isUpdating={updatingAssetIds[asset.id] === true}
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                    showAiQueueBadge={showThumbnailAiQueueBadges}
+                    isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
                   />
