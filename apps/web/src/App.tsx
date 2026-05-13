@@ -15,6 +15,8 @@ import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TuneIcon from '@mui/icons-material/Tune';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
@@ -4119,8 +4121,10 @@ export default function App() {
     const stored = window.localStorage.getItem(showVisibilityPanelStorageKey);
     return stored === null ? true : stored === 'true';
   });
-  const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [thumbnailSizeMenuOpen, setThumbnailSizeMenuOpen] = useState(false);
+  const [aiMenuOpen, setAiMenuOpen] = useState(false);
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const [orderInAlbumMenuOpen, setOrderInAlbumMenuOpen] = useState(false);
   const [toolbarOverflowOpen, setToolbarOverflowOpen] = useState(false);
   const [primaryArea, setPrimaryArea] = useState<TedographyPrimaryArea>(() => {
     if (typeof window === 'undefined') {
@@ -4232,8 +4236,10 @@ export default function App() {
   });
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
-  const viewOptionsRootRef = useRef<HTMLDivElement | null>(null);
   const thumbnailSizeRootRef = useRef<HTMLDivElement | null>(null);
+  const aiMenuRootRef = useRef<HTMLDivElement | null>(null);
+  const layoutMenuRootRef = useRef<HTMLDivElement | null>(null);
+  const orderInAlbumRootRef = useRef<HTMLDivElement | null>(null);
   const toolbarOverflowRootRef = useRef<HTMLDivElement | null>(null);
   const pendingGridRevealAssetIdRef = useRef<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -4241,11 +4247,6 @@ export default function App() {
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const timelineScrollMemoryRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
   const pendingTimelineZoomAnchorKeyRef = useRef<string | null>(null);
-  const [viewOptionsMenuPosition, setViewOptionsMenuPosition] = useState<{ top: number; right: number; maxHeight: number }>({
-    top: 0,
-    right: 0,
-    maxHeight: 400
-  });
   const [thumbnailSizeMenuPosition, setThumbnailSizeMenuPosition] = useState<{ top: number; right: number }>({
     top: 0,
     right: 0
@@ -4254,6 +4255,20 @@ export default function App() {
     top: 0,
     right: 0,
     maxHeight: 600
+  });
+  const [aiMenuPosition, setAiMenuPosition] = useState<{ top: number; right: number; maxHeight: number }>({
+    top: 0,
+    right: 0,
+    maxHeight: 400
+  });
+  const [layoutMenuPosition, setLayoutMenuPosition] = useState<{ top: number; right: number; maxHeight: number }>({
+    top: 0,
+    right: 0,
+    maxHeight: 400
+  });
+  const [orderInAlbumMenuPosition, setOrderInAlbumMenuPosition] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0
   });
   const [stateButtonsCompact, setStateButtonsCompact] = useState<boolean>(() => {
     return localStorage.getItem('tdg-state-buttons-compact') === 'true';
@@ -4271,62 +4286,6 @@ export default function App() {
       })
       .catch(() => setHealthStatus('error'));
   }, []);
-
-  useEffect(() => {
-    if (!viewOptionsOpen) {
-      return;
-    }
-
-    function updateViewOptionsMenuPosition(): void {
-      const rect = viewOptionsRootRef.current?.getBoundingClientRect();
-      if (!rect) {
-        return;
-      }
-
-      const spaceBelow = window.innerHeight - rect.bottom - 14;
-      const spaceAbove = rect.top - 14;
-      const right = Math.max(window.innerWidth - rect.right, 8);
-      if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
-        setViewOptionsMenuPosition({
-          top: rect.bottom + 6,
-          right,
-          maxHeight: Math.max(spaceBelow, 120)
-        });
-      } else {
-        const clampedHeight = Math.min(spaceAbove, 400);
-        setViewOptionsMenuPosition({
-          top: Math.max(rect.top - clampedHeight - 6, 8),
-          right,
-          maxHeight: Math.max(spaceAbove, 120)
-        });
-      }
-    }
-
-    updateViewOptionsMenuPosition();
-
-    function handleWindowPointerDown(event: MouseEvent): void {
-      if (!(event.target instanceof Node)) {
-        setViewOptionsOpen(false);
-        return;
-      }
-
-      const optionsRoot = document.getElementById('tdg-view-options-root');
-      if (optionsRoot?.contains(event.target)) {
-        return;
-      }
-
-      setViewOptionsOpen(false);
-    }
-
-    window.addEventListener('resize', updateViewOptionsMenuPosition);
-    window.addEventListener('scroll', updateViewOptionsMenuPosition, true);
-    window.addEventListener('mousedown', handleWindowPointerDown);
-    return () => {
-      window.removeEventListener('resize', updateViewOptionsMenuPosition);
-      window.removeEventListener('scroll', updateViewOptionsMenuPosition, true);
-      window.removeEventListener('mousedown', handleWindowPointerDown);
-    };
-  }, [viewOptionsOpen]);
 
   useEffect(() => {
     if (!thumbnailSizeMenuOpen) {
@@ -4414,6 +4373,128 @@ export default function App() {
       window.removeEventListener('mousedown', handleWindowPointerDown);
     };
   }, [toolbarOverflowOpen]);
+
+  useEffect(() => {
+    if (!aiMenuOpen) {
+      return;
+    }
+
+    function updateAiMenuPosition(): void {
+      const rect = aiMenuRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      setAiMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8),
+        maxHeight: Math.max(window.innerHeight - rect.bottom - 14, 120)
+      });
+    }
+
+    updateAiMenuPosition();
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setAiMenuOpen(false);
+        return;
+      }
+      const menuRoot = document.getElementById('tdg-ai-menu-root');
+      if (menuRoot?.contains(event.target)) {
+        return;
+      }
+      setAiMenuOpen(false);
+    }
+
+    window.addEventListener('resize', updateAiMenuPosition);
+    window.addEventListener('scroll', updateAiMenuPosition, true);
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateAiMenuPosition);
+      window.removeEventListener('scroll', updateAiMenuPosition, true);
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [aiMenuOpen]);
+
+  useEffect(() => {
+    if (!layoutMenuOpen) {
+      return;
+    }
+
+    function updateLayoutMenuPosition(): void {
+      const rect = layoutMenuRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      setLayoutMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8),
+        maxHeight: Math.max(window.innerHeight - rect.bottom - 14, 120)
+      });
+    }
+
+    updateLayoutMenuPosition();
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setLayoutMenuOpen(false);
+        return;
+      }
+      const menuRoot = document.getElementById('tdg-layout-menu-root');
+      if (menuRoot?.contains(event.target)) {
+        return;
+      }
+      setLayoutMenuOpen(false);
+    }
+
+    window.addEventListener('resize', updateLayoutMenuPosition);
+    window.addEventListener('scroll', updateLayoutMenuPosition, true);
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateLayoutMenuPosition);
+      window.removeEventListener('scroll', updateLayoutMenuPosition, true);
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [layoutMenuOpen]);
+
+  useEffect(() => {
+    if (!orderInAlbumMenuOpen) {
+      return;
+    }
+
+    function updateOrderInAlbumMenuPosition(): void {
+      const rect = orderInAlbumRootRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      setOrderInAlbumMenuPosition({
+        top: rect.bottom + 6,
+        right: Math.max(window.innerWidth - rect.right, 8)
+      });
+    }
+
+    updateOrderInAlbumMenuPosition();
+
+    function handleWindowPointerDown(event: MouseEvent): void {
+      if (!(event.target instanceof Node)) {
+        setOrderInAlbumMenuOpen(false);
+        return;
+      }
+      const menuRoot = document.getElementById('tdg-order-in-album-root');
+      if (menuRoot?.contains(event.target)) {
+        return;
+      }
+      setOrderInAlbumMenuOpen(false);
+    }
+
+    window.addEventListener('resize', updateOrderInAlbumMenuPosition);
+    window.addEventListener('scroll', updateOrderInAlbumMenuPosition, true);
+    window.addEventListener('mousedown', handleWindowPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateOrderInAlbumMenuPosition);
+      window.removeEventListener('scroll', updateOrderInAlbumMenuPosition, true);
+      window.removeEventListener('mousedown', handleWindowPointerDown);
+    };
+  }, [orderInAlbumMenuOpen]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -9657,7 +9738,7 @@ export default function App() {
                 onClick={() => setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev)}
                 title="Set review assignment status for this album"
               >
-                <span>Review Status</span>
+                <span>Review State</span>
                 <span aria-hidden="true">&gt;</span>
               </button>
               {albumTreeReviewStatusSubmenuOpen && selectedTreeNode ? (
@@ -9819,7 +9900,7 @@ export default function App() {
     return (
       <section style={sidePanelSectionStyle}>
         <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>Review Status</h2>
+          <h2 style={sidePanelTitleStyle}>Review State</h2>
           <button type="button" style={compareButtonStyle} onClick={clearFilters} disabled={!hasActiveFilters}>
             Reset
           </button>
@@ -11036,6 +11117,260 @@ export default function App() {
             </div>
           ) : null}
 
+          {/* AI Queue toolbar button */}
+          <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
+            <Tooltip title={aiQueueEntries.length > 0 ? `AI Queue (${aiQueueEntries.length})` : 'AI Queue'}>
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  data-selected={aiMenuOpen ? 'true' : undefined}
+                  onClick={() => setAiMenuOpen((prev) => !prev)}
+                  aria-label="AI Queue"
+                >
+                  <PsychologyIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: aiQueueEntries.length > 0 ? '#9333ea' : undefined }} />
+                  {aiQueueEntries.length > 0 ? (
+                    <span style={{ fontSize: '10px', lineHeight: 1, marginLeft: '2px', color: '#9333ea', fontWeight: 600 }}>
+                      {aiQueueEntries.length}
+                    </span>
+                  ) : null}
+                </button>
+              </span>
+            </Tooltip>
+            {aiMenuOpen ? (
+              <div
+                className="tdg-overflow-menu"
+                style={{
+                  position: 'fixed',
+                  top: `${aiMenuPosition.top}px`,
+                  right: `${aiMenuPosition.right}px`,
+                  maxHeight: `${aiMenuPosition.maxHeight}px`,
+                  overflowY: 'auto'
+                }}
+              >
+                <div className="tdg-overflow-section">
+                  AI Edit Queue{aiQueueEntries.length > 0 ? ` (${aiQueueEntries.length})` : ''}
+                </div>
+                <button
+                  type="button"
+                  className="tdg-overflow-item"
+                  onClick={() => { setAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                >
+                  View Queue
+                </button>
+                <button
+                  type="button"
+                  className="tdg-overflow-item"
+                  onClick={() => { void handleOpenAiHistory(); setAiMenuOpen(false); }}
+                >
+                  View AI History
+                </button>
+                {selectedAssetIds.length === 1 && selectedAsset ? (() => {
+                  const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
+                  return queueEntry ? (
+                    <>
+                      <button
+                        type="button"
+                        className="tdg-overflow-item"
+                        onClick={() => { setAddToAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                      >
+                        Edit Prompt
+                      </button>
+                      <button
+                        type="button"
+                        className="tdg-overflow-item"
+                        onClick={() => { void handleRemoveFromAiQueue(selectedAsset.id); setAiMenuOpen(false); }}
+                      >
+                        Remove from Queue
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { setAddToAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                    >
+                      Add to AI Queue
+                    </button>
+                  );
+                })() : null}
+                {aiQueueEntries.length > 0 ? (
+                  <>
+                    <div className="tdg-overflow-divider" />
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId)); setAiMenuOpen(false); }}
+                    >
+                      Export AI Queue
+                    </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleClearAiQueue(); setAiMenuOpen(false); }}
+                    >
+                      Clear AI Queue
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {/* View Options toolbar button */}
+          <div style={menuAnchorStyle} id="tdg-layout-menu-root" ref={layoutMenuRootRef}>
+            <Tooltip title="View Options">
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  data-selected={layoutMenuOpen ? 'true' : undefined}
+                  onClick={() => setLayoutMenuOpen((prev) => !prev)}
+                  aria-label="View Options"
+                >
+                  <TuneIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                </button>
+              </span>
+            </Tooltip>
+            {layoutMenuOpen ? (
+              <div
+                style={{
+                  ...optionsMenuStyle,
+                  position: 'fixed',
+                  top: `${layoutMenuPosition.top}px`,
+                  right: `${layoutMenuPosition.right}px`,
+                  maxHeight: `${layoutMenuPosition.maxHeight}px`,
+                  overflowY: 'auto'
+                }}
+              >
+                <button
+                  type="button"
+                  className="tdg-overflow-item"
+                  onClick={() => { setLayoutMenuOpen(false); setLeftPanelVisible((previous) => !previous); }}
+                >
+                  {leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
+                </button>
+                {(isLibraryArea || isSearchArea) ? (
+                  <button
+                    type="button"
+                    className="tdg-overflow-item"
+                    onClick={() => { setLayoutMenuOpen(false); setDetailsPanelsVisible((previous) => !previous); }}
+                  >
+                    {detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
+                  </button>
+                ) : null}
+                <div className="tdg-overflow-divider" />
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showFilmstrip}
+                    onChange={(event) => setShowFilmstrip(event.target.checked)}
+                  />
+                  Show filmstrip
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showVisibilityPanel}
+                    onChange={(event) => setShowVisibilityPanel(event.target.checked)}
+                  />
+                  Show review state panel
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailPhotoStateBadges}
+                    onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
+                  />
+                  Show photo review state
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailKeywordBadges}
+                    onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
+                  />
+                  Show photo keyword status
+                </label>
+                <span style={filterSubsectionTitleStyle}>Album Status Badge</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-status-badge-mode"
+                    checked={albumStatusBadgeMode === 'none'}
+                    onChange={() => setAlbumStatusBadgeMode('none')}
+                  />
+                  None
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-status-badge-mode"
+                    checked={albumStatusBadgeMode === 'keyword'}
+                    onChange={() => setAlbumStatusBadgeMode('keyword')}
+                  />
+                  Keyword status
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-status-badge-mode"
+                    checked={albumStatusBadgeMode === 'review'}
+                    onChange={() => setAlbumStatusBadgeMode('review')}
+                  />
+                  Review status
+                </label>
+                <span style={filterSubsectionTitleStyle}>Album Layout</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-results-presentation"
+                    checked={albumResultsPresentation === 'Merged'}
+                    onChange={() => handleSetAlbumResultsPresentation('Merged')}
+                  />
+                  Merged
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-results-presentation"
+                    checked={albumResultsPresentation === 'GroupedByAlbum'}
+                    onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
+                  />
+                  Grouped
+                </label>
+                <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Custom'}
+                    onChange={() => setAlbumTreeSortMode('Custom')}
+                  />
+                  Custom
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Name'}
+                    onChange={() => setAlbumTreeSortMode('Name')}
+                  />
+                  Name
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="radio"
+                    name="album-tree-sort-mode"
+                    checked={albumTreeSortMode === 'Month/Name'}
+                    onChange={() => setAlbumTreeSortMode('Month/Name')}
+                  />
+                  Month/Name
+                </label>
+              </div>
+            ) : null}
+          </div>
+
           {/* Overflow -- less-frequent actions */}
           <div style={menuAnchorStyle} id="tdg-toolbar-overflow-root" ref={toolbarOverflowRootRef}>
             <Tooltip title="More">
@@ -11245,152 +11580,105 @@ export default function App() {
                   </>
                 ) : null}
 
-                {/* AI Edit Queue */}
-                {(selectedAssetIds.length === 1 && selectedAsset) || aiQueueEntries.length > 0 ? (
-                  <>
-                    <div className="tdg-overflow-divider" />
-                    <div className="tdg-overflow-section">
-                      AI Edit Queue{aiQueueEntries.length > 0 ? ` (${aiQueueEntries.length})` : ''}
-                    </div>
-                    <button
-                      type="button"
-                      className="tdg-overflow-item"
-                      onClick={() => { setAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
-                    >
-                      View Queue
-                    </button>
-                    <button
-                      type="button"
-                      className="tdg-overflow-item"
-                      onClick={() => { void handleOpenAiHistory(); setToolbarOverflowOpen(false); }}
-                    >
-                      View AI History
-                    </button>
-                    {selectedAssetIds.length === 1 && selectedAsset ? (() => {
-                      const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
-                      return queueEntry ? (
-                        <>
-                          <button
-                            type="button"
-                            className="tdg-overflow-item"
-                            onClick={() => { setAddToAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
-                          >
-                            Edit Prompt
-                          </button>
-                          <button
-                            type="button"
-                            className="tdg-overflow-item"
-                            onClick={() => { void handleRemoveFromAiQueue(selectedAsset.id); setToolbarOverflowOpen(false); }}
-                          >
-                            Remove from Queue
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="tdg-overflow-item"
-                          onClick={() => { setAddToAiQueueDialogOpen(true); setToolbarOverflowOpen(false); }}
-                        >
-                          Add to AI Queue
-                        </button>
-                      );
-                    })() : null}
-                    {aiQueueEntries.length > 0 ? (
-                      <>
-                        <button
-                          type="button"
-                          className="tdg-overflow-item"
-                          onClick={() => { void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId)); setToolbarOverflowOpen(false); }}
-                        >
-                          Export AI Queue
-                        </button>
-                        <button
-                          type="button"
-                          className="tdg-overflow-item"
-                          onClick={() => { void handleClearAiQueue(); setToolbarOverflowOpen(false); }}
-                        >
-                          Clear AI Queue
-                        </button>
-                      </>
-                    ) : null}
-                  </>
-                ) : null}
 
                 {/* Order in Album */}
                 {isLibraryArea && isAlbumsMode ? (
                   <>
                     <div className="tdg-overflow-divider" />
-                    <div className="tdg-overflow-section">Order in Album</div>
-                    {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
+                    <div style={menuAnchorStyle} id="tdg-order-in-album-root" ref={orderInAlbumRootRef}>
                       <button
                         type="button"
                         className="tdg-overflow-item"
-                        onClick={() => {
-                          void handleSetSelectedAssetAlbumOrderingMode(selectedAssetAlbumOrderingMode === 'capture-time');
-                          setToolbarOverflowOpen(false);
-                        }}
-                        title={
-                          selectedAssetAlbumOrderingMode === 'manual'
-                            ? 'Use capture-time ordering for the selected photo in this album'
-                            : 'Force the selected photo to use manual ordering in this album'
-                        }
+                        data-selected={orderInAlbumMenuOpen ? 'true' : undefined}
+                        onClick={() => setOrderInAlbumMenuOpen((previous) => !previous)}
+                        aria-label="Order in Album"
                       >
-                        {selectedAssetAlbumOrderingMode === 'manual' ? 'Use Capture Time' : 'Use Manual Order'}
+                        Order in Album
+                        <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '12px' }}>›</span>
                       </button>
-                    ) : null}
-                    <div className="tdg-overflow-icon-row">
-                      <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one manually ordered photo to reorder'}>
-                        <span>
-                          <button
-                            type="button"
-                            className="tdg-overflow-icon-btn"
-                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('top'); setToolbarOverflowOpen(false); }}
-                            disabled={!canMoveCurrentAlbumSelectionToTop}
-                            aria-label="Move to top"
-                          >
-                            <VerticalAlignTopIcon style={{ fontSize: '16px' }} />
-                          </button>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move up' : 'Select one manually ordered photo to reorder'}>
-                        <span>
-                          <button
-                            type="button"
-                            className="tdg-overflow-icon-btn"
-                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('up'); setToolbarOverflowOpen(false); }}
-                            disabled={!canMoveCurrentAlbumSelectionUp}
-                            aria-label="Move up"
-                          >
-                            <ArrowUpwardIcon style={{ fontSize: '16px' }} />
-                          </button>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move down' : 'Select one manually ordered photo to reorder'}>
-                        <span>
-                          <button
-                            type="button"
-                            className="tdg-overflow-icon-btn"
-                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('down'); setToolbarOverflowOpen(false); }}
-                            disabled={!canMoveCurrentAlbumSelectionDown}
-                            aria-label="Move down"
-                          >
-                            <ArrowDownwardIcon style={{ fontSize: '16px' }} />
-                          </button>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move to end of album' : 'Select one manually ordered photo to reorder'}>
-                        <span>
-                          <button
-                            type="button"
-                            className="tdg-overflow-icon-btn"
-                            onClick={() => { void handleMoveSelectedAssetWithinAlbum('bottom'); setToolbarOverflowOpen(false); }}
-                            disabled={!canMoveCurrentAlbumSelectionToBottom}
-                            aria-label="Move to bottom"
-                          >
-                            <VerticalAlignBottomIcon style={{ fontSize: '16px' }} />
-                          </button>
-                        </span>
-                      </Tooltip>
+                      {orderInAlbumMenuOpen ? (
+                        <div
+                          className="tdg-overflow-menu"
+                          style={{
+                            position: 'fixed',
+                            top: `${orderInAlbumMenuPosition.top}px`,
+                            right: `${orderInAlbumMenuPosition.right}px`
+                          }}
+                        >
+                          {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
+                            <button
+                              type="button"
+                              className="tdg-overflow-item"
+                              onClick={() => {
+                                void handleSetSelectedAssetAlbumOrderingMode(selectedAssetAlbumOrderingMode === 'capture-time');
+                                setOrderInAlbumMenuOpen(false);
+                                setToolbarOverflowOpen(false);
+                              }}
+                              title={
+                                selectedAssetAlbumOrderingMode === 'manual'
+                                  ? 'Use capture-time ordering for the selected photo in this album'
+                                  : 'Force the selected photo to use manual ordering in this album'
+                              }
+                            >
+                              {selectedAssetAlbumOrderingMode === 'manual' ? 'Use Capture Time' : 'Use Manual Order'}
+                            </button>
+                          ) : null}
+                          <div className="tdg-overflow-icon-row">
+                            <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one manually ordered photo to reorder'}>
+                              <span>
+                                <button
+                                  type="button"
+                                  className="tdg-overflow-icon-btn"
+                                  onClick={() => { void handleMoveSelectedAssetWithinAlbum('top'); setOrderInAlbumMenuOpen(false); setToolbarOverflowOpen(false); }}
+                                  disabled={!canMoveCurrentAlbumSelectionToTop}
+                                  aria-label="Move to top"
+                                >
+                                  <VerticalAlignTopIcon style={{ fontSize: '16px' }} />
+                                </button>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move up' : 'Select one manually ordered photo to reorder'}>
+                              <span>
+                                <button
+                                  type="button"
+                                  className="tdg-overflow-icon-btn"
+                                  onClick={() => { void handleMoveSelectedAssetWithinAlbum('up'); setOrderInAlbumMenuOpen(false); setToolbarOverflowOpen(false); }}
+                                  disabled={!canMoveCurrentAlbumSelectionUp}
+                                  aria-label="Move up"
+                                >
+                                  <ArrowUpwardIcon style={{ fontSize: '16px' }} />
+                                </button>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move down' : 'Select one manually ordered photo to reorder'}>
+                              <span>
+                                <button
+                                  type="button"
+                                  className="tdg-overflow-icon-btn"
+                                  onClick={() => { void handleMoveSelectedAssetWithinAlbum('down'); setOrderInAlbumMenuOpen(false); setToolbarOverflowOpen(false); }}
+                                  disabled={!canMoveCurrentAlbumSelectionDown}
+                                  aria-label="Move down"
+                                >
+                                  <ArrowDownwardIcon style={{ fontSize: '16px' }} />
+                                </button>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move to end of album' : 'Select one manually ordered photo to reorder'}>
+                              <span>
+                                <button
+                                  type="button"
+                                  className="tdg-overflow-icon-btn"
+                                  onClick={() => { void handleMoveSelectedAssetWithinAlbum('bottom'); setOrderInAlbumMenuOpen(false); setToolbarOverflowOpen(false); }}
+                                  disabled={!canMoveCurrentAlbumSelectionToBottom}
+                                  aria-label="Move to bottom"
+                                >
+                                  <VerticalAlignBottomIcon style={{ fontSize: '16px' }} />
+                                </button>
+                              </span>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 ) : null}
@@ -11417,157 +11705,6 @@ export default function App() {
                   Maintenance
                 </button>
 
-                {/* Layout */}
-                <div className="tdg-overflow-divider" />
-                <div className="tdg-overflow-section">Layout</div>
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => { setToolbarOverflowOpen(false); setLeftPanelVisible((previous) => !previous); }}
-                >
-                  {leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
-                </button>
-                {(isLibraryArea || isSearchArea) ? (
-                  <button
-                    type="button"
-                    className="tdg-overflow-item"
-                    onClick={() => { setToolbarOverflowOpen(false); setDetailsPanelsVisible((previous) => !previous); }}
-                  >
-                    {detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
-                  </button>
-                ) : null}
-                <div style={menuAnchorStyle} id="tdg-view-options-root" ref={viewOptionsRootRef}>
-                  <button
-                    type="button"
-                    className="tdg-overflow-item"
-                    data-selected={viewOptionsOpen ? 'true' : undefined}
-                    onClick={() => setViewOptionsOpen((previous) => !previous)}
-                    aria-label="View Options"
-                  >
-                    View Options
-                    <span style={{ marginLeft: 'auto', color: '#9ca3af', fontSize: '12px' }}>›</span>
-                  </button>
-                  {viewOptionsOpen ? (
-                    <div
-                      style={{
-                        ...optionsMenuStyle,
-                        position: 'fixed',
-                        top: `${viewOptionsMenuPosition.top}px`,
-                        right: `${viewOptionsMenuPosition.right}px`,
-                        maxHeight: `${viewOptionsMenuPosition.maxHeight}px`,
-                        overflowY: 'auto'
-                      }}
-                    >
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="checkbox"
-                          checked={showFilmstrip}
-                          onChange={(event) => setShowFilmstrip(event.target.checked)}
-                        />
-                        Show filmstrip
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="checkbox"
-                          checked={showVisibilityPanel}
-                          onChange={(event) => setShowVisibilityPanel(event.target.checked)}
-                        />
-                        Show review status panel
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="checkbox"
-                          checked={showThumbnailPhotoStateBadges}
-                          onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
-                        />
-                        Show thumbnail state
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="checkbox"
-                          checked={showThumbnailKeywordBadges}
-                          onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
-                        />
-                        Show photo keyword status
-                      </label>
-                      <span style={filterSubsectionTitleStyle}>Album Status Badge</span>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-status-badge-mode"
-                          checked={albumStatusBadgeMode === 'none'}
-                          onChange={() => setAlbumStatusBadgeMode('none')}
-                        />
-                        None
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-status-badge-mode"
-                          checked={albumStatusBadgeMode === 'keyword'}
-                          onChange={() => setAlbumStatusBadgeMode('keyword')}
-                        />
-                        Keyword status
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-status-badge-mode"
-                          checked={albumStatusBadgeMode === 'review'}
-                          onChange={() => setAlbumStatusBadgeMode('review')}
-                        />
-                        Review status
-                      </label>
-                      <span style={filterSubsectionTitleStyle}>Album Layout</span>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-results-presentation"
-                          checked={albumResultsPresentation === 'Merged'}
-                          onChange={() => handleSetAlbumResultsPresentation('Merged')}
-                        />
-                        Merged
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-results-presentation"
-                          checked={albumResultsPresentation === 'GroupedByAlbum'}
-                          onChange={() => handleSetAlbumResultsPresentation('GroupedByAlbum')}
-                        />
-                        Grouped
-                      </label>
-                      <span style={filterSubsectionTitleStyle}>Album Tree Sort</span>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-tree-sort-mode"
-                          checked={albumTreeSortMode === 'Custom'}
-                          onChange={() => setAlbumTreeSortMode('Custom')}
-                        />
-                        Custom
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-tree-sort-mode"
-                          checked={albumTreeSortMode === 'Name'}
-                          onChange={() => setAlbumTreeSortMode('Name')}
-                        />
-                        Name
-                      </label>
-                      <label style={toggleOptionLabelStyle}>
-                        <input
-                          type="radio"
-                          name="album-tree-sort-mode"
-                          checked={albumTreeSortMode === 'Month/Name'}
-                          onChange={() => setAlbumTreeSortMode('Month/Name')}
-                        />
-                        Month/Name
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
               </div>
             ) : null}
           </div>
