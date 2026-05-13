@@ -1761,8 +1761,8 @@ export function PeopleReviewPage() {
                     <div style={inlineRowStyle}>
                       <button
                         type="button"
-                        style={isBusy || !faceState.canConfirm ? disabledButtonStyle : primaryButtonStyle}
-                        disabled={isBusy || !faceState.canConfirm}
+                        style={isBusy || !faceState.canConfirm || !!pendingConfirmation ? disabledButtonStyle : primaryButtonStyle}
+                        disabled={isBusy || !faceState.canConfirm || !!pendingConfirmation}
                         onClick={() => queueConfirmation(item)}
                         title={faceState.isPassiveConfirmed ? undefined : confirmActionHint ?? undefined}
                       >
@@ -1805,7 +1805,7 @@ export function PeopleReviewPage() {
                     {recentPeople.length > 0 ? (
                       <div style={inlineRowStyle}>
                         {recentPeople.map((person) => {
-                          const assignmentState = getAssignmentActionState({ faceState, person, busy: isBusy });
+                          const assignmentState = getAssignmentActionState({ faceState, person, busy: isBusy || !!pendingConfirmation });
 
                           return (
                             <button
@@ -1908,8 +1908,8 @@ export function PeopleReviewPage() {
                       </select>
                       <button
                         type="button"
-                        style={isBusy ? disabledButtonStyle : buttonStyle}
-                        disabled={isBusy}
+                        style={isBusy || !!pendingIgnore ? disabledButtonStyle : buttonStyle}
+                        disabled={isBusy || !!pendingIgnore}
                         onClick={() => queueIgnore(item, draft.ignoredReason)}
                       >
                         Queue Ignore
