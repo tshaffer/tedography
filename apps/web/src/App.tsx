@@ -296,6 +296,7 @@ const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
+const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
 const albumTreeBootstrapStorageKey = 'tedography.bootstrap.albumTreeNodes';
 const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
@@ -4091,6 +4092,14 @@ export default function App() {
 
     return window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true';
   });
+  const [showVisibilityPanel, setShowVisibilityPanel] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    const stored = window.localStorage.getItem(showVisibilityPanelStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   const [thumbnailSizeMenuOpen, setThumbnailSizeMenuOpen] = useState(false);
   const [toolbarOverflowOpen, setToolbarOverflowOpen] = useState(false);
@@ -4426,6 +4435,10 @@ export default function App() {
       showAlbumKeywordBadges ? 'true' : 'false'
     );
   }, [showAlbumKeywordBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(showVisibilityPanelStorageKey, showVisibilityPanel ? 'true' : 'false');
+  }, [showVisibilityPanel]);
 
   useEffect(() => {
     window.localStorage.setItem(primaryAreaStorageKey, primaryArea);
@@ -10559,7 +10572,7 @@ export default function App() {
       <aside style={isAlbumsMode ? leftPanelStyle : sidePanelStyle}>
         {isLibraryArea ? (
           <>
-            {renderVisibilityPanel()}
+            {showVisibilityPanel ? renderVisibilityPanel() : null}
             {isTimelineGridMode ? renderTimelineNavigationPanel() : null}
             {isLibraryAlbumsMode ? renderAlbumTreePanel() : null}
           </>
@@ -11367,6 +11380,14 @@ export default function App() {
                           onChange={(event) => setShowFilmstrip(event.target.checked)}
                         />
                         Show filmstrip
+                      </label>
+                      <label style={toggleOptionLabelStyle}>
+                        <input
+                          type="checkbox"
+                          checked={showVisibilityPanel}
+                          onChange={(event) => setShowVisibilityPanel(event.target.checked)}
+                        />
+                        Show visibility panel
                       </label>
                       <label style={toggleOptionLabelStyle}>
                         <input
