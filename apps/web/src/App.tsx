@@ -8439,6 +8439,8 @@ export default function App() {
   function closeAlbumTreeContextMenu(): void {
     setAlbumTreeOrderSubmenuOpen(false);
     setAlbumTreeKeywordStatusSubmenuOpen(false);
+    setAlbumTreeReviewStatusSubmenuOpen(false);
+    setAlbumTreePeopleStatusSubmenuOpen(false);
     setAlbumTreeContextMenu(null);
   }
 
@@ -9622,11 +9624,7 @@ export default function App() {
             <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
               Import Album
             </button>
-            <div
-              style={contextMenuSubmenuContainerStyle}
-              onPointerEnter={() => setAlbumTreeOrderSubmenuOpen(true)}
-              onPointerLeave={() => setAlbumTreeOrderSubmenuOpen(false)}
-            >
+            <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
                 style={contextMenuSubmenuTriggerStyle}
@@ -9792,15 +9790,15 @@ export default function App() {
             >
               Move Down
             </button>
-            <div
-              style={contextMenuSubmenuContainerStyle}
-              onPointerEnter={() => setAlbumTreeKeywordStatusSubmenuOpen(true)}
-              onPointerLeave={() => setAlbumTreeKeywordStatusSubmenuOpen(false)}
-            >
+            <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
                 style={contextMenuSubmenuTriggerStyle}
-                onClick={() => setAlbumTreeKeywordStatusSubmenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setAlbumTreeReviewStatusSubmenuOpen(false);
+                  setAlbumTreePeopleStatusSubmenuOpen(false);
+                  setAlbumTreeKeywordStatusSubmenuOpen((prev) => !prev);
+                }}
                 title="Set keyword assignment status for this album"
               >
                 <span>Keyword Status</span>
@@ -9833,15 +9831,15 @@ export default function App() {
                 </div>
               ) : null}
             </div>
-            <div
-              style={contextMenuSubmenuContainerStyle}
-              onPointerEnter={() => setAlbumTreeReviewStatusSubmenuOpen(true)}
-              onPointerLeave={() => setAlbumTreeReviewStatusSubmenuOpen(false)}
-            >
+            <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
                 style={contextMenuSubmenuTriggerStyle}
-                onClick={() => setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setAlbumTreeKeywordStatusSubmenuOpen(false);
+                  setAlbumTreePeopleStatusSubmenuOpen(false);
+                  setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev);
+                }}
                 title="Set review assignment status for this album"
               >
                 <span>Review State</span>
@@ -9874,15 +9872,15 @@ export default function App() {
                 </div>
               ) : null}
             </div>
-            <div
-              style={contextMenuSubmenuContainerStyle}
-              onPointerEnter={() => setAlbumTreePeopleStatusSubmenuOpen(true)}
-              onPointerLeave={() => setAlbumTreePeopleStatusSubmenuOpen(false)}
-            >
+            <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
                 style={contextMenuSubmenuTriggerStyle}
-                onClick={() => setAlbumTreePeopleStatusSubmenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setAlbumTreeKeywordStatusSubmenuOpen(false);
+                  setAlbumTreeReviewStatusSubmenuOpen(false);
+                  setAlbumTreePeopleStatusSubmenuOpen((prev) => !prev);
+                }}
                 title="Set people assignment status for this album"
               >
                 <span>People State</span>
