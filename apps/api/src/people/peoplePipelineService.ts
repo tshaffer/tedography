@@ -22,13 +22,15 @@ import type {
   ReviewFaceDetectionResponse
 } from '@tedography/shared';
 import { config } from '../config.js';
-import { findById, findByIds, setAssetPeopleRecognitionRanAt, updateMediaAssetPeople } from '../repositories/assetRepository.js';
+import { findById, findByIds, removePersonFromAllAssets, setAssetPeopleRecognitionRanAt, updateMediaAssetPeople } from '../repositories/assetRepository.js';
 import {
+  clearAutoMatchCandidateByPersonId,
   countFaceDetectionsByStatus,
   findFaceDetectionById,
   listConfirmedFaceDetectionsByPersonId,
   listFaceDetections,
   listFaceDetectionsByAssetId,
+  resetMatchedPersonDetections,
   summarizeFaceDetectionsByAssetIds,
   replaceFaceDetectionsForAsset,
   updateFaceDetection
@@ -40,7 +42,7 @@ import {
   replaceFaceMatchReviewsForAsset,
   upsertFaceMatchReview
 } from '../repositories/faceMatchReviewRepository.js';
-import { createPerson, findPeopleByIds, findPersonById, listPeople, updatePerson } from '../repositories/personRepository.js';
+import { createPerson, deletePersonById, findPeopleByIds, findPersonById, listPeople, updatePerson } from '../repositories/personRepository.js';
 import {
   createPersonFaceExample,
   findActivePersonFaceExampleByPersonAndDetection,
@@ -48,6 +50,7 @@ import {
   listActivePersonFaceExamplesByDetectionId,
   listActivePersonFaceExamplesByDetectionIds,
   listActivePersonFaceExamplesByPersonId,
+  markAllExamplesRemovedByPersonId,
   markPersonFaceExampleRemoved
 } from '../repositories/personFaceExampleRepository.js';
 import {
@@ -1227,6 +1230,34 @@ export async function splitPersonFromConfirmedFaces(input: {
     movedExampleCount,
     affectedAssetCount: affectedAssetIds.size,
     createdTargetPerson
+  };
+}
+
+export async function deletePersonWithCascade(personId: string): Promise<{
+  displayName: string;
+  resetDetectionsCount: number;
+  removedExamplesCount: number;
+  affectedAssetsCount: number;
+}> {
+  const person = await findPersonById(personId);
+  if (!person) {
+    throw new Error(`Person ${personId} not found.`);
+  }
+
+  const [resetDetectionsCount, , removedExamplesCount, affectedAssetsCount] = await Promise.all([
+    resetMatchedPersonDetections(personId),
+    clearAutoMatchCandidateByPersonId(personId),
+    markAllExamplesRemovedByPersonId(personId),
+    removePersonFromAllAssets(personId)
+  ]);
+
+  await deletePersonById(personId);
+
+  return {
+    displayName: person.displayName,
+    resetDetectionsCount,
+    removedExamplesCount,
+    affectedAssetsCount
   };
 }
 

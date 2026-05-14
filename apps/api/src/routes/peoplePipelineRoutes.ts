@@ -27,6 +27,7 @@ import {
   removePersonFaceExample,
   removeManualPersonTag,
   processPeoplePipelineForAsset,
+  deletePersonWithCascade,
   splitPersonFromConfirmedFaces,
   reviewFaceDetection
 } from '../people/peoplePipelineService.js';
@@ -205,6 +206,17 @@ peoplePipelineRoutes.patch('/people/:personId', async (req, res) => {
   } catch (error) {
     log.error('Failed to update person', error);
     res.status(400).json({ error: 'Failed to update person' } satisfies ImportApiErrorResponse);
+  }
+});
+
+peoplePipelineRoutes.delete('/people/:personId', async (req, res) => {
+  try {
+    const result = await deletePersonWithCascade(req.params.personId);
+    res.json(result);
+  } catch (error) {
+    log.error('Failed to delete person', error);
+    const message = error instanceof Error ? error.message : 'Failed to delete person';
+    res.status(message.includes('not found') ? 404 : 500).json({ error: message } satisfies ImportApiErrorResponse);
   }
 });
 

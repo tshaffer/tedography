@@ -649,6 +649,14 @@ export async function updateMediaAssetPeople(
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function removePersonFromAllAssets(personId: string): Promise<number> {
+  const result = await MediaAssetModel.updateMany(
+    { 'people.personId': personId },
+    { $pull: { people: { personId } } }
+  );
+  return result.modifiedCount;
+}
+
 export async function setAssetPeopleRecognitionRanAt(id: string, ranAt: string): Promise<void> {
   await MediaAssetModel.findOneAndUpdate(
     { id },

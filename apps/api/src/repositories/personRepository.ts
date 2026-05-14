@@ -80,6 +80,11 @@ export async function createPerson(input: {
   return person;
 }
 
+export async function deletePersonById(id: string): Promise<boolean> {
+  const result = await PersonModel.deleteOne({ id });
+  return result.deletedCount === 1;
+}
+
 export async function updatePerson(input: {
   id: string;
   displayName?: string;

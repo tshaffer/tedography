@@ -135,6 +135,15 @@ export async function createPersonFaceExample(input: {
   return item;
 }
 
+export async function markAllExamplesRemovedByPersonId(personId: string): Promise<number> {
+  const removedAt = new Date().toISOString();
+  const result = await PersonFaceExampleModel.updateMany(
+    { personId, status: { $ne: 'removed' } },
+    { $set: { status: 'removed', removedAt } }
+  );
+  return result.modifiedCount;
+}
+
 export async function markPersonFaceExampleRemoved(id: string): Promise<PersonFaceExample | null> {
   const removedAt = new Date().toISOString();
   const item = await PersonFaceExampleModel.findOneAndUpdate(

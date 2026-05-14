@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { GetPersonDetailResponse, ListPeopleResponse } from '@tedography/shared';
 import {
+  deletePerson,
   enrollPersonFromDetection,
   getPersonDetail,
   listPeople,
@@ -308,6 +309,30 @@ export function PersonDetailPage() {
     }
   }
 
+  async function handleDeletePerson(): Promise<void> {
+    if (!detail) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Permanently delete "${detail.person.displayName}"?\n\nThis will reset all face detections assigned to this person and remove them from all assets. This cannot be undone.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    setActionErrorMessage(null);
+    setNoticeMessage(null);
+    try {
+      await deletePerson(detail.person.id);
+      navigate('/people');
+    } catch (error) {
+      setActionErrorMessage(error instanceof Error ? error.message : 'Failed to delete person');
+      setSaving(false);
+    }
+  }
+
   async function handleRemoveExample(exampleId: string): Promise<void> {
     if (!detail) {
       return;
@@ -599,6 +624,14 @@ export function PersonDetailPage() {
                     onClick={() => void handleToggleFlag('isArchived')}
                   >
                     {detail.person.isArchived ? 'Unarchive' : 'Archive'}
+                  </button>
+                  <button
+                    type="button"
+                    style={saving ? disabledButtonStyle : { ...buttonStyle, backgroundColor: '#fff5f5', borderColor: '#e7b3b3', color: '#7a1f1f' }}
+                    disabled={saving}
+                    onClick={() => void handleDeletePerson()}
+                  >
+                    Delete
                   </button>
                 </div>
               </div>

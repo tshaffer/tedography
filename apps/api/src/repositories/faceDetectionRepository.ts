@@ -212,6 +212,28 @@ export async function findFaceDetectionById(id: string): Promise<FaceDetection |
   return detection ? normalizeFaceDetection(detection) : null;
 }
 
+export async function resetMatchedPersonDetections(personId: string): Promise<number> {
+  const result = await FaceDetectionModel.updateMany(
+    { matchedPersonId: personId, matchStatus: { $in: ['confirmed', 'autoMatched', 'suggested', 'unmatched'] } },
+    { $set: { matchedPersonId: null, matchConfidence: null, matchStatus: 'unmatched' } }
+  );
+  return result.modifiedCount;
+}
+
+export async function clearAutoMatchCandidateByPersonId(personId: string): Promise<number> {
+  const [r1, r2] = await Promise.all([
+    FaceDetectionModel.updateMany(
+      { autoMatchCandidatePersonId: personId, matchStatus: { $in: ['suggested', 'autoMatched'] } },
+      { $set: { autoMatchCandidatePersonId: null, autoMatchCandidateConfidence: null, matchStatus: 'unmatched' } }
+    ),
+    FaceDetectionModel.updateMany(
+      { autoMatchCandidatePersonId: personId, matchStatus: { $nin: ['suggested', 'autoMatched'] } },
+      { $set: { autoMatchCandidatePersonId: null, autoMatchCandidateConfidence: null } }
+    )
+  ]);
+  return r1.modifiedCount + r2.modifiedCount;
+}
+
 export async function updateFaceDetection(input: {
   id: string;
   cropPath?: string | null;

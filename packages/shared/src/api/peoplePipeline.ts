@@ -249,6 +249,13 @@ export interface RemovePersonExampleResponse {
   item: PersonFaceExample;
 }
 
+export interface DeletePersonResponse {
+  displayName: string;
+  resetDetectionsCount: number;
+  removedExamplesCount: number;
+  affectedAssetsCount: number;
+}
+
 export interface MergePersonRequest {
   targetPersonId: string;
 }

@@ -1,6 +1,7 @@
 import type {
   CreatePersonRequest,
   CreatePersonResponse,
+  DeletePersonResponse,
   EnrollPersonFromDetectionRequest,
   EnrollPersonFromDetectionResponse,
   GetPersonDetailResponse,
@@ -77,6 +78,13 @@ export async function updatePerson(
       },
       body: JSON.stringify(request)
     }
+  );
+}
+
+export async function deletePerson(personId: string): Promise<DeletePersonResponse> {
+  return fetchJson<DeletePersonResponse>(
+    `/api/people-pipeline/people/${encodeURIComponent(personId)}`,
+    { method: 'DELETE' }
   );
 }
 
