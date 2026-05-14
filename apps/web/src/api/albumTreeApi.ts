@@ -1,5 +1,6 @@
 import {
   type AlbumKeywordAssignmentStatus,
+  type AlbumPeopleAssignmentStatus,
   type AlbumReviewAssignmentStatus,
   type AlbumTreeChildOrderMode,
   type AlbumTreeNode,
@@ -271,6 +272,27 @@ export async function setAlbumReviewAssignmentStatus(
 ): Promise<AlbumTreeNode> {
   const response = await fetch(
     `/api/album-tree/${encodeURIComponent(albumId)}/review-assignment-status`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    }
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+export async function setAlbumPeopleAssignmentStatus(
+  albumId: string,
+  status: AlbumPeopleAssignmentStatus | null
+): Promise<AlbumTreeNode> {
+  const response = await fetch(
+    `/api/album-tree/${encodeURIComponent(albumId)}/people-assignment-status`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

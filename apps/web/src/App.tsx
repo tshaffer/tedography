@@ -34,6 +34,9 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import CropIcon from '@mui/icons-material/Crop';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import CheckIcon from '@mui/icons-material/Check';
+import LabelIcon from '@mui/icons-material/Label';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import PeopleIcon from '@mui/icons-material/People';
 import CloseIcon from '@mui/icons-material/Close';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -48,6 +51,7 @@ import {
   PhotoState,
   normalizePhotoState,
   type AlbumKeywordAssignmentStatus,
+  type AlbumPeopleAssignmentStatus,
   type AlbumReviewAssignmentStatus,
   type AlbumTreeNode,
   type AssetKeywordAssignmentStatus,
@@ -68,6 +72,7 @@ import {
   removeAssetsFromAlbum,
   renameAlbumTreeNode,
   setAlbumKeywordAssignmentStatus as setAlbumKeywordAssignmentStatusRequest,
+  setAlbumPeopleAssignmentStatus as setAlbumPeopleAssignmentStatusRequest,
   setAlbumReviewAssignmentStatus as setAlbumReviewAssignmentStatusRequest,
   updateAlbumTreeChildOrderMode,
   updateAlbumManualOrder,
@@ -302,6 +307,9 @@ const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoSt
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showThumbnailAiQueueBadgesStorageKey = 'tedography.showThumbnailAiQueueBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
+const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
+const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
+const showAlbumPeopleStatusBadgeStorageKey = 'tedography.album.showPeopleBadge';
 const albumStatusBadgeModeStorageKey = 'tedography.albumStatusBadgeMode';
 const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
@@ -1757,10 +1765,10 @@ function getAlbumAssetCountStatusBadgeStyle(status: AlbumAssetCountStatus): CSSP
   };
 }
 
-function getAlbumKeywordStatusDotColor(status: AlbumKeywordAssignmentStatus): string {
+function getAlbumStatusIconColor(status: AlbumKeywordAssignmentStatus | AlbumReviewAssignmentStatus | AlbumPeopleAssignmentStatus): string {
   if (status === 'complete') return '#16a34a';
   if (status === 'in-progress') return '#d97706';
-  return '#9ca3af';
+  return '#dc2626';
 }
 
 function getAlbumKeywordStatusTitle(status: AlbumKeywordAssignmentStatus): string {
@@ -1769,16 +1777,16 @@ function getAlbumKeywordStatusTitle(status: AlbumKeywordAssignmentStatus): strin
   return 'Keywords: not started';
 }
 
-function getAlbumReviewStatusDotColor(status: AlbumReviewAssignmentStatus): string {
-  if (status === 'complete') return '#16a34a';
-  if (status === 'in-progress') return '#d97706';
-  return '#9ca3af';
-}
-
 function getAlbumReviewStatusTitle(status: AlbumReviewAssignmentStatus): string {
   if (status === 'complete') return 'Review: complete';
   if (status === 'in-progress') return 'Review: in progress';
   return 'Review: not started';
+}
+
+function getAlbumPeopleStatusTitle(status: AlbumPeopleAssignmentStatus): string {
+  if (status === 'complete') return 'People: complete';
+  if (status === 'in-progress') return 'People: in progress';
+  return 'People: not started';
 }
 
 function getAssetKeywordStatusDotColor(status: AssetKeywordAssignmentStatus): string {
@@ -3789,6 +3797,7 @@ export default function App() {
   const [albumTreeOrderSubmenuOpen, setAlbumTreeOrderSubmenuOpen] = useState(false);
   const [albumTreeKeywordStatusSubmenuOpen, setAlbumTreeKeywordStatusSubmenuOpen] = useState(false);
   const [albumTreeReviewStatusSubmenuOpen, setAlbumTreeReviewStatusSubmenuOpen] = useState(false);
+  const [albumTreePeopleStatusSubmenuOpen, setAlbumTreePeopleStatusSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -4146,15 +4155,27 @@ export default function App() {
     const stored = window.localStorage.getItem(showThumbnailAiQueueBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
-  const [albumStatusBadgeMode, setAlbumStatusBadgeMode] = useState<'none' | 'keyword' | 'review'>(() => {
-    if (typeof window === 'undefined') {
-      return 'none';
-    }
-    const stored = window.localStorage.getItem(albumStatusBadgeModeStorageKey);
-    if (stored === 'keyword' || stored === 'review') return stored;
-    // migrate legacy showAlbumKeywordBadges setting
-    if (stored === null && window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true') return 'keyword';
-    return 'none';
+  const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const own = window.localStorage.getItem(showAlbumKeywordStatusBadgeStorageKey);
+    if (own !== null) return own === 'true';
+    // migrate from old albumStatusBadgeMode
+    const legacy = window.localStorage.getItem(albumStatusBadgeModeStorageKey);
+    if (legacy === 'keyword') return true;
+    // migrate from even older showAlbumKeywordBadges
+    return window.localStorage.getItem(showAlbumKeywordBadgesStorageKey) === 'true';
+  });
+  const [showAlbumReviewStatusBadge, setShowAlbumReviewStatusBadge] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const own = window.localStorage.getItem(showAlbumReviewStatusBadgeStorageKey);
+    if (own !== null) return own === 'true';
+    const legacy = window.localStorage.getItem(albumStatusBadgeModeStorageKey);
+    return legacy === 'review';
+  });
+  const [showAlbumPeopleStatusBadge, setShowAlbumPeopleStatusBadge] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem(showAlbumPeopleStatusBadgeStorageKey);
+    return stored === null ? true : stored === 'true';
   });
   const [showVisibilityPanel, setShowVisibilityPanel] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
@@ -4584,8 +4605,16 @@ export default function App() {
   }, [showThumbnailAiQueueBadges]);
 
   useEffect(() => {
-    window.localStorage.setItem(albumStatusBadgeModeStorageKey, albumStatusBadgeMode);
-  }, [albumStatusBadgeMode]);
+    window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
+  }, [showAlbumKeywordStatusBadge]);
+
+  useEffect(() => {
+    window.localStorage.setItem(showAlbumReviewStatusBadgeStorageKey, showAlbumReviewStatusBadge ? 'true' : 'false');
+  }, [showAlbumReviewStatusBadge]);
+
+  useEffect(() => {
+    window.localStorage.setItem(showAlbumPeopleStatusBadgeStorageKey, showAlbumPeopleStatusBadge ? 'true' : 'false');
+  }, [showAlbumPeopleStatusBadge]);
 
   useEffect(() => {
     window.localStorage.setItem(showVisibilityPanelStorageKey, showVisibilityPanel ? 'true' : 'false');
@@ -6915,6 +6944,21 @@ export default function App() {
       );
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Failed to update review assignment status.');
+    }
+  }
+
+  async function handleSetAlbumPeopleAssignmentStatus(
+    albumId: string,
+    status: AlbumPeopleAssignmentStatus | null
+  ): Promise<void> {
+    closeAlbumTreeContextMenu();
+    try {
+      const updatedNode = await setAlbumPeopleAssignmentStatusRequest(albumId, status);
+      setAlbumTreeNodes((previous) =>
+        previous.map((node) => (node.id === updatedNode.id ? updatedNode : node))
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to update people assignment status.');
     }
   }
 
@@ -9454,29 +9498,33 @@ export default function App() {
                         {getAlbumAssetCountStatusLabel(countStatus)}
                       </span>
                     ) : null}
-                    {!isGroup && albumStatusBadgeMode === 'keyword' && node.keywordAssignmentStatus ? (
-                      <span
-                        title={getAlbumKeywordStatusTitle(node.keywordAssignmentStatus)}
+                    {!isGroup && showAlbumKeywordStatusBadge && node.keywordAssignmentStatus ? (
+                      <LabelIcon
+                        titleAccess={getAlbumKeywordStatusTitle(node.keywordAssignmentStatus)}
                         style={{
                           flex: '0 0 auto',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: getAlbumKeywordStatusDotColor(node.keywordAssignmentStatus),
-                          display: 'inline-block'
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(node.keywordAssignmentStatus)
                         }}
                       />
                     ) : null}
-                    {!isGroup && albumStatusBadgeMode === 'review' && node.reviewAssignmentStatus ? (
-                      <span
-                        title={getAlbumReviewStatusTitle(node.reviewAssignmentStatus)}
+                    {!isGroup && showAlbumReviewStatusBadge && node.reviewAssignmentStatus ? (
+                      <RateReviewIcon
+                        titleAccess={getAlbumReviewStatusTitle(node.reviewAssignmentStatus)}
                         style={{
                           flex: '0 0 auto',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: getAlbumReviewStatusDotColor(node.reviewAssignmentStatus),
-                          display: 'inline-block'
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(node.reviewAssignmentStatus)
+                        }}
+                      />
+                    ) : null}
+                    {!isGroup && showAlbumPeopleStatusBadge && node.peopleAssignmentStatus ? (
+                      <PeopleIcon
+                        titleAccess={getAlbumPeopleStatusTitle(node.peopleAssignmentStatus)}
+                        style={{
+                          flex: '0 0 auto',
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(node.peopleAssignmentStatus)
                         }}
                       />
                     ) : null}
@@ -9819,6 +9867,47 @@ export default function App() {
                       type="button"
                       style={contextMenuItemStyle}
                       onClick={() => void handleSetAlbumReviewAssignmentStatus(selectedTreeNode.id, null)}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div
+              style={contextMenuSubmenuContainerStyle}
+              onPointerEnter={() => setAlbumTreePeopleStatusSubmenuOpen(true)}
+              onPointerLeave={() => setAlbumTreePeopleStatusSubmenuOpen(false)}
+            >
+              <button
+                type="button"
+                style={contextMenuSubmenuTriggerStyle}
+                onClick={() => setAlbumTreePeopleStatusSubmenuOpen((prev) => !prev)}
+                title="Set people assignment status for this album"
+              >
+                <span>People State</span>
+                <span aria-hidden="true">&gt;</span>
+              </button>
+              {albumTreePeopleStatusSubmenuOpen && selectedTreeNode ? (
+                <div style={contextMenuSubmenuStyle}>
+                  {(['not-started', 'in-progress', 'complete'] as AlbumPeopleAssignmentStatus[]).map(
+                    (status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        style={contextMenuItemStyle}
+                        onClick={() => void handleSetAlbumPeopleAssignmentStatus(selectedTreeNode.id, status)}
+                      >
+                        {selectedTreeNode.peopleAssignmentStatus === status ? '✓ ' : ''}
+                        {status === 'not-started' ? 'Not Started' : status === 'in-progress' ? 'In Progress' : 'Complete'}
+                      </button>
+                    )
+                  )}
+                  {selectedTreeNode.peopleAssignmentStatus ? (
+                    <button
+                      type="button"
+                      style={contextMenuItemStyle}
+                      onClick={() => void handleSetAlbumPeopleAssignmentStatus(selectedTreeNode.id, null)}
                     >
                       Clear
                     </button>
@@ -11367,33 +11456,30 @@ export default function App() {
                   />
                   Show AI queue indicator
                 </label>
-                <span style={filterSubsectionTitleStyle}>Album Status Badge</span>
+                <span style={filterSubsectionTitleStyle}>Album Status Badges</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
-                    type="radio"
-                    name="album-status-badge-mode"
-                    checked={albumStatusBadgeMode === 'none'}
-                    onChange={() => setAlbumStatusBadgeMode('none')}
-                  />
-                  None
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="radio"
-                    name="album-status-badge-mode"
-                    checked={albumStatusBadgeMode === 'keyword'}
-                    onChange={() => setAlbumStatusBadgeMode('keyword')}
+                    type="checkbox"
+                    checked={showAlbumKeywordStatusBadge}
+                    onChange={(event) => setShowAlbumKeywordStatusBadge(event.target.checked)}
                   />
                   Keyword status
                 </label>
                 <label style={toggleOptionLabelStyle}>
                   <input
-                    type="radio"
-                    name="album-status-badge-mode"
-                    checked={albumStatusBadgeMode === 'review'}
-                    onChange={() => setAlbumStatusBadgeMode('review')}
+                    type="checkbox"
+                    checked={showAlbumReviewStatusBadge}
+                    onChange={(event) => setShowAlbumReviewStatusBadge(event.target.checked)}
                   />
                   Review status
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showAlbumPeopleStatusBadge}
+                    onChange={(event) => setShowAlbumPeopleStatusBadge(event.target.checked)}
+                  />
+                  People status
                 </label>
                 <span style={filterSubsectionTitleStyle}>Album Layout</span>
                 <label style={toggleOptionLabelStyle}>

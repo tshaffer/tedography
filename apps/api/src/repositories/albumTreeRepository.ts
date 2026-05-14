@@ -1,5 +1,6 @@
 import {
   type AlbumKeywordAssignmentStatus,
+  type AlbumPeopleAssignmentStatus,
   type AlbumReviewAssignmentStatus,
   type AlbumTreeChildOrderMode,
   type AlbumTreeNode,
@@ -381,6 +382,19 @@ export async function setAlbumReviewAssignmentStatus(
   const doc = await AlbumTreeNodeModel.findOneAndUpdate(
     { id: albumId },
     { $set: { reviewAssignmentStatus: status ?? null } },
+    { new: true, runValidators: true }
+  ).lean<AlbumTreeNode>();
+
+  return doc ?? null;
+}
+
+export async function setAlbumPeopleAssignmentStatus(
+  albumId: string,
+  status: AlbumPeopleAssignmentStatus | null
+): Promise<AlbumTreeNode | null> {
+  const doc = await AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId },
+    { $set: { peopleAssignmentStatus: status ?? null } },
     { new: true, runValidators: true }
   ).lean<AlbumTreeNode>();
 

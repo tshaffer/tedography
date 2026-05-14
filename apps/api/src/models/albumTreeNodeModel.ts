@@ -26,6 +26,12 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
       enum: ['not-started', 'in-progress', 'complete'],
       default: null
     },
+    peopleAssignmentStatus: {
+      type: String,
+      required: false,
+      enum: ['not-started', 'in-progress', 'complete'],
+      default: null
+    },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },
