@@ -736,6 +736,12 @@ export function AssetPeopleReviewDialog({
         });
         await refreshAfterMutation(`Assigned face ${detectionId}.`);
       } else if (action.type === 'createAndAssign') {
+        const nameLower = action.displayName.toLowerCase();
+        const duplicate = peopleOptions.find((p) => p.displayName.trim().toLowerCase() === nameLower);
+        if (duplicate) {
+          setErrorMessage(`"${duplicate.displayName}" already exists. Use the assign dropdown to select them.`);
+          return;
+        }
         await reviewFaceDetection(detectionId, {
           action: 'createAndAssign',
           displayName: action.displayName,

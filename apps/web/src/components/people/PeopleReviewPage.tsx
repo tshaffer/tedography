@@ -1125,6 +1125,12 @@ export function PeopleReviewPage() {
         rememberRecentPerson(action.personId);
         setNoticeMessage(`Assigned face ${item.detection.id}.`);
       } else if (action.type === 'createAndAssign') {
+        const nameLower = action.displayName.toLowerCase();
+        const duplicate = peopleOptions.find((p) => p.displayName.trim().toLowerCase() === nameLower);
+        if (duplicate) {
+          setErrorMessage(`"${duplicate.displayName}" already exists. Use the assign dropdown to select them.`);
+          return false;
+        }
         await reviewFaceDetection(item.detection.id, {
           action: 'createAndAssign',
           displayName: action.displayName,

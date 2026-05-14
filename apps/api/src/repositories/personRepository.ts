@@ -51,6 +51,16 @@ export async function createPerson(input: {
   aliases?: string[];
   notes?: string | null;
 }): Promise<Person> {
+  const trimmedName = input.displayName.trim();
+  const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const existing = await PersonModel.findOne(
+    { displayName: { $regex: `^${escapedName}$`, $options: 'i' } },
+    { _id: 0 }
+  ).lean<Person | null>();
+  if (existing) {
+    throw new Error(`A person named "${trimmedName}" already exists.`);
+  }
+
   const id = randomUUID();
   await PersonModel.create({
     id,
