@@ -5,7 +5,6 @@ import { buildAlbumTreeDisplayList, type AlbumTreeNodeWithDepth } from '../../ut
 interface MoveAssetsToAlbumDialogProps {
   open: boolean;
   albums: AlbumTreeNode[];
-  sourceAlbum: AlbumTreeNode | null;
   selectedAssetCount: number;
   onClose: () => void;
   onMove: (input: { destinationAlbumId: string; keepInSourceAlbum: boolean }) => Promise<void>;
@@ -209,7 +208,6 @@ function getInitialExpandedGroupIds(nodes: AlbumTreeNode[], destinationAlbum: Al
 export function MoveAssetsToAlbumDialog({
   open,
   albums,
-  sourceAlbum,
   selectedAssetCount,
   onClose,
   onMove
@@ -223,8 +221,8 @@ export function MoveAssetsToAlbumDialog({
 
   const nodesById = useMemo(() => new Map(albums.map((album) => [album.id, album])), [albums]);
   const destinationAlbums = useMemo(
-    () => albums.filter((album) => album.id !== sourceAlbum?.id),
-    [albums, sourceAlbum]
+    () => albums.filter((album) => album.nodeType === 'Album'),
+    [albums]
   );
   const displayNodes = useMemo(
     () => buildAlbumTreeDisplayList(albums, expandedGroupIds),
@@ -238,7 +236,8 @@ export function MoveAssetsToAlbumDialog({
 
     const storedDestinationAlbumId = window.localStorage.getItem(lastMoveTargetAlbumStorageKey) ?? '';
     const initialDestinationAlbum =
-      destinationAlbums.find((album) => album.id === storedDestinationAlbumId) ?? destinationAlbums[0] ?? null;
+      albums.find((album) => album.nodeType === 'Album' && album.id === storedDestinationAlbumId) ??
+      albums.find((album) => album.nodeType === 'Album') ?? null;
 
     setDestinationAlbumId(initialDestinationAlbum?.id ?? '');
     setExpandedGroupIds(getInitialExpandedGroupIds(albums, initialDestinationAlbum));
@@ -265,7 +264,6 @@ export function MoveAssetsToAlbumDialog({
   }
 
   const canMove = destinationAlbumId.length > 0 && !movePending;
-  const isSearchStyleMove = sourceAlbum === null;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -273,39 +271,22 @@ export function MoveAssetsToAlbumDialog({
         <div style={headerStyle}>
           <h2 style={{ margin: 0 }}>Move Assets To Album</h2>
           <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#666' }}>
-            {isSearchStyleMove ? (
-              <>
-                Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} to a destination album.
-                Existing album memberships will be removed first.
-              </>
-            ) : (
-              <>
-                Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} from{' '}
-                <strong>{sourceAlbum.label}</strong>.
-              </>
-            )}
+            Move {selectedAssetCount} selected {selectedAssetCount === 1 ? 'asset' : 'assets'} to a destination album.
           </p>
         </div>
 
         <div style={bodyStyle}>
-          {!isSearchStyleMove && sourceAlbum ? (
-            <label style={fieldLabelStyle}>
-              <span>From album</span>
-              <input type="text" value={buildAlbumPathLabel(sourceAlbum, nodesById)} readOnly style={inputStyle} />
-            </label>
-          ) : null}
 
           <div style={fieldLabelStyle}>
             <span>To album</span>
             <div style={chooserPanelStyle}>
               {destinationAlbums.length === 0 ? (
-                <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No other albums available.</p>
+                <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>No albums available.</p>
               ) : (
                 displayNodes.map((node) => {
                   const isGroup = node.nodeType === 'Group';
                   const isExpanded = expandedGroupIds.includes(node.id);
-                  const isSelectable =
-                    node.nodeType === 'Album' && node.id !== sourceAlbum?.id;
+                  const isSelectable = node.nodeType === 'Album';
                   const isSelected = destinationAlbumId === node.id;
 
                   return (
@@ -362,16 +343,14 @@ export function MoveAssetsToAlbumDialog({
             </div>
           </div>
 
-          {!isSearchStyleMove ? (
-            <label style={checkboxRowStyle}>
-              <input
-                type="checkbox"
-                checked={keepInSourceAlbum}
-                onChange={(event) => setKeepInSourceAlbum(event.target.checked)}
-              />
-              <span>Keep assets in source album too</span>
-            </label>
-          ) : null}
+          <label style={checkboxRowStyle}>
+            <input
+              type="checkbox"
+              checked={keepInSourceAlbum}
+              onChange={(event) => setKeepInSourceAlbum(event.target.checked)}
+            />
+            <span>Also add to destination (keep existing album memberships)</span>
+          </label>
 
           {moveError ? <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{moveError}</p> : null}
         </div>

@@ -8755,62 +8755,22 @@ export default function App() {
     destinationAlbumId: string;
     keepInSourceAlbum: boolean;
   }): Promise<void> {
-    if (primaryArea === 'Search') {
-      if (selectedAssetsForAlbumMembershipAction.length === 0) {
-        throw new Error('Select one or more assets first.');
-      }
-
-      setAlbumMembershipNotice(null);
-      setUpdateError(null);
-
-      const selectedAssets = selectedAssetsForAlbumMembershipAction;
-      const selectedAssetIds = selectedAssets.map((asset) => asset.id);
-      const updatedAssets = await moveAssetsToAlbumRequest(input.destinationAlbumId, {
-        assetIds: selectedAssetIds
-      });
-      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
-      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
-      setSelectedAssetDetails((previous) =>
-        previous && updatesById.has(previous.id)
-          ? { ...previous, ...(updatesById.get(previous.id) ?? previous) }
-          : previous
-      );
-
-      const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
-      setAlbumMembershipNotice({
-        kind: 'success',
-        message:
-          `Moved ${selectedAssets.length} ${selectedAssets.length === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".`
-      });
-      setSelectedAssetIds([]);
-      setSelectedAssetId(null);
-      setSelectionAnchorAssetId(null);
-      return;
-    }
-
-    if (!focusedAlbumForMembershipAction) {
-      throw new Error('Select a source album first.');
-    }
-
-    if (selectedAssetsInFocusedAlbum.length === 0) {
-      throw new Error(`Select one or more assets in "${focusedAlbumForMembershipAction.label}".`);
-    }
-
-    if (input.destinationAlbumId === focusedAlbumForMembershipAction.id) {
-      throw new Error('Destination album must be different from the source album.');
+    const selectedAssets = selectedAssetsForAlbumMembershipAction;
+    if (selectedAssets.length === 0) {
+      throw new Error('Select one or more assets first.');
     }
 
     setAlbumMembershipNotice(null);
     setUpdateError(null);
 
+    const assetIds = selectedAssets.map((asset) => asset.id);
+    const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
+
     if (input.keepInSourceAlbum) {
-      await addAssetsToAlbum(input.destinationAlbumId, {
-        assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
-      });
+      await addAssetsToAlbum(input.destinationAlbumId, { assetIds });
+      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
     } else {
-      const updatedAssets = await moveAssetsToAlbumRequest(input.destinationAlbumId, {
-        assetIds: selectedAssetsInFocusedAlbum.map((asset) => asset.id)
-      });
+      const updatedAssets = await moveAssetsToAlbumRequest(input.destinationAlbumId, { assetIds });
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
       setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
       setSelectedAssetDetails((previous) =>
@@ -8820,17 +8780,11 @@ export default function App() {
       );
     }
 
-    const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
-    const movedCount = selectedAssetsInFocusedAlbum.length;
+    const count = selectedAssets.length;
     setAlbumMembershipNotice({
       kind: 'success',
-      message:
-        `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${movedCount} ${movedCount === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".` +
-        (input.keepInSourceAlbum ? ` They remain in "${focusedAlbumForMembershipAction.label}".` : '')
+      message: `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${count} ${count === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".`
     });
-    if (input.keepInSourceAlbum) {
-      await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
-    }
     setSelectedAssetIds([]);
     setSelectedAssetId(null);
     setSelectionAnchorAssetId(null);
@@ -12324,8 +12278,7 @@ export default function App() {
       <MoveAssetsToAlbumDialog
         open={moveAssetsDialogOpen}
         albums={albumTreeNodes}
-        sourceAlbum={isSearchArea ? null : focusedAlbumForMembershipAction}
-        selectedAssetCount={isSearchArea ? selectedAssetIdsForAlbumAction.length : selectedAssetsInFocusedAlbum.length}
+        selectedAssetCount={selectedAssetsForAlbumMembershipAction.length}
         onClose={() => setMoveAssetsDialogOpen(false)}
         onMove={handleMoveSelectedAssetsToAlbum}
       />
