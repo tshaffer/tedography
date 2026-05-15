@@ -258,7 +258,7 @@ export function MoveAssetsToAlbumDialog({
     }
 
     targetRow.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
-  }, [destinationAlbumId, displayNodes, open]);
+  }, [destinationAlbumId, open]);
 
   if (!open) {
     return null;
