@@ -205,6 +205,7 @@ export function AssetKeywordsPanel({
 }: AssetKeywordsPanelProps) {
   const [pendingEntries, setPendingEntries] = useState<KeywordEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const titleLabel = selectedAssetCount > 1 ? 'Common Keywords' : 'Keywords';
   const emptyStateLabel = selectedAssetCount > 1 ? 'No common keywords' : 'No keywords';
@@ -257,25 +258,46 @@ export function AssetKeywordsPanel({
       <div style={embeddedStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <h4 style={{ ...embeddedTitleStyle, margin: 0 }}>{titleLabel}</h4>
-          {selectedAssetCount > 0 ? (
-            <button
-              type="button"
-              onClick={() => setAddOpen((prev) => !prev)}
-              title={addOpen ? 'Close add keywords' : 'Add keywords'}
-              style={{
-                background: 'none',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                color: addOpen ? '#6b7280' : '#374151',
-                fontSize: '14px',
-                lineHeight: 1,
-                padding: '1px 6px',
-              }}
-            >
-              {addOpen ? '×' : '+'}
-            </button>
-          ) : null}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {selectedAssetCount > 0 && onSetKeywordAssignmentStatus ? (
+              <button
+                type="button"
+                onClick={() => setStatusOpen((prev) => !prev)}
+                title={statusOpen ? 'Hide keyword status' : 'Set keyword assignment status'}
+                style={{
+                  background: 'none',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: statusOpen ? '#6b7280' : '#374151',
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  padding: '1px 6px',
+                }}
+              >
+                {statusOpen ? '×' : '⋯'}
+              </button>
+            ) : null}
+            {selectedAssetCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setAddOpen((prev) => !prev)}
+                title={addOpen ? 'Close add keywords' : 'Add keywords'}
+                style={{
+                  background: 'none',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: addOpen ? '#6b7280' : '#374151',
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  padding: '1px 6px',
+                }}
+              >
+                {addOpen ? '×' : '+'}
+              </button>
+            ) : null}
+          </div>
         </div>
         {keywordsError ? (
           <p style={{ ...emptyLabelStyle, color: '#a12622', marginBottom: '6px' }}>
@@ -398,7 +420,7 @@ export function AssetKeywordsPanel({
                 ) : null}
           </div>
         ) : null}
-        {selectedAssetCount > 0 && onSetKeywordAssignmentStatus ? (
+        {selectedAssetCount > 0 && onSetKeywordAssignmentStatus && statusOpen ? (
           <div style={statusRowStyle}>
             <span style={{ fontSize: '11px', color: '#6b7280', marginRight: '2px' }}>Keywords:</span>
             {(['not-started', 'in-progress', 'complete'] as AssetKeywordAssignmentStatus[]).map((status) => {
