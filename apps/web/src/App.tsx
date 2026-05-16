@@ -7596,8 +7596,19 @@ export default function App() {
         assetIdsWithNoFacesDetected
       };
 
-      writeSessionStorageJson(peopleRunSummaryStorageKey, refreshed);
-      setRunSummary(refreshed);
+      const pendingAttentionCount = new Set([
+        ...assetIdsWithSuggestedMatches,
+        ...assetIdsWithUnmatchedFaces,
+        ...assetIdsWithPipelineIgnoredFaces
+      ]).size;
+
+      if (pendingAttentionCount === 0) {
+        window.sessionStorage.removeItem(peopleRunSummaryStorageKey);
+        setRunSummary(null);
+      } else {
+        writeSessionStorageJson(peopleRunSummaryStorageKey, refreshed);
+        setRunSummary(refreshed);
+      }
     } catch {
       // Keep existing counts on error — user can dismiss and re-run if needed
     } finally {
