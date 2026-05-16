@@ -865,7 +865,7 @@ export function AssetPeopleReviewDialog({
           <div style={badgeRowStyle}>
             <span style={badgeStyle}>Detections: {assetState?.detections.length ?? 0}</span>
             <span style={badgeStyle}>Reviewable: {reviewableCount}</span>
-            <span style={badgeStyle}>Confirmed: {(assetState?.people ?? []).length}</span>
+            <span style={badgeStyle}>People: {(assetState?.people ?? []).length}</span>
           </div>
 
           {assetState ? (

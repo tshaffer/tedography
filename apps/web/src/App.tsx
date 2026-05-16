@@ -5104,7 +5104,7 @@ export default function App() {
   }, [selectedAssetId]);
 
   useEffect(() => {
-    if (primaryArea !== 'Library' || !selectedAssetId || selectedAssetIds.length !== 1) {
+    if ((primaryArea !== 'Library' && primaryArea !== 'Search') || !selectedAssetId || selectedAssetIds.length !== 1) {
       setSelectedAssetPeopleStatus(null);
       setSelectedAssetPeopleStatusError(null);
       setSelectedAssetPeopleStatusLoading(false);
@@ -7380,6 +7380,22 @@ export default function App() {
     );
     setSelectedAssetPeopleStatus((current) =>
       current ? { ...current, people: updatedPeople } : current
+    );
+  }
+
+  async function handleAddManualPersonTagToAll(personId: string): Promise<void> {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+    const results = await Promise.all(
+      selectedAssetIds.map((assetId) => addManualPersonTag(assetId, personId))
+    );
+    const updatedById = new Map(selectedAssetIds.map((assetId, i) => [assetId, results[i] ?? []]));
+    setAssets((previous) =>
+      previous.map((asset) => {
+        const updated = updatedById.get(asset.id);
+        return updated ? { ...asset, people: updated } : asset;
+      })
     );
   }
 
@@ -10891,7 +10907,7 @@ export default function App() {
             assetOperationMessage={assetMaintenanceMessage}
             assetOperationError={assetMaintenanceError}
             peopleStatus={
-              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
                 ? {
                     detectionsCount: selectedAssetPeopleStatus?.detections.length ?? 0,
                     reviewableCount:
@@ -10903,22 +10919,28 @@ export default function App() {
                     people: selectedAssetPeopleStatus?.people ?? selectedAsset.people ?? [],
                     recognitionRanAt: selectedAssetPeopleStatus?.peopleRecognitionRanAt ?? null,
                     recognitionBusy: peopleRecognitionBusy,
-                    onRunRecognition: handleRunPeopleRecognitionForSelectedAssets,
                     loading: selectedAssetPeopleStatusLoading,
                     errorMessage: selectedAssetPeopleStatusError,
-                    reviewHref: `/people/review?assetId=${encodeURIComponent(selectedAsset.id)}`,
-                    onOpenReview: handleOpenAssetPeopleReviewDialog
+                    onOpenReview: handleOpenAssetPeopleReviewDialog,
+                    ...(isLibraryArea ? {
+                      onRunRecognition: handleRunPeopleRecognitionForSelectedAssets
+                    } : {})
                   }
                 : null
             }
             onAddManualPerson={
-              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
                 ? handleAddManualPersonTag
                 : undefined
             }
             onRemoveManualPerson={
-              isLibraryArea && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
                 ? handleRemoveManualPersonTag
+                : undefined
+            }
+            bulkPersonTag={
+              isLibraryArea && selectedAssetIds.length > 1
+                ? { count: selectedAssetIds.length, onTag: handleAddManualPersonTagToAll }
                 : undefined
             }
             keywordsSlot={

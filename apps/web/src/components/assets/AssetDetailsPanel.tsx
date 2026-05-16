@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+
 import { type MediaAsset, type MediaAssetPerson, type Person } from '@tedography/domain';
 import Chip from '@mui/material/Chip';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import FaceIcon from '@mui/icons-material/Face';
 import { listPeople } from '../../api/peoplePipelineApi';
 
 interface AssetDetailsPanelProps {
@@ -29,11 +30,12 @@ interface AssetDetailsPanelProps {
     onRunRecognition?: () => void;
     loading?: boolean;
     errorMessage?: string | null;
-    reviewHref?: string;
+
     onOpenReview?: () => void;
   } | null;
   onAddManualPerson?: ((personId: string) => Promise<void>) | undefined;
   onRemoveManualPerson?: ((personId: string) => Promise<void>) | undefined;
+  bulkPersonTag?: { count: number; onTag: (personId: string) => Promise<void> } | undefined;
   keywordsSlot?: ReactNode;
 }
 
@@ -272,12 +274,14 @@ export function AssetDetailsPanel({
   peopleStatus = null,
   onAddManualPerson,
   onRemoveManualPerson,
+  bulkPersonTag,
   keywordsSlot
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [peopleDetailsOpen, setPeopleDetailsOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [personPickerBusy, setPersonPickerBusy] = useState(false);
+  const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
+  const [bulkPickerBusy, setBulkPickerBusy] = useState(false);
 
   if (!asset) {
     return (
@@ -346,23 +350,23 @@ export function AssetDetailsPanel({
                   {personPickerOpen ? '×' : '+'}
                 </button>
               ) : null}
-              {peopleStatus.detectionsCount > 0 ? (
+              {peopleStatus.detectionsCount > 0 && peopleStatus.onOpenReview ? (
                 <button
                   type="button"
-                  onClick={() => setPeopleDetailsOpen((prev) => !prev)}
-                  title={peopleDetailsOpen ? 'Hide details' : 'Show details'}
+                  onClick={peopleStatus.onOpenReview}
+                  title="Review Faces"
                   style={{
                     background: 'none',
                     border: '1px solid #d1d5db',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    color: peopleDetailsOpen ? '#6b7280' : '#374151',
-                    fontSize: '14px',
-                    lineHeight: 1,
-                    padding: '1px 6px',
+                    color: '#374151',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '2px 4px',
                   }}
                 >
-                  {peopleDetailsOpen ? '×' : '⋯'}
+                  <FaceIcon style={{ fontSize: '16px' }} />
                 </button>
               ) : null}
             </div>
@@ -428,41 +432,51 @@ export function AssetDetailsPanel({
             <span style={{ color: '#aaa', fontSize: '12px' }}>None confirmed yet.</span>
           )}
 
-          {/* Expanded details */}
-          {peopleStatus.detectionsCount > 0 && peopleDetailsOpen ? (
-            <div style={{ marginTop: '8px' }}>
-              {renderRow('Detections', String(peopleStatus.detectionsCount))}
-              {renderRow('Reviewable', String(peopleStatus.reviewableCount))}
-              {renderRow(
-                'Confirmed',
-                peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').length > 0
-                  ? peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').map((p) => p.displayName).join(', ')
-                  : 'None'
-              )}
-              {peopleStatus.reviewableCount > 0 || peopleStatus.people.filter((p) => p.source === 'confirmed-face-detection').length === 0 ? (
-                <p style={{ margin: '8px 0 0', color: '#666', fontSize: '12px' }}>
-                  {peopleStatus.reviewableCount > 0
-                    ? 'Reviewable faces still need confirmation before they become derived asset people.'
-                    : 'Detections exist, nothing confirmed.'}
-                </p>
-              ) : null}
-              {peopleStatus.reviewHref ? (
-                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {peopleStatus.onOpenReview ? (
-                    <button type="button" style={buttonStyle} onClick={peopleStatus.onOpenReview}>
-                      Review Faces
-                    </button>
-                  ) : null}
-                  <Link
-                    to={peopleStatus.reviewHref}
-                    style={{ ...buttonStyle, display: 'inline-block', textDecoration: 'none' }}
-                  >
-                    Open Full People Review
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+        </section>
+      ) : null}
+
+      {/* Bulk person tagging (multi-selection) */}
+      {bulkPersonTag ? (
+        <section style={subSectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>People</h4>
+            <button
+              type="button"
+              onClick={() => setBulkPickerOpen((prev) => !prev)}
+              title={bulkPickerOpen ? 'Cancel' : `Tag all ${bulkPersonTag.count} selected photos with a person`}
+              style={{
+                background: 'none',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: bulkPickerOpen ? '#6b7280' : '#374151',
+                fontSize: '14px',
+                lineHeight: 1,
+                padding: '1px 6px'
+              }}
+            >
+              {bulkPickerOpen ? '×' : '+'}
+            </button>
+          </div>
+          {bulkPickerOpen ? (
+            <PersonPicker
+              assignedPersonIds={new Set()}
+              busy={bulkPickerBusy}
+              onPick={async (personId) => {
+                setBulkPickerBusy(true);
+                try {
+                  await bulkPersonTag.onTag(personId);
+                  setBulkPickerOpen(false);
+                } finally {
+                  setBulkPickerBusy(false);
+                }
+              }}
+            />
+          ) : (
+            <p style={{ margin: 0, color: '#aaa', fontSize: '12px' }}>
+              Tag all {bulkPersonTag.count} selected photos with a person.
+            </p>
+          )}
         </section>
       ) : null}
 
