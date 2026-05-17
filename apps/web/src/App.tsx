@@ -1714,9 +1714,9 @@ const albumTreeCountStatusBadgeBaseStyle: CSSProperties = {
   border: '1px solid transparent'
 };
 
-function getAlbumAssetCountStatusLabel(status: AlbumAssetCountStatus): string {
+function getAlbumAssetCountStatusLabel(status: AlbumAssetCountStatus, count: number): string {
   if (status === 'known-complete') {
-    return '=';
+    return String(count);
   }
 
   if (status === 'not-in-current-scope') {
@@ -9410,12 +9410,11 @@ export default function App() {
             const countStatus = !isGroup
               ? albumAssetCountStatuses.get(node.id) ?? 'loading-indeterminate'
               : null;
-            const labelText = isGroup
-              ? node.label
-              : `${node.label} (${albumAssetCounts.get(node.id) ?? 0})`;
+            const albumCount = albumAssetCounts.get(node.id) ?? 0;
+            const labelText = node.label;
             const titleText = !isGroup && countStatus
-              ? `${labelText} • ${getAlbumAssetCountStatusTitle(countStatus, node.label)}`
-              : labelText;
+              ? `${node.label} (${albumCount}) • ${getAlbumAssetCountStatusTitle(countStatus, node.label)}`
+              : node.label;
 
             return (
               <div
@@ -9478,7 +9477,7 @@ export default function App() {
                         style={getAlbumAssetCountStatusBadgeStyle(countStatus)}
                         aria-label={getAlbumAssetCountStatusTitle(countStatus, node.label)}
                       >
-                        {getAlbumAssetCountStatusLabel(countStatus)}
+                        {getAlbumAssetCountStatusLabel(countStatus, albumCount)}
                       </span>
                     ) : null}
                     {!isGroup && showAlbumKeywordStatusBadge && node.keywordAssignmentStatus ? (
