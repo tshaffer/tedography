@@ -35,7 +35,7 @@ interface AssetDetailsPanelProps {
   } | null;
   onAddManualPerson?: ((personId: string) => Promise<void>) | undefined;
   onRemoveManualPerson?: ((personId: string) => Promise<void>) | undefined;
-  bulkPersonTag?: { count: number; onTag: (personId: string) => Promise<void> } | undefined;
+  bulkPersonTag?: { count: number; commonPeople: MediaAssetPerson[]; onTag: (personId: string) => Promise<void> } | undefined;
   keywordsSlot?: ReactNode;
 }
 
@@ -460,7 +460,7 @@ export function AssetDetailsPanel({
           </div>
           {bulkPickerOpen ? (
             <PersonPicker
-              assignedPersonIds={new Set()}
+              assignedPersonIds={new Set(bulkPersonTag.commonPeople.map((p) => p.personId))}
               busy={bulkPickerBusy}
               onPick={async (personId) => {
                 setBulkPickerBusy(true);
@@ -472,6 +472,18 @@ export function AssetDetailsPanel({
                 }
               }}
             />
+          ) : bulkPersonTag.commonPeople.length > 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {bulkPersonTag.commonPeople.map((person) => (
+                <Chip
+                  key={person.personId}
+                  label={person.displayName}
+                  size="small"
+                  variant={person.source === 'manual-asset-tag' ? 'outlined' : 'filled'}
+                  title={person.source === 'manual-asset-tag' ? 'Manually tagged' : 'Face detected'}
+                />
+              ))}
+            </div>
           ) : (
             <p style={{ margin: 0, color: '#aaa', fontSize: '12px' }}>
               Tag all {bulkPersonTag.count} selected photos with a person.

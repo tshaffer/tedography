@@ -10951,7 +10951,18 @@ export default function App() {
             }
             bulkPersonTag={
               isLibraryArea && selectedAssetIds.length > 1
-                ? { count: selectedAssetIds.length, onTag: handleAddManualPersonTagToAll }
+                ? {
+                    count: selectedAssetIds.length,
+                    onTag: handleAddManualPersonTagToAll,
+                    commonPeople: (() => {
+                      const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id));
+                      if (selectedAssets.length === 0) return [];
+                      const firstPeople = selectedAssets[0]?.people ?? [];
+                      return firstPeople.filter((p) =>
+                        selectedAssets.every((a) => (a.people ?? []).some((ap) => ap.personId === p.personId))
+                      );
+                    })()
+                  }
                 : undefined
             }
             keywordsSlot={
