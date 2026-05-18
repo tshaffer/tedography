@@ -11385,72 +11385,6 @@ export default function App() {
                   overflowY: 'auto'
                 }}
               >
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => { setLayoutMenuOpen(false); setLeftPanelVisible((previous) => !previous); }}
-                >
-                  {leftPanelVisible ? 'Hide Left Panel' : 'Show Left Panel'}
-                </button>
-                {(isLibraryArea || isSearchArea) ? (
-                  <button
-                    type="button"
-                    className="tdg-overflow-item"
-                    onClick={() => { setLayoutMenuOpen(false); setDetailsPanelsVisible((previous) => !previous); }}
-                  >
-                    {detailsPanelsVisible ? 'Hide Inspector' : 'Show Inspector'}
-                  </button>
-                ) : null}
-                <div className="tdg-overflow-divider" />
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={peopleReviewSimplifiedView}
-                    onChange={(event) => setPeopleReviewSimplifiedView(event.target.checked)}
-                  />
-                  People Review: simplified view
-                </label>
-                <div className="tdg-overflow-divider" />
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showFilmstrip}
-                    onChange={(event) => setShowFilmstrip(event.target.checked)}
-                  />
-                  Show filmstrip
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showVisibilityPanel}
-                    onChange={(event) => setShowVisibilityPanel(event.target.checked)}
-                  />
-                  Show review state panel
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showThumbnailPhotoStateBadges}
-                    onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
-                  />
-                  Show photo review state
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showThumbnailKeywordBadges}
-                    onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
-                  />
-                  Show photo keyword status
-                </label>
-                <label style={toggleOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={showThumbnailAiQueueBadges}
-                    onChange={(event) => setShowThumbnailAiQueueBadges(event.target.checked)}
-                  />
-                  Show AI queue indicator
-                </label>
                 <span style={filterSubsectionTitleStyle}>Album Status Badges</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -11475,6 +11409,75 @@ export default function App() {
                     onChange={(event) => setShowAlbumPeopleStatusBadge(event.target.checked)}
                   />
                   People status
+                </label>
+                <span style={filterSubsectionTitleStyle}>Photo Badges</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailPhotoStateBadges}
+                    onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
+                  />
+                  Review State
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailKeywordBadges}
+                    onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
+                  />
+                  Keyword Status
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailAiQueueBadges}
+                    onChange={(event) => setShowThumbnailAiQueueBadges(event.target.checked)}
+                  />
+                  AI Queue Indicator
+                </label>
+                <span style={filterSubsectionTitleStyle}>Panel Visibility</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={leftPanelVisible}
+                    onChange={(event) => setLeftPanelVisible(event.target.checked)}
+                  />
+                  Show album panel
+                </label>
+                {(isLibraryArea || isSearchArea) ? (
+                  <label style={toggleOptionLabelStyle}>
+                    <input
+                      type="checkbox"
+                      checked={detailsPanelsVisible}
+                      onChange={(event) => setDetailsPanelsVisible(event.target.checked)}
+                    />
+                    Show inspector
+                  </label>
+                ) : null}
+                <span style={filterSubsectionTitleStyle}>Display Panels</span>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={peopleReviewSimplifiedView}
+                    onChange={(event) => setPeopleReviewSimplifiedView(event.target.checked)}
+                  />
+                  People Review: simplified view
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showVisibilityPanel}
+                    onChange={(event) => setShowVisibilityPanel(event.target.checked)}
+                  />
+                  Show review state panel
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showFilmstrip}
+                    onChange={(event) => setShowFilmstrip(event.target.checked)}
+                  />
+                  Show filmstrip
                 </label>
                 <span style={filterSubsectionTitleStyle}>Album Layout</span>
                 <label style={toggleOptionLabelStyle}>
