@@ -51,13 +51,13 @@ import 'dotenv/config';
  *
  * Example run:
  *   SHAFFEROGRAPHY_MONGODB_URI="mongodb://localhost:27017" \
- *   CANON_TO_TEDOGRAPHY_DEST_ROOT="/Volumes/ShMedia/TedographyImportStaging" \
+ *   CANON_TO_TEDOGRAPHY_DEST_ROOT="/Volumes/ShMedia/Tedography/ImportStaging" \
  *   CANON_TO_TEDOGRAPHY_MANIFESTS_ROOT="/Volumes/ShMedia/MANIFESTS" \
  *   pnpm canon-import-plan --limit 100 --verbose
  *
  * Example apply run:
  *   SHAFFEROGRAPHY_MONGODB_URI="mongodb://localhost:27017" \
- *   CANON_TO_TEDOGRAPHY_DEST_ROOT="/Volumes/ShMedia/TedographyImportStaging" \
+ *   CANON_TO_TEDOGRAPHY_DEST_ROOT="/Volumes/ShMedia/Tedography/ImportStaging" \
  *   CANON_TO_TEDOGRAPHY_DEDUP_PLAN_CSV="/path/to/dedup_plan__unique.csv" \
  *   CANON_TO_TEDOGRAPHY_ALREADY_IN_CANON_CSV="/path/to/already_in_canon.csv" \
  *   CANON_TO_TEDOGRAPHY_CANONICAL_INVENTORY_CSV="/path/to/canonical_inventory__by-hash.csv" \

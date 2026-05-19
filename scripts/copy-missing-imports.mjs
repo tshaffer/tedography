@@ -3,7 +3,7 @@
  * copy-missing-imports.mjs
  *
  * Project-ready Node script to copy files listed in a CSV into:
- *   /Volumes/ShMedia/Shafferography/ShafferographyMediaNew/MissingFromImports
+ *   /Volumes/ShMedia/Tedography/Media/MissingFromImports
  *
  * Expected CSV columns:
  *   - filePath
@@ -20,7 +20,7 @@
  *     --csv /absolute/path/to/shafferography_only.csv
  *
  * Optional:
- *   --dest /Volumes/ShMedia/Shafferography/ShafferographyMediaNew/MissingFromImports
+ *   --dest /Volumes/ShMedia/Tedography/Media/MissingFromImports
  *   --manifest /absolute/path/to/copy_manifest.csv
  *   --dry-run
  */
@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const DEFAULT_DEST =
-  '/Volumes/ShMedia/Shafferography/ShafferographyMediaNew/MissingFromImports';
+  '/Volumes/ShMedia/Tedography/Media/MissingFromImports';
 
 function main() {
   const args = parseArgs(process.argv);

@@ -17,7 +17,7 @@ Example:
 
 ```env
 TEDOGRAPHY_STORAGE_ROOTS=shmedia|ShMedia|/Volumes/ShMedia;shafferoto|Shafferoto Backup|/Volumes/SHAFFEROTO
-TEDOGRAPHY_DERIVED_ROOT=/Volumes/ShMedia/TedographyDerived
+TEDOGRAPHY_DERIVED_ROOT=/Volumes/ShMedia/Tedography/Derived
 ```
 
 `TEDOGRAPHY_IMPORT_ROOT` is obsolete and should not be configured.
@@ -260,13 +260,13 @@ curl -X POST http://localhost:4000/api/import/register \
 After success, verify derived file exists:
 
 ```bash
-find /Volumes/ShMedia/TedographyDerived/display-jpegs -name "*.jpg" | head
+find /Volumes/ShMedia/Tedography/Derived/display-jpegs -name "*.jpg" | head
 ```
 
 Verify thumbnail file exists:
 
 ```bash
-find /Volumes/ShMedia/TedographyDerived/thumbnails -name "*.jpg" | head
+find /Volumes/ShMedia/Tedography/Derived/thumbnails -name "*.jpg" | head
 ```
 
 ## 7. Verify MongoDB After Register
