@@ -10980,6 +10980,22 @@ export default function App() {
                 onSetKeywordAssignmentStatus={handleSetAssetKeywordAssignmentStatus}
               />
             }
+            aiQueueEntry={
+              selectedAsset
+                ? (aiQueueEntries.find((e) => e.assetId === selectedAsset.id) ?? null)
+                : null
+            }
+            onSaveAiPrompt={
+              selectedAsset
+                ? async (prompt) => handleSaveAiQueuePrompt(selectedAsset.id, prompt)
+                : undefined
+            }
+            onProcessWithGemini={
+              selectedAsset
+                ? () => { void handleProcessAiQueue([selectedAsset.id]); }
+                : undefined
+            }
+            aiProcessing={aiQueueProcessing}
           />
         </section>
       </aside>
