@@ -4197,7 +4197,8 @@ export default function App() {
     if (typeof window === 'undefined') {
       return 'Library';
     }
-
+    const urlArea = new URLSearchParams(window.location.search).get('area');
+    if (urlArea) return parsePrimaryAreaFromStorage(urlArea);
     return parsePrimaryAreaFromStorage(window.localStorage.getItem(primaryAreaStorageKey));
   });
   const [checkedAlbumIds, setCheckedAlbumIds] = useState<string[]>(() => {

@@ -1,30 +1,13 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
+import { TedographyPageShell } from './TedographyPageShell';
 import type { PeopleBrowseSort, PeopleBrowseSummaryItem } from '@tedography/shared';
 import { listPeopleBrowse } from '../../api/peoplePipelineApi';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 const pageStyle: CSSProperties = {
-  fontFamily: 'Arial, sans-serif',
-  margin: '0 auto',
-  padding: '16px',
   maxWidth: '1500px',
-  backgroundColor: '#f3f4f6',
-  minHeight: '100vh',
-  boxSizing: 'border-box'
-};
-
-const linkRowStyle: CSSProperties = {
-  display: 'flex',
-  gap: '12px',
-  flexWrap: 'wrap',
-  marginBottom: '12px'
-};
-
-const linkStyle: CSSProperties = {
-  color: '#0f5f73',
-  fontWeight: 700,
-  textDecoration: 'none'
+  margin: '0 auto',
 };
 
 const panelStyle: CSSProperties = {
@@ -225,21 +208,9 @@ export function PeopleBrowsePage() {
   }, [items, nameQuery, showArchived, showHidden, sortBy]);
 
   return (
+    <TedographyPageShell activeArea="People">
     <div style={pageStyle}>
-      <div style={linkRowStyle}>
-        <Link to="/" style={linkStyle}>
-          Back to Library
-        </Link>
-        <Link to="/people/review" style={linkStyle}>
-          People Review
-        </Link>
-        <Link to="/people/dev" style={linkStyle}>
-          People Dev Harness
-        </Link>
-      </div>
-
       <section style={panelStyle}>
-        <h1 style={{ margin: '0 0 10px', fontSize: '32px' }}>People</h1>
         <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
           Browse known people by confirmed asset presence. Click a person to open their tedography detail page and jump from there into Search or review work.
         </p>
@@ -364,5 +335,6 @@ export function PeopleBrowsePage() {
         </section>
       ) : null}
     </div>
+    </TedographyPageShell>
   );
 }

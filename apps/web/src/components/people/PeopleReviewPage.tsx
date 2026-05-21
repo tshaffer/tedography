@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { TedographyPageShell } from './TedographyPageShell';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
 import {
@@ -13,25 +14,8 @@ import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilitie
 import { getAssignmentActionState, getExampleActionState, getFaceReviewActionState } from './peopleReviewActionState';
 
 const pageStyle: CSSProperties = {
-  fontFamily: 'Arial, sans-serif',
-  margin: '0 auto',
-  padding: '16px',
   maxWidth: '1400px',
-  backgroundColor: '#f3f4f6',
-  minHeight: '100vh',
-  boxSizing: 'border-box'
-};
-
-const linkRowStyle: CSSProperties = {
-  display: 'flex',
-  gap: '12px',
-  marginBottom: '12px'
-};
-
-const linkStyle: CSSProperties = {
-  color: '#0f5f73',
-  fontWeight: 700,
-  textDecoration: 'none'
+  margin: '0 auto',
 };
 
 const panelStyle: CSSProperties = {
@@ -1334,18 +1318,9 @@ export function PeopleReviewPage() {
   }, [busyDetectionId, currentItem, filteredItems, loading]);
 
   return (
+    <TedographyPageShell activeArea="People Review">
     <div style={pageStyle}>
-      <div style={linkRowStyle}>
-        <Link to="/" style={linkStyle}>
-          Back to Library
-        </Link>
-        <Link to="/people/dev" style={linkStyle}>
-          People Dev Harness
-        </Link>
-      </div>
-
       <section style={panelStyle}>
-        <h1 style={{ margin: '0 0 10px', fontSize: '32px' }}>People Review</h1>
         {!simplifiedView ? (
           <p style={{ margin: '0 0 14px', color: '#5b6673' }}>
             Minimal review workbench for persisted face detections and derived <code>mediaAsset.people</code>.
@@ -2127,5 +2102,6 @@ export function PeopleReviewPage() {
         ))
         : null}
     </div>
+    </TedographyPageShell>
   );
 }
