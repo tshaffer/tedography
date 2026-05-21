@@ -44,6 +44,7 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TagIcon from '@mui/icons-material/Tag';
 import DownloadIcon from '@mui/icons-material/Download';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -121,6 +122,7 @@ import {
 import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
 import { AiHistoryDialog } from './components/aiQueue/AiHistoryDialog';
 import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
+import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { getAiHistory } from './api/aiHistoryApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
@@ -3786,6 +3788,7 @@ export default function App() {
   const [aiQueueProcessNotice, setAiQueueProcessNotice] = useState<string | null>(null);
   const [aiQueueProcessError, setAiQueueProcessError] = useState<string | null>(null);
   const [aiQueueProcessing, setAiQueueProcessing] = useState(false);
+  const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
   const [aiHistoryDialogOpen, setAiHistoryDialogOpen] = useState(false);
   const [aiHistoryEntries, setAiHistoryEntries] = useState<import('@tedography/domain').AiEditHistoryEntry[]>([]);
   const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
@@ -11138,6 +11141,18 @@ export default function App() {
                 </button>
               </span>
             </Tooltip>
+            <Tooltip title="Publish to Google Photos">
+              <span>
+                <button
+                  type="button"
+                  style={toolbarIconButtonStyle}
+                  onClick={() => setPublishToGooglePhotosOpen(true)}
+                  aria-label="Publish to Google Photos"
+                >
+                  <CloudUploadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
+                </button>
+              </span>
+            </Tooltip>
           </div>
 
           {/* Rotation + Crop */}
@@ -12381,6 +12396,12 @@ export default function App() {
         loading={aiHistoryLoading}
         error={aiHistoryError}
         onClose={() => setAiHistoryDialogOpen(false)}
+      />
+      <PublishToGooglePhotosDialog
+        open={publishToGooglePhotosOpen}
+        selectedAssetIds={selectedAssetIds}
+        visibleAssetIds={visibleAssets.map((a) => a.id)}
+        onClose={() => setPublishToGooglePhotosOpen(false)}
       />
 
       <ImportAssetsDialog

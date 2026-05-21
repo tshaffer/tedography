@@ -25,6 +25,7 @@ dist/
 mock-media
 
 apps/api/.env
+google-photos-tokens.json
 
 apps/api/scripts/output
 apps/scripts/output

@@ -248,4 +248,10 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   aiQueueExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,
+  googlePhotos: {
+    clientId: process.env.GOOGLE_PHOTOS_CLIENT_ID?.trim() || null,
+    clientSecret: process.env.GOOGLE_PHOTOS_CLIENT_SECRET?.trim() || null,
+    redirectUri: process.env.GOOGLE_PHOTOS_REDIRECT_URI?.trim() || 'http://localhost:4000/api/google-photos/callback',
+    tokenPath: process.env.GOOGLE_PHOTOS_TOKEN_PATH?.trim() || path.resolve(process.cwd(), 'google-photos-tokens.json'),
+  },
 };
