@@ -3735,7 +3735,7 @@ function computePeopleRunSummary(
 }
 
 export default function App() {
-  const { user, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState('loading');
@@ -9670,8 +9670,11 @@ export default function App() {
             </button>
             <button
               type="button"
-              style={contextMenuItemStyle}
+              style={can('create-albums') ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              disabled={!can('create-albums')}
+              title={can('create-albums') ? undefined : 'Your role cannot create albums'}
               onClick={() => {
+                if (!can('create-albums')) return;
                 closeAlbumTreeContextMenu();
                 void handleCreateAlbum();
               }}
@@ -9994,17 +9997,17 @@ export default function App() {
               </span>
             </Tooltip>
             {isLibraryArea ? (
-              <Tooltip title="Add top-level group">
+              <Tooltip title={!can('create-albums') ? 'Your role cannot create albums' : 'Add top-level group'}>
                 <span>
                   <button
                     type="button"
                     style={
-                      canCreateGroupNode
+                      (can('create-albums') && canCreateGroupNode)
                         ? toolbarIconButtonStyle
                         : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
                     }
                     onClick={() => void handleCreateTopLevelGroup()}
-                    disabled={!canCreateGroupNode}
+                    disabled={!can('create-albums') || !canCreateGroupNode}
                     aria-label="Add top-level group"
                   >
                     <CreateNewFolderIcon sx={{ fontSize: 18 }} />
@@ -11042,14 +11045,16 @@ export default function App() {
             <div style={toolbarGroupStyle}>
               {reviewActions.map((state) => {
                 const icon = getPhotoStateIcon(state);
-                const enabled = hasSelectedAssets;
+                const enabled = hasSelectedAssets && can('set-photo-state');
                 return (
                   <Tooltip
                     key={state}
                     title={
-                      enabled
-                        ? `Apply ${state} to the current selection`
-                        : `Select one or more photos to apply ${state}`
+                      !can('set-photo-state')
+                        ? 'Your role cannot change photo state'
+                        : enabled
+                          ? `Apply ${state} to the current selection`
+                          : `Select one or more photos to apply ${state}`
                     }
                   >
                     <span>
@@ -11086,13 +11091,13 @@ export default function App() {
           {/* Actions: Move to Album */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
-              <Tooltip title={hasSelectedAssets ? 'Move selected photos to an album' : 'Select one or more photos to move to an album'}>
+              <Tooltip title={!can('move-photos-to-album') ? 'Your role cannot move photos to albums' : hasSelectedAssets ? 'Move selected photos to an album' : 'Select one or more photos to move to an album'}>
                 <span>
                   <button
                     type="button"
-                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(can('move-photos-to-album') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => setMoveAssetsDialogOpen(true)}
-                    disabled={!hasSelectedAssets}
+                    disabled={!can('move-photos-to-album') || !hasSelectedAssets}
                     aria-label="Move to Album"
                   >
                     <ArrowForwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
@@ -11119,12 +11124,13 @@ export default function App() {
                 </span>
               </Tooltip>
             ) : null}
-            <Tooltip title="Keyword Management">
+            <Tooltip title={can('keyword-management') ? 'Keyword Management' : 'Your role cannot manage keywords'}>
               <span>
                 <button
                   type="button"
-                  style={toolbarIconButtonStyle}
-                  onClick={() => setKeywordManagementDialogOpen(true)}
+                  style={can('keyword-management') ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  onClick={() => can('keyword-management') && setKeywordManagementDialogOpen(true)}
+                  disabled={!can('keyword-management')}
                   aria-label="Keyword Management"
                 >
                   <TagIcon fontSize="inherit" style={toolbarIconContentStyle} />
@@ -11135,15 +11141,16 @@ export default function App() {
 
           {/* Actions: Import */}
           <div style={toolbarGroupStyle}>
-            <Tooltip title="Import assets">
+            <Tooltip title={can('import') ? 'Import assets' : 'Your role cannot import assets'}>
               <span>
                 <button
                   type="button"
-                  style={toolbarIconButtonStyle}
-                  onClick={() => handleOpenImportDialog()}
+                  style={can('import') ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  onClick={() => can('import') && handleOpenImportDialog()}
+                  disabled={!can('import')}
                   aria-label="Import"
                 >
-                  <DownloadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
+                  <DownloadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: can('import') ? '#0969da' : undefined }} />
                 </button>
               </span>
             </Tooltip>
@@ -11159,16 +11166,16 @@ export default function App() {
                 </button>
               </span>
             </Tooltip>
-            <Tooltip title={hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
+            <Tooltip title={!can('print') ? 'Your role cannot print' : hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
               <span>
                 <button
                   type="button"
-                  style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  style={(can('print') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                   onClick={() => setPrintDialogOpen(true)}
-                  disabled={!hasSelectedAssets}
+                  disabled={!can('print') || !hasSelectedAssets}
                   aria-label="Print selected photos"
                 >
-                  <PrintIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: hasSelectedAssets ? '#555' : '#bbb' }} />
+                  <PrintIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: (can('print') && hasSelectedAssets) ? '#555' : '#bbb' }} />
                 </button>
               </span>
             </Tooltip>
@@ -11177,52 +11184,52 @@ export default function App() {
           {/* Rotation + Crop */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
-              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
+              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
                 <span>
                   <button
                     type="button"
-                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => void handleRotateSelectedAssets('counterclockwise')}
-                    disabled={!hasSelectedAssets}
+                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
                     aria-label="Rotate selected photos counterclockwise"
                   >
                     <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
                   </button>
                 </span>
               </Tooltip>
-              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
+              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
                 <span>
                   <button
                     type="button"
-                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => void handleRotateSelectedAssets('180')}
-                    disabled={!hasSelectedAssets}
+                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
                     aria-label="Rotate selected photos 180 degrees"
                   >
                     <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />
                   </button>
                 </span>
               </Tooltip>
-              <Tooltip title={hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
+              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
                 <span>
                   <button
                     type="button"
-                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => void handleRotateSelectedAssets('clockwise')}
-                    disabled={!hasSelectedAssets}
+                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
                     aria-label="Rotate selected photos clockwise"
                   >
                     <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
                   </button>
                 </span>
               </Tooltip>
-              <Tooltip title={selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
+              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot crop photos' : selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
                 <span>
                   <button
                     type="button"
-                    style={selectedAssetIds.length === 1 ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(can('rotate-and-crop') && selectedAssetIds.length === 1) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => void handleStartCrop()}
-                    disabled={selectedAssetIds.length !== 1}
+                    disabled={!can('rotate-and-crop') || selectedAssetIds.length !== 1}
                     aria-label="Crop photo in Preview"
                   >
                     <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />
@@ -11708,11 +11715,13 @@ export default function App() {
                       type="button"
                       className="tdg-overflow-item"
                       onClick={() => { void handleAddSelectedToAlbum(); setToolbarOverflowOpen(false); }}
-                      disabled={!hasSelectedAssets}
+                      disabled={!can('move-photos-to-album') || !hasSelectedAssets}
                       title={
-                        hasSelectedAssets
-                          ? 'Add current selection to a manual album'
-                          : 'Select one or more photos to add them to a manual album'
+                        !can('move-photos-to-album')
+                          ? 'Your role cannot add photos to albums'
+                          : hasSelectedAssets
+                            ? 'Add current selection to a manual album'
+                            : 'Select one or more photos to add them to a manual album'
                       }
                     >
                       + Add to Album
@@ -11722,13 +11731,15 @@ export default function App() {
                         type="button"
                         className="tdg-overflow-item"
                         onClick={() => { void handleRemoveSelectedFromFocusedAlbum(); setToolbarOverflowOpen(false); }}
-                        disabled={selectedAssetsInFocusedAlbum.length === 0}
+                        disabled={!can('remove-from-album') || selectedAssetsInFocusedAlbum.length === 0}
                         title={
-                          selectedAssetIdsForAlbumAction.length === 0
-                            ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                            : selectedAssetsInFocusedAlbum.length > 0
-                              ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
-                              : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                          !can('remove-from-album')
+                            ? 'Your role cannot remove photos from albums'
+                            : selectedAssetIdsForAlbumAction.length === 0
+                              ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                              : selectedAssetsInFocusedAlbum.length > 0
+                                ? `Remove selected assets from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
+                                : `None of the selected assets are in "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
                         }
                       >
                         {`Remove from "${focusedAlbumForMembershipAction?.label ?? 'Album'}"`}
@@ -11902,17 +11913,19 @@ export default function App() {
                 >
                   People Dev
                 </Link>
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => {
-                    setToolbarOverflowOpen(false);
-                    setMaintenanceDialogOpen(true);
-                  }}
-                  title="Open maintenance tools"
-                >
-                  Maintenance
-                </button>
+                {can('maintenance') ? (
+                  <button
+                    type="button"
+                    className="tdg-overflow-item"
+                    onClick={() => {
+                      setToolbarOverflowOpen(false);
+                      setMaintenanceDialogOpen(true);
+                    }}
+                    title="Open maintenance tools"
+                  >
+                    Maintenance
+                  </button>
+                ) : null}
 
               </div>
             ) : null}
