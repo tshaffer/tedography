@@ -36,3 +36,8 @@ export async function getMe(): Promise<MeResponse> {
 export async function getUsers(): Promise<UserListResponse> {
   return fetchJson<UserListResponse>('/api/auth/users');
 }
+
+/** Fetches user names + IDs without requiring a session — for the login screen */
+export async function getPublicUsers(): Promise<UserListResponse> {
+  return fetchJson<UserListResponse>('/api/auth/users/public');
+}

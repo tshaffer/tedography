@@ -43,6 +43,13 @@ authRoutes.get('/me', requireAuth, (req, res) => {
   res.json(response);
 });
 
+/** GET /api/auth/users/public — list user names + IDs, no auth required (for login screen) */
+authRoutes.get('/users/public', async (_req, res) => {
+  const users = await listUsers();
+  const response: UserListResponse = { users };
+  res.json(response);
+});
+
 /** GET /api/auth/users — list all users (names only, no PIN hashes) — requires auth */
 authRoutes.get('/users', requireAuth, async (_req, res) => {
   const users = await listUsers();

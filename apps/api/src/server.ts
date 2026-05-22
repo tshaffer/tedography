@@ -121,7 +121,7 @@ export function createServer(): Express {
       store: MongoStore.create({
         mongoUrl: config.mongoUri,
         collectionName: 'sessions',
-        ttl: 0, // 0 = no TTL, sessions persist indefinitely
+        // ttl omitted → connect-mongo default of 14 days; long enough for home use
       }),
     })
   );

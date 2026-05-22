@@ -38,7 +38,8 @@ module.exports = {
     proxy: [
       {
         context: ["/api", "/media", "/import-media"],
-        target: "http://localhost:4000"
+        target: "http://localhost:4000",
+        changeOrigin: true
       }
     ]
   }

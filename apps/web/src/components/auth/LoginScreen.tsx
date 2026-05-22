@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import type { TedographyUser } from '@tedography/domain';
-import { getUsers } from '../../api/authApi';
+import { getPublicUsers } from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 
 const PASSCODE_LENGTH = 4;
@@ -115,7 +115,7 @@ export function LoginScreen(): ReactElement {
     // so we keep a lightweight public endpoint for just user names.
     // For now we call the same endpoint; it will 401 when not authed.
     // We fall back gracefully: if the list is empty, show a manual ID input.
-    getUsers()
+    getPublicUsers()
       .then(({ users: all }) => {
         setUsers(all);
         if (all.length === 1 && all[0]) {
