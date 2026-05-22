@@ -11948,7 +11948,7 @@ export default function App() {
             <Tooltip title="Log out">
               <button
                 type="button"
-                style={{ ...toolbarButtonStyle, fontSize: 12, color: '#888', padding: '3px 8px' }}
+                style={{ ...toolbarButtonStyle, fontSize: 12, padding: '3px 8px' }}
                 onClick={() => { void logout(); }}
               >
                 Log out
