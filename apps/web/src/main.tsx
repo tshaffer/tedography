@@ -4,21 +4,39 @@ import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
 import { store } from './app/store';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoginScreen } from './components/auth/LoginScreen';
 import { PeopleBrowsePage } from './components/people/PeopleBrowsePage';
 import { PeopleDevPage } from './components/people/PeopleDevPage';
 import { PersonDetailPage } from './components/people/PersonDetailPage';
 import { PeopleReviewPage } from './components/people/PeopleReviewPage';
 
+function AuthGate({ children }: { children: React.ReactNode }): React.ReactElement {
+  const { user, loading } = useAuth();
+  if (loading) {
+    // Blank while we check for an existing session
+    return <div style={{ height: '100vh', background: '#1a1a2e' }} />;
+  }
+  if (!user) {
+    return <LoginScreen />;
+  }
+  return <>{children}</>;
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <Provider store={store}>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/people" element={<PeopleBrowsePage />} />
-        <Route path="/people/:personId" element={<PersonDetailPage />} />
-        <Route path="/people/dev" element={<PeopleDevPage />} />
-        <Route path="/people/review" element={<PeopleReviewPage />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <AuthGate>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<App />} />
+            <Route path="/people" element={<PeopleBrowsePage />} />
+            <Route path="/people/:personId" element={<PersonDetailPage />} />
+            <Route path="/people/dev" element={<PeopleDevPage />} />
+            <Route path="/people/review" element={<PeopleReviewPage />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthGate>
+    </AuthProvider>
   </Provider>
 );

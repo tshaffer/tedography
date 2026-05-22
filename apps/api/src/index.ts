@@ -10,6 +10,7 @@ import { syncKeywordIndexes } from './repositories/keywordRepository.js';
 import { syncKeywordChangeEventIndexes } from './repositories/keywordChangeEventRepository.js';
 import { syncPersonIndexes } from './repositories/personRepository.js';
 import { syncSmartAlbumIndexes } from './repositories/smartAlbumRepository.js';
+import { syncUserIndexes } from './repositories/userRepository.js';
 
 await connectToMongo();
 
@@ -21,6 +22,7 @@ await syncKeywordChangeEventIndexes();
 await syncSmartAlbumIndexes();
 await syncFaceDetectionIndexes();
 await syncFaceMatchReviewIndexes();
+await syncUserIndexes();
 
 const app = createServer();
 

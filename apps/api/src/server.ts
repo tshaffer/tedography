@@ -1,9 +1,12 @@
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import cors from 'cors';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import express, { type Express } from 'express';
 import { PhotoState, normalizePhotoState } from '@tedography/domain';
 import type { RefreshOperationResponse } from '@tedography/domain';
+import { config } from './config.js';
 import { log } from './logger.js';
 import {
   rotateAssetClockwise,
@@ -35,6 +38,8 @@ import { mediaRoutes } from './routes/mediaRoutes.js';
 import { peoplePipelineRoutes } from './routes/peoplePipelineRoutes.js';
 import { smartAlbumRoutes } from './routes/smartAlbumRoutes.js';
 import { resolveOriginalAbsolutePathForAsset } from './media/resolveAssetMediaPath.js';
+import { authRoutes } from './routes/authRoutes.js';
+import { requireAuth } from './middleware/requireAuth.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -98,8 +103,35 @@ function parseCaptureDate(value: unknown): { year: number; month: number; day: n
 export function createServer(): Express {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({ credentials: true, origin: true }));
   app.use(express.json());
+
+  // Session middleware — must come before auth routes and requireAuth
+  app.use(
+    session({
+      secret: config.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        secure: false,  // home network only; set true if TLS is added
+        maxAge: undefined, // indefinite (browser-session lifetime)
+        sameSite: 'lax',
+      },
+      store: MongoStore.create({
+        mongoUrl: config.mongoUri,
+        collectionName: 'sessions',
+        ttl: 0, // 0 = no TTL, sessions persist indefinitely
+      }),
+    })
+  );
+
+  // Auth routes are public (no requireAuth)
+  app.use('/api/auth', authRoutes);
+
+  // All other /api routes require authentication
+  app.use('/api', requireAuth);
+
   app.use('/api/import', importRoutes);
   app.use('/api/media', mediaRoutes);
   app.use('/api/album-tree', albumTreeRoutes);

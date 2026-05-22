@@ -245,6 +245,7 @@ export const config = {
     }
   } satisfies PeoplePipelineConfig,
 
+  sessionSecret: requireEnv('TEDOGRAPHY_SESSION_SECRET'),
   port: Number(process.env.PORT ?? 4000),
   aiQueueExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,

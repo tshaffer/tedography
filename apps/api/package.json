@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "debug": "tsx src/index.ts",
+    "users:create": "tsx src/tools/createAdminUser.ts",
     "assets:verify": "tsx src/tools/assetIntegrityVerification.ts",
     "locations:backfill": "tsx src/tools/backfillAssetLocations.ts",
     "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",
@@ -25,16 +26,21 @@
     "@tedography/import-pipeline": "workspace:*",
     "@tedography/media-metadata": "workspace:*",
     "@tedography/shared": "workspace:*",
+    "bcrypt": "^6.0.0",
+    "connect-mongo": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "exiftool-vendored": "^31.1.0",
     "express": "5.2.1",
+    "express-session": "^1.19.0",
     "mongoose": "9.2.4",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "5.0.6",
+    "@types/express-session": "^1.19.0",
     "@types/node": "25.3.5",
     "tsx": "4.21.0",
     "typescript": "5.9.3"
