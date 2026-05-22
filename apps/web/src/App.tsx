@@ -45,6 +45,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TagIcon from '@mui/icons-material/Tag';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import PrintIcon from '@mui/icons-material/Print';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -123,6 +124,7 @@ import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
 import { AiHistoryDialog } from './components/aiQueue/AiHistoryDialog';
 import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
+import { PrintDialog } from './components/print/PrintDialog';
 import { getAiHistory } from './api/aiHistoryApi';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
@@ -3789,6 +3791,7 @@ export default function App() {
   const [aiQueueProcessError, setAiQueueProcessError] = useState<string | null>(null);
   const [aiQueueProcessing, setAiQueueProcessing] = useState(false);
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [aiHistoryDialogOpen, setAiHistoryDialogOpen] = useState(false);
   const [aiHistoryEntries, setAiHistoryEntries] = useState<import('@tedography/domain').AiEditHistoryEntry[]>([]);
   const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
@@ -11154,6 +11157,19 @@ export default function App() {
                 </button>
               </span>
             </Tooltip>
+            <Tooltip title={hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
+              <span>
+                <button
+                  type="button"
+                  style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  onClick={() => setPrintDialogOpen(true)}
+                  disabled={!hasSelectedAssets}
+                  aria-label="Print selected photos"
+                >
+                  <PrintIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: hasSelectedAssets ? '#555' : '#bbb' }} />
+                </button>
+              </span>
+            </Tooltip>
           </div>
 
           {/* Rotation + Crop */}
@@ -12403,6 +12419,11 @@ export default function App() {
         selectedAssetIds={selectedAssetIds}
         visibleAssetIds={visibleAssets.map((a) => a.id)}
         onClose={() => setPublishToGooglePhotosOpen(false)}
+      />
+      <PrintDialog
+        open={printDialogOpen}
+        assets={visibleAssets.filter((a) => selectedAssetIds.includes(a.id))}
+        onClose={() => setPrintDialogOpen(false)}
       />
 
       <ImportAssetsDialog

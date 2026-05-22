@@ -248,6 +248,7 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   aiQueueExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,
+  printOrdersRoot: parseOptionalAbsolutePathEnv('TEDOGRAPHY_PRINT_ORDERS_ROOT'),
   googlePhotos: {
     clientId: process.env.GOOGLE_PHOTOS_CLIENT_ID?.trim() || null,
     clientSecret: process.env.GOOGLE_PHOTOS_CLIENT_SECRET?.trim() || null,

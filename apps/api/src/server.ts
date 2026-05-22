@@ -27,6 +27,7 @@ import { listAssetIdsWithReviewableDetections } from './repositories/faceDetecti
 import { aiHistoryRoutes } from './routes/aiHistoryRoutes.js';
 import { aiQueueRoutes } from './routes/aiQueueRoutes.js';
 import { googlePhotosRoutes } from './routes/googlePhotosRoutes.js';
+import { printRoutes } from './routes/printRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { assetKeywordRoutes, keywordRoutes } from './routes/keywordRoutes.js';
@@ -110,6 +111,7 @@ export function createServer(): Express {
   app.use('/api/ai-queue', aiQueueRoutes);
   app.use('/api/ai-history', aiHistoryRoutes);
   app.use('/api/google-photos', googlePhotosRoutes);
+  app.use('/api/print', printRoutes);
 
   app.get('/api/health', (_req, res) => {
     // Keep both fields for backward compatibility across frontend iterations.

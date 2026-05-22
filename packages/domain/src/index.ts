@@ -21,3 +21,4 @@ export * from './enums/PhotoState.js';
 export * from './enums/StorageRole.js';
 export * from './import/index.js';
 export * from './types/SearchSpec.js';
+export * from './types/PrintTypes.js';
