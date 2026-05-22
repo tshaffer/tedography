@@ -176,6 +176,7 @@ import {
   usesCaptureTimeOrderInAlbum
 } from './utilities/smartAlbumOrder';
 import type { ListAssetFaceDetectionsResponse, PeopleRecognitionRunSummary, ProcessPeopleAssetResponse } from '@tedography/shared';
+import { useAuth } from './context/AuthContext';
 
 const photoStateFilterOptions: PhotoState[] = [
   PhotoState.New,
@@ -3734,6 +3735,7 @@ function computePeopleRunSummary(
 }
 
 export default function App() {
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState('loading');
@@ -11938,6 +11940,20 @@ export default function App() {
             <Link to="/people" style={toolbarLinkButtonStyle}>
               People
             </Link>
+          </div>
+
+          {/* User / logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 12, borderLeft: '1px solid #e3e6ea' }}>
+            <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{user?.name ?? ''}</span>
+            <Tooltip title="Log out">
+              <button
+                type="button"
+                style={{ ...toolbarButtonStyle, fontSize: 12, color: '#888', padding: '3px 8px' }}
+                onClick={() => { void logout(); }}
+              >
+                Log out
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
