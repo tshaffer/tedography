@@ -6,6 +6,7 @@ import { log } from '../logger.js';
 import { findByIds } from '../repositories/assetRepository.js';
 import { buildResolvedItem } from '../print/printJobService.js';
 import { getProviderById, getProviders } from '../print/printProviderRegistry.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 
 export const printRoutes: RouterType = Router();
 
@@ -14,7 +15,7 @@ printRoutes.get('/providers', (_req, res) => {
   res.json({ providers });
 });
 
-printRoutes.post('/jobs', async (req, res) => {
+printRoutes.post('/jobs', requireFeature('print'), async (req, res) => {
   const body = req.body as Partial<PrintJobRequest>;
 
   if (!body.providerId) {

@@ -43,6 +43,7 @@ import {
   updateKeywordParent
 } from '../repositories/keywordRepository.js';
 import { listKeywordChangesSince } from '../repositories/keywordChangeEventRepository.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 
 export const keywordRoutes: Router = Router();
 
@@ -68,7 +69,7 @@ function parseIdArray(value: unknown): string[] | null {
   return parsed.length > 0 ? [...new Set(parsed)] : null;
 }
 
-keywordRoutes.post('/', async (req, res) => {
+keywordRoutes.post('/', requireFeature('keyword-management'), async (req, res) => {
   const body = req.body as Partial<CreateKeywordRequest> | undefined;
   const label = parseNonEmptyLabel(body?.label);
   if (!label) {
@@ -127,7 +128,7 @@ keywordRoutes.get('/tree', async (_req, res) => {
   }
 });
 
-keywordRoutes.patch('/:keywordId', async (req, res) => {
+keywordRoutes.patch('/:keywordId', requireFeature('keyword-management'), async (req, res) => {
   const body = req.body as Partial<UpdateKeywordLabelRequest> | undefined;
   const label = parseNonEmptyLabel(body?.label);
 
@@ -138,7 +139,7 @@ keywordRoutes.patch('/:keywordId', async (req, res) => {
 
   try {
     res.json({
-      item: await updateKeywordLabel(req.params.keywordId, label)
+      item: await updateKeywordLabel(req.params.keywordId as string, label)
     } satisfies UpdateKeywordLabelResponse);
   } catch (error) {
     if (error instanceof KeywordNotFoundError) {
@@ -156,7 +157,7 @@ keywordRoutes.patch('/:keywordId', async (req, res) => {
   }
 });
 
-keywordRoutes.patch('/:keywordId/parent', async (req, res) => {
+keywordRoutes.patch('/:keywordId/parent', requireFeature('keyword-management'), async (req, res) => {
   const body = req.body as Partial<UpdateKeywordParentRequest> | undefined;
   const parentKeywordId =
     typeof body?.parentKeywordId === 'string' && body.parentKeywordId.trim().length > 0
@@ -170,7 +171,7 @@ keywordRoutes.patch('/:keywordId/parent', async (req, res) => {
 
   try {
     res.json({
-      item: await updateKeywordParent(req.params.keywordId, parentKeywordId)
+      item: await updateKeywordParent(req.params.keywordId as string, parentKeywordId)
     } satisfies UpdateKeywordParentResponse);
   } catch (error) {
     if (error instanceof KeywordNotFoundError || error instanceof KeywordParentNotFoundError) {
@@ -188,9 +189,9 @@ keywordRoutes.patch('/:keywordId/parent', async (req, res) => {
   }
 });
 
-keywordRoutes.delete('/:keywordId', async (req, res) => {
+keywordRoutes.delete('/:keywordId', requireFeature('keyword-management'), async (req, res) => {
   try {
-    const deletedIds = await deleteKeyword(req.params.keywordId);
+    const deletedIds = await deleteKeyword(req.params.keywordId as string);
     res.json({ deletedIds } satisfies DeleteKeywordResponse);
   } catch (error) {
     if (error instanceof KeywordNotFoundError) {
@@ -241,7 +242,7 @@ assetKeywordRoutes.get('/:assetId/keywords', async (req, res) => {
   }
 });
 
-assetKeywordRoutes.post('/keywords/add', async (req, res) => {
+assetKeywordRoutes.post('/keywords/add', requireFeature('keyword-management'), async (req, res) => {
   const body = req.body as Partial<UpdateAssetKeywordsRequest> | undefined;
   const assetIds = parseIdArray(body?.assetIds);
   const keywordIds = parseIdArray(body?.keywordIds);
@@ -273,7 +274,7 @@ assetKeywordRoutes.post('/keywords/add', async (req, res) => {
   }
 });
 
-assetKeywordRoutes.post('/keywords/remove', async (req, res) => {
+assetKeywordRoutes.post('/keywords/remove', requireFeature('keyword-management'), async (req, res) => {
   const body = req.body as Partial<UpdateAssetKeywordsRequest> | undefined;
   const assetIds = parseIdArray(body?.assetIds);
   const keywordIds = parseIdArray(body?.keywordIds);

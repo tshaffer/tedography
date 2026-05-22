@@ -34,6 +34,7 @@ import {
 import { listPeopleBrowseSummaries } from '../people/peopleBrowseService.js';
 import { getPersonDetail } from '../people/personDetailService.js';
 import { log } from '../logger.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 
 export const peoplePipelineRoutes: Router = Router();
 
@@ -117,7 +118,7 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/review/scoped', async (req, res) => {
+peoplePipelineRoutes.post('/review/scoped', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<AssetIdsScopeRequest & {
     statuses?: FaceDetectionMatchStatus[];
     personId?: string;
@@ -446,7 +447,7 @@ peoplePipelineRoutes.post('/assets/:assetId/process', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/detections/:detectionId/review', async (req, res) => {
+peoplePipelineRoutes.post('/detections/:detectionId/review', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<ReviewFaceDetectionRequest> | undefined;
   const action = body?.action;
 
@@ -470,7 +471,7 @@ peoplePipelineRoutes.post('/detections/:detectionId/review', async (req, res) =>
       ...(body?.notes !== undefined ? { notes: body.notes } : {}),
       ...(body?.ignoredReason !== undefined ? { ignoredReason: body.ignoredReason } : {})
     };
-    const response = await reviewFaceDetection(req.params.detectionId, {
+    const response = await reviewFaceDetection(req.params.detectionId as string, {
       ...request
     });
     if (!response) {

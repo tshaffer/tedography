@@ -26,6 +26,7 @@ import { scanImportTarget, ScanServiceError } from '../import/scanService.js';
 import { resolveSafeAbsolutePath } from '../import/storagePathUtils.js';
 import { getStorageRootById, getStorageRoots } from '../import/storageRoots.js';
 import { log } from '../logger.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 
 export const importRoutes: Router = Router();
 
@@ -89,7 +90,7 @@ importRoutes.get('/browse', async (req, res) => {
   }
 });
 
-importRoutes.post('/scan', async (req, res) => {
+importRoutes.post('/scan', requireFeature('import'), async (req, res) => {
   const body = req.body as Partial<ScanImportRequest> | undefined;
   const rootId = body?.rootId;
   const relativePath = body?.relativePath;
@@ -138,7 +139,7 @@ importRoutes.post('/scan', async (req, res) => {
   }
 });
 
-importRoutes.post('/register', async (req, res) => {
+importRoutes.post('/register', requireFeature('import'), async (req, res) => {
   const body = req.body as Partial<RegisterImportRequest> | undefined;
   const rootId = body?.rootId;
   const files = body?.files;
@@ -216,7 +217,7 @@ function readRefreshFolderRequest(body: Partial<RefreshFolderRequest> | undefine
   };
 }
 
-importRoutes.post('/reimport-known', async (req, res) => {
+importRoutes.post('/reimport-known', requireFeature('maintenance'), async (req, res) => {
   const request = readRefreshFolderRequest(req.body as Partial<RefreshFolderRequest> | undefined);
   if (!request) {
     const errorResponse: ImportApiErrorResponse = { error: 'rootId and relativePath are required' };
@@ -262,7 +263,7 @@ importRoutes.post('/verify-known', async (req, res) => {
   }
 });
 
-importRoutes.post('/rebuild-derived', async (req, res) => {
+importRoutes.post('/rebuild-derived', requireFeature('maintenance'), async (req, res) => {
   const request = readRefreshFolderRequest(req.body as Partial<RefreshFolderRequest> | undefined);
   if (!request) {
     const errorResponse: ImportApiErrorResponse = { error: 'rootId and relativePath are required' };

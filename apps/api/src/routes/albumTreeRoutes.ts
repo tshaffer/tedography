@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireFeature } from '../middleware/requireFeature.js';
 import type {
   AlbumKeywordAssignmentStatus,
   AlbumPeopleAssignmentStatus,
@@ -199,7 +200,7 @@ albumTreeRoutes.get('/', async (_req, res) => {
   }
 });
 
-albumTreeRoutes.post('/', async (req, res) => {
+albumTreeRoutes.post('/', requireFeature('create-albums'), async (req, res) => {
   const createRequest = req.body as CreateAlbumTreeNodeRequest;
   const label = parseNonEmptyLabel(createRequest.label);
   const nodeType = parseNodeType(createRequest.nodeType);
@@ -489,7 +490,7 @@ albumTreeRoutes.delete('/:id', async (req, res) => {
   }
 });
 
-albumMembershipRoutes.post('/:id/assets', async (req, res) => {
+albumMembershipRoutes.post('/:id/assets', requireFeature('move-photos-to-album'), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -497,7 +498,7 @@ albumMembershipRoutes.post('/:id/assets', async (req, res) => {
     return;
   }
 
-  const albumNode = await loadAlbumNode(req.params.id.trim());
+  const albumNode = await loadAlbumNode((req.params.id as string).trim());
   if (!albumNode) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
     res.status(404).json(errorResponse);
@@ -513,7 +514,7 @@ albumMembershipRoutes.post('/:id/assets', async (req, res) => {
   }
 });
 
-albumMembershipRoutes.delete('/:id/assets', async (req, res) => {
+albumMembershipRoutes.delete('/:id/assets', requireFeature('remove-from-album'), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -521,7 +522,7 @@ albumMembershipRoutes.delete('/:id/assets', async (req, res) => {
     return;
   }
 
-  const albumNode = await loadAlbumNode(req.params.id.trim());
+  const albumNode = await loadAlbumNode((req.params.id as string).trim());
   if (!albumNode) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
     res.status(404).json(errorResponse);
@@ -537,7 +538,7 @@ albumMembershipRoutes.delete('/:id/assets', async (req, res) => {
   }
 });
 
-albumMembershipRoutes.post('/:id/move-assets', async (req, res) => {
+albumMembershipRoutes.post('/:id/move-assets', requireFeature('move-photos-to-album'), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -545,7 +546,7 @@ albumMembershipRoutes.post('/:id/move-assets', async (req, res) => {
     return;
   }
 
-  const albumNode = await loadAlbumNode(req.params.id.trim());
+  const albumNode = await loadAlbumNode((req.params.id as string).trim());
   if (!albumNode) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
     res.status(404).json(errorResponse);

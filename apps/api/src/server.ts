@@ -40,6 +40,7 @@ import { smartAlbumRoutes } from './routes/smartAlbumRoutes.js';
 import { resolveOriginalAbsolutePathForAsset } from './media/resolveAssetMediaPath.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { requireAuth } from './middleware/requireAuth.js';
+import { requireFeature } from './middleware/requireFeature.js';
 
 function parsePhotoState(value: unknown): PhotoState | null {
   return normalizePhotoState(value);
@@ -203,7 +204,7 @@ export function createServer(): Express {
     }
   });
 
-  app.patch('/api/assets/:id/photoState', async (req, res) => {
+  app.patch('/api/assets/:id/photoState', requireFeature('set-photo-state'), async (req, res) => {
     const photoState = parsePhotoState((req.body as { photoState?: unknown }).photoState);
     if (!photoState) {
       res.status(400).json({ error: 'photoState must be one of New, Pending, Keep, Discard' });
@@ -211,7 +212,7 @@ export function createServer(): Express {
     }
 
     try {
-      const updatedAsset = await updatePhotoState(req.params.id, photoState);
+      const updatedAsset = await updatePhotoState(req.params.id as string, photoState);
 
       if (!updatedAsset) {
         res.status(404).json({ error: 'Asset not found' });
@@ -268,9 +269,9 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/reimport', async (req, res) => {
+  app.post('/api/assets/:id/reimport', requireFeature('maintenance'), async (req, res) => {
     try {
-      const response: RefreshOperationResponse = await reimportAssetById(req.params.id);
+      const response: RefreshOperationResponse = await reimportAssetById(req.params.id as string);
       res.json(response);
     } catch (error) {
       if (error instanceof RefreshServiceError) {
@@ -285,9 +286,9 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rebuild-derived', async (req, res) => {
+  app.post('/api/assets/:id/rebuild-derived', requireFeature('maintenance'), async (req, res) => {
     try {
-      const response: RefreshOperationResponse = await rebuildDerivedFilesForAsset(req.params.id);
+      const response: RefreshOperationResponse = await rebuildDerivedFilesForAsset(req.params.id as string);
       res.json(response);
     } catch (error) {
       if (error instanceof RefreshServiceError) {
@@ -302,9 +303,9 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-clockwise', async (req, res) => {
+  app.post('/api/assets/:id/rotate-clockwise', requireFeature('rotate-and-crop'), async (req, res) => {
     try {
-      const updatedAsset = await rotateAssetClockwise(req.params.id);
+      const updatedAsset = await rotateAssetClockwise(req.params.id as string);
       res.json(updatedAsset);
     } catch (error) {
       if (error instanceof AssetRotationServiceError) {
@@ -323,9 +324,9 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-counterclockwise', async (req, res) => {
+  app.post('/api/assets/:id/rotate-counterclockwise', requireFeature('rotate-and-crop'), async (req, res) => {
     try {
-      const updatedAsset = await rotateAssetCounterclockwise(req.params.id);
+      const updatedAsset = await rotateAssetCounterclockwise(req.params.id as string);
       res.json(updatedAsset);
     } catch (error) {
       if (error instanceof AssetRotationServiceError) {
@@ -344,9 +345,9 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-180', async (req, res) => {
+  app.post('/api/assets/:id/rotate-180', requireFeature('rotate-and-crop'), async (req, res) => {
     try {
-      const updatedAsset = await rotateAsset180(req.params.id);
+      const updatedAsset = await rotateAsset180(req.params.id as string);
       res.json(updatedAsset);
     } catch (error) {
       if (error instanceof AssetRotationServiceError) {
