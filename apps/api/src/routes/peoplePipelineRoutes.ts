@@ -118,7 +118,10 @@ peoplePipelineRoutes.get('/review', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/review/scoped', requireFeature('people-face-review'), async (req, res) => {
+peoplePipelineRoutes.post('/review/scoped', requireFeature('people-face-review', (req) => {
+  const ids = (req.body as { assetIds?: unknown }).assetIds;
+  return Array.isArray(ids) ? ids.map(String) : [];
+}), async (req, res) => {
   const body = req.body as Partial<AssetIdsScopeRequest & {
     statuses?: FaceDetectionMatchStatus[];
     personId?: string;
@@ -447,7 +450,10 @@ peoplePipelineRoutes.post('/assets/:assetId/process', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/detections/:detectionId/review', requireFeature('people-face-review'), async (req, res) => {
+peoplePipelineRoutes.post('/detections/:detectionId/review', requireFeature('people-face-review', async (req) => {
+  const detection = await findFaceDetectionById(req.params.detectionId as string);
+  return detection ? [detection.mediaAssetId] : [];
+}), async (req, res) => {
   const body = req.body as Partial<ReviewFaceDetectionRequest> | undefined;
   const action = body?.action;
 

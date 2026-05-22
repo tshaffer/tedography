@@ -400,3 +400,39 @@ export async function setAlbumPeopleAssignmentStatus(
 
   return doc ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Writer (per-album grant) management
+// ---------------------------------------------------------------------------
+
+/** Fetch album nodes by their IDs — used for per-album write-access checks */
+export async function findAlbumNodesByIds(ids: string[]): Promise<AlbumTreeNode[]> {
+  if (ids.length === 0) return [];
+  return AlbumTreeNodeModel.find({ id: { $in: ids } }, { _id: 0 }).lean<AlbumTreeNode[]>();
+}
+
+/**
+ * Add a userId to an album's writerUserIds (idempotent — $addToSet).
+ * Returns the updated node, or null if the album doesn't exist.
+ */
+export async function addAlbumWriter(albumId: string, userId: string): Promise<AlbumTreeNode | null> {
+  const doc = await AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId },
+    { $addToSet: { writerUserIds: userId } },
+    { new: true, runValidators: true }
+  ).lean<AlbumTreeNode>();
+  return doc ?? null;
+}
+
+/**
+ * Remove a userId from an album's writerUserIds.
+ * Returns the updated node, or null if the album doesn't exist.
+ */
+export async function removeAlbumWriter(albumId: string, userId: string): Promise<AlbumTreeNode | null> {
+  const doc = await AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId },
+    { $pull: { writerUserIds: userId } },
+    { new: true, runValidators: true }
+  ).lean<AlbumTreeNode>();
+  return doc ?? null;
+}

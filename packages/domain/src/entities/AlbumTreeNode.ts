@@ -13,6 +13,8 @@ export interface AlbumTreeNode {
   keywordAssignmentStatus?: AlbumKeywordAssignmentStatus | null;
   reviewAssignmentStatus?: AlbumReviewAssignmentStatus | null;
   peopleAssignmentStatus?: AlbumPeopleAssignmentStatus | null;
+  /** User IDs granted write access to this album (used for 'per-album' permission checks) */
+  writerUserIds?: string[];
   createdAt: string;
   updatedAt: string;
 }

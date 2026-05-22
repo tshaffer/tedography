@@ -15,7 +15,10 @@ printRoutes.get('/providers', (_req, res) => {
   res.json({ providers });
 });
 
-printRoutes.post('/jobs', requireFeature('print'), async (req, res) => {
+printRoutes.post('/jobs', requireFeature('print', (req) => {
+  const items = (req.body as { items?: unknown }).items;
+  return Array.isArray(items) ? items.map((i) => String((i as { assetId?: unknown }).assetId ?? '')).filter(Boolean) : [];
+}), async (req, res) => {
   const body = req.body as Partial<PrintJobRequest>;
 
   if (!body.providerId) {

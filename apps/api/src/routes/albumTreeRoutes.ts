@@ -18,6 +18,7 @@ import {
   updateAlbumMembershipOrderingMode
 } from '../repositories/assetRepository.js';
 import {
+  addAlbumWriter,
   AlbumTreeSiblingLabelConflictError,
   countChildren,
   createAlbumTreeNode,
@@ -25,6 +26,7 @@ import {
   findAlbumTreeNodeById,
   listAlbumTreeNodes,
   moveAlbumTreeNode,
+  removeAlbumWriter,
   reorderAlbumTreeNodeWithinSiblings,
   renameAlbumTreeNode,
   setAlbumKeywordAssignmentStatus,
@@ -32,6 +34,7 @@ import {
   setAlbumReviewAssignmentStatus,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
+import { findRoleById } from '../repositories/roleRepository.js';
 
 type AlbumTreeErrorResponse = {
   error: string;
@@ -242,6 +245,16 @@ albumTreeRoutes.post('/', requireFeature('create-albums'), async (req, res) => {
       parentId,
       ...(targetIndex !== undefined ? { targetIndex } : {})
     });
+
+    // Auto-grant write access to limited users who create an album
+    if (nodeType === 'Album' && req.currentUser) {
+      const role = await findRoleById(req.currentUser.roleId);
+      if (role && role.permissions['create-albums'] === 'allow' &&
+          Object.values(role.permissions).some((p) => p === 'per-album')) {
+        await addAlbumWriter(created.id, req.currentUser.id);
+      }
+    }
+
     res.status(201).json(created);
   } catch (error) {
     if (error instanceof AlbumTreeSiblingLabelConflictError) {
@@ -490,7 +503,10 @@ albumTreeRoutes.delete('/:id', async (req, res) => {
   }
 });
 
-albumMembershipRoutes.post('/:id/assets', requireFeature('move-photos-to-album'), async (req, res) => {
+albumMembershipRoutes.post('/:id/assets', requireFeature('move-photos-to-album', (req) => {
+  const ids = (req.body as { assetIds?: unknown }).assetIds;
+  return Array.isArray(ids) ? ids.map(String) : [];
+}), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -514,7 +530,10 @@ albumMembershipRoutes.post('/:id/assets', requireFeature('move-photos-to-album')
   }
 });
 
-albumMembershipRoutes.delete('/:id/assets', requireFeature('remove-from-album'), async (req, res) => {
+albumMembershipRoutes.delete('/:id/assets', requireFeature('remove-from-album', (req) => {
+  const ids = (req.body as { assetIds?: unknown }).assetIds;
+  return Array.isArray(ids) ? ids.map(String) : [];
+}), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -538,7 +557,10 @@ albumMembershipRoutes.delete('/:id/assets', requireFeature('remove-from-album'),
   }
 });
 
-albumMembershipRoutes.post('/:id/move-assets', requireFeature('move-photos-to-album'), async (req, res) => {
+albumMembershipRoutes.post('/:id/move-assets', requireFeature('move-photos-to-album', (req) => {
+  const ids = (req.body as { assetIds?: unknown }).assetIds;
+  return Array.isArray(ids) ? ids.map(String) : [];
+}), async (req, res) => {
   const assetIds = parseAssetIds((req.body as { assetIds?: unknown }).assetIds);
   if (!assetIds) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'assetIds must be a non-empty string array' };
@@ -801,4 +823,38 @@ albumTreeRoutes.patch('/:id/people-assignment-status', async (req, res) => {
     };
     res.status(500).json(errorResponse);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Album writer management — admin only
+// ---------------------------------------------------------------------------
+
+/** POST /api/album-tree/:id/writers  { userId: string } */
+albumTreeRoutes.post('/:id/writers', async (req, res) => {
+  const albumId = req.params.id as string;
+  const userId = (req.body as { userId?: unknown }).userId;
+  if (typeof userId !== 'string' || userId.trim().length === 0) {
+    res.status(400).json({ error: 'userId is required' } satisfies AlbumTreeErrorResponse);
+    return;
+  }
+
+  const updated = await addAlbumWriter(albumId, userId.trim());
+  if (!updated) {
+    res.status(404).json({ error: 'Album node not found' } satisfies AlbumTreeErrorResponse);
+    return;
+  }
+  res.json(updated);
+});
+
+/** DELETE /api/album-tree/:id/writers/:userId */
+albumTreeRoutes.delete('/:id/writers/:userId', async (req, res) => {
+  const albumId = req.params.id as string;
+  const userId = req.params.userId as string;
+
+  const updated = await removeAlbumWriter(albumId, userId);
+  if (!updated) {
+    res.status(404).json({ error: 'Album node not found' } satisfies AlbumTreeErrorResponse);
+    return;
+  }
+  res.json(updated);
 });

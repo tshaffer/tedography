@@ -204,7 +204,7 @@ export function createServer(): Express {
     }
   });
 
-  app.patch('/api/assets/:id/photoState', requireFeature('set-photo-state'), async (req, res) => {
+  app.patch('/api/assets/:id/photoState', requireFeature('set-photo-state', (req) => [req.params.id as string]), async (req, res) => {
     const photoState = parsePhotoState((req.body as { photoState?: unknown }).photoState);
     if (!photoState) {
       res.status(400).json({ error: 'photoState must be one of New, Pending, Keep, Discard' });
@@ -303,7 +303,7 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-clockwise', requireFeature('rotate-and-crop'), async (req, res) => {
+  app.post('/api/assets/:id/rotate-clockwise', requireFeature('rotate-and-crop', (req) => [req.params.id as string]), async (req, res) => {
     try {
       const updatedAsset = await rotateAssetClockwise(req.params.id as string);
       res.json(updatedAsset);
@@ -324,7 +324,7 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-counterclockwise', requireFeature('rotate-and-crop'), async (req, res) => {
+  app.post('/api/assets/:id/rotate-counterclockwise', requireFeature('rotate-and-crop', (req) => [req.params.id as string]), async (req, res) => {
     try {
       const updatedAsset = await rotateAssetCounterclockwise(req.params.id as string);
       res.json(updatedAsset);
@@ -345,7 +345,7 @@ export function createServer(): Express {
     }
   });
 
-  app.post('/api/assets/:id/rotate-180', requireFeature('rotate-and-crop'), async (req, res) => {
+  app.post('/api/assets/:id/rotate-180', requireFeature('rotate-and-crop', (req) => [req.params.id as string]), async (req, res) => {
     try {
       const updatedAsset = await rotateAsset180(req.params.id as string);
       res.json(updatedAsset);

@@ -32,6 +32,7 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
       enum: ['not-started', 'in-progress', 'complete'],
       default: null
     },
+    writerUserIds: { type: [String], required: false, default: [] },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },
