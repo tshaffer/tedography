@@ -2,6 +2,7 @@ import type {
   LoginRequest,
   LoginResponse,
   MeResponse,
+  MyPermissionsResponse,
   UserListResponse,
 } from '@tedography/domain';
 
@@ -40,4 +41,8 @@ export async function getUsers(): Promise<UserListResponse> {
 /** Fetches user names + IDs without requiring a session — for the login screen */
 export async function getPublicUsers(): Promise<UserListResponse> {
   return fetchJson<UserListResponse>('/api/auth/users/public');
+}
+
+export async function getMyPermissions(): Promise<MyPermissionsResponse> {
+  return fetchJson<MyPermissionsResponse>('/api/auth/my-permissions');
 }

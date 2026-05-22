@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "debug": "tsx src/index.ts",
     "users:create": "tsx src/tools/createAdminUser.ts",
+    "roles:seed": "tsx src/tools/seedRoles.ts",
     "assets:verify": "tsx src/tools/assetIntegrityVerification.ts",
     "locations:backfill": "tsx src/tools/backfillAssetLocations.ts",
     "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",

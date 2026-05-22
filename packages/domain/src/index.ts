@@ -23,3 +23,4 @@ export * from './import/index.js';
 export * from './types/SearchSpec.js';
 export * from './types/PrintTypes.js';
 export * from './types/AuthTypes.js';
+export * from './types/RbacTypes.js';

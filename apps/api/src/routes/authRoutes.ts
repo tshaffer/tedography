@@ -1,7 +1,8 @@
 import { Router, type IRouter } from 'express';
-import type { LoginRequest, LoginResponse, MeResponse, UserListResponse } from '@tedography/domain';
+import type { LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, UserListResponse } from '@tedography/domain';
 import { verifyPin } from '../auth/authService.js';
 import { listUsers } from '../repositories/userRepository.js';
+import { findRoleById } from '../repositories/roleRepository.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const authRoutes: IRouter = Router();
@@ -47,6 +48,18 @@ authRoutes.get('/me', requireAuth, (req, res) => {
 authRoutes.get('/users/public', async (_req, res) => {
   const users = await listUsers();
   const response: UserListResponse = { users };
+  res.json(response);
+});
+
+/** GET /api/auth/my-permissions — returns the resolved permission map for the current user */
+authRoutes.get('/my-permissions', requireAuth, async (req, res) => {
+  const user = req.currentUser!;
+  const role = await findRoleById(user.roleId);
+  if (!role) {
+    res.status(500).json({ error: `Role "${user.roleId}" not found — run pnpm roles:seed` });
+    return;
+  }
+  const response: MyPermissionsResponse = { roleId: role.id, permissions: role.permissions };
   res.json(response);
 });
 
