@@ -587,7 +587,7 @@ export function AssetDetailsPanel({
       <div style={actionsStyle}>
         <button
           type="button"
-          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          style={(assetOperationBusy || !onEditCaptureDate) ? disabledButtonStyle : buttonStyle}
           onClick={onEditCaptureDate}
           disabled={assetOperationBusy || !onEditCaptureDate}
         >
@@ -595,7 +595,7 @@ export function AssetDetailsPanel({
         </button>
         <button
           type="button"
-          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          style={(assetOperationBusy || !onReimportAsset) ? disabledButtonStyle : buttonStyle}
           onClick={onReimportAsset}
           disabled={assetOperationBusy || !onReimportAsset}
         >
@@ -603,7 +603,7 @@ export function AssetDetailsPanel({
         </button>
         <button
           type="button"
-          style={assetOperationBusy ? disabledButtonStyle : buttonStyle}
+          style={(assetOperationBusy || !onRebuildDerivedFiles) ? disabledButtonStyle : buttonStyle}
           onClick={onRebuildDerivedFiles}
           disabled={assetOperationBusy || !onRebuildDerivedFiles}
         >

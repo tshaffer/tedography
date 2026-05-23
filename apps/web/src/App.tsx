@@ -10925,7 +10925,7 @@ export default function App() {
             albumLabels={selectedAssetAlbumLabels}
             albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
             onEditCaptureDate={
-              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset && canInAlbum('set-photo-state', focusedAlbumWriterIds)
                 ? handleOpenSetCaptureDateDialog
                 : undefined
             }
