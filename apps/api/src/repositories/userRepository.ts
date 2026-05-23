@@ -61,3 +61,13 @@ export async function updateUserPin(userId: string, pinHash: string): Promise<bo
   const result = await UserModel.updateOne({ id: userId }, { $set: { pinHash } });
   return result.matchedCount > 0;
 }
+
+/** Update the role for a user. Returns the updated public user, or null if not found. */
+export async function updateUserRole(userId: string, roleId: string): Promise<TedographyUser | null> {
+  const doc = await UserModel.findOneAndUpdate(
+    { id: userId },
+    { $set: { roleId } },
+    { new: true, lean: true, projection: { _id: 0, pinHash: 0 } }
+  ).lean<UserDoc | null>();
+  return doc ? toPublicUser(doc) : null;
+}

@@ -25,3 +25,15 @@ export interface MeResponse {
 export interface UserListResponse {
   users: TedographyUser[];
 }
+
+/** What POST /api/auth/users accepts */
+export interface CreateUserRequest {
+  name: string;
+  roleId: string;
+  pin: string;
+}
+
+/** What GET /api/auth/roles returns */
+export interface RoleListResponse {
+  roles: { id: string; displayName: string }[];
+}

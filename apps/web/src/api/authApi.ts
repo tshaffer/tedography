@@ -1,8 +1,11 @@
 import type {
+  CreateUserRequest,
   LoginRequest,
   LoginResponse,
   MeResponse,
   MyPermissionsResponse,
+  RoleListResponse,
+  TedographyUser,
   UserListResponse,
 } from '@tedography/domain';
 
@@ -52,5 +55,25 @@ export async function changePin(currentPin: string, newPin: string): Promise<voi
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ currentPin, newPin }),
+  });
+}
+
+export async function getRoles(): Promise<RoleListResponse> {
+  return fetchJson<RoleListResponse>('/api/auth/roles');
+}
+
+export async function updateUserRole(userId: string, roleId: string): Promise<TedographyUser> {
+  return fetchJson<TedographyUser>(`/api/auth/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roleId }),
+  });
+}
+
+export async function createUser(input: CreateUserRequest): Promise<TedographyUser> {
+  return fetchJson<TedographyUser>('/api/auth/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
   });
 }

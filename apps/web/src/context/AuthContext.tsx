@@ -31,6 +31,8 @@ interface AuthContextValue {
    * If writerUserIds is undefined, falls back to optimistic (same as can()).
    */
   canInAlbum: (feature: FeatureId, writerUserIds?: string[]) => boolean;
+  /** Re-fetch the users list from the server (call after role changes or new-user creation) */
+  refreshUsers: () => Promise<void>;
   login: (userId: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -62,10 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
       .finally(() => setLoading(false));
   }, []);
 
-  function loadUsers(): void {
-    // getUsers requires auth; if not authed, the login screen will handle loading users
-    // by calling getUsers after a successful login. No-op here.
-  }
+  const refreshUsers = useCallback(async () => {
+    const { users: all } = await getUsers();
+    setUsers(all);
+  }, []);
 
   const login = useCallback(async (userId: string, pin: string) => {
     const { user: u } = await apiLogin(userId, pin);
@@ -102,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
   }, [permissions, user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, users, permissions, can, canInAlbum, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, users, permissions, can, canInAlbum, refreshUsers, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

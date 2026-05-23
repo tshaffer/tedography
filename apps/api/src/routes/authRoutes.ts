@@ -1,8 +1,8 @@
 import { Router, type IRouter } from 'express';
-import type { LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, UserListResponse } from '@tedography/domain';
+import type { CreateUserRequest, LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, RoleListResponse, UserListResponse } from '@tedography/domain';
 import { hashPin, verifyPin } from '../auth/authService.js';
-import { listUsers, updateUserPin } from '../repositories/userRepository.js';
-import { findRoleById } from '../repositories/roleRepository.js';
+import { createUser, listUsers, updateUserPin, updateUserRole } from '../repositories/userRepository.js';
+import { findRoleById, listRoles } from '../repositories/roleRepository.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const authRoutes: IRouter = Router();
@@ -101,4 +101,84 @@ authRoutes.patch('/pin', requireAuth, async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+/** GET /api/auth/roles — list all roles (admin only) */
+authRoutes.get('/roles', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+  const roles = await listRoles();
+  const response: RoleListResponse = { roles: roles.map((r) => ({ id: r.id, displayName: r.displayName })) };
+  res.json(response);
+});
+
+/** PATCH /api/auth/users/:id/role — change a user's role (admin only) */
+authRoutes.patch('/users/:id/role', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const targetId = req.params.id as string;
+  if (targetId === req.currentUser!.id) {
+    res.status(400).json({ error: 'You cannot change your own role' });
+    return;
+  }
+
+  const { roleId } = req.body as { roleId?: unknown };
+  if (typeof roleId !== 'string' || roleId.trim().length === 0) {
+    res.status(400).json({ error: 'roleId is required' });
+    return;
+  }
+
+  const role = await findRoleById(roleId);
+  if (!role) {
+    res.status(400).json({ error: `Unknown role: ${roleId}` });
+    return;
+  }
+
+  const updated = await updateUserRole(targetId, roleId);
+  if (!updated) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  res.json(updated);
+});
+
+/** POST /api/auth/users — create a new user (admin only) */
+authRoutes.post('/users', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const body = req.body as CreateUserRequest;
+
+  if (typeof body.name !== 'string' || body.name.trim().length === 0) {
+    res.status(400).json({ error: 'name is required' });
+    return;
+  }
+
+  if (typeof body.roleId !== 'string' || body.roleId.trim().length === 0) {
+    res.status(400).json({ error: 'roleId is required' });
+    return;
+  }
+
+  if (typeof body.pin !== 'string' || body.pin.trim().length < 4) {
+    res.status(400).json({ error: 'pin must be at least 4 characters' });
+    return;
+  }
+
+  const role = await findRoleById(body.roleId);
+  if (!role) {
+    res.status(400).json({ error: `Unknown role: ${body.roleId}` });
+    return;
+  }
+
+  const pinHash = await hashPin(body.pin);
+  const user = await createUser({ name: body.name.trim(), roleId: body.roleId, pinHash });
+  res.status(201).json(user);
 });
