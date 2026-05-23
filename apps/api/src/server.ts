@@ -226,7 +226,12 @@ export function createServer(): Express {
     }
   });
 
-  app.patch('/api/assets/capture-date', async (req, res) => {
+  app.patch('/api/assets/capture-date', requireFeature('set-photo-state', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds)
+      ? body.assetIds.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      : [];
+  }), async (req, res) => {
     const payload = req.body as { assetIds?: unknown; captureDateTime?: unknown; captureDate?: unknown };
     const assetIds = Array.isArray(payload.assetIds)
       ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)

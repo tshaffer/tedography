@@ -46,3 +46,11 @@ export async function getPublicUsers(): Promise<UserListResponse> {
 export async function getMyPermissions(): Promise<MyPermissionsResponse> {
   return fetchJson<MyPermissionsResponse>('/api/auth/my-permissions');
 }
+
+export async function changePin(currentPin: string, newPin: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>('/api/auth/pin', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPin, newPin }),
+  });
+}

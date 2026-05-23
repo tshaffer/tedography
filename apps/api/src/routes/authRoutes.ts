@@ -1,7 +1,7 @@
 import { Router, type IRouter } from 'express';
 import type { LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, UserListResponse } from '@tedography/domain';
-import { verifyPin } from '../auth/authService.js';
-import { listUsers } from '../repositories/userRepository.js';
+import { hashPin, verifyPin } from '../auth/authService.js';
+import { listUsers, updateUserPin } from '../repositories/userRepository.js';
 import { findRoleById } from '../repositories/roleRepository.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
@@ -68,4 +68,37 @@ authRoutes.get('/users', requireAuth, async (_req, res) => {
   const users = await listUsers();
   const response: UserListResponse = { users };
   res.json(response);
+});
+
+/** PATCH /api/auth/pin — change the current user's PIN */
+authRoutes.patch('/pin', requireAuth, async (req, res) => {
+  const { currentPin, newPin } = req.body as { currentPin?: unknown; newPin?: unknown };
+
+  if (typeof currentPin !== 'string' || currentPin.trim().length === 0) {
+    res.status(400).json({ error: 'currentPin is required' });
+    return;
+  }
+
+  if (typeof newPin !== 'string' || newPin.trim().length < 4) {
+    res.status(400).json({ error: 'newPin must be at least 4 characters' });
+    return;
+  }
+
+  const userId = req.currentUser!.id;
+
+  // Verify the current PIN before allowing the change
+  const verified = await verifyPin(userId, currentPin);
+  if (!verified) {
+    res.status(401).json({ error: 'Current PIN is incorrect' });
+    return;
+  }
+
+  const pinHash = await hashPin(newPin);
+  const updated = await updateUserPin(userId, pinHash);
+  if (!updated) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  res.json({ ok: true });
 });

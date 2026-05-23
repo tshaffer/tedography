@@ -55,3 +55,9 @@ export async function createUser(input: {
   const doc = await UserModel.create({ id, ...input });
   return toPublicUser(doc.toObject() as UserDoc);
 }
+
+/** Update the stored PIN hash for a user. Returns true if the user was found and updated. */
+export async function updateUserPin(userId: string, pinHash: string): Promise<boolean> {
+  const result = await UserModel.updateOne({ id: userId }, { $set: { pinHash } });
+  return result.matchedCount > 0;
+}

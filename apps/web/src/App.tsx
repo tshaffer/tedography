@@ -129,6 +129,7 @@ import { PublishToGooglePhotosDialog } from './components/publish/PublishToGoogl
 import { PrintDialog } from './components/print/PrintDialog';
 import { getAiHistory } from './api/aiHistoryApi';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
+import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3811,6 +3812,7 @@ export default function App() {
   const [aiHistoryError, setAiHistoryError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
+  const [changePinOpen, setChangePinOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
@@ -8971,6 +8973,10 @@ export default function App() {
   }
 
   async function handleKeyboardReview(shortcutKey: string): Promise<void> {
+    if (!canInAlbum('set-photo-state', focusedAlbumWriterIds)) {
+      return;
+    }
+
     const key = shortcutKey.toLowerCase();
     if (key === 'delete' || key === 'backspace') {
       if (selectedAssetIds.length > 0) {
@@ -9116,7 +9122,7 @@ export default function App() {
           handleSelectRelativeInList(compareAssets, -1);
         }
 
-        if (isDiscardKeyboardEvent(event) && surveyFocusedAsset) {
+        if (canInAlbum('set-photo-state', focusedAlbumWriterIds) && isDiscardKeyboardEvent(event) && surveyFocusedAsset) {
           event.preventDefault();
           void handleSetPhotoState(surveyFocusedAsset.id, PhotoState.Discard);
           return;
@@ -9198,7 +9204,7 @@ export default function App() {
           handleSelectRelativeInList(immersiveNavigationAssets, -1);
         }
 
-        if (isDiscardKeyboardEvent(event)) {
+        if (canInAlbum('set-photo-state', focusedAlbumWriterIds) && isDiscardKeyboardEvent(event)) {
           event.preventDefault();
           void handleDiscardDisplayedImmersiveAsset();
           return;
@@ -9261,7 +9267,7 @@ export default function App() {
         openImmersive();
       }
 
-      if (isLoupeMode && isDiscardKeyboardEvent(event) && selectedAsset) {
+      if (isLoupeMode && canInAlbum('set-photo-state', focusedAlbumWriterIds) && isDiscardKeyboardEvent(event) && selectedAsset) {
         event.preventDefault();
         void handleSetPhotoState(selectedAsset.id, PhotoState.Discard);
         return;
@@ -9276,7 +9282,9 @@ export default function App() {
     };
   }, [
     albumTreeContextMenu,
+    canInAlbum,
     compareAssets,
+    focusedAlbumWriterIds,
     immersiveAssets,
     immersiveSelectedAssetIndex,
     loupeAssets,
@@ -11996,6 +12004,15 @@ export default function App() {
           {/* User / logout */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 12, borderLeft: '1px solid #e3e6ea' }}>
             <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{user?.name ?? ''}</span>
+            <Tooltip title="Change your PIN">
+              <button
+                type="button"
+                style={{ ...toolbarButtonStyle, fontSize: 12, padding: '3px 8px' }}
+                onClick={() => setChangePinOpen(true)}
+              >
+                Change PIN
+              </button>
+            </Tooltip>
             <Tooltip title="Log out">
               <button
                 type="button"
@@ -12515,6 +12532,9 @@ export default function App() {
           setManageWritersAlbum(updated);
         }}
       />
+      {changePinOpen ? (
+        <ChangePinDialog onClose={() => setChangePinOpen(false)} />
+      ) : null}
       <KeywordManagementDialog
         open={keywordManagementDialogOpen}
         onClose={() => setKeywordManagementDialogOpen(false)}
