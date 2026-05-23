@@ -326,9 +326,8 @@ export function UsersPage(): React.ReactElement {
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>
-        <Link to="/" style={backLinkStyle}>← Library</Link>
+        <Link to="/admin" style={backLinkStyle}>← Admin</Link>
         <h1 style={titleStyle}>Users</h1>
-        <Link to="/admin/roles" style={{ ...backLinkStyle, marginLeft: 'auto' }}>Manage Roles →</Link>
       </div>
 
       {/* ---- User table ---- */}

@@ -10,6 +10,7 @@ import { PeopleBrowsePage } from './components/people/PeopleBrowsePage';
 import { PeopleDevPage } from './components/people/PeopleDevPage';
 import { PersonDetailPage } from './components/people/PersonDetailPage';
 import { PeopleReviewPage } from './components/people/PeopleReviewPage';
+import { AdminPage } from './components/admin/AdminPage';
 import { UsersPage } from './components/admin/UsersPage';
 import { RolesPage } from './components/admin/RolesPage';
 
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/people/:personId" element={<PersonDetailPage />} />
             <Route path="/people/dev" element={<PeopleDevPage />} />
             <Route path="/people/review" element={<PeopleReviewPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/roles" element={<RolesPage />} />
           </Routes>

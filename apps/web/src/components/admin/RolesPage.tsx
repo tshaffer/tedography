@@ -491,7 +491,7 @@ export function RolesPage(): React.ReactElement {
   return (
     <div style={pageStyle}>
       <div style={headerStyle}>
-        <Link to="/admin/users" style={backLinkStyle}>← Users</Link>
+        <Link to="/admin" style={backLinkStyle}>← Admin</Link>
         <h1 style={titleStyle}>Roles</h1>
       </div>
 
