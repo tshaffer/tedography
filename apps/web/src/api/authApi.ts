@@ -77,3 +77,7 @@ export async function createUser(input: CreateUserRequest): Promise<TedographyUs
     body: JSON.stringify(input),
   });
 }
+
+export async function deleteUser(userId: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>(`/api/auth/users/${userId}`, { method: 'DELETE' });
+}

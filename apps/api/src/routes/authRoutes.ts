@@ -1,7 +1,7 @@
 import { Router, type IRouter } from 'express';
 import type { CreateUserRequest, LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, RoleListResponse, UserListResponse } from '@tedography/domain';
 import { hashPin, verifyPin } from '../auth/authService.js';
-import { createUser, listUsers, updateUserPin, updateUserRole } from '../repositories/userRepository.js';
+import { createUser, deleteUser, listUsers, updateUserPin, updateUserRole } from '../repositories/userRepository.js';
 import { findRoleById, listRoles } from '../repositories/roleRepository.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
@@ -181,4 +181,26 @@ authRoutes.post('/users', requireAuth, async (req, res) => {
   const pinHash = await hashPin(body.pin);
   const user = await createUser({ name: body.name.trim(), roleId: body.roleId, pinHash });
   res.status(201).json(user);
+});
+
+/** DELETE /api/auth/users/:id — delete a user (admin only, cannot delete self) */
+authRoutes.delete('/users/:id', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const targetId = req.params.id as string;
+  if (targetId === req.currentUser!.id) {
+    res.status(400).json({ error: 'You cannot delete your own account' });
+    return;
+  }
+
+  const deleted = await deleteUser(targetId);
+  if (!deleted) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  res.json({ ok: true });
 });

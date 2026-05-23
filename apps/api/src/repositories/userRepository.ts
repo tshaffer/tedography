@@ -62,6 +62,12 @@ export async function updateUserPin(userId: string, pinHash: string): Promise<bo
   return result.matchedCount > 0;
 }
 
+/** Delete a user by id. Returns true if deleted, false if not found. */
+export async function deleteUser(userId: string): Promise<boolean> {
+  const result = await UserModel.deleteOne({ id: userId });
+  return result.deletedCount > 0;
+}
+
 /** Update the role for a user. Returns the updated public user, or null if not found. */
 export async function updateUserRole(userId: string, roleId: string): Promise<TedographyUser | null> {
   const doc = await UserModel.findOneAndUpdate(

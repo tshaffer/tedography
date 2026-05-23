@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { TedographyUser } from '@tedography/domain';
 import { useAuth } from '../../context/AuthContext';
-import { createUser, getRoles, updateUserRole } from '../../api/authApi';
+import { createUser, deleteUser, getRoles, updateUserRole } from '../../api/authApi';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -170,6 +170,37 @@ const createButtonDisabledStyle: CSSProperties = {
   cursor: 'not-allowed',
 };
 
+const deleteButtonStyle: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  color: '#9ca3af',
+  fontSize: 15,
+  lineHeight: 1,
+  padding: '0 4px',
+};
+
+const confirmDeleteButtonStyle: CSSProperties = {
+  padding: '3px 10px',
+  fontSize: 11,
+  borderRadius: 6,
+  border: '1px solid #dc2626',
+  backgroundColor: '#dc2626',
+  color: '#fff',
+  cursor: 'pointer',
+  fontWeight: 600,
+};
+
+const cancelDeleteButtonStyle: CSSProperties = {
+  padding: '3px 8px',
+  fontSize: 11,
+  borderRadius: 6,
+  border: '1px solid #d1d5db',
+  backgroundColor: '#f9fafb',
+  cursor: 'pointer',
+  color: '#374151',
+};
+
 const errorStyle: CSSProperties = {
   fontSize: 12,
   color: '#b91c1c',
@@ -196,6 +227,10 @@ export function UsersPage(): React.ReactElement {
   const [pendingRoles, setPendingRoles] = useState<Record<string, string>>({});
   const [savingRole, setSavingRole] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+
+  // Delete state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // Create-user form
   const [newName, setNewName] = useState('');
@@ -251,6 +286,23 @@ export function UsersPage(): React.ReactElement {
     }
   }
 
+  async function handleDelete(userId: string): Promise<void> {
+    setDeleting(userId);
+    setRowError((prev) => ({ ...prev, [userId]: '' }));
+    try {
+      await deleteUser(userId);
+      await refreshUsers();
+      setConfirmDeleteId(null);
+    } catch (e) {
+      setRowError((prev) => ({
+        ...prev,
+        [userId]: e instanceof Error ? e.message : 'Failed to delete user',
+      }));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   async function handleCreate(): Promise<void> {
     if (creating || !newName.trim() || !newRoleId || newPin.trim().length < 4) return;
     setCreating(true);
@@ -285,6 +337,7 @@ export function UsersPage(): React.ReactElement {
             <th style={thStyle}>Name</th>
             <th style={thStyle}>Role</th>
             <th style={thStyle}>User ID</th>
+            <th style={{ ...thStyle, width: 100 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -340,6 +393,40 @@ export function UsersPage(): React.ReactElement {
                 </td>
                 <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 11, color: '#9ca3af' }}>
                   {u.id}
+                </td>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                  {!isSelf ? (
+                    confirmDeleteId === u.id ? (
+                      <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          style={confirmDeleteButtonStyle}
+                          disabled={deleting === u.id}
+                          onClick={() => void handleDelete(u.id)}
+                        >
+                          {deleting === u.id ? '…' : 'Delete'}
+                        </button>
+                        <button
+                          type="button"
+                          style={cancelDeleteButtonStyle}
+                          disabled={deleting === u.id}
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        style={deleteButtonStyle}
+                        title={`Delete ${u.name}`}
+                        onClick={() => setConfirmDeleteId(u.id)}
+                      >
+                        ×
+                      </button>
+                    )
+                  ) : null}
+                  {err && !isDirty ? <span style={{ fontSize: 11, color: '#b91c1c' }}>{err}</span> : null}
                 </td>
               </tr>
             );

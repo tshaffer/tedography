@@ -166,7 +166,7 @@ peoplePipelineRoutes.post('/review/scoped', requireFeature('people-face-review',
   }
 });
 
-peoplePipelineRoutes.post('/scopes/asset-summary', async (req, res) => {
+peoplePipelineRoutes.post('/scopes/asset-summary', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<AssetIdsScopeRequest> | undefined;
   const assetIds = Array.isArray(body?.assetIds)
     ? body.assetIds.map((value: unknown) => String(value).trim()).filter(Boolean)
@@ -185,7 +185,7 @@ peoplePipelineRoutes.post('/scopes/asset-summary', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.patch('/people/:personId', async (req, res) => {
+peoplePipelineRoutes.patch('/people/:personId', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<UpdatePersonRequest> | undefined;
 
   if (body?.displayName !== undefined && body.displayName.trim().length === 0) {
@@ -195,7 +195,7 @@ peoplePipelineRoutes.patch('/people/:personId', async (req, res) => {
 
   try {
     const item = await updatePerson({
-      id: req.params.personId,
+      id: req.params.personId as string,
       ...(body?.displayName !== undefined ? { displayName: body.displayName } : {}),
       ...(body?.isHidden !== undefined ? { isHidden: body.isHidden } : {}),
       ...(body?.isArchived !== undefined ? { isArchived: body.isArchived } : {})
@@ -213,9 +213,9 @@ peoplePipelineRoutes.patch('/people/:personId', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.delete('/people/:personId', async (req, res) => {
+peoplePipelineRoutes.delete('/people/:personId', requireFeature('people-face-review'), async (req, res) => {
   try {
-    const result = await deletePersonWithCascade(req.params.personId);
+    const result = await deletePersonWithCascade(req.params.personId as string);
     res.json(result);
   } catch (error) {
     log.error('Failed to delete person', error);
@@ -262,7 +262,7 @@ peoplePipelineRoutes.get('/dev/recent-assets', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/people', async (req, res) => {
+peoplePipelineRoutes.post('/people', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<CreatePersonRequest> | undefined;
   if (typeof body?.displayName !== 'string' || body.displayName.trim().length === 0) {
     res.status(400).json({ error: 'displayName is required' } satisfies ImportApiErrorResponse);
@@ -283,7 +283,7 @@ peoplePipelineRoutes.post('/people', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req, res) => {
+peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<EnrollPersonFromDetectionRequest> | undefined;
   if (typeof body?.detectionId !== 'string' || body.detectionId.trim().length === 0) {
     res.status(400).json({ error: 'detectionId is required' } satisfies ImportApiErrorResponse);
@@ -293,7 +293,7 @@ peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req,
   try {
     res.json(
       await enrollPersonFromDetection({
-        personId: req.params.personId,
+        personId: req.params.personId as string,
         detectionId: body.detectionId.trim()
       })
     );
@@ -304,7 +304,7 @@ peoplePipelineRoutes.post('/people/:personId/enroll-from-detection', async (req,
   }
 });
 
-peoplePipelineRoutes.post('/people/:personId/merge', async (req, res) => {
+peoplePipelineRoutes.post('/people/:personId/merge', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<MergePersonRequest> | undefined;
   if (typeof body?.targetPersonId !== 'string' || body.targetPersonId.trim().length === 0) {
     res.status(400).json({ error: 'targetPersonId is required' } satisfies ImportApiErrorResponse);
@@ -314,7 +314,7 @@ peoplePipelineRoutes.post('/people/:personId/merge', async (req, res) => {
   try {
     res.json(
       await mergePersonIntoTarget({
-        sourcePersonId: req.params.personId,
+        sourcePersonId: req.params.personId as string,
         targetPersonId: body.targetPersonId.trim()
       })
     );
@@ -325,7 +325,7 @@ peoplePipelineRoutes.post('/people/:personId/merge', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.post('/people/:personId/split', async (req, res) => {
+peoplePipelineRoutes.post('/people/:personId/split', requireFeature('people-face-review'), async (req, res) => {
   const body = req.body as Partial<SplitPersonRequest> | undefined;
   const detectionIds = Array.isArray(body?.detectionIds)
     ? body.detectionIds.map((value: unknown) => String(value))
@@ -339,7 +339,7 @@ peoplePipelineRoutes.post('/people/:personId/split', async (req, res) => {
   try {
     res.json(
       await splitPersonFromConfirmedFaces({
-        sourcePersonId: req.params.personId,
+        sourcePersonId: req.params.personId as string,
         detectionIds,
         ...(typeof body?.targetPersonId === 'string' ? { targetPersonId: body.targetPersonId } : {}),
         ...(typeof body?.newDisplayName === 'string' ? { newDisplayName: body.newDisplayName } : {})
@@ -352,12 +352,12 @@ peoplePipelineRoutes.post('/people/:personId/split', async (req, res) => {
   }
 });
 
-peoplePipelineRoutes.delete('/people/:personId/examples/:exampleId', async (req, res) => {
+peoplePipelineRoutes.delete('/people/:personId/examples/:exampleId', requireFeature('people-face-review'), async (req, res) => {
   try {
     res.json(
       await removePersonFaceExample({
-        personId: req.params.personId,
-        exampleId: req.params.exampleId
+        personId: req.params.personId as string,
+        exampleId: req.params.exampleId as string
       })
     );
   } catch (error) {
@@ -406,14 +406,14 @@ peoplePipelineRoutes.get('/detections/:detectionId/preview', async (req, res) =>
   }
 });
 
-peoplePipelineRoutes.post('/assets/:assetId/manual-people', async (req, res) => {
+peoplePipelineRoutes.post('/assets/:assetId/manual-people', requireFeature('people-face-review'), async (req, res) => {
   const { personId } = req.body as { personId?: string };
   if (typeof personId !== 'string' || personId.trim().length === 0) {
     res.status(400).json({ error: 'personId is required' } satisfies ImportApiErrorResponse);
     return;
   }
   try {
-    const people = await addManualPersonTag(req.params.assetId, personId);
+    const people = await addManualPersonTag(req.params.assetId as string, personId);
     res.json({ people });
   } catch (error) {
     if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'NOT_FOUND') {
@@ -425,9 +425,9 @@ peoplePipelineRoutes.post('/assets/:assetId/manual-people', async (req, res) => 
   }
 });
 
-peoplePipelineRoutes.delete('/assets/:assetId/manual-people/:personId', async (req, res) => {
+peoplePipelineRoutes.delete('/assets/:assetId/manual-people/:personId', requireFeature('people-face-review'), async (req, res) => {
   try {
-    const people = await removeManualPersonTag(req.params.assetId, req.params.personId);
+    const people = await removeManualPersonTag(req.params.assetId as string, req.params.personId as string);
     res.json({ people });
   } catch (error) {
     if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'NOT_FOUND') {
@@ -439,11 +439,11 @@ peoplePipelineRoutes.delete('/assets/:assetId/manual-people/:personId', async (r
   }
 });
 
-peoplePipelineRoutes.post('/assets/:assetId/process', async (req, res) => {
+peoplePipelineRoutes.post('/assets/:assetId/process', requireFeature('maintenance'), async (req, res) => {
   const body = req.body as Partial<ProcessPeopleAssetRequest> | undefined;
 
   try {
-    res.json(await processPeoplePipelineForAsset(req.params.assetId, { force: body?.force === true }));
+    res.json(await processPeoplePipelineForAsset(req.params.assetId as string, { force: body?.force === true }));
   } catch (error) {
     log.error('Failed to process people pipeline asset', error);
     res.status(500).json({ error: 'Failed to process people pipeline asset' } satisfies ImportApiErrorResponse);

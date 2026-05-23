@@ -191,7 +191,7 @@ export function createServer(): Express {
 
   app.get('/api/assets/:id', async (req, res) => {
     try {
-      const asset = await findById(req.params.id);
+      const asset = await findById(req.params.id as string);
       if (!asset) {
         res.status(404).json({ error: 'Asset not found' });
         return;
@@ -397,9 +397,9 @@ on run argv
 end run
 `;
 
-  app.post('/api/assets/:id/open-in-preview', async (req, res) => {
+  app.post('/api/assets/:id/open-in-preview', requireFeature('maintenance'), async (req, res) => {
     try {
-      const asset = await findById(req.params.id);
+      const asset = await findById(req.params.id as string);
       if (!asset) {
         res.status(404).json({ error: 'Asset not found' });
         return;
@@ -421,7 +421,7 @@ end run
 
   app.get('/api/assets/:id/file-stat', async (req, res) => {
     try {
-      const asset = await findById(req.params.id);
+      const asset = await findById(req.params.id as string);
       if (!asset) {
         res.status(404).json({ error: 'Asset not found' });
         return;
