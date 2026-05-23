@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import PersonIcon from '@mui/icons-material/Person';
 import type { TedographyUser } from '@tedography/domain';
 
 // ---------------------------------------------------------------------------
@@ -22,11 +23,6 @@ function avatarColor(name: string): { bg: string; fg: string } {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]!;
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -188,7 +184,7 @@ export function UserMenu({ user, onChangePinClick, onLogout }: UserMenuProps): R
         aria-expanded={open}
       >
         <div style={avatarStyle(color.bg)}>
-          <span style={{ color: color.fg }}>{initials(user.name)}</span>
+          <PersonIcon sx={{ fontSize: 18, color: color.fg }} />
         </div>
         <span style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>{user.name}</span>
         <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 2 }}>{open ? '▲' : '▾'}</span>
