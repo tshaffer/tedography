@@ -1672,7 +1672,9 @@ const compactDisabledSecondaryButtonStyle: CSSProperties = {
 };
 
 const disabledToolbarActionButtonStyle: CSSProperties = {
-  ...compareButtonStyle
+  ...compareButtonStyle,
+  opacity: 0.35,
+  cursor: 'not-allowed'
 };
 
 const stateButtonIconLabelStyle: CSSProperties = {
