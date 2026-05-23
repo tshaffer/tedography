@@ -3,23 +3,15 @@ import { Link } from 'react-router-dom';
 import type { TedographyUser } from '@tedography/domain';
 import { useAuth } from '../../context/AuthContext';
 import { createUser, deleteUser, getRoles, updateUserRole } from '../../api/authApi';
+import { TedographyPageShell } from '../shared/TedographyPageShell';
 
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
 const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  backgroundColor: '#f8fafc',
   padding: '32px 40px',
   fontFamily: 'system-ui, sans-serif',
-};
-
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 16,
-  marginBottom: 28,
 };
 
 const titleStyle: CSSProperties = {
@@ -253,13 +245,13 @@ export function UsersPage(): React.ReactElement {
 
   if (user?.roleId !== 'admin') {
     return (
-      <div style={pageStyle}>
-        <div style={deniedStyle}>
+      <TedographyPageShell activeArea="Admin/Users">
+        <div style={{ ...pageStyle, ...deniedStyle }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: '#374151' }}>Access denied</p>
           <p>This page is only available to admins.</p>
           <Link to="/" style={backLinkStyle}>← Back to library</Link>
         </div>
-      </div>
+      </TedographyPageShell>
     );
   }
 
@@ -324,11 +316,9 @@ export function UsersPage(): React.ReactElement {
   const canCreate = !creating && newName.trim().length > 0 && newRoleId.length > 0 && newPin.trim().length >= 4;
 
   return (
+    <TedographyPageShell activeArea="Admin/Users">
     <div style={pageStyle}>
-      <div style={headerStyle}>
-        <Link to="/admin" style={backLinkStyle}>← Admin</Link>
-        <h1 style={titleStyle}>Users</h1>
-      </div>
+      <h1 style={titleStyle}>Users</h1>
 
       {/* ---- User table ---- */}
       <table style={tableStyle}>
@@ -488,5 +478,6 @@ export function UsersPage(): React.ReactElement {
       {createError ? <p style={errorStyle}>{createError}</p> : null}
       {createSuccess ? <p style={successStyle}>{createSuccess}</p> : null}
     </div>
+    </TedographyPageShell>
   );
 }

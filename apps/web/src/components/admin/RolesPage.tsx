@@ -3,27 +3,19 @@ import { Link } from 'react-router-dom';
 import { FEATURE_IDS, FEATURE_LABELS, type PermissionValue, type TedographyRole } from '@tedography/domain';
 import { useAuth } from '../../context/AuthContext';
 import { createRole, deleteRole, getRoles, updateRole } from '../../api/authApi';
+import { TedographyPageShell } from '../shared/TedographyPageShell';
 
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
 const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  backgroundColor: '#f8fafc',
   padding: '32px 40px',
   fontFamily: 'system-ui, sans-serif',
 };
 
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 16,
-  marginBottom: 28,
-};
-
 const titleStyle: CSSProperties = {
-  margin: 0,
+  margin: '0 0 24px',
   fontSize: 22,
   fontWeight: 700,
   color: '#0f172a',
@@ -33,13 +25,6 @@ const backLinkStyle: CSSProperties = {
   fontSize: 13,
   color: '#2563eb',
   textDecoration: 'none',
-};
-
-const deniedStyle: CSSProperties = {
-  textAlign: 'center',
-  padding: '60px 0',
-  color: '#9ca3af',
-  fontSize: 14,
 };
 
 const sectionTitleStyle: CSSProperties = {
@@ -439,13 +424,13 @@ export function RolesPage(): React.ReactElement {
 
   if (user?.roleId !== 'admin') {
     return (
-      <div style={pageStyle}>
-        <div style={deniedStyle}>
+      <TedographyPageShell activeArea="Admin/Roles">
+        <div style={{ ...pageStyle, textAlign: 'center', paddingTop: 60 }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: '#374151' }}>Access denied</p>
-          <p>This page is only available to admins.</p>
+          <p style={{ color: '#9ca3af', fontSize: 14 }}>This page is only available to admins.</p>
           <Link to="/" style={backLinkStyle}>← Back to library</Link>
         </div>
-      </div>
+      </TedographyPageShell>
     );
   }
 
@@ -482,18 +467,16 @@ export function RolesPage(): React.ReactElement {
 
   if (loading) {
     return (
-      <div style={pageStyle}>
-        <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading…</div>
-      </div>
+      <TedographyPageShell activeArea="Admin/Roles">
+        <div style={{ ...pageStyle, color: '#9ca3af', fontSize: 14 }}>Loading…</div>
+      </TedographyPageShell>
     );
   }
 
   return (
+    <TedographyPageShell activeArea="Admin/Roles">
     <div style={pageStyle}>
-      <div style={headerStyle}>
-        <Link to="/admin" style={backLinkStyle}>← Admin</Link>
-        <h1 style={titleStyle}>Roles</h1>
-      </div>
+      <h1 style={titleStyle}>Roles</h1>
 
       <p style={{ margin: '0 0 24px', fontSize: 13, color: '#6b7280', maxWidth: 640 }}>
         Roles define what each user can do. The three built-in roles (admin, full, limited) can be
@@ -559,5 +542,6 @@ export function RolesPage(): React.ReactElement {
         {createError ? <p style={errorStyle}>{createError}</p> : null}
       </div>
     </div>
+    </TedographyPageShell>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { TedographyPageShell } from './TedographyPageShell';
+import { TedographyPageShell } from '../shared/TedographyPageShell';
 import type { PeopleBrowseSort, PeopleBrowseSummaryItem } from '@tedography/shared';
 import { listPeopleBrowse } from '../../api/peoplePipelineApi';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';

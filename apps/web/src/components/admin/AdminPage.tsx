@@ -3,30 +3,20 @@ import { Link } from 'react-router-dom';
 import PeopleIcon from '@mui/icons-material/People';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useAuth } from '../../context/AuthContext';
+import { TedographyPageShell } from '../shared/TedographyPageShell';
 
-const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  backgroundColor: '#f8fafc',
-  padding: '48px 40px',
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const innerStyle: CSSProperties = {
+  padding: '32px 40px',
   fontFamily: 'system-ui, sans-serif',
 };
 
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 16,
-  marginBottom: 40,
-};
-
-const backLinkStyle: CSSProperties = {
-  fontSize: 13,
-  color: '#2563eb',
-  textDecoration: 'none',
-};
-
 const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 24,
+  margin: '0 0 32px',
+  fontSize: 22,
   fontWeight: 700,
   color: '#0f172a',
 };
@@ -84,67 +74,76 @@ const deniedStyle: CSSProperties = {
   fontSize: 14,
 };
 
+const backLinkStyle: CSSProperties = {
+  fontSize: 13,
+  color: '#2563eb',
+  textDecoration: 'none',
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function AdminPage(): React.ReactElement {
   const { user } = useAuth();
 
   if (user?.roleId !== 'admin') {
     return (
-      <div style={pageStyle}>
-        <div style={deniedStyle}>
+      <TedographyPageShell activeArea="Admin">
+        <div style={{ ...innerStyle, ...deniedStyle }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: '#374151' }}>Access denied</p>
           <p>This page is only available to admins.</p>
           <Link to="/" style={backLinkStyle}>← Back to library</Link>
         </div>
-      </div>
+      </TedographyPageShell>
     );
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={headerStyle}>
-        <Link to="/" style={backLinkStyle}>← Library</Link>
+    <TedographyPageShell activeArea="Admin">
+      <div style={innerStyle}>
         <h1 style={titleStyle}>Admin</h1>
-      </div>
 
-      <div style={gridStyle}>
-        <Link
-          to="/admin/users"
-          style={cardStyle}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)';
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = '#c7d2fe';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e2e8f0';
-          }}
-        >
-          <div style={iconCircleStyle('#e0f2fe')}>
-            <PeopleIcon sx={{ fontSize: 22, color: '#0369a1' }} />
-          </div>
-          <p style={cardTitleStyle}>Users</p>
-          <p style={cardDescStyle}>Create accounts, change roles, and remove users.</p>
-        </Link>
+        <div style={gridStyle}>
+          <Link
+            to="/admin/users"
+            style={cardStyle}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#c7d2fe';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e2e8f0';
+            }}
+          >
+            <div style={iconCircleStyle('#e0f2fe')}>
+              <PeopleIcon sx={{ fontSize: 22, color: '#0369a1' }} />
+            </div>
+            <p style={cardTitleStyle}>Users</p>
+            <p style={cardDescStyle}>Create accounts, change roles, and remove users.</p>
+          </Link>
 
-        <Link
-          to="/admin/roles"
-          style={cardStyle}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)';
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = '#c7d2fe';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e2e8f0';
-          }}
-        >
-          <div style={iconCircleStyle('#fef9c3')}>
-            <ShieldIcon sx={{ fontSize: 22, color: '#a16207' }} />
-          </div>
-          <p style={cardTitleStyle}>Roles</p>
-          <p style={cardDescStyle}>Define what each role can do with per-feature permissions.</p>
-        </Link>
+          <Link
+            to="/admin/roles"
+            style={cardStyle}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#c7d2fe';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#e2e8f0';
+            }}
+          >
+            <div style={iconCircleStyle('#fef9c3')}>
+              <ShieldIcon sx={{ fontSize: 22, color: '#a16207' }} />
+            </div>
+            <p style={cardTitleStyle}>Roles</p>
+            <p style={cardDescStyle}>Define what each role can do with per-feature permissions.</p>
+          </Link>
+        </div>
       </div>
-    </div>
+    </TedographyPageShell>
   );
 }

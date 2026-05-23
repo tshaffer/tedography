@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { TedographyPageShell } from './TedographyPageShell';
+import { TedographyPageShell } from '../shared/TedographyPageShell';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
 import {
