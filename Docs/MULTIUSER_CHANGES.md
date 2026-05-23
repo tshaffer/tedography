@@ -104,7 +104,7 @@ toolbar controls are hidden rather than shown as disabled:
   (`maintenance` is denied for Full.)
 - **Reimport** and **Rebuild Derived Files** buttons in the asset inspector are
   hidden.
-- The **Open in Preview** action is restricted to Admin only at the API level.
+- The **Crop photo in Preview** action is restricted to Admin only at the API level.
 
 ### All other features enabled
 
@@ -154,5 +154,5 @@ toolbar controls are hidden rather than shown as disabled:
 ### Maintenance tools
 
 - Admin is the only role with access to the **Maintenance** dialog, **Reimport**,
-  **Rebuild Derived Files**, **Open in Preview**, and the AI queue processing
+  **Rebuild Derived Files**, **Crop photo in Preview**, and the AI queue processing
   and export operations.
