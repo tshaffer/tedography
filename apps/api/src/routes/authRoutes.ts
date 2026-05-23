@@ -1,8 +1,10 @@
 import { Router, type IRouter } from 'express';
-import type { CreateUserRequest, LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, RoleListResponse, UserListResponse } from '@tedography/domain';
+import type { CreateRoleRequest, CreateUserRequest, LoginRequest, LoginResponse, MeResponse, MyPermissionsResponse, RoleListResponse, UserListResponse } from '@tedography/domain';
+import { FEATURE_IDS } from '@tedography/domain';
 import { hashPin, verifyPin } from '../auth/authService.js';
 import { createUser, deleteUser, listUsers, updateUserPin, updateUserRole } from '../repositories/userRepository.js';
-import { findRoleById, listRoles } from '../repositories/roleRepository.js';
+import { countUsersWithRole } from '../repositories/userRepository.js';
+import { deleteRole, findRoleById, listRoles, upsertRole } from '../repositories/roleRepository.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const authRoutes: IRouter = Router();
@@ -103,15 +105,118 @@ authRoutes.patch('/pin', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-/** GET /api/auth/roles — list all roles (admin only) */
+/** GET /api/auth/roles — list all roles with full permission maps (admin only) */
 authRoutes.get('/roles', requireAuth, async (req, res) => {
   if (req.currentUser!.roleId !== 'admin') {
     res.status(403).json({ error: 'Admin access required' });
     return;
   }
   const roles = await listRoles();
-  const response: RoleListResponse = { roles: roles.map((r) => ({ id: r.id, displayName: r.displayName })) };
+  const response: RoleListResponse = { roles };
   res.json(response);
+});
+
+/** POST /api/auth/roles — create a new role (admin only) */
+authRoutes.post('/roles', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const body = req.body as CreateRoleRequest;
+
+  if (typeof body.id !== 'string' || body.id.trim().length === 0) {
+    res.status(400).json({ error: 'id is required' });
+    return;
+  }
+
+  if (typeof body.displayName !== 'string' || body.displayName.trim().length === 0) {
+    res.status(400).json({ error: 'displayName is required' });
+    return;
+  }
+
+  if (!body.permissions || typeof body.permissions !== 'object') {
+    res.status(400).json({ error: 'permissions map is required' });
+    return;
+  }
+
+  const missingFeatures = FEATURE_IDS.filter((f) => !['allow', 'deny', 'per-album'].includes(body.permissions[f]));
+  if (missingFeatures.length > 0) {
+    res.status(400).json({ error: `Missing or invalid permission values for: ${missingFeatures.join(', ')}` });
+    return;
+  }
+
+  const existing = await findRoleById(body.id.trim());
+  if (existing) {
+    res.status(409).json({ error: `Role "${body.id}" already exists` });
+    return;
+  }
+
+  const role = await upsertRole({ id: body.id.trim(), displayName: body.displayName.trim(), permissions: body.permissions });
+  res.status(201).json(role);
+});
+
+/** PATCH /api/auth/roles/:id — update a role's displayName and/or permissions (admin only) */
+authRoutes.patch('/roles/:id', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const roleId = req.params.id as string;
+  const existing = await findRoleById(roleId);
+  if (!existing) {
+    res.status(404).json({ error: `Role "${roleId}" not found` });
+    return;
+  }
+
+  const body = req.body as Partial<CreateRoleRequest>;
+
+  const displayName = typeof body.displayName === 'string' && body.displayName.trim().length > 0
+    ? body.displayName.trim()
+    : existing.displayName;
+
+  let permissions = existing.permissions;
+  if (body.permissions) {
+    const missingFeatures = FEATURE_IDS.filter((f) => !['allow', 'deny', 'per-album'].includes(body.permissions![f]));
+    if (missingFeatures.length > 0) {
+      res.status(400).json({ error: `Missing or invalid permission values for: ${missingFeatures.join(', ')}` });
+      return;
+    }
+    permissions = body.permissions;
+  }
+
+  const updated = await upsertRole({ id: roleId, displayName, permissions });
+  res.json(updated);
+});
+
+/** DELETE /api/auth/roles/:id — delete a role (admin only; 'admin' role and roles with assigned users are protected) */
+authRoutes.delete('/roles/:id', requireAuth, async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const roleId = req.params.id as string;
+
+  if (roleId === 'admin') {
+    res.status(400).json({ error: 'The admin role cannot be deleted' });
+    return;
+  }
+
+  const count = await countUsersWithRole(roleId);
+  if (count > 0) {
+    res.status(400).json({ error: `Cannot delete role "${roleId}" — ${count} user(s) are still assigned to it` });
+    return;
+  }
+
+  const deleted = await deleteRole(roleId);
+  if (!deleted) {
+    res.status(404).json({ error: `Role "${roleId}" not found` });
+    return;
+  }
+
+  res.json({ ok: true });
 });
 
 /** PATCH /api/auth/users/:id/role — change a user's role (admin only) */

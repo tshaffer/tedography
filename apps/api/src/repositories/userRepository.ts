@@ -46,6 +46,11 @@ export async function countUsers(): Promise<number> {
   return UserModel.countDocuments();
 }
 
+/** Count how many users are assigned to a given role. */
+export async function countUsersWithRole(roleId: string): Promise<number> {
+  return UserModel.countDocuments({ roleId });
+}
+
 export async function createUser(input: {
   name: string;
   roleId: string;

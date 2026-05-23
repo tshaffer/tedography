@@ -33,7 +33,14 @@ export interface CreateUserRequest {
   pin: string;
 }
 
-/** What GET /api/auth/roles returns */
+/** What GET /api/auth/roles returns — full role objects including permissions */
 export interface RoleListResponse {
-  roles: { id: string; displayName: string }[];
+  roles: import('./RbacTypes.js').TedographyRole[];
+}
+
+/** What POST /api/auth/roles accepts */
+export interface CreateRoleRequest {
+  id: string;
+  displayName: string;
+  permissions: import('./RbacTypes.js').PermissionMap;
 }

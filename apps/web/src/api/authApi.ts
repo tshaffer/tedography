@@ -1,10 +1,12 @@
 import type {
+  CreateRoleRequest,
   CreateUserRequest,
   LoginRequest,
   LoginResponse,
   MeResponse,
   MyPermissionsResponse,
   RoleListResponse,
+  TedographyRole,
   TedographyUser,
   UserListResponse,
 } from '@tedography/domain';
@@ -80,4 +82,24 @@ export async function createUser(input: CreateUserRequest): Promise<TedographyUs
 
 export async function deleteUser(userId: string): Promise<void> {
   await fetchJson<{ ok: boolean }>(`/api/auth/users/${userId}`, { method: 'DELETE' });
+}
+
+export async function createRole(input: CreateRoleRequest): Promise<TedographyRole> {
+  return fetchJson<TedographyRole>('/api/auth/roles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateRole(roleId: string, input: Partial<CreateRoleRequest>): Promise<TedographyRole> {
+  return fetchJson<TedographyRole>(`/api/auth/roles/${roleId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteRole(roleId: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>(`/api/auth/roles/${roleId}`, { method: 'DELETE' });
 }
