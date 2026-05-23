@@ -19,8 +19,18 @@ interface AuthContextValue {
   users: TedographyUser[];
   /** Resolved permission map for the current user — null until loaded */
   permissions: PermissionMap | null;
-  /** Returns true if the current user is allowed to use a feature */
+  /**
+   * Returns true if the current user is allowed to use a feature.
+   * For per-album features this is optimistic (returns true if not explicitly denied).
+   * Use canInAlbum() when an album context is known.
+   */
   can: (feature: FeatureId) => boolean;
+  /**
+   * Like can(), but resolves per-album features against a specific album's writerUserIds.
+   * Pass the album's writerUserIds when you know which album the action targets.
+   * If writerUserIds is undefined, falls back to optimistic (same as can()).
+   */
+  canInAlbum: (feature: FeatureId, writerUserIds?: string[]) => boolean;
   login: (userId: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -74,13 +84,25 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
 
   const can = useCallback((feature: FeatureId): boolean => {
     if (!permissions) return false;
-    // 'per-album' at this level means the feature is conditionally allowed;
-    // Phase 5 will refine this per album. For now treat it as allowed.
+    // 'per-album' treated as optimistically allowed; use canInAlbum() when album context is known.
     return permissions[feature] !== 'deny';
   }, [permissions]);
 
+  const canInAlbum = useCallback((feature: FeatureId, writerUserIds?: string[]): boolean => {
+    if (!permissions) return false;
+    const perm = permissions[feature];
+    if (perm === 'deny') return false;
+    if (perm === 'allow') return true;
+    // per-album: check writerUserIds when available
+    if (writerUserIds !== undefined) {
+      return user !== null && writerUserIds.includes(user.id);
+    }
+    // No album context — optimistic
+    return true;
+  }, [permissions, user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, users, permissions, can, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, users, permissions, can, canInAlbum, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
