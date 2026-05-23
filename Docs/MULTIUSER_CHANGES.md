@@ -151,6 +151,23 @@ toolbar controls are hidden rather than shown as disabled:
   **Delete / Cancel** confirmation before the account is permanently removed.
   An admin cannot delete their own account.
 
+### Role management
+
+- A **Manage Roles →** link in the Users page header navigates to `/admin/roles`.
+- The **Roles** page lists every role (built-in and custom) as a card showing:
+  - The role's display name and internal ID.
+  - A permission grid — one row per feature, showing whether the role has
+    **allow**, **deny**, or **per-album** access.
+- Clicking **Edit** on a card makes the display name and all permission values
+  editable inline; **Save** / **Cancel** confirm or discard the change.
+- The three built-in roles (**admin**, **full**, **limited**) can be edited
+  but not deleted.
+- Custom roles can be **deleted** via a Delete button (with confirmation), as
+  long as no users are currently assigned to that role.
+- A **Create role** form at the bottom of the page accepts a role ID (lowercase
+  letters, numbers, and hyphens), a display name, and a full permission grid
+  (each feature defaults to **allow**).
+
 ### Maintenance tools
 
 - Admin is the only role with access to the **Maintenance** dialog, **Reimport**,
