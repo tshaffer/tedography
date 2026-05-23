@@ -64,6 +64,8 @@ import {
   type SearchCaptureDateAvailabilityMode
 } from '@tedography/domain';
 import {
+  addAlbumWriter,
+  removeAlbumWriter,
   addAssetsToAlbum,
   createAlbumTreeNode,
   deleteAlbumTreeNode,
@@ -126,6 +128,7 @@ import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
 import { getAiHistory } from './api/aiHistoryApi';
+import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -3743,7 +3746,7 @@ function computePeopleRunSummary(
 }
 
 export default function App() {
-  const { user, logout, can, canInAlbum } = useAuth();
+  const { user, users, logout, can, canInAlbum } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState('loading');
@@ -3807,6 +3810,7 @@ export default function App() {
   const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
   const [aiHistoryError, setAiHistoryError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
   const [albumTreeContextMenu, setAlbumTreeContextMenu] = useState<AlbumTreeContextMenuState | null>(null);
@@ -9918,6 +9922,18 @@ export default function App() {
                 </div>
               ) : null}
             </div>
+            {user?.roleId === 'admin' && selectedAlbumTreeAlbumNode ? (
+              <button
+                type="button"
+                style={contextMenuItemStyle}
+                onClick={() => {
+                  closeAlbumTreeContextMenu();
+                  setManageWritersAlbum(selectedAlbumTreeAlbumNode);
+                }}
+              >
+                Manage Writers…
+              </button>
+            ) : null}
             <button
               type="button"
               style={contextMenuItemStyle}
@@ -11919,6 +11935,15 @@ export default function App() {
                 {/* Tools */}
                 <div className="tdg-overflow-divider" />
                 <div className="tdg-overflow-section">Tools</div>
+                {user?.roleId === 'admin' ? (
+                  <Link
+                    to="/admin/users"
+                    className="tdg-overflow-item"
+                    onClick={() => setToolbarOverflowOpen(false)}
+                  >
+                    Users
+                  </Link>
+                ) : null}
                 <Link
                   to="/people/dev"
                   className="tdg-overflow-item"
@@ -12479,6 +12504,15 @@ export default function App() {
         onImportCompleted={() => {
           void loadAssets({ showLoading: false, preserveCachedFirstPage: false });
           void loadAlbumTreeNodes({ showLoading: false });
+        }}
+      />
+      <ManageAlbumWritersDialog
+        album={manageWritersAlbum}
+        users={users}
+        onClose={() => setManageWritersAlbum(null)}
+        onAlbumUpdated={(updated) => {
+          setAlbumTreeNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+          setManageWritersAlbum(updated);
         }}
       />
       <KeywordManagementDialog

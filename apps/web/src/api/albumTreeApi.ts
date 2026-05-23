@@ -245,6 +245,35 @@ export async function updateAlbumOrderingMode(
   return (await response.json()) as MediaAsset;
 }
 
+export async function addAlbumWriter(albumId: string, userId: string): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(albumId)}/writers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+export async function removeAlbumWriter(albumId: string, userId: string): Promise<AlbumTreeNode> {
+  const response = await fetch(
+    `/api/album-tree/${encodeURIComponent(albumId)}/writers/${encodeURIComponent(userId)}`,
+    { method: 'DELETE' }
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
 export async function setAlbumKeywordAssignmentStatus(
   albumId: string,
   status: AlbumKeywordAssignmentStatus | null
