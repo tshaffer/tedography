@@ -15,8 +15,8 @@ interface AssetDetailsPanelProps {
   albumLabels?: string[];
   albumOrderingModeLabel?: string | null;
   onEditCaptureDate?: (() => void) | undefined;
-  onReimportAsset?: () => void;
-  onRebuildDerivedFiles?: () => void;
+  onReimportAsset?: (() => void) | undefined;
+  onRebuildDerivedFiles?: (() => void) | undefined;
   /** undefined = hide button; null = show disabled (not in any album); fn = show enabled */
   onShowInAlbum?: (() => void) | null | undefined;
   assetOperationBusy?: boolean;

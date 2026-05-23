@@ -23,9 +23,9 @@ interface AssetKeywordsPanelProps {
   keywordsError?: string | null;
   updateBusy?: boolean;
   keywordAssignmentStatus?: AssetKeywordAssignmentStatus | null;
-  onAddKeywords: (entries: KeywordEntry[]) => Promise<boolean>;
-  onRemoveKeyword: (keyword: Keyword) => Promise<void>;
-  onSetKeywordAssignmentStatus?: (status: AssetKeywordAssignmentStatus | null) => Promise<void>;
+  onAddKeywords?: ((entries: KeywordEntry[]) => Promise<boolean>) | undefined;
+  onRemoveKeyword?: ((keyword: Keyword) => Promise<void>) | undefined;
+  onSetKeywordAssignmentStatus?: ((status: AssetKeywordAssignmentStatus | null) => Promise<void>) | undefined;
 }
 
 const panelStyle: CSSProperties = {
@@ -232,7 +232,7 @@ export function AssetKeywordsPanel({
   );
 
   async function handleAdd(): Promise<void> {
-    if (sanitizedPendingEntries.length === 0 || selectedAssetCount === 0 || updateBusy) {
+    if (sanitizedPendingEntries.length === 0 || selectedAssetCount === 0 || updateBusy || !onAddKeywords) {
       return;
     }
     const applied = await onAddKeywords(sanitizedPendingEntries);
@@ -278,7 +278,7 @@ export function AssetKeywordsPanel({
                 {statusOpen ? '×' : '⋯'}
               </button>
             ) : null}
-            {selectedAssetCount > 0 ? (
+            {selectedAssetCount > 0 && onAddKeywords ? (
               <button
                 type="button"
                 onClick={() => setAddOpen((prev) => !prev)}
@@ -320,7 +320,7 @@ export function AssetKeywordsPanel({
                   label={<KeywordChipLabel keyword={keyword} keywordMap={keywordMap} />}
                   size="small"
                   title={formatKeywordPathLabel(keyword, keywordMap)}
-                  onDelete={!updateBusy ? () => void onRemoveKeyword(keyword) : undefined}
+                  onDelete={onRemoveKeyword && !updateBusy ? () => void onRemoveKeyword(keyword) : undefined}
                 />
               ))}
             </div>
@@ -328,7 +328,7 @@ export function AssetKeywordsPanel({
             <span style={emptyLabelStyle}>{emptyStateLabel}</span>
           )}
         </div>
-        {selectedAssetCount > 0 && addOpen ? (
+        {selectedAssetCount > 0 && onAddKeywords && addOpen ? (
           <div style={{ borderTop: '1px solid #efefef', marginTop: '6px', paddingTop: '6px' }}>
             <div style={addRowStyle}>
                   <Autocomplete<KeywordEntry, true, false, true>
@@ -476,7 +476,7 @@ export function AssetKeywordsPanel({
                 size="small"
                 title={formatKeywordPathLabel(keyword, keywordMap)}
                 onDelete={
-                  !updateBusy ? () => void onRemoveKeyword(keyword) : undefined
+                  onRemoveKeyword && !updateBusy ? () => void onRemoveKeyword(keyword) : undefined
                 }
               />
             ))}
@@ -486,7 +486,7 @@ export function AssetKeywordsPanel({
         )}
       </div>
 
-      {selectedAssetCount > 0 ? (
+      {selectedAssetCount > 0 && onAddKeywords ? (
         <>
           <div style={dividerStyle} />
 

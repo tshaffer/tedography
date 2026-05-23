@@ -3308,6 +3308,7 @@ type SurveyModeProps = {
   focusedAsset: MediaAsset;
   focusedIndex: number;
   isUpdating: boolean;
+  canSetPhotoState: boolean;
   onClose: () => void;
   onFocusAsset: (assetId: string) => void;
   onOpenImmersiveAsset: (assetId: string) => void;
@@ -3521,6 +3522,7 @@ function SurveyMode({
   focusedAsset,
   focusedIndex,
   isUpdating,
+  canSetPhotoState,
   onClose,
   onFocusAsset,
   onOpenImmersiveAsset,
@@ -3587,10 +3589,14 @@ function SurveyMode({
               <button
                 key={state}
                 type="button"
-                style={surveyActionButtonStyle}
-                onClick={() => onSetPhotoState(focusedAsset.id, state)}
-                disabled={isUpdating || focusedAsset.photoState === state}
-                title={`Set focused image to ${state}`}
+                style={
+                  !canSetPhotoState || isUpdating || focusedAsset.photoState === state
+                    ? { ...surveyActionButtonStyle, opacity: 0.35, cursor: !canSetPhotoState ? 'not-allowed' : 'default' }
+                    : surveyActionButtonStyle
+                }
+                onClick={() => canSetPhotoState && onSetPhotoState(focusedAsset.id, state)}
+                disabled={!canSetPhotoState || isUpdating || focusedAsset.photoState === state}
+                title={!canSetPhotoState ? 'Your role cannot change photo state' : `Set focused image to ${state}`}
               >
                 {state}
               </button>
@@ -10923,8 +10929,8 @@ export default function App() {
                 ? handleOpenSetCaptureDateDialog
                 : undefined
             }
-            onReimportAsset={() => void handleReimportSelectedAsset()}
-            onRebuildDerivedFiles={() => void handleRebuildDerivedFilesForSelectedAsset()}
+            onReimportAsset={can('maintenance') ? () => void handleReimportSelectedAsset() : undefined}
+            onRebuildDerivedFiles={can('maintenance') ? () => void handleRebuildDerivedFilesForSelectedAsset() : undefined}
             onShowInAlbum={
               isSearchArea && selectedAssetIds.length === 1 && selectedAsset
                 ? (selectedAsset.albumIds?.length ?? 0) > 0
@@ -10994,9 +11000,9 @@ export default function App() {
                 keywordsError={keywordsError}
                 updateBusy={keywordUpdateBusy}
                 keywordAssignmentStatus={sharedKeywordAssignmentStatus}
-                onAddKeywords={handleAddKeywordsToSelectedAssets}
-                onRemoveKeyword={handleRemoveKeywordFromSelectedAssets}
-                onSetKeywordAssignmentStatus={handleSetAssetKeywordAssignmentStatus}
+                onAddKeywords={can('keyword-management') ? handleAddKeywordsToSelectedAssets : undefined}
+                onRemoveKeyword={can('keyword-management') ? handleRemoveKeywordFromSelectedAssets : undefined}
+                onSetKeywordAssignmentStatus={can('keyword-management') ? handleSetAssetKeywordAssignmentStatus : undefined}
               />
             }
             aiQueueEntry={
@@ -12383,6 +12389,7 @@ export default function App() {
           focusedAsset={surveyFocusedAsset}
           focusedIndex={surveyFocusedIndex}
           isUpdating={updatingAssetIds[surveyFocusedAsset.id] === true}
+          canSetPhotoState={canInAlbum('set-photo-state', focusedAlbumWriterIds)}
           onClose={() => setSurveyOpen(false)}
           onFocusAsset={setSelectedAssetId}
           onOpenImmersiveAsset={openImmersiveForAsset}
