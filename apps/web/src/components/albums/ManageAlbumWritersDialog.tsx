@@ -144,9 +144,13 @@ export function ManageAlbumWritersDialog({
 
   if (!album) return null;
 
+  // Admin and full users have blanket 'allow' and bypass writerUserIds entirely.
+  const fullAccessUsers = users.filter((u) => u.roleId === 'admin' || u.roleId === 'full');
+  // Explicit writers: limited users who have been granted access to this album.
   const writerIdSet = new Set(album.writerUserIds ?? []);
-  const writers = users.filter((u) => writerIdSet.has(u.id));
-  const candidates = users.filter((u) => !writerIdSet.has(u.id));
+  const explicitWriters = users.filter((u) => u.roleId === 'limited' && writerIdSet.has(u.id));
+  // Candidates: limited users not yet granted access.
+  const candidates = users.filter((u) => u.roleId === 'limited' && !writerIdSet.has(u.id));
 
   async function handleAdd(): Promise<void> {
     if (!selectedUserId || busy) return;
@@ -183,18 +187,28 @@ export function ManageAlbumWritersDialog({
         <h3 style={titleStyle}>Manage Writers</h3>
         <p style={subtitleStyle}>{album.label}</p>
 
-        <div style={sectionLabelStyle}>Current writers</div>
-        {writers.length === 0 ? (
+        {/* Admin / full users — always have access, not removable */}
+        <div style={sectionLabelStyle}>Full access</div>
+        {fullAccessUsers.map((u) => (
+          <div key={u.id} style={{ ...writerRowStyle, backgroundColor: '#f0f9ff' }}>
+            <span>
+              {u.name}
+              <span style={{ marginLeft: 8, fontSize: 11, color: '#9ca3af' }}>{u.roleId}</span>
+            </span>
+            <span style={{ fontSize: 11, color: '#9ca3af', paddingRight: 4 }}>always</span>
+          </div>
+        ))}
+
+        {/* Explicit writers — limited users granted per-album access */}
+        <div style={{ ...sectionLabelStyle, marginTop: 14 }}>Explicit writers (limited)</div>
+        {explicitWriters.length === 0 ? (
           <p style={{ margin: '0 0 6px', fontSize: 13, color: '#9ca3af' }}>
-            No writers — only admin can edit this album.
+            No limited users have been granted access to this album.
           </p>
         ) : (
-          writers.map((u) => (
+          explicitWriters.map((u) => (
             <div key={u.id} style={writerRowStyle}>
-              <span>
-                {u.name}
-                <span style={{ marginLeft: 8, fontSize: 11, color: '#9ca3af' }}>{u.roleId}</span>
-              </span>
+              <span>{u.name}</span>
               <button
                 type="button"
                 style={removeButtonStyle}
@@ -208,6 +222,7 @@ export function ManageAlbumWritersDialog({
           ))
         )}
 
+        {/* Add a limited user */}
         {candidates.length > 0 ? (
           <div style={addRowStyle}>
             <select
@@ -216,10 +231,10 @@ export function ManageAlbumWritersDialog({
               disabled={busy}
               onChange={(e) => setSelectedUserId(e.target.value)}
             >
-              <option value="">Add a writer…</option>
+              <option value="">Add a limited user…</option>
               {candidates.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} ({u.roleId})
+                  {u.name}
                 </option>
               ))}
             </select>
@@ -232,6 +247,10 @@ export function ManageAlbumWritersDialog({
               Add
             </button>
           </div>
+        ) : candidates.length === 0 && users.filter((u) => u.roleId === 'limited').length > 0 ? (
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#9ca3af' }}>
+            All limited users already have access.
+          </p>
         ) : null}
 
         {error ? <p style={errorStyle}>{error}</p> : null}
