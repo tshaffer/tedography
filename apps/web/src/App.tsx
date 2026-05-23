@@ -5263,6 +5263,11 @@ export default function App() {
         : implicitAlbumForMembershipAction,
     [implicitAlbumForMembershipAction, selectedTreeNode]
   );
+  // When a focused album is known, resolve its writerUserIds (defaulting missing field to []).
+  // Pass undefined only when there is no album context, signaling canInAlbum to be optimistic.
+  const focusedAlbumWriterIds: string[] | undefined = focusedAlbumForMembershipAction
+    ? (focusedAlbumForMembershipAction.writerUserIds ?? [])
+    : undefined;
   const albumTreeCreationParentId = useMemo(
     () => resolveAlbumTreeCreationParentId(selectedTreeNode),
     [selectedTreeNode]
@@ -11045,7 +11050,7 @@ export default function App() {
             <div style={toolbarGroupStyle}>
               {reviewActions.map((state) => {
                 const icon = getPhotoStateIcon(state);
-                const enabled = hasSelectedAssets && canInAlbum('set-photo-state', focusedAlbumForMembershipAction?.writerUserIds);
+                const enabled = hasSelectedAssets && canInAlbum('set-photo-state', focusedAlbumWriterIds);
                 return (
                   <Tooltip
                     key={state}
@@ -11091,13 +11096,13 @@ export default function App() {
           {/* Actions: Move to Album */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
-              <Tooltip title={!canInAlbum('move-photos-to-album', focusedAlbumForMembershipAction?.writerUserIds) ? 'Your role cannot move photos to albums' : hasSelectedAssets ? 'Move selected photos to an album' : 'Select one or more photos to move to an album'}>
+              <Tooltip title={!canInAlbum('move-photos-to-album', focusedAlbumWriterIds) ? 'Your role cannot move photos to albums' : hasSelectedAssets ? 'Move selected photos to an album' : 'Select one or more photos to move to an album'}>
                 <span>
                   <button
                     type="button"
-                    style={(canInAlbum('move-photos-to-album', focusedAlbumForMembershipAction?.writerUserIds) && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={(canInAlbum('move-photos-to-album', focusedAlbumWriterIds) && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => setMoveAssetsDialogOpen(true)}
-                    disabled={!canInAlbum('move-photos-to-album', focusedAlbumForMembershipAction?.writerUserIds) || !hasSelectedAssets}
+                    disabled={!canInAlbum('move-photos-to-album', focusedAlbumWriterIds) || !hasSelectedAssets}
                     aria-label="Move to Album"
                   >
                     <ArrowForwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
@@ -11715,9 +11720,9 @@ export default function App() {
                       type="button"
                       className="tdg-overflow-item"
                       onClick={() => { void handleAddSelectedToAlbum(); setToolbarOverflowOpen(false); }}
-                      disabled={!canInAlbum('move-photos-to-album', focusedAlbumForMembershipAction?.writerUserIds) || !hasSelectedAssets}
+                      disabled={!canInAlbum('move-photos-to-album', focusedAlbumWriterIds) || !hasSelectedAssets}
                       title={
-                        !canInAlbum('move-photos-to-album', focusedAlbumForMembershipAction?.writerUserIds)
+                        !canInAlbum('move-photos-to-album', focusedAlbumWriterIds)
                           ? 'Your role cannot add photos to albums'
                           : hasSelectedAssets
                             ? 'Add current selection to a manual album'
@@ -11731,9 +11736,9 @@ export default function App() {
                         type="button"
                         className="tdg-overflow-item"
                         onClick={() => { void handleRemoveSelectedFromFocusedAlbum(); setToolbarOverflowOpen(false); }}
-                        disabled={!canInAlbum('remove-from-album', focusedAlbumForMembershipAction?.writerUserIds) || selectedAssetsInFocusedAlbum.length === 0}
+                        disabled={!canInAlbum('remove-from-album', focusedAlbumWriterIds) || selectedAssetsInFocusedAlbum.length === 0}
                         title={
-                          !canInAlbum('remove-from-album', focusedAlbumForMembershipAction?.writerUserIds)
+                          !canInAlbum('remove-from-album', focusedAlbumWriterIds)
                             ? 'Your role cannot remove photos from albums'
                             : selectedAssetIdsForAlbumAction.length === 0
                               ? `Select one or more photos to remove them from "${focusedAlbumForMembershipAction?.label ?? 'the focused album'}"`
