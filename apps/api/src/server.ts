@@ -397,7 +397,7 @@ on run argv
 end run
 `;
 
-  app.post('/api/assets/:id/open-in-preview', requireFeature('maintenance'), async (req, res) => {
+  app.post('/api/assets/:id/open-in-preview', requireFeature('rotate-and-crop'), async (req, res) => {
     try {
       const asset = await findById(req.params.id as string);
       if (!asset) {

@@ -104,7 +104,8 @@ toolbar controls are hidden rather than shown as disabled:
   (`maintenance` is denied for Full.)
 - **Reimport** and **Rebuild Derived Files** buttons in the asset inspector are
   hidden.
-- The **Crop photo in Preview** action is restricted to Admin only at the API level.
+- **Crop photo in Preview** is available to Full users (and Limited users in albums
+  where they have write access), following the `rotate-and-crop` permission.
 
 ### All other features enabled
 
@@ -171,5 +172,7 @@ toolbar controls are hidden rather than shown as disabled:
 ### Maintenance tools
 
 - Admin is the only role with access to the **Maintenance** dialog, **Reimport**,
-  **Rebuild Derived Files**, **Crop photo in Preview**, and the AI queue processing
-  and export operations.
+  **Rebuild Derived Files**, and the AI queue processing and export operations.
+- **Crop photo in Preview** follows the `rotate-and-crop` feature: Admin and Full
+  users can always use it; Limited users can use it only in albums where they have
+  write access.
