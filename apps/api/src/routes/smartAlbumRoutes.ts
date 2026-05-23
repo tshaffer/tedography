@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireFeature } from '../middleware/requireFeature.js';
 import type { ImportApiErrorResponse } from '@tedography/domain';
 import type {
   CreateSmartAlbumRequest,
@@ -39,7 +40,7 @@ function isFilterSpecObject(value: unknown): value is NonNullable<CreateSmartAlb
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-smartAlbumRoutes.post('/', async (req, res) => {
+smartAlbumRoutes.post('/', requireFeature('create-albums'), async (req, res) => {
   const body = req.body as Partial<CreateSmartAlbumRequest> | undefined;
   const label = parseOptionalLabel(body?.label);
   if (!label) {
@@ -78,7 +79,7 @@ smartAlbumRoutes.get('/', async (_req, res) => {
 
 smartAlbumRoutes.get('/:id', async (req, res) => {
   try {
-    const item = await getSmartAlbumById(req.params.id);
+    const item = await getSmartAlbumById(req.params.id as string);
     if (!item) {
       res.status(404).json({ error: 'Smart Album not found' } satisfies ImportApiErrorResponse);
       return;
@@ -91,7 +92,7 @@ smartAlbumRoutes.get('/:id', async (req, res) => {
   }
 });
 
-smartAlbumRoutes.patch('/:id', async (req, res) => {
+smartAlbumRoutes.patch('/:id', requireFeature('create-albums'), async (req, res) => {
   const body = req.body as Partial<UpdateSmartAlbumRequest> | undefined;
   const parsedLabel = parseOptionalLabel(body?.label);
   const label = parsedLabel ?? undefined;
@@ -117,7 +118,7 @@ smartAlbumRoutes.patch('/:id', async (req, res) => {
       ...(body?.filterSpec !== undefined ? { filterSpec: body.filterSpec } : {})
     };
     res.json({
-      item: await updateSmartAlbum(req.params.id, updateRequest)
+      item: await updateSmartAlbum(req.params.id as string, updateRequest)
     } satisfies UpdateSmartAlbumResponse);
   } catch (error) {
     if (error instanceof SmartAlbumNotFoundError) {
@@ -135,15 +136,15 @@ smartAlbumRoutes.patch('/:id', async (req, res) => {
   }
 });
 
-smartAlbumRoutes.delete('/:id', async (req, res) => {
+smartAlbumRoutes.delete('/:id', requireFeature('create-albums'), async (req, res) => {
   try {
-    const deleted = await deleteSmartAlbum(req.params.id);
+    const deleted = await deleteSmartAlbum(req.params.id as string);
     if (!deleted) {
       res.status(404).json({ error: 'Smart Album not found' } satisfies ImportApiErrorResponse);
       return;
     }
 
-    res.json({ id: req.params.id } satisfies DeleteSmartAlbumResponse);
+    res.json({ id: req.params.id as string } satisfies DeleteSmartAlbumResponse);
   } catch (error) {
     log.error('Failed to delete smart album', error);
     res.status(500).json({ error: 'Failed to delete smart album' } satisfies ImportApiErrorResponse);

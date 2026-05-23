@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router, type Router as RouterType } from 'express';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { config } from '../config.js';
 import { editImageWithGemini } from '../import/aiImageEditService.js';
 import { log } from '../logger.js';
@@ -32,7 +33,7 @@ aiQueueRoutes.get('/', async (_req, res) => {
   }
 });
 
-aiQueueRoutes.post('/', async (req, res) => {
+aiQueueRoutes.post('/', requireFeature('maintenance'), async (req, res) => {
   const { assetId, prompt } = req.body as { assetId?: string; prompt?: string };
   if (!assetId) {
     res.status(400).json({ error: 'assetId is required' });
@@ -47,7 +48,7 @@ aiQueueRoutes.post('/', async (req, res) => {
   }
 });
 
-aiQueueRoutes.delete('/', async (_req, res) => {
+aiQueueRoutes.delete('/', requireFeature('maintenance'), async (_req, res) => {
   try {
     await clearQueue();
     res.json({ ok: true });
@@ -57,9 +58,9 @@ aiQueueRoutes.delete('/', async (_req, res) => {
   }
 });
 
-aiQueueRoutes.delete('/:assetId', async (req, res) => {
+aiQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, res) => {
   try {
-    await removeQueueEntry(req.params.assetId);
+    await removeQueueEntry(req.params.assetId as string);
     res.json({ ok: true });
   } catch (error) {
     log.error('Failed to remove from AI queue', error);
@@ -67,7 +68,7 @@ aiQueueRoutes.delete('/:assetId', async (req, res) => {
   }
 });
 
-aiQueueRoutes.post('/process', async (req, res) => {
+aiQueueRoutes.post('/process', requireFeature('maintenance'), async (req, res) => {
   const exportPath = config.aiQueueExportPath;
   if (!exportPath) {
     res.status(400).json({ error: 'TEDOGRAPHY_AI_QUEUE_EXPORT_PATH is not configured in .env' });
@@ -117,7 +118,7 @@ aiQueueRoutes.post('/process', async (req, res) => {
   }
 });
 
-aiQueueRoutes.post('/export', async (req, res) => {
+aiQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) => {
   const exportPath = config.aiQueueExportPath;
   if (!exportPath) {
     res.status(400).json({ error: 'TEDOGRAPHY_AI_QUEUE_EXPORT_PATH is not configured in .env' });

@@ -1,4 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { config } from '../config.js';
 import { log } from '../logger.js';
 import { findByIds } from '../repositories/assetRepository.js';
@@ -62,7 +63,7 @@ googlePhotosRoutes.get('/callback', async (req, res) => {
   }
 });
 
-googlePhotosRoutes.delete('/disconnect', async (_req, res) => {
+googlePhotosRoutes.delete('/disconnect', requireFeature('maintenance'), async (_req, res) => {
   try {
     await disconnect();
     res.json({ ok: true });
@@ -78,7 +79,7 @@ export interface PublishRequest {
   uploadVersion: 'original' | 'display';
 }
 
-googlePhotosRoutes.post('/publish', async (req, res) => {
+googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) => {
   const body = req.body as Partial<PublishRequest>;
 
   if (!Array.isArray(body.assetIds) || body.assetIds.length === 0) {

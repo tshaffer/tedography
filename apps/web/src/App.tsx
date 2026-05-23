@@ -46,6 +46,7 @@ import TagIcon from '@mui/icons-material/Tag';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
+import LockIcon from '@mui/icons-material/Lock';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -9506,6 +9507,12 @@ export default function App() {
                 >
                   <span style={albumTreeLabelContentStyle}>
                     <span style={albumTreeLabelTextStyle}>{labelText}</span>
+                    {!isGroup && user?.roleId === 'limited' && !canInAlbum('set-photo-state', node.writerUserIds ?? []) ? (
+                      <LockIcon
+                        titleAccess="You do not have write access to this album"
+                        style={{ flex: '0 0 auto', fontSize: '10px', color: '#bbb' }}
+                      />
+                    ) : null}
                     {!isGroup && countStatus ? (
                       <span
                         style={getAlbumAssetCountStatusBadgeStyle(countStatus)}
@@ -11161,58 +11168,64 @@ export default function App() {
                 </span>
               </Tooltip>
             ) : null}
-            <Tooltip title={can('keyword-management') ? 'Keyword Management' : 'Your role cannot manage keywords'}>
-              <span>
-                <button
-                  type="button"
-                  style={can('keyword-management') ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                  onClick={() => can('keyword-management') && setKeywordManagementDialogOpen(true)}
-                  disabled={!can('keyword-management')}
-                  aria-label="Keyword Management"
-                >
-                  <TagIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                </button>
-              </span>
-            </Tooltip>
+            {can('keyword-management') ? (
+              <Tooltip title="Keyword Management">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    onClick={() => setKeywordManagementDialogOpen(true)}
+                    aria-label="Keyword Management"
+                  >
+                    <TagIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            ) : null}
           </div>
 
-          {/* Actions: Import */}
+          {/* Actions: Import — hidden entirely for roles that cannot import */}
+          {can('import') ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip title="Import assets">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    onClick={() => handleOpenImportDialog()}
+                    aria-label="Import"
+                  >
+                    <DownloadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
+                  </button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Publish to Google Photos">
+                <span>
+                  <button
+                    type="button"
+                    style={toolbarIconButtonStyle}
+                    onClick={() => setPublishToGooglePhotosOpen(true)}
+                    aria-label="Publish to Google Photos"
+                  >
+                    <CloudUploadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
+          {/* Print — visible for all roles; disabled when no selection or per-album access denied */}
           <div style={toolbarGroupStyle}>
-            <Tooltip title={can('import') ? 'Import assets' : 'Your role cannot import assets'}>
+            <Tooltip title={!canInAlbum('print', focusedAlbumWriterIds) ? 'Your role cannot print in this album' : hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
               <span>
                 <button
                   type="button"
-                  style={can('import') ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                  onClick={() => can('import') && handleOpenImportDialog()}
-                  disabled={!can('import')}
-                  aria-label="Import"
-                >
-                  <DownloadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: can('import') ? '#0969da' : undefined }} />
-                </button>
-              </span>
-            </Tooltip>
-            <Tooltip title="Publish to Google Photos">
-              <span>
-                <button
-                  type="button"
-                  style={toolbarIconButtonStyle}
-                  onClick={() => setPublishToGooglePhotosOpen(true)}
-                  aria-label="Publish to Google Photos"
-                >
-                  <CloudUploadIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#0969da' }} />
-                </button>
-              </span>
-            </Tooltip>
-            <Tooltip title={!can('print') ? 'Your role cannot print' : hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
-              <span>
-                <button
-                  type="button"
-                  style={(can('print') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  style={(canInAlbum('print', focusedAlbumWriterIds) && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                   onClick={() => setPrintDialogOpen(true)}
-                  disabled={!can('print') || !hasSelectedAssets}
+                  disabled={!canInAlbum('print', focusedAlbumWriterIds) || !hasSelectedAssets}
                   aria-label="Print selected photos"
                 >
-                  <PrintIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: (can('print') && hasSelectedAssets) ? '#555' : '#bbb' }} />
+                  <PrintIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: (canInAlbum('print', focusedAlbumWriterIds) && hasSelectedAssets) ? '#555' : '#bbb' }} />
                 </button>
               </span>
             </Tooltip>

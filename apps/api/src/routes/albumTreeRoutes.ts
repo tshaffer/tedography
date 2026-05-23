@@ -268,7 +268,7 @@ albumTreeRoutes.post('/', requireFeature('create-albums'), async (req, res) => {
   }
 });
 
-albumTreeRoutes.patch('/:id', async (req, res) => {
+albumTreeRoutes.patch('/:id', requireFeature('create-albums'), async (req, res) => {
   const label = parseNonEmptyLabel((req.body as { label?: unknown }).label);
   if (!label) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'label is required' };
@@ -277,7 +277,7 @@ albumTreeRoutes.patch('/:id', async (req, res) => {
   }
 
   try {
-    const updated = await renameAlbumTreeNode(req.params.id, label);
+    const updated = await renameAlbumTreeNode(req.params.id as string, label);
     if (!updated) {
       const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
       res.status(404).json(errorResponse);
@@ -297,7 +297,7 @@ albumTreeRoutes.patch('/:id', async (req, res) => {
   }
 });
 
-albumTreeRoutes.post('/:id/move', async (req, res) => {
+albumTreeRoutes.post('/:id/move', requireFeature('create-albums'), async (req, res) => {
   const moveRequest = req.body as MoveAlbumTreeNodeRequest;
   const parentId = parseParentId(moveRequest.parentId);
   const targetIndex = parseNonNegativeInteger(moveRequest.targetIndex);
@@ -307,7 +307,7 @@ albumTreeRoutes.post('/:id/move', async (req, res) => {
     return;
   }
 
-  const node = await findAlbumTreeNodeById(req.params.id);
+  const node = await findAlbumTreeNodeById(req.params.id as string);
   if (!node) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
     res.status(404).json(errorResponse);
@@ -366,7 +366,7 @@ albumTreeRoutes.post('/:id/move', async (req, res) => {
   }
 });
 
-albumTreeRoutes.post('/:id/reorder', async (req, res) => {
+albumTreeRoutes.post('/:id/reorder', requireFeature('create-albums'), async (req, res) => {
   const direction = parseReorderDirection((req.body as { direction?: unknown }).direction);
   if (!direction) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'direction must be "up" or "down"' };
@@ -374,7 +374,7 @@ albumTreeRoutes.post('/:id/reorder', async (req, res) => {
     return;
   }
 
-  const node = await findAlbumTreeNodeById(req.params.id);
+  const node = await findAlbumTreeNodeById(req.params.id as string);
   if (!node) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
     res.status(404).json(errorResponse);
@@ -431,7 +431,7 @@ albumTreeRoutes.post('/:id/reorder', async (req, res) => {
   }
 });
 
-albumTreeRoutes.post('/:id/child-order-mode', async (req, res) => {
+albumTreeRoutes.post('/:id/child-order-mode', requireFeature('create-albums'), async (req, res) => {
   const childOrderMode = parseAlbumTreeChildOrderMode(
     (req.body as AlbumTreeChildOrderModeRequest).childOrderMode
   );
@@ -443,7 +443,7 @@ albumTreeRoutes.post('/:id/child-order-mode', async (req, res) => {
     return;
   }
 
-  const node = await findAlbumTreeNodeById(req.params.id);
+  const node = await findAlbumTreeNodeById(req.params.id as string);
   if (!node || node.nodeType !== 'Group') {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Group node not found' };
     res.status(404).json(errorResponse);
@@ -465,8 +465,8 @@ albumTreeRoutes.post('/:id/child-order-mode', async (req, res) => {
   }
 });
 
-albumTreeRoutes.delete('/:id', async (req, res) => {
-  const node = await findAlbumTreeNodeById(req.params.id);
+albumTreeRoutes.delete('/:id', requireFeature('create-albums'), async (req, res) => {
+  const node = await findAlbumTreeNodeById(req.params.id as string);
   if (!node) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Node not found' };
     res.status(404).json(errorResponse);
@@ -585,7 +585,7 @@ albumMembershipRoutes.post('/:id/move-assets', requireFeature('move-photos-to-al
 });
 
 albumMembershipRoutes.post('/:id/manual-order', async (req, res) => {
-  const albumNode = await loadAlbumNode(req.params.id);
+  const albumNode = await loadAlbumNode(req.params.id as string);
   if (!albumNode) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
     res.status(404).json(errorResponse);
@@ -633,7 +633,7 @@ albumMembershipRoutes.post('/:id/manual-order', async (req, res) => {
 });
 
 albumMembershipRoutes.post('/:id/ordering-mode', async (req, res) => {
-  const albumNode = await loadAlbumNode(req.params.id);
+  const albumNode = await loadAlbumNode(req.params.id as string);
   if (!albumNode) {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
     res.status(404).json(errorResponse);
@@ -711,7 +711,7 @@ const validAlbumReviewAssignmentStatuses: AlbumReviewAssignmentStatus[] = [
   'complete'
 ];
 
-albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
+albumTreeRoutes.patch('/:id/keyword-assignment-status', requireFeature('create-albums'), async (req, res) => {
   const body = req.body as { status?: unknown } | undefined;
   const rawStatus = body?.status;
 
@@ -733,7 +733,7 @@ albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
   const status = (rawStatus ?? null) as AlbumKeywordAssignmentStatus | null;
 
   try {
-    const updated = await setAlbumKeywordAssignmentStatus(req.params.id, status);
+    const updated = await setAlbumKeywordAssignmentStatus(req.params.id as string, status);
     if (!updated) {
       const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
       res.status(404).json(errorResponse);
@@ -749,7 +749,7 @@ albumTreeRoutes.patch('/:id/keyword-assignment-status', async (req, res) => {
   }
 });
 
-albumTreeRoutes.patch('/:id/review-assignment-status', async (req, res) => {
+albumTreeRoutes.patch('/:id/review-assignment-status', requireFeature('create-albums'), async (req, res) => {
   const body = req.body as { status?: unknown } | undefined;
   const rawStatus = body?.status;
 
@@ -771,7 +771,7 @@ albumTreeRoutes.patch('/:id/review-assignment-status', async (req, res) => {
   const status = (rawStatus ?? null) as AlbumReviewAssignmentStatus | null;
 
   try {
-    const updated = await setAlbumReviewAssignmentStatus(req.params.id, status);
+    const updated = await setAlbumReviewAssignmentStatus(req.params.id as string, status);
     if (!updated) {
       const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
       res.status(404).json(errorResponse);
@@ -787,7 +787,7 @@ albumTreeRoutes.patch('/:id/review-assignment-status', async (req, res) => {
   }
 });
 
-albumTreeRoutes.patch('/:id/people-assignment-status', async (req, res) => {
+albumTreeRoutes.patch('/:id/people-assignment-status', requireFeature('create-albums'), async (req, res) => {
   const body = req.body as { status?: unknown } | undefined;
   const rawStatus = body?.status;
 
@@ -809,7 +809,7 @@ albumTreeRoutes.patch('/:id/people-assignment-status', async (req, res) => {
   const status = (rawStatus ?? null) as AlbumPeopleAssignmentStatus | null;
 
   try {
-    const updated = await setAlbumPeopleAssignmentStatus(req.params.id, status);
+    const updated = await setAlbumPeopleAssignmentStatus(req.params.id as string, status);
     if (!updated) {
       const errorResponse: AlbumTreeErrorResponse = { error: 'Album not found' };
       res.status(404).json(errorResponse);
@@ -831,6 +831,10 @@ albumTreeRoutes.patch('/:id/people-assignment-status', async (req, res) => {
 
 /** POST /api/album-tree/:id/writers  { userId: string } */
 albumTreeRoutes.post('/:id/writers', async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' } satisfies AlbumTreeErrorResponse);
+    return;
+  }
   const albumId = req.params.id as string;
   const userId = (req.body as { userId?: unknown }).userId;
   if (typeof userId !== 'string' || userId.trim().length === 0) {
@@ -848,6 +852,10 @@ albumTreeRoutes.post('/:id/writers', async (req, res) => {
 
 /** DELETE /api/album-tree/:id/writers/:userId */
 albumTreeRoutes.delete('/:id/writers/:userId', async (req, res) => {
+  if (req.currentUser!.roleId !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' } satisfies AlbumTreeErrorResponse);
+    return;
+  }
   const albumId = req.params.id as string;
   const userId = req.params.userId as string;
 
