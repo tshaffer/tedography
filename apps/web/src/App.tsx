@@ -131,6 +131,7 @@ import { PrintDialog } from './components/print/PrintDialog';
 import { getAiHistory } from './api/aiHistoryApi';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
+import { UserMenu } from './components/auth/UserMenu';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
@@ -12014,28 +12015,14 @@ export default function App() {
             </Link>
           </div>
 
-          {/* User / logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 12, borderLeft: '1px solid #e3e6ea' }}>
-            <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{user?.name ?? ''}</span>
-            <Tooltip title="Change your PIN">
-              <button
-                type="button"
-                style={{ ...toolbarButtonStyle, fontSize: 12, padding: '3px 8px' }}
-                onClick={() => setChangePinOpen(true)}
-              >
-                Change PIN
-              </button>
-            </Tooltip>
-            <Tooltip title="Log out">
-              <button
-                type="button"
-                style={{ ...toolbarButtonStyle, fontSize: 12, padding: '3px 8px' }}
-                onClick={() => { void logout(); }}
-              >
-                Log out
-              </button>
-            </Tooltip>
-          </div>
+          {/* User menu */}
+          {user ? (
+            <UserMenu
+              user={user}
+              onChangePinClick={() => setChangePinOpen(true)}
+              onLogout={() => { void logout(); }}
+            />
+          ) : null}
         </div>
       </div>
 
