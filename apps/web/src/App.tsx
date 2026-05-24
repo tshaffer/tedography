@@ -11237,58 +11237,75 @@ export default function App() {
           {/* Rotation + Crop */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
-              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate'}>
-                <span>
-                  <button
-                    type="button"
-                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                    onClick={() => void handleRotateSelectedAssets('counterclockwise')}
-                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
-                    aria-label="Rotate selected photos counterclockwise"
-                  >
-                    <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate'}>
-                <span>
-                  <button
-                    type="button"
-                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                    onClick={() => void handleRotateSelectedAssets('180')}
-                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
-                    aria-label="Rotate selected photos 180 degrees"
-                  >
-                    <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot rotate photos' : hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate'}>
-                <span>
-                  <button
-                    type="button"
-                    style={(can('rotate-and-crop') && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                    onClick={() => void handleRotateSelectedAssets('clockwise')}
-                    disabled={!can('rotate-and-crop') || !hasSelectedAssets}
-                    aria-label="Rotate selected photos clockwise"
-                  >
-                    <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-              <Tooltip title={!can('rotate-and-crop') ? 'Your role cannot crop photos' : selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop'}>
-                <span>
-                  <button
-                    type="button"
-                    style={(can('rotate-and-crop') && selectedAssetIds.length === 1) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                    onClick={() => void handleStartCrop()}
-                    disabled={!can('rotate-and-crop') || selectedAssetIds.length !== 1}
-                    aria-label="Crop photo in Preview"
-                  >
-                    <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
+              {(() => {
+                const canRotateCrop = canInAlbum('rotate-and-crop', focusedAlbumWriterIds);
+                const rotateDeniedReason = !can('rotate-and-crop')
+                  ? 'Your role cannot rotate photos'
+                  : !canRotateCrop
+                  ? 'No write access to this album'
+                  : null;
+                const cropDeniedReason = !can('rotate-and-crop')
+                  ? 'Your role cannot crop photos'
+                  : !canRotateCrop
+                  ? 'No write access to this album'
+                  : null;
+                return (
+                  <>
+                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate')}>
+                      <span>
+                        <button
+                          type="button"
+                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => void handleRotateSelectedAssets('counterclockwise')}
+                          disabled={!canRotateCrop || !hasSelectedAssets}
+                          aria-label="Rotate selected photos counterclockwise"
+                        >
+                          <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate')}>
+                      <span>
+                        <button
+                          type="button"
+                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => void handleRotateSelectedAssets('180')}
+                          disabled={!canRotateCrop || !hasSelectedAssets}
+                          aria-label="Rotate selected photos 180 degrees"
+                        >
+                          <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate')}>
+                      <span>
+                        <button
+                          type="button"
+                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => void handleRotateSelectedAssets('clockwise')}
+                          disabled={!canRotateCrop || !hasSelectedAssets}
+                          aria-label="Rotate selected photos clockwise"
+                        >
+                          <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={cropDeniedReason ?? (selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop')}>
+                      <span>
+                        <button
+                          type="button"
+                          style={(canRotateCrop && selectedAssetIds.length === 1) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                          onClick={() => void handleStartCrop()}
+                          disabled={!canRotateCrop || selectedAssetIds.length !== 1}
+                          aria-label="Crop photo in Preview"
+                        >
+                          <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </button>
+                      </span>
+                    </Tooltip>
+                  </>
+                );
+              })()}
             </div>
           ) : null}
 
