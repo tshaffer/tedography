@@ -679,6 +679,12 @@ const contextMenuSubmenuTriggerStyle: CSSProperties = {
   gap: '8px'
 };
 
+const disabledContextMenuSubmenuTriggerStyle: CSSProperties = {
+  ...contextMenuSubmenuTriggerStyle,
+  color: '#999',
+  cursor: 'not-allowed'
+};
+
 const contextMenuSubmenuContainerStyle: CSSProperties = {
   position: 'relative'
 };
@@ -9643,7 +9649,13 @@ export default function App() {
       >
         {isSelectedGroupMenu ? (
           <>
-            <button type="button" style={contextMenuItemStyle} onClick={handleImportAlbumFromSelectedGroup}>
+            <button
+              type="button"
+              style={can('import') ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              disabled={!can('import')}
+              title={can('import') ? undefined : 'Your role cannot import photos'}
+              onClick={handleImportAlbumFromSelectedGroup}
+            >
               Import Album
             </button>
             <div style={contextMenuSubmenuContainerStyle}>
@@ -9775,7 +9787,13 @@ export default function App() {
         ) : null}
         {isSelectedAlbumMenu ? (
           <>
-            <button type="button" style={contextMenuItemStyle} onClick={handleImportPhotosIntoSelectedAlbum}>
+            <button
+              type="button"
+              style={can('import') ? contextMenuItemStyle : disabledContextMenuItemStyle}
+              disabled={!can('import')}
+              title={can('import') ? undefined : 'Your role cannot import photos'}
+              onClick={handleImportPhotosIntoSelectedAlbum}
+            >
               Import Photos
             </button>
             <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
@@ -9818,13 +9836,15 @@ export default function App() {
             <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
-                style={contextMenuSubmenuTriggerStyle}
+                style={can('keyword-management') ? contextMenuSubmenuTriggerStyle : disabledContextMenuSubmenuTriggerStyle}
+                disabled={!can('keyword-management')}
                 onClick={() => {
+                  if (!can('keyword-management')) return;
                   setAlbumTreeReviewStatusSubmenuOpen(false);
                   setAlbumTreePeopleStatusSubmenuOpen(false);
                   setAlbumTreeKeywordStatusSubmenuOpen((prev) => !prev);
                 }}
-                title="Set keyword assignment status for this album"
+                title={can('keyword-management') ? 'Set keyword assignment status for this album' : 'Your role cannot manage keywords'}
               >
                 <span>Keyword Status</span>
                 <span aria-hidden="true">&gt;</span>
@@ -9857,19 +9877,31 @@ export default function App() {
               ) : null}
             </div>
             <div style={contextMenuSubmenuContainerStyle}>
-              <button
-                type="button"
-                style={contextMenuSubmenuTriggerStyle}
-                onClick={() => {
-                  setAlbumTreeKeywordStatusSubmenuOpen(false);
-                  setAlbumTreePeopleStatusSubmenuOpen(false);
-                  setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev);
-                }}
-                title="Set review assignment status for this album"
-              >
-                <span>Review State</span>
-                <span aria-hidden="true">&gt;</span>
-              </button>
+              {(() => {
+                const canReview = canInAlbum('set-photo-state', selectedAlbumTreeAlbumNode?.writerUserIds ?? []);
+                const reviewTitle = !can('set-photo-state')
+                  ? 'Your role cannot set review state'
+                  : !canReview
+                  ? 'No write access to this album'
+                  : 'Set review assignment status for this album';
+                return (
+                  <button
+                    type="button"
+                    style={canReview ? contextMenuSubmenuTriggerStyle : disabledContextMenuSubmenuTriggerStyle}
+                    disabled={!canReview}
+                    onClick={() => {
+                      if (!canReview) return;
+                      setAlbumTreeKeywordStatusSubmenuOpen(false);
+                      setAlbumTreePeopleStatusSubmenuOpen(false);
+                      setAlbumTreeReviewStatusSubmenuOpen((prev) => !prev);
+                    }}
+                    title={reviewTitle}
+                  >
+                    <span>Review State</span>
+                    <span aria-hidden="true">&gt;</span>
+                  </button>
+                );
+              })()}
               {albumTreeReviewStatusSubmenuOpen && selectedTreeNode ? (
                 <div style={contextMenuSubmenuStyle}>
                   {(['not-started', 'in-progress', 'complete'] as AlbumReviewAssignmentStatus[]).map(
@@ -9898,19 +9930,31 @@ export default function App() {
               ) : null}
             </div>
             <div style={contextMenuSubmenuContainerStyle}>
-              <button
-                type="button"
-                style={contextMenuSubmenuTriggerStyle}
-                onClick={() => {
-                  setAlbumTreeKeywordStatusSubmenuOpen(false);
-                  setAlbumTreeReviewStatusSubmenuOpen(false);
-                  setAlbumTreePeopleStatusSubmenuOpen((prev) => !prev);
-                }}
-                title="Set people assignment status for this album"
-              >
-                <span>People State</span>
-                <span aria-hidden="true">&gt;</span>
-              </button>
+              {(() => {
+                const canPeople = canInAlbum('people-face-review', selectedAlbumTreeAlbumNode?.writerUserIds ?? []);
+                const peopleTitle = !can('people-face-review')
+                  ? 'Your role cannot set people state'
+                  : !canPeople
+                  ? 'No write access to this album'
+                  : 'Set people assignment status for this album';
+                return (
+                  <button
+                    type="button"
+                    style={canPeople ? contextMenuSubmenuTriggerStyle : disabledContextMenuSubmenuTriggerStyle}
+                    disabled={!canPeople}
+                    onClick={() => {
+                      if (!canPeople) return;
+                      setAlbumTreeKeywordStatusSubmenuOpen(false);
+                      setAlbumTreeReviewStatusSubmenuOpen(false);
+                      setAlbumTreePeopleStatusSubmenuOpen((prev) => !prev);
+                    }}
+                    title={peopleTitle}
+                  >
+                    <span>People State</span>
+                    <span aria-hidden="true">&gt;</span>
+                  </button>
+                );
+              })()}
               {albumTreePeopleStatusSubmenuOpen && selectedTreeNode ? (
                 <div style={contextMenuSubmenuStyle}>
                   {(['not-started', 'in-progress', 'complete'] as AlbumPeopleAssignmentStatus[]).map(
