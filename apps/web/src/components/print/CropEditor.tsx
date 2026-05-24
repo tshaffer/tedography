@@ -75,6 +75,33 @@ export function CropEditor({
   const dragStart = useRef<{ mouseX: number; mouseY: number; cropX: number; cropY: number } | null>(null);
   const resizeStart = useRef<{ corner: CornerHandle; fixedNX: number; fixedNY: number } | null>(null);
 
+  // ── EXIF-rotation correction ───────────────────────────────────────────────
+  // iPhones (and other cameras) often store landscape shots as portrait pixels
+  // with an EXIF rotation tag. The browser auto-rotates the displayed <img>,
+  // making displaySize.w > displaySize.h even though sourceWidth < sourceHeight.
+  // When that happens the parent's printAspect (and the initial crop) were
+  // computed for the wrong orientation. We detect the swap here and correct:
+  //   • recompute the initial crop in display-normalized coordinates
+  //   • invert printAspect so resize stays constrained to the right shape
+  const exifCorrectedAspect = useRef<number | null>(null);
+  useEffect(() => {
+    if (displaySize.w === 0 || displaySize.h === 0) return;
+    if (exifCorrectedAspect.current === printAspect) return; // already handled
+    const displayIsLandscape = displaySize.w > displaySize.h;
+    const storedIsLandscape  = sourceWidth  > sourceHeight;
+    if (displayIsLandscape === storedIsLandscape) {
+      exifCorrectedAspect.current = printAspect; // orientations match — nothing to fix
+      return;
+    }
+    // Orientations differ: image has been EXIF-rotated by the browser.
+    // Recompute the default crop in display-normalized space with the
+    // corrected (inverted) print aspect so the box looks right on screen.
+    exifCorrectedAspect.current = printAspect;
+    onChange(computeDefaultCrop(displaySize.w, displaySize.h, 1 / printAspect));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displaySize, printAspect]);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleImageLoad = useCallback(() => {
     const el = imgRef.current;
     if (el) setDisplaySize({ w: el.offsetWidth, h: el.offsetHeight });
@@ -129,9 +156,17 @@ export function CropEditor({
     const fixedNY = corner === 'nw' || corner === 'ne' ? crop.y + crop.height : crop.y;
     resizeStart.current = { corner, fixedNX, fixedNY };
 
-    // The crop is stored in normalized image coords, so the target crop aspect ratio
-    // in those coords is printAspect * sourceHeight / sourceWidth, not printAspect.
-    const normAspect = (printAspect * sourceHeight) / sourceWidth;
+    // The crop is stored in normalized display coords (fractions of the displayed image).
+    // The target crop aspect in those coords is effectivePrintAspect * dh/dw.
+    // For EXIF-rotated images the browser swaps orientation vs the stored dimensions,
+    // so we detect that mismatch and invert printAspect accordingly.
+    const displayIsLandscapeR = displaySize.w > displaySize.h;
+    const storedIsLandscapeR  = sourceWidth  > sourceHeight;
+    const exifSwapped = displayIsLandscapeR !== storedIsLandscapeR;
+    const effectivePrintAspect = exifSwapped ? 1 / printAspect : printAspect;
+    const normAspect = (displaySize.h > 0 && displaySize.w > 0)
+      ? effectivePrintAspect * displaySize.h / displaySize.w
+      : (printAspect * sourceHeight) / sourceWidth; // fallback (should not happen)
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!resizeStart.current) return;
