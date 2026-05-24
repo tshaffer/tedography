@@ -57,8 +57,13 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
     }
 
     const peopleById = new Map(input.people.map((person) => [person.id, person]));
-    const { matches, searchedFaceQualitySharpness, searchedFaceQualityBrightness } =
-      await this.client.searchUsersByImage(input.cropImagePath ?? input.imagePath);
+
+    // Run both calls concurrently: match search + crop quality detection.
+    const cropPath = input.cropImagePath ?? input.imagePath;
+    const [{ matches }, cropQuality] = await Promise.all([
+      this.client.searchUsersByImage(cropPath),
+      this.client.detectCropQuality(cropPath),
+    ]);
 
     const candidates: FaceMatchCandidate[] = matches
       .flatMap((match) => {
@@ -82,8 +87,8 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
 
     return {
       candidates,
-      searchQualitySharpness: searchedFaceQualitySharpness,
-      searchQualityBrightness: searchedFaceQualityBrightness,
+      searchQualitySharpness: cropQuality?.sharpness ?? null,
+      searchQualityBrightness: cropQuality?.brightness ?? null,
     };
   }
 

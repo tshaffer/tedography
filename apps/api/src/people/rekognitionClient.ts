@@ -26,6 +26,7 @@ type DetectFaceBoundingBox = {
 
 type DetectFaceQuality = {
   Sharpness?: number;
+  Brightness?: number;
 };
 
 type DetectFaceDetail = {
@@ -278,8 +279,6 @@ export interface RekognitionDetectedFace {
 
 export interface RekognitionSearchResult {
   matches: RekognitionUserMatch[];
-  searchedFaceQualitySharpness: number | null;
-  searchedFaceQualityBrightness: number | null;
 }
 
 export interface RekognitionUserMatch {
@@ -449,6 +448,32 @@ export class RekognitionClient {
     });
   }
 
+  // Run DetectFaces with ALL attributes on a face crop to get Brightness and Sharpness.
+  // SearchUsersByImage only returns BoundingBox in SearchedFace.FaceDetail — Quality is
+  // never populated — so we make a second call on the crop to capture quality data.
+  // Returns null if no face is detected in the crop (e.g. after upsampling a tiny face).
+  public async detectCropQuality(cropPath: string): Promise<{ sharpness: number | null; brightness: number | null } | null> {
+    const response = await this.sendImageCommandWithPreparedBytes<{
+      FaceDetails?: DetectFaceDetail[];
+    }>({
+      commandName: 'DetectFacesCommand',
+      imagePath: cropPath,
+      buildInput: (bytes) => ({
+        Image: { Bytes: bytes },
+        Attributes: ['ALL']
+      }),
+      fallbackMessage: 'Rekognition DetectFaces (crop quality) request failed.'
+    });
+
+    const first = Array.isArray(response.FaceDetails) ? response.FaceDetails[0] : undefined;
+    if (!first) return null;
+
+    return {
+      sharpness:  typeof first.Quality?.Sharpness  === 'number' ? first.Quality.Sharpness  / 100 : null,
+      brightness: typeof first.Quality?.Brightness === 'number' ? first.Quality.Brightness / 100 : null,
+    };
+  }
+
   public async searchUsersByImage(imagePath: string): Promise<RekognitionSearchResult> {
     await this.ensureCollectionExists();
 
@@ -462,9 +487,8 @@ export class RekognitionClient {
     });
 
     const parseResult = (raw: unknown): RekognitionSearchResult => {
-      const response = raw as { UserMatches?: SearchUserMatch[]; SearchedFace?: SearchedFace };
+      const response = raw as { UserMatches?: SearchUserMatch[] };
       const matches = Array.isArray(response.UserMatches) ? response.UserMatches : [];
-      const quality = response.SearchedFace?.FaceDetail?.Quality;
       return {
         matches: matches.flatMap((item) => {
           if (typeof item.User?.UserId !== 'string' || typeof item.Similarity !== 'number') {
@@ -472,16 +496,10 @@ export class RekognitionClient {
           }
           return [{ userId: item.User.UserId, similarity: item.Similarity / 100 }];
         }),
-        searchedFaceQualitySharpness: typeof quality?.Sharpness === 'number' ? quality.Sharpness / 100 : null,
-        searchedFaceQualityBrightness: typeof quality?.Brightness === 'number' ? quality.Brightness / 100 : null,
       };
     };
 
-    const emptyResult: RekognitionSearchResult = {
-      matches: [],
-      searchedFaceQualitySharpness: null,
-      searchedFaceQualityBrightness: null,
-    };
+    const emptyResult: RekognitionSearchResult = { matches: [] };
 
     // Attempt the search, with retry logic for both image-too-large and no-face cases.
     let bytes = await prepareImageBytes(imagePath, 'default');
