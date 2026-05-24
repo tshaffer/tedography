@@ -66,6 +66,7 @@ export interface PeoplePipelineConfig {
   minFaceAreaPercent: number;
   minCropWidthPx: number;
   minCropHeightPx: number;
+  minQualityScore: number;
   autoMatchThreshold: number;
   reviewThreshold: number;
   storeFaceCrops: boolean;
@@ -205,6 +206,11 @@ export const config = {
       process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_HEIGHT_PX,
       120,
       'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_CROP_HEIGHT_PX'
+    ),
+    minQualityScore: parsePositiveNumberEnv(
+      process.env.TEDOGRAPHY_PEOPLE_PIPELINE_MIN_QUALITY_SCORE,
+      0.1,
+      'TEDOGRAPHY_PEOPLE_PIPELINE_MIN_QUALITY_SCORE'
     ),
     autoMatchThreshold: parsePositiveNumberEnv(
       process.env.TEDOGRAPHY_PEOPLE_PIPELINE_AUTO_MATCH_THRESHOLD,

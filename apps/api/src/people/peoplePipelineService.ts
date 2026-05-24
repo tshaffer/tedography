@@ -161,7 +161,7 @@ function determineIgnoredReason(input: {
     return 'too-small';
   }
 
-  if (input.qualityScore !== null && input.qualityScore < 0.45) {
+  if (input.qualityScore !== null && input.qualityScore < config.peoplePipeline.minQualityScore) {
     return 'too-low-quality';
   }
 
