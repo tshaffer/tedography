@@ -43,6 +43,19 @@ type SearchUserMatch = {
   User?: SearchUserRecord;
 };
 
+type SearchedFaceQuality = {
+  Brightness?: number;
+  Sharpness?: number;
+};
+
+type SearchedFaceDetail = {
+  Quality?: SearchedFaceQuality;
+};
+
+type SearchedFace = {
+  FaceDetail?: SearchedFaceDetail;
+};
+
 type IndexFaceRecord = {
   Face?: {
     FaceId?: string;
@@ -263,6 +276,12 @@ export interface RekognitionDetectedFace {
   qualityScore: number | null;
 }
 
+export interface RekognitionSearchResult {
+  matches: RekognitionUserMatch[];
+  searchedFaceQualitySharpness: number | null;
+  searchedFaceQualityBrightness: number | null;
+}
+
 export interface RekognitionUserMatch {
   userId: string;
   similarity: number;
@@ -430,7 +449,7 @@ export class RekognitionClient {
     });
   }
 
-  public async searchUsersByImage(imagePath: string): Promise<RekognitionUserMatch[]> {
+  public async searchUsersByImage(imagePath: string): Promise<RekognitionSearchResult> {
     await this.ensureCollectionExists();
 
     const threshold = config.peoplePipeline.rekognition.faceMatchThreshold;
@@ -442,22 +461,33 @@ export class RekognitionClient {
       QualityFilter: 'NONE'
     });
 
-    const parseMatches = (raw: unknown): RekognitionUserMatch[] => {
-      const response = raw as { UserMatches?: SearchUserMatch[] };
+    const parseResult = (raw: unknown): RekognitionSearchResult => {
+      const response = raw as { UserMatches?: SearchUserMatch[]; SearchedFace?: SearchedFace };
       const matches = Array.isArray(response.UserMatches) ? response.UserMatches : [];
-      return matches.flatMap((item) => {
-        if (typeof item.User?.UserId !== 'string' || typeof item.Similarity !== 'number') {
-          return [];
-        }
-        return [{ userId: item.User.UserId, similarity: item.Similarity / 100 }];
-      });
+      const quality = response.SearchedFace?.FaceDetail?.Quality;
+      return {
+        matches: matches.flatMap((item) => {
+          if (typeof item.User?.UserId !== 'string' || typeof item.Similarity !== 'number') {
+            return [];
+          }
+          return [{ userId: item.User.UserId, similarity: item.Similarity / 100 }];
+        }),
+        searchedFaceQualitySharpness: typeof quality?.Sharpness === 'number' ? quality.Sharpness / 100 : null,
+        searchedFaceQualityBrightness: typeof quality?.Brightness === 'number' ? quality.Brightness / 100 : null,
+      };
+    };
+
+    const emptyResult: RekognitionSearchResult = {
+      matches: [],
+      searchedFaceQualitySharpness: null,
+      searchedFaceQualityBrightness: null,
     };
 
     // Attempt the search, with retry logic for both image-too-large and no-face cases.
     let bytes = await prepareImageBytes(imagePath, 'default');
 
     try {
-      return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
+      return parseResult(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
     } catch (firstError) {
 
       // ── Image too large → recompress and retry ────────────────────────────
@@ -470,9 +500,9 @@ export class RekognitionClient {
           );
         }
         try {
-          return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
+          return parseResult(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
         } catch (retryError) {
-          if (isNoFaceInImageError(retryError)) return [];
+          if (isNoFaceInImageError(retryError)) return emptyResult;
           throw mapAwsError(retryError, 'Rekognition SearchUsersByImage request failed.');
         }
       }
@@ -481,9 +511,9 @@ export class RekognitionClient {
       if (isNoFaceInImageError(firstError)) {
         try {
           const upsampledBytes = await upsampleForRetry(imagePath);
-          return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(upsampledBytes)));
+          return parseResult(await this.sendRaw('SearchUsersByImageCommand', buildInput(upsampledBytes)));
         } catch (retryError) {
-          if (isNoFaceInImageError(retryError)) return []; // still too small — give up gracefully
+          if (isNoFaceInImageError(retryError)) return emptyResult; // still too small — give up gracefully
           throw mapAwsError(retryError, 'Rekognition SearchUsersByImage (upsampled retry) failed.');
         }
       }

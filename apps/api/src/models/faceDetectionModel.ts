@@ -16,6 +16,8 @@ const faceDetectionSchema = new Schema<FaceDetection>(
     previewPath: { type: String, required: false, trim: true, default: null },
     detectionConfidence: { type: Number, required: false, default: null },
     qualityScore: { type: Number, required: false, default: null },
+    searchQualitySharpness: { type: Number, required: false, default: null },
+    searchQualityBrightness: { type: Number, required: false, default: null },
     faceAreaPercent: { type: Number, required: false, default: null },
     engine: { type: String, required: true, trim: true },
     engineVersion: { type: String, required: false, trim: true, default: null },

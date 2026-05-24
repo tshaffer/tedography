@@ -30,6 +30,8 @@ export interface FaceDetection {
   previewPath?: string | null;
   detectionConfidence?: number | null;
   qualityScore?: number | null;
+  searchQualitySharpness?: number | null;
+  searchQualityBrightness?: number | null;
   faceAreaPercent?: number | null;
   engine: string;
   engineVersion?: string | null;

@@ -434,6 +434,8 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       previewPath: null as string | null,
       detectionConfidence: detectedFace.detectionConfidence ?? null,
       qualityScore: detectedFace.qualityScore ?? null,
+      searchQualitySharpness: null as number | null,
+      searchQualityBrightness: null as number | null,
       faceAreaPercent: computeFaceAreaPercent(asset, { boundingBox: normalizedBoundingBox }),
       engine: engine.engineName,
       engineVersion: engine.engineVersion,
@@ -470,9 +472,9 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
       continue;
     }
 
-    let candidates;
+    let matchResult;
     try {
-      candidates = await engine.matchFace({
+      matchResult = await engine.matchFace({
         asset,
         imagePath,
         cropImagePath,
@@ -496,6 +498,12 @@ export async function processPeoplePipelineForAsset(assetId: string, _options?: 
 
       throw error;
     }
+    const { candidates, searchQualitySharpness, searchQualityBrightness } = matchResult;
+
+    // Attach search-time quality to the base so it's stored on every detection path.
+    faceDetectionBase.searchQualitySharpness = searchQualitySharpness ?? null;
+    faceDetectionBase.searchQualityBrightness = searchQualityBrightness ?? null;
+
     const bestCandidate = candidates[0] ?? null;
 
     if (!bestCandidate || bestCandidate.confidence < config.peoplePipeline.reviewThreshold) {

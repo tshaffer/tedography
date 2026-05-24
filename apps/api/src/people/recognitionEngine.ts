@@ -11,6 +11,14 @@ export interface FaceMatchCandidate {
   confidence: number;
 }
 
+export interface FaceMatchResult {
+  candidates: FaceMatchCandidate[];
+  /** Sharpness of the searched face as reported by the recognition engine (0–1). */
+  searchQualitySharpness?: number | null;
+  /** Brightness of the searched face as reported by the recognition engine (0–1). */
+  searchQualityBrightness?: number | null;
+}
+
 export class PeopleRecognitionEngineError extends Error {
   constructor(
     message: string,
@@ -51,7 +59,7 @@ export interface PeopleRecognitionEngine {
     cropImagePath?: string | null;
     detection: Pick<FaceDetection, 'faceIndex' | 'boundingBox'>;
     people: Person[];
-  }): Promise<FaceMatchCandidate[]>;
+  }): Promise<FaceMatchResult>;
   enrollFaceExample?(input: {
     person: Person;
     asset: MediaAsset;

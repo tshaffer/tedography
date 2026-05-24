@@ -1,5 +1,5 @@
 import type { MediaAsset, Person } from '@tedography/domain';
-import type { DetectedFaceResult, FaceMatchCandidate, PeopleRecognitionEngine } from './recognitionEngine.js';
+import type { DetectedFaceResult, FaceMatchCandidate, FaceMatchResult, PeopleRecognitionEngine } from './recognitionEngine.js';
 
 export class NoopRecognitionEngine implements PeopleRecognitionEngine {
   public readonly engineName = 'none';
@@ -17,7 +17,7 @@ export class NoopRecognitionEngine implements PeopleRecognitionEngine {
     cropImagePath?: string | null;
     detection: { faceIndex: number; boundingBox: DetectedFaceResult['boundingBox'] };
     people: Person[];
-  }): Promise<FaceMatchCandidate[]> {
-    return [];
+  }): Promise<FaceMatchResult> {
+    return { candidates: [], searchQualitySharpness: null, searchQualityBrightness: null };
   }
 }

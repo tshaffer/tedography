@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { MediaAsset, Person } from '@tedography/domain';
-import type { DetectedFaceResult, FaceMatchCandidate, PeopleRecognitionEngine } from './recognitionEngine.js';
+import type { DetectedFaceResult, FaceMatchCandidate, FaceMatchResult, PeopleRecognitionEngine } from './recognitionEngine.js';
 
 function buildDeterministicSeed(...parts: string[]): number {
   const digest = createHash('sha256').update(parts.join('::')).digest();
@@ -61,9 +61,9 @@ export class MockRecognitionEngine implements PeopleRecognitionEngine {
     cropImagePath?: string | null;
     detection: { faceIndex: number; boundingBox: DetectedFaceResult['boundingBox'] };
     people: Person[];
-  }): Promise<FaceMatchCandidate[]> {
+  }): Promise<FaceMatchResult> {
     if (input.people.length === 0) {
-      return [];
+      return { candidates: [], searchQualitySharpness: null, searchQualityBrightness: null };
     }
 
     const scored = input.people.map((person) => {
@@ -74,10 +74,12 @@ export class MockRecognitionEngine implements PeopleRecognitionEngine {
       };
     });
 
-    return scored.sort((left, right) =>
+    const candidates = scored.sort((left, right) =>
       right.confidence === left.confidence
         ? left.personId.localeCompare(right.personId)
         : right.confidence - left.confidence
     );
+
+    return { candidates, searchQualitySharpness: null, searchQualityBrightness: null };
   }
 }

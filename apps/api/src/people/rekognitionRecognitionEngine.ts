@@ -3,6 +3,7 @@ import type {
   DetectedFaceResult,
   FaceEnrollmentResult,
   FaceMatchCandidate,
+  FaceMatchResult,
   PeopleRecognitionEngine,
   RemoveEnrollmentExampleResult
 } from './recognitionEngine.js';
@@ -50,15 +51,16 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
     cropImagePath?: string | null;
     detection: Pick<FaceDetection, 'faceIndex' | 'boundingBox'>;
     people: Person[];
-  }): Promise<FaceMatchCandidate[]> {
+  }): Promise<FaceMatchResult> {
     if (input.people.length === 0) {
-      return [];
+      return { candidates: [], searchQualitySharpness: null, searchQualityBrightness: null };
     }
 
     const peopleById = new Map(input.people.map((person) => [person.id, person]));
-    const matches = await this.client.searchUsersByImage(input.cropImagePath ?? input.imagePath);
+    const { matches, searchedFaceQualitySharpness, searchedFaceQualityBrightness } =
+      await this.client.searchUsersByImage(input.cropImagePath ?? input.imagePath);
 
-    return matches
+    const candidates: FaceMatchCandidate[] = matches
       .flatMap((match) => {
         const personId = parsePeopleEngineIdentityKey(match.userId);
         if (!personId || !peopleById.has(personId)) {
@@ -77,6 +79,12 @@ export class RekognitionRecognitionEngine implements PeopleRecognitionEngine {
           ? left.personId.localeCompare(right.personId)
           : right.confidence - left.confidence
       );
+
+    return {
+      candidates,
+      searchQualitySharpness: searchedFaceQualitySharpness,
+      searchQualityBrightness: searchedFaceQualityBrightness,
+    };
   }
 
   public async enrollFaceExample(input: {
