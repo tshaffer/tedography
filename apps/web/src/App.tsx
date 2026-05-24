@@ -11157,13 +11157,19 @@ export default function App() {
           {/* Actions: People Recog, Keywords */}
           <div style={toolbarGroupStyle}>
             {isLibraryArea ? (
-              <Tooltip title={!hasSelectedAssets ? 'Select one or more photos to run people recognition' : peopleRecognitionBusy ? 'Running people recognition...' : 'Run people recognition for the current selection'}>
+              <Tooltip title={
+                !can('people-face-review') ? 'Your role cannot run people recognition' :
+                !canInAlbum('people-face-review', focusedAlbumWriterIds) ? 'No write access to this album' :
+                peopleRecognitionBusy ? 'Running people recognition...' :
+                !hasSelectedAssets ? 'Select one or more photos to run people recognition' :
+                'Run people recognition for the current selection'
+              }>
                 <span>
                   <button
                     type="button"
-                    style={hasSelectedAssets && !peopleRecognitionBusy ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    style={canInAlbum('people-face-review', focusedAlbumWriterIds) && hasSelectedAssets && !peopleRecognitionBusy ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
                     onClick={() => void handleRunPeopleRecognitionForSelectedAssets()}
-                    disabled={!hasSelectedAssets || peopleRecognitionBusy}
+                    disabled={!canInAlbum('people-face-review', focusedAlbumWriterIds) || !hasSelectedAssets || peopleRecognitionBusy}
                     aria-label="Run People Recognition"
                   >
                     <EmojiEmotionsIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#f0a030' }} />
