@@ -1901,6 +1901,14 @@ export function PeopleReviewPage() {
                         {formatConfidence(item.detection.detectionConfidence)}
                       </div>
                       <div style={metaItemStyle}>
+                        <span style={labelStyle}>Search Quality — Sharpness</span>
+                        {formatConfidence(item.detection.searchQualitySharpness)}
+                      </div>
+                      <div style={metaItemStyle}>
+                        <span style={labelStyle}>Search Quality — Brightness</span>
+                        {formatConfidence(item.detection.searchQualityBrightness)}
+                      </div>
+                      <div style={metaItemStyle}>
                         <span style={labelStyle}>Suggested Person</span>
                         {item.suggestedPerson?.displayName ?? '—'}
                       </div>
