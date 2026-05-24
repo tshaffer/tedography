@@ -87,15 +87,18 @@ export async function exportPrintJpeg(
   preview = false
 ): Promise<void> {
   const { sourceFilePath, sourceWidth, sourceHeight, item } = resolved;
-  const landscape = sourceWidth > sourceHeight;
-  const { w: printW, h: printH } = printPixelDimensions(item.size, landscape);
 
-  // Determine actual post-rotation dimensions: EXIF orientations 5–8 swap w/h
+  // Read EXIF orientation first so we can determine the post-rotation dimensions.
+  // EXIF orientations 5–8 swap width and height (e.g. iPhone landscape shots stored portrait).
   const meta = await sharp(sourceFilePath).metadata();
   const orientation = meta.orientation ?? 1;
   const swapDims = orientation >= 5 && orientation <= 8;
   const effectiveW = swapDims ? (meta.height ?? sourceWidth) : (meta.width ?? sourceWidth);
   const effectiveH = swapDims ? (meta.width ?? sourceHeight) : (meta.height ?? sourceHeight);
+
+  // Use effective (post-rotation) dimensions to decide print orientation.
+  const landscape = effectiveW > effectiveH;
+  const { w: printW, h: printH } = printPixelDimensions(item.size, landscape);
 
   let pipeline = sharp(sourceFilePath).rotate(); // auto-correct EXIF orientation
 
