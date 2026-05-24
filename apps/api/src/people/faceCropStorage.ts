@@ -11,9 +11,14 @@ type SharpLikePipeline = {
   metadata(): Promise<{ width?: number; height?: number; orientation?: number }>;
   rotate(): SharpLikePipeline;
   extract(region: { left: number; top: number; width: number; height: number }): SharpLikePipeline;
+  resize(options: { width?: number; height?: number; fit?: string; withoutEnlargement?: boolean }): SharpLikePipeline;
   jpeg(options?: { quality?: number }): SharpLikePipeline;
   toFile(filePath: string): Promise<unknown>;
 };
+
+// Minimum face crop dimension sent to Rekognition. Crops smaller than this
+// get upsampled so the face recognition API has enough pixels to work with.
+const MIN_FACE_CROP_PX = 160;
 
 let sharpModulePromise: Promise<SharpLikeModule> | null = null;
 
@@ -83,8 +88,8 @@ export async function generateFaceCropForAsset(input: {
   await fs.mkdir(parentDirectory, { recursive: true });
 
   const sharpModule = await loadSharp();
-  const pipeline = sharpModule.default(input.imagePath) as SharpLikePipeline;
-  const metadata = await pipeline.metadata();
+  const metaPipeline = sharpModule.default(input.imagePath) as SharpLikePipeline;
+  const metadata = await metaPipeline.metadata();
   const dimensions = resolveOrientedImageDimensions({
     metadataWidth: metadata.width,
     metadataHeight: metadata.height,
@@ -102,16 +107,22 @@ export async function generateFaceCropForAsset(input: {
   const cropWidth = Math.max(1, Math.floor(clamp(input.detection.boundingBox.width * width, 1, width - left)));
   const cropHeight = Math.max(1, Math.floor(clamp(input.detection.boundingBox.height * height, 1, height - top)));
 
-  await (sharpModule.default(input.imagePath) as SharpLikePipeline)
+  // Upsample small crops so Rekognition has enough pixels to match reliably.
+  const needsUpscale = cropWidth < MIN_FACE_CROP_PX || cropHeight < MIN_FACE_CROP_PX;
+  let pipeline = (sharpModule.default(input.imagePath) as SharpLikePipeline)
     .rotate()
-    .extract({
-      left,
-      top,
-      width: cropWidth,
-      height: cropHeight
-    })
-    .jpeg({ quality: 92 })
-    .toFile(absolutePath);
+    .extract({ left, top, width: cropWidth, height: cropHeight });
+
+  if (needsUpscale) {
+    pipeline = pipeline.resize({
+      width: MIN_FACE_CROP_PX,
+      height: MIN_FACE_CROP_PX,
+      fit: 'inside',
+      withoutEnlargement: false
+    });
+  }
+
+  await pipeline.jpeg({ quality: 92 }).toFile(absolutePath);
 
   return { relativePath, absolutePath };
 }
