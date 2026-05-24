@@ -29,7 +29,9 @@ module.exports = {
   ],
   devtool: "source-map",
   devServer: {
+    host: '0.0.0.0',   // listen on all interfaces so LAN devices can connect
     port: 3000,
+    allowedHosts: 'all', // allow requests from LAN IPs (not just localhost)
     hot: true,
     historyApiFallback: true,
     static: {
