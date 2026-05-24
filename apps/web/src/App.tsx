@@ -11392,8 +11392,8 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* AI Queue toolbar button */}
-          <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
+          {/* AI Queue toolbar button — maintenance feature, admin only */}
+          {can('maintenance') ? <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
             <Tooltip title={aiQueueEntries.length > 0 ? `AI Queue (${aiQueueEntries.length})` : 'AI Queue'}>
               <span>
                 <button
@@ -11490,7 +11490,7 @@ export default function App() {
                 ) : null}
               </div>
             ) : null}
-          </div>
+          </div> : null}
 
           {/* View Options toolbar button */}
           <div style={menuAnchorStyle} id="tdg-layout-menu-root" ref={layoutMenuRootRef}>
