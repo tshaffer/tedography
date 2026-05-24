@@ -10988,25 +10988,27 @@ export default function App() {
                     recognitionBusy: peopleRecognitionBusy,
                     loading: selectedAssetPeopleStatusLoading,
                     errorMessage: selectedAssetPeopleStatusError,
-                    onOpenReview: handleOpenAssetPeopleReviewDialog,
-                    ...(isLibraryArea ? {
+                    ...(canInAlbum('people-face-review', focusedAlbumWriterIds) ? {
+                      onOpenReview: handleOpenAssetPeopleReviewDialog,
+                    } : {}),
+                    ...(isLibraryArea && canInAlbum('people-face-review', focusedAlbumWriterIds) ? {
                       onRunRecognition: handleRunPeopleRecognitionForSelectedAssets
                     } : {})
                   }
                 : null
             }
             onAddManualPerson={
-              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset && canInAlbum('people-face-review', focusedAlbumWriterIds)
                 ? handleAddManualPersonTag
                 : undefined
             }
             onRemoveManualPerson={
-              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset
+              (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset && canInAlbum('people-face-review', focusedAlbumWriterIds)
                 ? handleRemoveManualPersonTag
                 : undefined
             }
             bulkPersonTag={
-              isLibraryArea && selectedAssetIds.length > 1
+              isLibraryArea && selectedAssetIds.length > 1 && canInAlbum('people-face-review', focusedAlbumWriterIds)
                 ? {
                     count: selectedAssetIds.length,
                     onTag: handleAddManualPersonTagToAll,
