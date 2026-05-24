@@ -9796,43 +9796,51 @@ export default function App() {
             >
               Import Photos
             </button>
-            <button type="button" style={contextMenuItemStyle} onClick={openMoveDialogForSelectedTreeNode}>
-              Move To...
-            </button>
-            <button
-              type="button"
-              style={canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}
-              onClick={() => {
-                void handleReorderSelectedTreeNode('up');
-              }}
-              disabled={!canMoveSelectedTreeNodeUp}
-              title={
-                !canUseCustomReorderCommands
-                  ? 'Available only when these siblings use Custom order'
-                  : canMoveSelectedTreeNodeUp
-                    ? 'Move earlier among same-type siblings'
-                    : 'Already first in custom order'
-              }
-            >
-              Move Up
-            </button>
-            <button
-              type="button"
-              style={canMoveSelectedTreeNodeDown ? contextMenuItemStyle : disabledContextMenuItemStyle}
-              onClick={() => {
-                void handleReorderSelectedTreeNode('down');
-              }}
-              disabled={!canMoveSelectedTreeNodeDown}
-              title={
-                !canUseCustomReorderCommands
-                  ? 'Available only when these siblings use Custom order'
-                  : canMoveSelectedTreeNodeDown
-                    ? 'Move later among same-type siblings'
-                    : 'Already last in custom order'
-              }
-            >
-              Move Down
-            </button>
+            {(() => {
+              const hasAlbumAccess = canInAlbum('set-photo-state', selectedAlbumTreeAlbumNode?.writerUserIds ?? []);
+              const noAccessTitle = 'No write access to this album';
+              return (
+                <>
+                  <button
+                    type="button"
+                    style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    disabled={!hasAlbumAccess}
+                    title={hasAlbumAccess ? undefined : noAccessTitle}
+                    onClick={hasAlbumAccess ? openMoveDialogForSelectedTreeNode : undefined}
+                  >
+                    Move To...
+                  </button>
+                  <button
+                    type="button"
+                    style={hasAlbumAccess && canMoveSelectedTreeNodeUp ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => { if (hasAlbumAccess) void handleReorderSelectedTreeNode('up'); }}
+                    disabled={!hasAlbumAccess || !canMoveSelectedTreeNodeUp}
+                    title={
+                      !hasAlbumAccess ? noAccessTitle
+                      : !canUseCustomReorderCommands ? 'Available only when these siblings use Custom order'
+                      : canMoveSelectedTreeNodeUp ? 'Move earlier among same-type siblings'
+                      : 'Already first in custom order'
+                    }
+                  >
+                    Move Up
+                  </button>
+                  <button
+                    type="button"
+                    style={hasAlbumAccess && canMoveSelectedTreeNodeDown ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    onClick={() => { if (hasAlbumAccess) void handleReorderSelectedTreeNode('down'); }}
+                    disabled={!hasAlbumAccess || !canMoveSelectedTreeNodeDown}
+                    title={
+                      !hasAlbumAccess ? noAccessTitle
+                      : !canUseCustomReorderCommands ? 'Available only when these siblings use Custom order'
+                      : canMoveSelectedTreeNodeDown ? 'Move later among same-type siblings'
+                      : 'Already last in custom order'
+                    }
+                  >
+                    Move Down
+                  </button>
+                </>
+              );
+            })()}
             <div style={contextMenuSubmenuContainerStyle}>
               <button
                 type="button"
@@ -9994,26 +10002,32 @@ export default function App() {
                 Manage Writers…
               </button>
             ) : null}
-            <button
-              type="button"
-              style={contextMenuItemStyle}
-              onClick={() => {
-                closeAlbumTreeContextMenu();
-                void handleRenameSelectedTreeNode();
-              }}
-            >
-              Rename
-            </button>
-            <button
-              type="button"
-              style={contextMenuItemStyle}
-              onClick={() => {
-                closeAlbumTreeContextMenu();
-                void handleDeleteSelectedTreeNode();
-              }}
-            >
-              Delete
-            </button>
+            {(() => {
+              const hasAlbumAccess = canInAlbum('set-photo-state', selectedAlbumTreeAlbumNode?.writerUserIds ?? []);
+              const noAccessTitle = 'No write access to this album';
+              return (
+                <>
+                  <button
+                    type="button"
+                    style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    disabled={!hasAlbumAccess}
+                    title={hasAlbumAccess ? undefined : noAccessTitle}
+                    onClick={hasAlbumAccess ? () => { closeAlbumTreeContextMenu(); void handleRenameSelectedTreeNode(); } : undefined}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                    disabled={!hasAlbumAccess}
+                    title={hasAlbumAccess ? undefined : noAccessTitle}
+                    onClick={hasAlbumAccess ? () => { closeAlbumTreeContextMenu(); void handleDeleteSelectedTreeNode(); } : undefined}
+                  >
+                    Delete
+                  </button>
+                </>
+              );
+            })()}
           </>
         ) : null}
       </div>
