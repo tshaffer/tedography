@@ -133,6 +133,29 @@ export function isRekognitionImageBytesTooLargeError(error: unknown): boolean {
   );
 }
 
+// Rekognition throws InvalidParameterException (distinct from the bytes-too-large variant)
+// when it cannot detect any face in the submitted image.  We use this to trigger an
+// upsample-and-retry pass in searchUsersByImage.
+export function isNoFaceInImageError(error: unknown): boolean {
+  return (
+    getErrorName(error) === 'InvalidParameterException' &&
+    !isRekognitionImageBytesTooLargeError(error)
+  );
+}
+
+// Upsample the image to at least 400 px on its shorter side before retrying.
+// Face crops for small faces are often well under 100 px — Rekognition needs
+// more pixels even when QualityFilter is NONE.
+async function upsampleForRetry(inputPath: string): Promise<Uint8Array> {
+  const sharpModule = await loadSharpModule();
+  const buffer = await (sharpModule.default(inputPath) as SharpLikePipeline)
+    .rotate()
+    .resize({ width: 400, height: 400, fit: 'inside', withoutEnlargement: false })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  return normalizeBytes(buffer);
+}
+
 async function encodeJpegToTargetSize(inputPath: string, mode: ImagePreparationMode): Promise<Uint8Array> {
   const sharpModule = await loadSharpModule();
   const attempts =
@@ -411,34 +434,62 @@ export class RekognitionClient {
     await this.ensureCollectionExists();
 
     const threshold = config.peoplePipeline.rekognition.faceMatchThreshold;
-    const response = await this.sendImageCommandWithPreparedBytes<{
-      UserMatches?: SearchUserMatch[];
-    }>({
-      commandName: 'SearchUsersByImageCommand',
-      imagePath,
-      buildInput: (bytes) => ({
-        CollectionId: requireCollectionId(),
-        Image: { Bytes: bytes },
-        ...(threshold !== null ? { FaceMatchThreshold: threshold * 100 } : {}),
-        MaxUsers: Math.max(1, Math.floor(config.peoplePipeline.rekognition.maxResults)),
-        QualityFilter: 'NONE'
-      }),
-      fallbackMessage: 'Rekognition SearchUsersByImage request failed.'
+    const buildInput = (bytes: Uint8Array): object => ({
+      CollectionId: requireCollectionId(),
+      Image: { Bytes: bytes },
+      ...(threshold !== null ? { FaceMatchThreshold: threshold * 100 } : {}),
+      MaxUsers: Math.max(1, Math.floor(config.peoplePipeline.rekognition.maxResults)),
+      QualityFilter: 'NONE'
     });
 
-    const matches = Array.isArray(response.UserMatches) ? response.UserMatches : [];
-    return matches.flatMap((item) => {
-      if (typeof item.User?.UserId !== 'string' || typeof item.Similarity !== 'number') {
-        return [];
+    const parseMatches = (raw: unknown): RekognitionUserMatch[] => {
+      const response = raw as { UserMatches?: SearchUserMatch[] };
+      const matches = Array.isArray(response.UserMatches) ? response.UserMatches : [];
+      return matches.flatMap((item) => {
+        if (typeof item.User?.UserId !== 'string' || typeof item.Similarity !== 'number') {
+          return [];
+        }
+        return [{ userId: item.User.UserId, similarity: item.Similarity / 100 }];
+      });
+    };
+
+    // Attempt the search, with retry logic for both image-too-large and no-face cases.
+    let bytes = await prepareImageBytes(imagePath, 'default');
+
+    try {
+      return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
+    } catch (firstError) {
+
+      // ── Image too large → recompress and retry ────────────────────────────
+      if (isRekognitionImageBytesTooLargeError(firstError)) {
+        bytes = await prepareImageBytes(imagePath, 'aggressive');
+        if (bytes.byteLength > REKOGNITION_IMAGE_BYTES_LIMIT) {
+          throw new PeopleRecognitionEngineError(
+            `Image payload is still too large for Rekognition after recompression (${bytes.byteLength} bytes).`,
+            'request-failed'
+          );
+        }
+        try {
+          return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(bytes)));
+        } catch (retryError) {
+          if (isNoFaceInImageError(retryError)) return [];
+          throw mapAwsError(retryError, 'Rekognition SearchUsersByImage request failed.');
+        }
       }
 
-      return [
-        {
-          userId: item.User.UserId,
-          similarity: item.Similarity / 100
+      // ── No face detected → upsample and retry ────────────────────────────
+      if (isNoFaceInImageError(firstError)) {
+        try {
+          const upsampledBytes = await upsampleForRetry(imagePath);
+          return parseMatches(await this.sendRaw('SearchUsersByImageCommand', buildInput(upsampledBytes)));
+        } catch (retryError) {
+          if (isNoFaceInImageError(retryError)) return []; // still too small — give up gracefully
+          throw mapAwsError(retryError, 'Rekognition SearchUsersByImage (upsampled retry) failed.');
         }
-      ];
-    });
+      }
+
+      throw mapAwsError(firstError, 'Rekognition SearchUsersByImage request failed.');
+    }
   }
 
   public async ensureUserExists(userId: string): Promise<void> {
