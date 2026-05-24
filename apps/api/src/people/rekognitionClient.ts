@@ -421,7 +421,7 @@ export class RekognitionClient {
         Image: { Bytes: bytes },
         ...(threshold !== null ? { FaceMatchThreshold: threshold * 100 } : {}),
         MaxUsers: Math.max(1, Math.floor(config.peoplePipeline.rekognition.maxResults)),
-        QualityFilter: 'AUTO'
+        QualityFilter: 'NONE'
       }),
       fallbackMessage: 'Rekognition SearchUsersByImage request failed.'
     });
