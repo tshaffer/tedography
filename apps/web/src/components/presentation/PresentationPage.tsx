@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   PRESENTATION_CHANNEL_NAME,
   type PresentationMessage,
-} from '../../utilities/presentationChannel.js';
-import { getDisplayMediaUrl } from '../../utilities/mediaUrls.js';
+} from '../../utilities/presentationChannel';
+import { getDisplayMediaUrl } from '../../utilities/mediaUrls';
 
 const rootStyle: CSSProperties = {
   position: 'fixed',
