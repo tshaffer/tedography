@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { UserMenu } from '../auth/UserMenu';
 
@@ -23,6 +23,8 @@ export type ActiveArea =
 export interface TedographyPageShellProps {
   activeArea: ActiveArea;
   children: ReactNode;
+  /** When provided, the Library nav item calls this handler instead of using a plain Link. */
+  onLibraryClick?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,8 +100,9 @@ const contentStyle: CSSProperties = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function TedographyPageShell({ activeArea, children }: TedographyPageShellProps) {
+export function TedographyPageShell({ activeArea, children, onLibraryClick }: TedographyPageShellProps) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [changePinOpen, setChangePinOpen] = useState(false);
 
   const isAdminArea =
@@ -114,7 +117,17 @@ export function TedographyPageShell({ activeArea, children }: TedographyPageShel
         {/* ── People / standard areas ── */}
         {!isAdminArea && (
           <>
-            <Link to="/?area=Library" style={activeArea === 'Library' ? navActive : navBase}>Library</Link>
+            {onLibraryClick ? (
+              <button
+                type="button"
+                style={activeArea === 'Library' ? navActive : navBase}
+                onClick={() => { onLibraryClick(); navigate('/?area=Library'); }}
+              >
+                Library
+              </button>
+            ) : (
+              <Link to="/?area=Library" style={activeArea === 'Library' ? navActive : navBase}>Library</Link>
+            )}
             <Link to="/?area=Search"  style={activeArea === 'Search'  ? navActive : navBase}>Search</Link>
             <Link to="/people"        style={activeArea === 'People'  ? navActive : navBase}>People</Link>
             <Link to="/people/review" style={activeArea === 'People Review' ? navActive : navBase}>People Review</Link>

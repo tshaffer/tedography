@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { TedographyPageShell } from '../shared/TedographyPageShell';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
 import type { PeoplePipelineSummaryResponse, PeopleReviewQueueItem, PeopleReviewQueueSort } from '@tedography/shared';
@@ -488,6 +488,7 @@ const ignoredReasonOptions: FaceDetectionIgnoredReason[] = [
   'other'
 ];
 const scopedPeopleReviewAssetIdsStorageKey = 'tedography.people.review.scopeAssetIds';
+const peopleRunSummaryStorageKey = 'tedography.people.runSummary';
 
 type ScopedPeopleReviewAssetIdsState = {
   assetIds: string[];
@@ -637,6 +638,7 @@ function getConfirmActionHint(item: PeopleReviewQueueItem): string | null {
 }
 
 export function PeopleReviewPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [simplifiedView] = useState<boolean>(() => {
     const stored = window.localStorage.getItem('tedography.peopleReview.simplifiedView');
@@ -724,13 +726,13 @@ export function PeopleReviewPage() {
       setItems(queueResponse.items);
       setCounts(queueResponse.counts);
 
-      if (!hasAutoAdjustedFiltersRef.current && queueResponse.items.length === 0) {
+      if (!hasAutoAdjustedFiltersRef.current) {
+        hasAutoAdjustedFiltersRef.current = true;
         const selectedSet = new Set(selectedStatuses);
         const unselectedWithItems = (Object.entries(queueResponse.counts) as [FaceDetectionMatchStatus, number][])
           .filter(([status, count]) => count > 0 && !selectedSet.has(status))
           .map(([status]) => status);
         if (unselectedWithItems.length > 0) {
-          hasAutoAdjustedFiltersRef.current = true;
           setSelectedStatuses((prev) => [...prev, ...unselectedWithItems]);
         }
       }
@@ -1322,7 +1324,10 @@ export function PeopleReviewPage() {
   }, [busyDetectionId, currentItem, filteredItems, loading]);
 
   return (
-    <TedographyPageShell activeArea="People Review">
+    <TedographyPageShell
+      activeArea="People Review"
+      onLibraryClick={() => { window.sessionStorage.removeItem(peopleRunSummaryStorageKey); }}
+    >
     <div style={pageStyle}>
       <section style={panelStyle}>
         {!simplifiedView ? (
@@ -1678,6 +1683,13 @@ export function PeopleReviewPage() {
         ) : null}
 
         <div style={{ ...badgeRowStyle, marginTop: '14px' }}>
+          <button
+            type="button"
+            style={compactButtonStyle}
+            onClick={() => navigate('/?area=Library')}
+          >
+            Show Summary
+          </button>
           {statusOptions.map((status) => {
             const selected = selectedStatusSet.has(status.value);
             return (

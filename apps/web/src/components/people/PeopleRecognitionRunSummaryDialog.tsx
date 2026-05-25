@@ -253,7 +253,7 @@ export function PeopleRecognitionRunSummaryDialog({
             </button>
             <button
               type="button"
-              style={pipelineIgnored > 0 && !isRefreshing ? buttonStyle : disabledButtonStyle}
+              style={pipelineIgnored > 0 && !isRefreshing ? primaryButtonStyle : disabledButtonStyle}
               disabled={pipelineIgnored === 0 || isRefreshing}
               onClick={onReviewIgnoredFaces}
             >
