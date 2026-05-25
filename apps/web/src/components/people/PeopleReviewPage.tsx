@@ -132,24 +132,6 @@ const assetGroupStyle: CSSProperties = {
   gap: '8px'
 };
 
-const assetGroupHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: '12px',
-  padding: '6px 4px 2px',
-};
-
-const assetGroupFilenameStyle: CSSProperties = {
-  fontSize: '14px',
-  fontWeight: 600,
-  color: '#0f172a',
-};
-
-const assetGroupIdStyle: CSSProperties = {
-  fontSize: '11px',
-  color: '#94a3b8',
-  fontFamily: 'monospace',
-};
 
 const assetThumbnailHeaderStyle: CSSProperties = {
   padding: '10px 14px',
@@ -310,7 +292,10 @@ function AssetThumbnailWithFaceBoxes({
       <div style={sourcePreviewLayoutStyle}>
         <div>
           <div style={{ ...inlineRowStyle, justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700 }}>Source asset context</div>
+            <div style={{ ...inlineRowStyle, gap: '10px', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{filename}</span>
+              <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>{assetId}</span>
+            </div>
             <label style={{ ...inlineRowStyle, gap: '6px', fontSize: '13px', color: '#163246', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -1770,10 +1755,6 @@ export function PeopleReviewPage() {
               onShowFaceBoxesChange={setShowFaceBoxes}
               currentDetectionId={currentItem?.detection.id ?? null}
             />
-            <div style={assetGroupHeaderStyle}>
-              <span style={assetGroupFilenameStyle}>{group.asset.filename}</span>
-              <span style={assetGroupIdStyle}>{group.assetId}</span>
-            </div>
             {group.items.map((item) => {
             const draft = getDraft(item.detection.id, item.detection.ignoredReason);
             const isBusy = busyDetectionId === item.detection.id || busyDetectionId === '__batch__';
