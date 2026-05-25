@@ -132,6 +132,25 @@ const assetGroupStyle: CSSProperties = {
   gap: '8px'
 };
 
+const assetGroupHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: '12px',
+  padding: '6px 4px 2px',
+};
+
+const assetGroupFilenameStyle: CSSProperties = {
+  fontSize: '14px',
+  fontWeight: 600,
+  color: '#0f172a',
+};
+
+const assetGroupIdStyle: CSSProperties = {
+  fontSize: '11px',
+  color: '#94a3b8',
+  fontFamily: 'monospace',
+};
+
 const assetThumbnailHeaderStyle: CSSProperties = {
   padding: '10px 14px',
   backgroundColor: '#f1f5f9',
@@ -1751,6 +1770,10 @@ export function PeopleReviewPage() {
               onShowFaceBoxesChange={setShowFaceBoxes}
               currentDetectionId={currentItem?.detection.id ?? null}
             />
+            <div style={assetGroupHeaderStyle}>
+              <span style={assetGroupFilenameStyle}>{group.asset.filename}</span>
+              <span style={assetGroupIdStyle}>{group.assetId}</span>
+            </div>
             {group.items.map((item) => {
             const draft = getDraft(item.detection.id, item.detection.ignoredReason);
             const isBusy = busyDetectionId === item.detection.id || busyDetectionId === '__batch__';
@@ -1836,7 +1859,6 @@ export function PeopleReviewPage() {
                     <span style={isCurrent ? currentBadgeStyle : badgeStyle}>Status: {item.detection.matchStatus}</span>
                     {isCurrent ? <span style={currentBadgeStyle}>Current</span> : null}
                     <span style={badgeStyle}>Face #{item.detection.faceIndex}</span>
-                    <span style={badgeStyle}>Asset: {item.asset.id}</span>
                     {pendingAssignment ? (
                       <span style={queuedBadgeStyle}>
                         Queued → {pendingAssignment.personName}
