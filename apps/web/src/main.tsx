@@ -13,6 +13,7 @@ import { PeopleReviewPage } from './components/people/PeopleReviewPage';
 import { AdminPage } from './components/admin/AdminPage';
 import { UsersPage } from './components/admin/UsersPage';
 import { RolesPage } from './components/admin/RolesPage';
+import { PresentationPage } from './components/presentation/PresentationPage';
 
 function AuthGate({ children }: { children: React.ReactNode }): React.ReactElement {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/roles" element={<RolesPage />} />
+            <Route path="/present" element={<PresentationPage />} />
           </Routes>
         </BrowserRouter>
       </AuthGate>

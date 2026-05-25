@@ -174,6 +174,10 @@ import {
 } from './utilities/albumTree';
 import { getDisplayMediaUrl, getThumbnailMediaUrl } from './utilities/mediaUrls';
 import {
+  PRESENTATION_CHANNEL_NAME,
+  type PresentationMessage,
+} from './utilities/presentationChannel';
+import {
   formatAlbumOrderingModeLabel,
   getAlbumOrderingModeInAlbum,
   isForcedManualOrderInAlbum,
@@ -4331,6 +4335,8 @@ export default function App() {
   });
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
+  const presentationChannelRef = useRef<BroadcastChannel | null>(null);
+  const selectedAssetIdRef = useRef<string | null>(null);
   const thumbnailSizeRootRef = useRef<HTMLDivElement | null>(null);
   const aiMenuRootRef = useRef<HTMLDivElement | null>(null);
   const layoutMenuRootRef = useRef<HTMLDivElement | null>(null);
@@ -4658,6 +4664,44 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(libraryBrowseModeStorageKey, libraryBrowseMode);
   }, [libraryBrowseMode]);
+
+  // ── Presentation channel ──────────────────────────────────────────────────
+  // Keep a ref so the hello-handler always reads the latest selectedAssetId.
+  useEffect(() => {
+    selectedAssetIdRef.current = selectedAssetId;
+  }, [selectedAssetId]);
+
+  useEffect(() => {
+    const channel = new BroadcastChannel(PRESENTATION_CHANNEL_NAME);
+    presentationChannelRef.current = channel;
+
+    channel.addEventListener('message', (event: MessageEvent<PresentationMessage>) => {
+      if (event.data.type === 'hello') {
+        // Presentation window just opened — send it the current photo.
+        const current = selectedAssetIdRef.current;
+        const msg: PresentationMessage = current
+          ? { type: 'current', assetId: current }
+          : { type: 'current', assetId: null };
+        channel.postMessage(msg);
+      }
+    });
+
+    return () => {
+      channel.close();
+      presentationChannelRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Broadcast the current photo to any open presentation window whenever it changes.
+  useEffect(() => {
+    const channel = presentationChannelRef.current;
+    if (!channel) return;
+    if (selectedAssetId) {
+      channel.postMessage({ type: 'photo', assetId: selectedAssetId } satisfies PresentationMessage);
+    } else {
+      channel.postMessage({ type: 'clear' } satisfies PresentationMessage);
+    }
+  }, [selectedAssetId]);
 
   useEffect(() => {
     window.localStorage.setItem(slideshowLoopStorageKey, slideshowLoop ? 'true' : 'false');
@@ -11901,6 +11945,17 @@ export default function App() {
                       }
                     >
                       Slideshow
+                    </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => {
+                        window.open('/present', 'tedography-presentation', 'width=1280,height=800');
+                        setToolbarOverflowOpen(false);
+                      }}
+                      title="Open presentation window (drag to TV display, then go full-screen)"
+                    >
+                      Present
                     </button>
                     <button
                       type="button"
