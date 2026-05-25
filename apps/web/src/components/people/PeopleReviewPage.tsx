@@ -1256,6 +1256,56 @@ export function PeopleReviewPage() {
     }
   }
 
+  async function runConfirmAllByStatus(status: 'suggested' | 'autoMatched' | 'ignored'): Promise<void> {
+    const targetItems = filteredItems.filter((item) => item.detection.matchStatus === status);
+    if (targetItems.length === 0 || busyDetectionId) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled(
+        targetItems.map((item) => {
+          if (status === 'ignored') {
+            const ignoredReason = getDraft(item.detection.id, item.detection.ignoredReason).ignoredReason;
+            return reviewFaceDetection(item.detection.id, {
+              action: 'ignore',
+              ignoredReason,
+              reviewer: 'people-review-ui'
+            });
+          }
+          const confirmPersonId =
+            item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId ?? null;
+          if (!confirmPersonId) {
+            return Promise.reject(new Error(`Face ${item.detection.id} has no person to confirm`));
+          }
+          rememberRecentPerson(confirmPersonId);
+          return reviewFaceDetection(item.detection.id, {
+            action: 'confirm',
+            personId: confirmPersonId,
+            reviewer: 'people-review-ui'
+          });
+        })
+      );
+
+      const succeededCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.length - succeededCount;
+      await loadPageData();
+
+      const label = status === 'suggested' ? 'Suggested' : status === 'autoMatched' ? 'Auto Matched' : 'Ignored';
+      setNoticeMessage(
+        failedCount === 0
+          ? `Confirmed all ${succeededCount} ${label} face${succeededCount === 1 ? '' : 's'}.`
+          : `Confirmed ${succeededCount} ${label} face${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to confirm faces');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
   useEffect(() => {
     function handleWindowKeyDown(event: KeyboardEvent): void {
       if (loading || busyDetectionId || isEditableEventTarget(event.target)) {
@@ -1689,6 +1739,33 @@ export function PeopleReviewPage() {
             onClick={() => navigate('/?area=Library')}
           >
             Show Summary
+          </button>
+          <button
+            type="button"
+            style={counts['suggested'] > 0 && !busyDetectionId ? compactButtonStyle : disabledButtonStyle}
+            disabled={counts['suggested'] === 0 || Boolean(busyDetectionId)}
+            onClick={() => void runConfirmAllByStatus('suggested')}
+            title={`Confirm all ${counts['suggested']} suggested face${counts['suggested'] === 1 ? '' : 's'}`}
+          >
+            Confirm Suggested ({counts['suggested']})
+          </button>
+          <button
+            type="button"
+            style={counts['autoMatched'] > 0 && !busyDetectionId ? compactButtonStyle : disabledButtonStyle}
+            disabled={counts['autoMatched'] === 0 || Boolean(busyDetectionId)}
+            onClick={() => void runConfirmAllByStatus('autoMatched')}
+            title={`Confirm all ${counts['autoMatched']} auto-matched face${counts['autoMatched'] === 1 ? '' : 's'}`}
+          >
+            Confirm Auto Matched ({counts['autoMatched']})
+          </button>
+          <button
+            type="button"
+            style={counts['ignored'] > 0 && !busyDetectionId ? compactButtonStyle : disabledButtonStyle}
+            disabled={counts['ignored'] === 0 || Boolean(busyDetectionId)}
+            onClick={() => void runConfirmAllByStatus('ignored')}
+            title={`Confirm all ${counts['ignored']} ignored face${counts['ignored'] === 1 ? '' : 's'}`}
+          >
+            Confirm Ignored ({counts['ignored']})
           </button>
           {statusOptions.map((status) => {
             const selected = selectedStatusSet.has(status.value);
