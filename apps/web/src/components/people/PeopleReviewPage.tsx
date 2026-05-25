@@ -1032,6 +1032,54 @@ export function PeopleReviewPage() {
     });
   }
 
+  async function applyAllPending(): Promise<void> {
+    const assignmentEntries = Object.entries(pendingAssignments);
+    const confirmationEntries = Object.entries(pendingConfirmations);
+    const ignoreEntries = Object.entries(pendingIgnores);
+    const total = assignmentEntries.length + confirmationEntries.length + ignoreEntries.length;
+    if (total === 0 || busyDetectionId) return;
+
+    setBusyDetectionId('__batch__');
+    setErrorMessage(null);
+    setNoticeMessage(null);
+
+    try {
+      const results = await Promise.allSettled([
+        ...assignmentEntries.map(([detectionId, { personId }]) =>
+          reviewFaceDetection(detectionId, { action: 'assign', personId, reviewer: 'people-review-ui' })
+        ),
+        ...confirmationEntries.map(([detectionId, { confirmPersonId }]) =>
+          reviewFaceDetection(detectionId, {
+            action: 'confirm',
+            ...(confirmPersonId ? { personId: confirmPersonId } : {}),
+            reviewer: 'people-review-ui'
+          })
+        ),
+        ...ignoreEntries.map(([detectionId, { ignoredReason }]) =>
+          reviewFaceDetection(detectionId, { action: 'ignore', ignoredReason, reviewer: 'people-review-ui' })
+        )
+      ]);
+
+      const succeededCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.length - succeededCount;
+
+      setPendingAssignments({});
+      setPendingConfirmations({});
+      setPendingIgnores({});
+      await loadPageData();
+
+      setNoticeMessage(
+        failedCount === 0
+          ? `Applied all ${succeededCount} queued action${succeededCount === 1 ? '' : 's'}.`
+          : `Applied ${succeededCount} action${succeededCount === 1 ? '' : 's'}; ${failedCount} failed.`
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to apply queued actions');
+    } finally {
+      setBusyDetectionId(null);
+    }
+  }
+
   async function applyPendingIgnores(): Promise<void> {
     const entries = Object.entries(pendingIgnores);
     if (entries.length === 0) return;
@@ -1586,6 +1634,35 @@ export function PeopleReviewPage() {
                 </button>
               </div>
             </div>
+          </div>
+        ) : null}
+
+        {Object.keys(pendingAssignments).length + Object.keys(pendingConfirmations).length + Object.keys(pendingIgnores).length > 0 ? (
+          <div
+            style={{
+              ...panelStyle,
+              marginTop: '14px',
+              marginBottom: '0',
+              padding: '10px 12px',
+              backgroundColor: '#0f5f73',
+              borderColor: '#0a4a5a',
+              boxShadow: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#e0f4f8' }}>
+              {Object.keys(pendingAssignments).length + Object.keys(pendingConfirmations).length + Object.keys(pendingIgnores).length} total action{Object.keys(pendingAssignments).length + Object.keys(pendingConfirmations).length + Object.keys(pendingIgnores).length === 1 ? '' : 's'} queued
+            </div>
+            <button
+              type="button"
+              style={busyDetectionId ? disabledButtonStyle : applyButtonStyle}
+              disabled={Boolean(busyDetectionId)}
+              onClick={() => void applyAllPending()}
+            >
+              Apply All ({Object.keys(pendingAssignments).length + Object.keys(pendingConfirmations).length + Object.keys(pendingIgnores).length})
+            </button>
           </div>
         ) : null}
 
