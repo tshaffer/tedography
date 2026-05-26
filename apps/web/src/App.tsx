@@ -7742,7 +7742,7 @@ export default function App() {
     try {
       console.log('[confirmSuggested] fetching queue for', snapshot.assetIdsWithSuggestedMatches.length, 'assets');
       const { items } = await listPeopleReviewQueue({
-        statuses: ['suggested'],
+        statuses: ['suggested', 'autoMatched'],
         assetIds: snapshot.assetIdsWithSuggestedMatches,
       });
       console.log('[confirmSuggested] queue returned', items.length, 'items:', items.map((i) => ({
