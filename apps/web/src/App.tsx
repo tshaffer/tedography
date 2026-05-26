@@ -1285,14 +1285,14 @@ const cardPeopleBadgeStyle: CSSProperties = {
   bottom: '5px',
   left: '6px',
   zIndex: 2,
-  width: '16px',
-  height: '16px',
+  width: '28px',
+  height: '28px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#0ea5e9',
+  color: '#00d4ff',
   pointerEvents: 'none',
-  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
+  filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.6))'
 };
 
 const cardSelectedBadgeStyle: CSSProperties = {
@@ -3041,7 +3041,7 @@ function AssetCard({
             style={cardPeopleBadgeStyle}
             title={`People: ${asset.people.map((p) => p.displayName).join(', ')}`}
           >
-            <FaceIcon style={{ fontSize: '14px' }} />
+            <FaceIcon style={{ fontSize: '28px' }} />
           </span>
         ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
