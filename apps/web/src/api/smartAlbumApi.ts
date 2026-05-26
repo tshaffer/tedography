@@ -13,7 +13,7 @@ type ApiErrorPayload = {
 };
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+  const response = await fetch(input, { cache: 'no-store', ...init });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
     throw new Error(payload.error ?? `Request failed with status ${response.status}`);
