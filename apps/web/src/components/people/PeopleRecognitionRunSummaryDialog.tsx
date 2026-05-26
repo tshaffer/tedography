@@ -6,9 +6,7 @@ interface PeopleRecognitionRunSummaryDialogProps {
   summary: PeopleRecognitionRunSummary;
   isRefreshing?: boolean;
   onClose: () => void;
-  onReviewSuggestedMatches: () => void;
-  onReviewUnmatchedFaces: () => void;
-  onReviewIgnoredFaces: () => void;
+  onReview: () => void;
   onShowNoFaceAssets: () => void;
   onShowFailedAssets: () => void;
 }
@@ -142,9 +140,7 @@ export function PeopleRecognitionRunSummaryDialog({
   summary,
   isRefreshing = false,
   onClose,
-  onReviewSuggestedMatches,
-  onReviewUnmatchedFaces,
-  onReviewIgnoredFaces,
+  onReview,
   onShowNoFaceAssets,
   onShowFailedAssets
 }: PeopleRecognitionRunSummaryDialogProps) {
@@ -237,27 +233,11 @@ export function PeopleRecognitionRunSummaryDialog({
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
-              style={suggested > 0 && !isRefreshing ? primaryButtonStyle : disabledButtonStyle}
-              disabled={suggested === 0 || isRefreshing}
-              onClick={onReviewSuggestedMatches}
+              style={pendingAttentionCount > 0 && !isRefreshing ? primaryButtonStyle : disabledButtonStyle}
+              disabled={pendingAttentionCount === 0 || isRefreshing}
+              onClick={onReview}
             >
-              Review Suggested Matches ({suggested})
-            </button>
-            <button
-              type="button"
-              style={unmatched > 0 && !isRefreshing ? primaryButtonStyle : disabledButtonStyle}
-              disabled={unmatched === 0 || isRefreshing}
-              onClick={onReviewUnmatchedFaces}
-            >
-              Review Unmatched Faces ({unmatched})
-            </button>
-            <button
-              type="button"
-              style={pipelineIgnored > 0 && !isRefreshing ? primaryButtonStyle : disabledButtonStyle}
-              disabled={pipelineIgnored === 0 || isRefreshing}
-              onClick={onReviewIgnoredFaces}
-            >
-              Review Auto-Ignored Faces ({pipelineIgnored})
+              Review ({pendingAttentionCount})
             </button>
             <button
               type="button"

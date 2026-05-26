@@ -7701,37 +7701,21 @@ export default function App() {
     window.sessionStorage.removeItem(peopleRunSummaryStorageKey);
   }
 
-  function handleRunSummaryReviewSuggested(): void {
-    if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) return;
+  function handleRunSummaryReview(): void {
+    if (!runSummary) return;
+    const assetIds = [
+      ...new Set([
+        ...runSummary.assetIdsWithSuggestedMatches,
+        ...runSummary.assetIdsWithUnmatchedFaces,
+        ...runSummary.assetIdsWithPipelineIgnoredFaces
+      ])
+    ];
+    if (assetIds.length === 0) return;
     writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
     writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
-      assetIds: runSummary.assetIdsWithSuggestedMatches,
+      assetIds,
       scopeType: runSummary.scopeType,
-      scopeLabel: `Run summary – suggested matches (${runSummary.assetIdsWithSuggestedMatches.length} assets)`,
-      scopeSourceLabel: runSummary.scopeLabel
-    } satisfies ScopedPeopleReviewAssetIdsState);
-    void navigate('/people/review?scopeAssetIds=active');
-  }
-
-  function handleRunSummaryReviewUnmatched(): void {
-    if (!runSummary || runSummary.assetIdsWithUnmatchedFaces.length === 0) return;
-    writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
-    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
-      assetIds: runSummary.assetIdsWithUnmatchedFaces,
-      scopeType: runSummary.scopeType,
-      scopeLabel: `Run summary – unmatched faces (${runSummary.assetIdsWithUnmatchedFaces.length} assets)`,
-      scopeSourceLabel: runSummary.scopeLabel
-    } satisfies ScopedPeopleReviewAssetIdsState);
-    void navigate('/people/review?scopeAssetIds=active');
-  }
-
-  function handleRunSummaryReviewIgnoredFaces(): void {
-    if (!runSummary || runSummary.assetIdsWithPipelineIgnoredFaces.length === 0) return;
-    writeSessionStorageJson(peopleRunSummaryStorageKey, runSummary);
-    writeSessionStorageJson(scopedPeopleReviewAssetIdsStorageKey, {
-      assetIds: runSummary.assetIdsWithPipelineIgnoredFaces,
-      scopeType: runSummary.scopeType,
-      scopeLabel: `Run summary – auto-ignored faces (${runSummary.assetIdsWithPipelineIgnoredFaces.length} assets)`,
+      scopeLabel: `Run summary – pending review (${assetIds.length} asset${assetIds.length === 1 ? '' : 's'})`,
       scopeSourceLabel: runSummary.scopeLabel
     } satisfies ScopedPeopleReviewAssetIdsState);
     void navigate('/people/review?scopeAssetIds=active');
@@ -12729,9 +12713,7 @@ export default function App() {
           summary={runSummary}
           isRefreshing={runSummaryRefreshing}
           onClose={dismissRunSummary}
-          onReviewSuggestedMatches={handleRunSummaryReviewSuggested}
-          onReviewUnmatchedFaces={handleRunSummaryReviewUnmatched}
-          onReviewIgnoredFaces={handleRunSummaryReviewIgnoredFaces}
+          onReview={handleRunSummaryReview}
           onShowNoFaceAssets={handleRunSummaryShowNoFaceAssets}
           onShowFailedAssets={handleRunSummaryShowFailedAssets}
         />
