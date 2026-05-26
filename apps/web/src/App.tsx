@@ -7727,13 +7727,18 @@ export default function App() {
   async function handleRunSummaryConfirmSuggested(): Promise<void> {
     if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) return;
     setRunSummaryConfirmingSuggested(true);
+    const snapshot = runSummary;
     try {
       const { items } = await listPeopleReviewQueue({
         statuses: ['suggested'],
-        assetIds: runSummary.assetIdsWithSuggestedMatches,
-        limit: 2000
+        assetIds: snapshot.assetIdsWithSuggestedMatches,
       });
-      await Promise.allSettled(
+
+      if (items.length === 0) {
+        return;
+      }
+
+      const results = await Promise.allSettled(
         items.map((item) => {
           const personId = item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId;
           if (!personId) return Promise.resolve();
@@ -7744,12 +7749,17 @@ export default function App() {
           });
         })
       );
-      // Refresh summary counts to reflect the confirmations.
-      void refreshRunSummaryBuckets(runSummary);
-    } catch {
-      // Best-effort — summary will still refresh.
+
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.error(`handleRunSummaryConfirmSuggested: ${failed.length} of ${results.length} confirm calls failed`, failed);
+      }
+    } catch (error) {
+      console.error('handleRunSummaryConfirmSuggested: failed to fetch or confirm suggested detections', error);
     } finally {
       setRunSummaryConfirmingSuggested(false);
+      // Always refresh bucket counts so the dialog reflects current state.
+      await refreshRunSummaryBuckets(snapshot);
     }
   }
 
