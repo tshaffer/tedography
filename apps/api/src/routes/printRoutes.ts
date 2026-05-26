@@ -58,7 +58,7 @@ printRoutes.post('/jobs', requireFeature('print', (req) => {
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const outputDir = path.join(root, `BayPhoto_Print_Order_${timestamp}`);
+    const outputDir = path.join(root, `${provider.info.folderPrefix}_${timestamp}`);
 
     const result = await provider.exportPackage(resolvedItems, outputDir);
     res.json(result);

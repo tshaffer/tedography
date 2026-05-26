@@ -33,6 +33,7 @@ export class WhccExportProvider implements PrintProvider {
     description: 'Generate a print package for manual upload to whcc.com.',
     supportedSizes: ['4x6', '5x7', '8x10', '11x14'],
     supportedFinishes: ['lustre', 'glossy', 'matte'],
+    folderPrefix: 'WHCC',
   };
 
   async exportPackage(resolvedItems: ResolvedPrintItem[], outputDir: string): Promise<PrintJobResult> {

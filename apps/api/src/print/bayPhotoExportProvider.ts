@@ -33,6 +33,7 @@ export class BayPhotoExportProvider implements PrintProvider {
     description: 'Generate a print package for manual upload to bayphoto.com.',
     supportedSizes: ['4x6', '5x7', '8x10', '11x14'],
     supportedFinishes: ['matte', 'lustre', 'glossy'],
+    folderPrefix: 'BayPhoto',
   };
 
   async exportPackage(resolvedItems: ResolvedPrintItem[], outputDir: string): Promise<PrintJobResult> {

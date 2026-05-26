@@ -29,6 +29,8 @@ export interface PrintProviderInfo {
   description: string;
   supportedSizes: PrintSize[];
   supportedFinishes: PrintFinish[];
+  /** Prefix used when naming the output folder, e.g. "BayPhoto" → "BayPhoto_2026-05-26T13-44-06" */
+  folderPrefix: string;
 }
 
 export interface PrintItemResult {
