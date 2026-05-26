@@ -834,7 +834,7 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
             </div>
           )}
           <p style={{ fontSize: 13, color: '#555', marginTop: 14 }}>
-            Upload the contents of the output folder to Bay Photo to place your order.
+            Upload the contents of the output folder to {selectedProvider?.label ?? 'your print lab'} to place your order.
             Open <code>order-summary.html</code> for a full preview before uploading.
           </p>
         </div>
