@@ -7638,9 +7638,13 @@ export default function App() {
 
       results.forEach((result, index) => {
         const assetId = summary.processedAssetIds[index];
-        if (assetId === undefined || result.status === 'rejected') return;
+        if (assetId === undefined || result.status === 'rejected') {
+          console.warn('[refreshBuckets] skipping asset', assetId, '— result status:', result.status);
+          return;
+        }
 
         const { detections, reviews } = result.value;
+        console.log(`[refreshBuckets] asset ${assetId}: ${detections.length} detections —`, detections.map((d) => ({ id: d.id, matchStatus: d.matchStatus })));
         if (detections.length === 0) {
           assetIdsWithNoFacesDetected.push(assetId);
           return;
@@ -7685,6 +7689,8 @@ export default function App() {
         ...assetIdsWithPipelineIgnoredFaces
       ]).size;
 
+      console.log('[refreshBuckets] new counts — suggested:', assetIdsWithSuggestedMatches.length, 'unmatched:', assetIdsWithUnmatchedFaces.length, 'pipelineIgnored:', assetIdsWithPipelineIgnoredFaces.length, 'pendingAttention:', pendingAttentionCount);
+
       if (pendingAttentionCount === 0) {
         window.sessionStorage.removeItem(peopleRunSummaryStorageKey);
         setRunSummary(null);
@@ -7692,7 +7698,8 @@ export default function App() {
         writeSessionStorageJson(peopleRunSummaryStorageKey, refreshed);
         setRunSummary(refreshed);
       }
-    } catch {
+    } catch (err) {
+      console.error('[refreshBuckets] error during refresh:', err);
       // Keep existing counts on error — user can dismiss and re-run if needed
     } finally {
       setRunSummaryRefreshing(false);
@@ -7725,41 +7732,64 @@ export default function App() {
   }
 
   async function handleRunSummaryConfirmSuggested(): Promise<void> {
-    if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) return;
+    console.log('[confirmSuggested] start — assetIdsWithSuggestedMatches:', runSummary?.assetIdsWithSuggestedMatches);
+    if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) {
+      console.log('[confirmSuggested] bailing early — no suggested assets');
+      return;
+    }
     setRunSummaryConfirmingSuggested(true);
     const snapshot = runSummary;
     try {
+      console.log('[confirmSuggested] fetching queue for', snapshot.assetIdsWithSuggestedMatches.length, 'assets');
       const { items } = await listPeopleReviewQueue({
         statuses: ['suggested'],
         assetIds: snapshot.assetIdsWithSuggestedMatches,
       });
+      console.log('[confirmSuggested] queue returned', items.length, 'items:', items.map((i) => ({
+        detectionId: i.detection.id,
+        matchStatus: i.detection.matchStatus,
+        autoMatchCandidatePersonId: i.detection.autoMatchCandidatePersonId,
+        matchedPersonId: i.detection.matchedPersonId,
+      })));
 
       if (items.length === 0) {
+        console.log('[confirmSuggested] no items to confirm — returning');
         return;
       }
 
       const results = await Promise.allSettled(
-        items.map((item) => {
+        items.map(async (item) => {
           const personId = item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId;
-          if (!personId) return Promise.resolve();
-          return reviewFaceDetection(item.detection.id, {
+          console.log(`[confirmSuggested] detection ${item.detection.id}: personId=${personId ?? 'NONE'}`);
+          if (!personId) {
+            console.warn(`[confirmSuggested] skipping detection ${item.detection.id} — no personId`);
+            return Promise.resolve();
+          }
+          console.log(`[confirmSuggested] POSTing confirm for detection ${item.detection.id} → person ${personId}`);
+          const result = await reviewFaceDetection(item.detection.id, {
             action: 'confirm',
             personId,
             reviewer: 'people-review-ui'
           });
+          console.log(`[confirmSuggested] confirm result for ${item.detection.id}:`, result);
+          return result;
         })
       );
 
+      console.log('[confirmSuggested] allSettled results:', results.map((r) => r.status));
       const failed = results.filter((r) => r.status === 'rejected');
       if (failed.length > 0) {
-        console.error(`handleRunSummaryConfirmSuggested: ${failed.length} of ${results.length} confirm calls failed`, failed);
+        console.error(`[confirmSuggested] ${failed.length} of ${results.length} confirm calls failed`, failed);
+      } else {
+        console.log('[confirmSuggested] all confirms succeeded');
       }
     } catch (error) {
-      console.error('handleRunSummaryConfirmSuggested: failed to fetch or confirm suggested detections', error);
+      console.error('[confirmSuggested] outer catch — failed to fetch or confirm:', error);
     } finally {
       setRunSummaryConfirmingSuggested(false);
-      // Always refresh bucket counts so the dialog reflects current state.
+      console.log('[confirmSuggested] refreshing run summary buckets…');
       await refreshRunSummaryBuckets(snapshot);
+      console.log('[confirmSuggested] done');
     }
   }
 
