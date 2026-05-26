@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -615,7 +616,7 @@ const topBarStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
   flexWrap: 'nowrap',
-  gap: '8px',
+  gap: '0',
   padding: '8px',
   border: '1px solid #d6d6d6',
   borderRadius: '10px',
@@ -623,8 +624,40 @@ const topBarStyle: CSSProperties = {
   position: 'relative',
   zIndex: 20,
   minWidth: 0,
-  overflowX: 'clip',
-  overflowY: 'hidden'
+  overflow: 'hidden'
+};
+
+// Shrinkable middle section — clips when viewport is narrow rather than pushing buttons off-screen
+const toolbarScrollContainerStyle: CSSProperties = {
+  flex: '0 1 auto',
+  minWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexWrap: 'nowrap',
+  overflow: 'hidden'
+};
+
+// Always-visible tool buttons (AI Queue, View Options, ⋯ More) — never clip
+const toolbarFixedToolsStyle: CSSProperties = {
+  flex: '0 0 auto',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  marginLeft: '4px'
+};
+
+// Grow spacer — pushes Library/Search/People to the far right
+const toolbarSpacerStyle: CSSProperties = {
+  flex: '1 1 auto'
+};
+
+// Far-right area: Library/Search/People + User menu
+const toolbarTrailingContainerStyle: CSSProperties = {
+  flex: '0 0 auto',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px'
 };
 
 const secondaryBarStyle: CSSProperties = {
@@ -1323,6 +1356,22 @@ const cardActiveRingStyle: CSSProperties = {
   zIndex: 1
 };
 
+// Shown on every unselected card when touch-selection mode is active.
+// Selected cards already show cardSelectedBadgeStyle (blue filled ✓).
+const touchSelectEmptyRingStyle: CSSProperties = {
+  position: 'absolute',
+  top: '8px',
+  right: '8px',
+  zIndex: 2,
+  width: '22px',
+  height: '22px',
+  borderRadius: '50%',
+  border: '2px solid rgba(255,255,255,0.85)',
+  backgroundColor: 'rgba(0,0,0,0.25)',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+  pointerEvents: 'none'
+};
+
 const cardHoverLabelStyle: CSSProperties = {
   position: 'absolute',
   left: '6px',
@@ -1623,6 +1672,25 @@ body {
   cursor: not-allowed !important;
   transform: none !important;
   box-shadow: none !important;
+}
+
+/* Hide desktop-only toolbar groups on touch devices (iPad, phone) */
+@media (pointer: coarse) {
+  .tdg-desktop-only { display: none !important; }
+}
+
+/* Suppress iOS Safari's native image callout on long-press */
+[data-grid-card] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* pointer-events: none on img routes all touch events to the article,
+   preventing the browser from treating the element as an image target
+   for its native Save/Copy/Open context menu */
+[data-grid-card] img {
+  pointer-events: none;
+  -webkit-touch-callout: none;
 }
 `;
 
@@ -1980,6 +2048,7 @@ const slideshowControlsBarStyle: CSSProperties = {
   flexDirection: 'column',
   gap: '6px',
   flexShrink: 0,
+  transition: 'opacity 0.4s ease',
 };
 
 const slideshowProgressTrackStyle: CSSProperties = {
@@ -2917,8 +2986,10 @@ type AssetCardProps = {
   showAiQueueBadge: boolean;
   showPeopleBadge: boolean;
   isInAiQueue: boolean;
+  touchSelectionMode: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
+  onLongPress: (assetId: string) => void;
 };
 
 function AssetCard({
@@ -2931,12 +3002,17 @@ function AssetCard({
   showAiQueueBadge,
   showPeopleBadge,
   isInAiQueue,
+  touchSelectionMode,
   onCardClick,
-  onCardDoubleClick
+  onCardDoubleClick,
+  onLongPress
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const pendingClickTimeoutRef = useRef<number | null>(null);
+  // Long-press detection for touch multi-select.
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const thumbnailImageUrl = getAssetThumbnailImageUrl(asset);
   const displayImageUrl = getAssetDisplayImageUrl(asset);
   const imageUrl = imageFailed ? displayImageUrl : thumbnailImageUrl;
@@ -2952,15 +3028,55 @@ function AssetCard({
       if (pendingClickTimeoutRef.current !== null) {
         window.clearTimeout(pendingClickTimeoutRef.current);
       }
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+      }
     };
   }, []);
 
+  function handleTouchStart(): void {
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      longPressTimerRef.current = null;
+      onLongPress(asset.id);
+    }, 500);
+  }
+
+  function handleTouchMove(): void {
+    // Finger moved — user is scrolling, cancel the long-press.
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function handleTouchEnd(): void {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
   function handleClick(event: ReactMouseEvent<HTMLElement>): void {
+    // Suppress the synthetic click that fires right after a long-press touch sequence.
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+
     if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
       if (pendingClickTimeoutRef.current !== null) {
         window.clearTimeout(pendingClickTimeoutRef.current);
         pendingClickTimeoutRef.current = null;
       }
+      onCardClick(event, asset.id);
+      return;
+    }
+
+    // In touch selection mode every tap is an immediate toggle — no double-click
+    // delay needed since double-tap is suppressed via touch-action: manipulation.
+    if (touchSelectionMode) {
       onCardClick(event, asset.id);
       return;
     }
@@ -2980,6 +3096,7 @@ function AssetCard({
   }
 
   function handleDoubleClick(): void {
+    if (touchSelectionMode) return; // no double-click action in touch selection mode
     if (pendingClickTimeoutRef.current !== null) {
       window.clearTimeout(pendingClickTimeoutRef.current);
       pendingClickTimeoutRef.current = null;
@@ -2998,16 +3115,21 @@ function AssetCard({
           ? {
               ...cardStyle,
               ...(isSelected ? selectedCardStyle : {}),
-              ...activeCardStyle
+              ...activeCardStyle,
+              touchAction: 'manipulation'
             }
           : isSelected
-            ? { ...cardStyle, ...selectedCardStyle }
-            : cardStyle
+            ? { ...cardStyle, ...selectedCardStyle, touchAction: 'manipulation' }
+            : { ...cardStyle, touchAction: 'manipulation' }
       }
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onContextMenu={(e) => e.preventDefault()}
       title={asset.filename}
     >
       <div style={thumbnailFrameStyle}>
@@ -3044,7 +3166,11 @@ function AssetCard({
             <FaceIcon style={{ fontSize: '28px' }} />
           </span>
         ) : null}
-        {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
+        {isSelected
+          ? <span style={cardSelectedBadgeStyle}>✓</span>
+          : touchSelectionMode
+            ? <span style={touchSelectEmptyRingStyle} />
+            : null}
         {isActive ? <span style={cardActiveRingStyle} /> : null}
         {imageUrl && !imageFailed ? (
           <img
@@ -3210,6 +3336,48 @@ function SlideshowViewer({
 }: SlideshowViewerProps) {
   const [isHovered, setIsHovered] = useState(false);
   const showOverlay = isHovered || !isPlaying;
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const isPlayingRef = useRef(isPlaying);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep ref in sync with prop
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const showAndScheduleHide = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimerRef.current !== null) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    if (isPlayingRef.current) {
+      hideTimerRef.current = setTimeout(() => {
+        setControlsVisible(false);
+        hideTimerRef.current = null;
+      }, 3000);
+    }
+  }, []);
+
+  // Show controls when paused; schedule hide when playing
+  useEffect(() => {
+    if (isPlaying) {
+      showAndScheduleHide();
+    } else {
+      if (hideTimerRef.current !== null) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      setControlsVisible(true);
+    }
+    return () => {
+      if (hideTimerRef.current !== null) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+    };
+  }, [isPlaying, showAndScheduleHide]);
+
   const imageUrl = getAssetDisplayImageUrl(asset);
   const progressPercent = total > 1 ? (index / (total - 1)) * 100 : 100;
 
@@ -3223,11 +3391,11 @@ function SlideshowViewer({
   const peopleNames = (asset.people ?? []).map((p) => p.displayName);
 
   return (
-    <div style={slideshowOverlayStyle}>
+    <div style={slideshowOverlayStyle} onTouchStart={showAndScheduleHide}>
       <div
         style={slideshowImageAreaStyle}
-        onClick={onTogglePlayPause}
-        onMouseEnter={() => setIsHovered(true)}
+        onClick={() => { showAndScheduleHide(); onTogglePlayPause(); }}
+        onMouseEnter={() => { setIsHovered(true); showAndScheduleHide(); }}
         onMouseLeave={() => setIsHovered(false)}
         title={isPlaying ? 'Click to pause' : 'Click to play'}
       >
@@ -3252,7 +3420,7 @@ function SlideshowViewer({
         </div>
       </div>
 
-      <div style={slideshowControlsBarStyle}>
+      <div style={{ ...slideshowControlsBarStyle, opacity: controlsVisible ? 1 : 0, pointerEvents: controlsVisible ? 'auto' : 'none' }}>
         <div style={slideshowProgressTrackStyle}>
           <div
             style={{
@@ -4373,6 +4541,9 @@ export default function App() {
   const [activeTimelineMonthKey, setActiveTimelineMonthKey] = useState<string | null>(null);
   const mainColumnRef = useRef<HTMLElement | null>(null);
   const presentationChannelRef = useRef<BroadcastChannel | null>(null);
+  // When true, the grid is in touch multi-select mode: taps toggle selection
+  // rather than replacing it. Entered via long-press on a thumbnail.
+  const [touchSelectionMode, setTouchSelectionMode] = useState(false);
   const selectedAssetIdRef = useRef<string | null>(null);
   const thumbnailSizeRootRef = useRef<HTMLDivElement | null>(null);
   const aiMenuRootRef = useRef<HTMLDivElement | null>(null);
@@ -4409,7 +4580,9 @@ export default function App() {
     right: 0
   });
   const [stateButtonsCompact, setStateButtonsCompact] = useState<boolean>(() => {
-    return localStorage.getItem('tdg-state-buttons-compact') === 'true';
+    const stored = localStorage.getItem('tdg-state-buttons-compact');
+    // Default is true (icons only); labels must be explicitly opted into.
+    return stored === null ? true : stored === 'true';
   });
 
   useEffect(() => {
@@ -9166,6 +9339,9 @@ export default function App() {
   }
 
   function handleCardClick(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
+    // Suppress the synthetic click that fires right after a drag-select gesture.
+    if (dragSelectHappenedRef.current) return;
+
     if (event.shiftKey) {
       const anchorId = selectionAnchorAssetId ?? selectedAssetId ?? assetId;
       const anchorIndex = visibleAssets.findIndex((asset) => asset.id === anchorId);
@@ -9181,7 +9357,8 @@ export default function App() {
       }
     }
 
-    const isToggleSelection = event.metaKey || event.ctrlKey;
+    // In touch selection mode every tap is a toggle (no modifier needed).
+    const isToggleSelection = event.metaKey || event.ctrlKey || touchSelectionMode;
 
     if (!isToggleSelection) {
       setSelectedAssetId(assetId);
@@ -9206,6 +9383,104 @@ export default function App() {
       setSelectedAssetId(nextSelectedIds[0] ?? null);
     }
   }
+
+  function handleLongPress(assetId: string): void {
+    setTouchSelectionMode(true);
+    // Select the long-pressed card if it isn't already selected.
+    if (!selectedAssetIds.includes(assetId)) {
+      setSelectedAssetIds([assetId]);
+      setSelectedAssetId(assetId);
+      setSelectionAnchorAssetId(assetId);
+    }
+  }
+
+  // Auto-exit touch selection mode when the selection is fully cleared.
+  useEffect(() => {
+    if (touchSelectionMode && selectedAssetIds.length === 0) {
+      setTouchSelectionMode(false);
+    }
+  }, [touchSelectionMode, selectedAssetIds.length]);
+
+  // ── Drag-to-select (touch) ───────────────────────────────────────────────
+  // A ref that handleCardClick checks to suppress the synthetic click that
+  // fires after a drag gesture ends.
+  const dragSelectHappenedRef = useRef(false);
+
+  useEffect(() => {
+    if (!touchSelectionMode) return;
+
+    const dragStart = { x: 0, y: 0 };
+    let dragging = false;
+    let lastAssetId: string | null = null;
+
+    function cardAtPoint(x: number, y: number): string | null {
+      const el = document.elementFromPoint(x, y);
+      const card = el?.closest('[data-grid-card]');
+      return card?.getAttribute('data-asset-id') ?? null;
+    }
+
+    let startedOnCard = false;
+
+    function onTouchStart(e: TouchEvent) {
+      const touch = e.touches[0];
+      if (!touch) return;
+      // Only track drags that start on a grid card.
+      const assetId = cardAtPoint(touch.clientX, touch.clientY);
+      startedOnCard = !!assetId;
+      if (!assetId) return;
+      dragStart.x = touch.clientX;
+      dragStart.y = touch.clientY;
+      dragging = false;
+      lastAssetId = null;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      // If the gesture didn't start on a card, don't interfere with scrolling.
+      if (!startedOnCard) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      const dx = touch.clientX - dragStart.x;
+      const dy = touch.clientY - dragStart.y;
+
+      // Start drag-selecting once the finger has moved at least 8 px.
+      if (!dragging) {
+        if (Math.sqrt(dx * dx + dy * dy) < 8) return;
+        dragging = true;
+      }
+
+      // Prevent the page from scrolling while drag-selecting.
+      e.preventDefault();
+
+      const assetId = cardAtPoint(touch.clientX, touch.clientY);
+      if (!assetId || assetId === lastAssetId) return;
+      lastAssetId = assetId;
+
+      setSelectedAssetIds((prev) =>
+        prev.includes(assetId) ? prev : [...prev, assetId]
+      );
+    }
+
+    function onTouchEnd() {
+      if (dragging) {
+        // Flag so that handleCardClick suppresses the synthetic click.
+        dragSelectHappenedRef.current = true;
+        setTimeout(() => { dragSelectHappenedRef.current = false; }, 300);
+      }
+      dragging = false;
+      startedOnCard = false;
+      lastAssetId = null;
+    }
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    // Non-passive so we can call preventDefault() to suppress scroll while dragging.
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [touchSelectionMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
@@ -11265,17 +11540,31 @@ export default function App() {
       <style>{controlStateStyles}</style>
       <div style={topBarsStackStyle}>
         <div style={topBarStyle}>
+          {/* ── Scrollable middle section ── */}
+          <div style={toolbarScrollContainerStyle}>
           {/* Title */}
           <div style={toolbarGroupStyle}>
             <strong style={toolbarTitleStyle}>Tedography</strong>
           </div>
 
-          {/* Selection count + Clear */}
+          {/* Selection count + Clear / Done */}
           {hasSelectedAssets ? (
             <div style={toolbarGroupStyle}>
               <span style={{ fontSize: '12px', color: '#444', whiteSpace: 'nowrap' }}>
                 {selectionCount} selected
               </span>
+              {touchSelectionMode ? (
+                <button
+                  type="button"
+                  style={{ ...toolbarButtonStyle, marginLeft: '4px' }}
+                  onClick={() => {
+                    setSelectedAssetIds(visibleAssets.map((a) => a.id));
+                    setSelectedAssetId(visibleAssets[0]?.id ?? null);
+                  }}
+                >
+                  All
+                </button>
+              ) : null}
               <button
                 type="button"
                 style={{ ...toolbarButtonStyle, marginLeft: '4px' }}
@@ -11283,6 +11572,15 @@ export default function App() {
               >
                 Clear
               </button>
+              {touchSelectionMode ? (
+                <button
+                  type="button"
+                  style={{ ...toolbarButtonStyle, marginLeft: '4px', fontWeight: 600, color: '#1f6feb' }}
+                  onClick={() => { clearSelection(); setTouchSelectionMode(false); }}
+                >
+                  Done
+                </button>
+              ) : null}
             </div>
           ) : null}
 
@@ -11325,7 +11623,7 @@ export default function App() {
                         disabled={!enabled}
                       >
                         {icon}
-                        {!stateButtonsCompact ? <span>{state}</span> : null}
+                        {!stateButtonsCompact ? <span className="tdg-state-btn-label">{state}</span> : null}
                       </button>
                     </span>
                   </Tooltip>
@@ -11353,8 +11651,8 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* Actions: People Recog, Keywords */}
-          <div style={toolbarGroupStyle}>
+          {/* Actions: People Recog, Keywords — hidden on touch devices */}
+          <div style={toolbarGroupStyle} className="tdg-desktop-only">
             {isLibraryArea ? (
               <Tooltip title={
                 !can('people-face-review') ? 'Your role cannot run people recognition' :
@@ -11392,9 +11690,9 @@ export default function App() {
             ) : null}
           </div>
 
-          {/* Actions: Import — hidden entirely for roles that cannot import */}
+          {/* Actions: Import — hidden on touch devices and for roles that cannot import */}
           {can('import') ? (
-            <div style={toolbarGroupStyle}>
+            <div style={toolbarGroupStyle} className="tdg-desktop-only">
               <Tooltip title="Import assets">
                 <span>
                   <button
@@ -11422,8 +11720,8 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* Print — visible for all roles; disabled when no selection or per-album access denied */}
-          <div style={toolbarGroupStyle}>
+          {/* Print — hidden on touch devices */}
+          <div style={toolbarGroupStyle} className="tdg-desktop-only">
             <Tooltip title={!canInAlbum('print', focusedAlbumWriterIds) ? 'Your role cannot print in this album' : hasSelectedAssets ? 'Print selected photos' : 'Select one or more photos to print'}>
               <span>
                 <button
@@ -11514,7 +11812,12 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* View modes: Grid, Loupe, Survey, Fullscreen */}
+          </div>{/* end toolbarScrollContainerStyle */}
+
+          {/* ── Always-visible tool buttons ── */}
+          <div style={toolbarFixedToolsStyle}>
+
+          {/* View modes: Grid, Loupe, Survey, Fullscreen — always visible */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
               <Tooltip title="Grid">
@@ -11896,6 +12199,44 @@ export default function App() {
                   overflowY: 'auto'
                 }}
               >
+                {/* State buttons — always available in overflow for narrow screens */}
+                {(isLibraryArea || isSearchArea) ? (
+                  <>
+                    <div className="tdg-overflow-section">Photo State</div>
+                    {reviewActions.map((state) => {
+                      const icon = getPhotoStateIcon(state);
+                      const enabled = hasSelectedAssets && canInAlbum('set-photo-state', focusedAlbumWriterIds);
+                      return (
+                        <button
+                          key={state}
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => {
+                            if (isLoupeMode && selectedAsset) {
+                              void handleSetPhotoState(selectedAsset.id, state);
+                            } else {
+                              void handleApplyPhotoStateToSelectedAssets(state);
+                            }
+                            setToolbarOverflowOpen(false);
+                          }}
+                          disabled={!enabled}
+                          title={
+                            !can('set-photo-state')
+                              ? 'Your role cannot change photo state'
+                              : enabled
+                                ? `Apply ${state} to the current selection`
+                                : `Select one or more photos to apply ${state}`
+                          }
+                        >
+                          <span style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center' }}>{icon}</span>
+                          {state}
+                        </button>
+                      );
+                    })}
+                    <div className="tdg-overflow-divider" />
+                  </>
+                ) : null}
+
                 {/* Display */}
                 <div className="tdg-overflow-section">Display</div>
                 <button
@@ -12233,9 +12574,13 @@ export default function App() {
               </div>
             ) : null}
           </div>
+          </div>{/* end toolbarFixedToolsStyle */}
 
-          <div style={topBarSpacerStyle} />
+          {/* ── Grow spacer — pushes Library/Search/People to the far right ── */}
+          <div style={toolbarSpacerStyle} />
 
+          {/* ── Far-right: area navigation + user menu ── */}
+          <div style={toolbarTrailingContainerStyle}>
           <div style={topBarSectionStyle}>
             <button
               type="button"
@@ -12266,7 +12611,8 @@ export default function App() {
               onLogout={() => { void logout(); }}
             />
           ) : null}
-        </div>
+          </div>{/* end toolbarTrailingContainerStyle */}
+        </div>{/* end topBarStyle */}
       </div>
 
 
@@ -12489,8 +12835,10 @@ export default function App() {
                           showAiQueueBadge={showThumbnailAiQueueBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                          touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
+                          onLongPress={handleLongPress}
                         />
                       ))}
                     </div>
@@ -12520,8 +12868,10 @@ export default function App() {
                           showAiQueueBadge={showThumbnailAiQueueBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                          touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
+                          onLongPress={handleLongPress}
                         />
                       ))}
                     </div>
@@ -12542,8 +12892,10 @@ export default function App() {
                     showAiQueueBadge={showThumbnailAiQueueBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
                     isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                    touchSelectionMode={touchSelectionMode}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
+                    onLongPress={handleLongPress}
                   />
                 ))}
               </div>
