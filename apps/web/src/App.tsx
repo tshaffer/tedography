@@ -47,6 +47,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
 import LockIcon from '@mui/icons-material/Lock';
+import FaceIcon from '@mui/icons-material/Face';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -323,6 +324,7 @@ const peopleReviewSimplifiedViewStorageKey = 'tedography.peopleReview.simplified
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showThumbnailAiQueueBadgesStorageKey = 'tedography.showThumbnailAiQueueBadges';
+const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
@@ -1274,6 +1276,21 @@ const cardAiQueueBadgeStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   color: '#9333ea',
+  pointerEvents: 'none',
+  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
+};
+
+const cardPeopleBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '5px',
+  left: '6px',
+  zIndex: 2,
+  width: '16px',
+  height: '16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#0ea5e9',
   pointerEvents: 'none',
   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
 };
@@ -2898,6 +2915,7 @@ type AssetCardProps = {
   showPhotoStateBadge: boolean;
   showKeywordAssignmentBadge: boolean;
   showAiQueueBadge: boolean;
+  showPeopleBadge: boolean;
   isInAiQueue: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
@@ -2911,6 +2929,7 @@ function AssetCard({
   showPhotoStateBadge,
   showKeywordAssignmentBadge,
   showAiQueueBadge,
+  showPeopleBadge,
   isInAiQueue,
   onCardClick,
   onCardDoubleClick
@@ -3015,6 +3034,14 @@ function AssetCard({
             title="In AI queue"
           >
             <PsychologyIcon style={{ fontSize: '14px' }} />
+          </span>
+        ) : null}
+        {showPeopleBadge && asset.people && asset.people.length > 0 ? (
+          <span
+            style={cardPeopleBadgeStyle}
+            title={`People: ${asset.people.map((p) => p.displayName).join(', ')}`}
+          >
+            <FaceIcon style={{ fontSize: '14px' }} />
           </span>
         ) : null}
         {isSelected ? <span style={cardSelectedBadgeStyle}>✓</span> : null}
@@ -4192,6 +4219,13 @@ export default function App() {
     const stored = window.localStorage.getItem(showThumbnailAiQueueBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showThumbnailPeopleBadges, setShowThumbnailPeopleBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showThumbnailPeopleBadgesStorageKey) === 'true';
+  });
   const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const own = window.localStorage.getItem(showAlbumKeywordStatusBadgeStorageKey);
@@ -4643,6 +4677,13 @@ export default function App() {
       showThumbnailAiQueueBadges ? 'true' : 'false'
     );
   }, [showThumbnailAiQueueBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailPeopleBadgesStorageKey,
+      showThumbnailPeopleBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailPeopleBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
@@ -11726,6 +11767,14 @@ export default function App() {
                   />
                   AI Queue Indicator
                 </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailPeopleBadges}
+                    onChange={(event) => setShowThumbnailPeopleBadges(event.target.checked)}
+                  />
+                  People
+                </label>
                 <span style={filterSubsectionTitleStyle}>Panel Visibility</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -12438,6 +12487,7 @@ export default function App() {
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailAiQueueBadges}
+                          showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -12468,6 +12518,7 @@ export default function App() {
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailAiQueueBadges}
+                          showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -12489,6 +12540,7 @@ export default function App() {
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                     showAiQueueBadge={showThumbnailAiQueueBadges}
+                    showPeopleBadge={showThumbnailPeopleBadges}
                     isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
