@@ -110,8 +110,10 @@ import {
   getPeopleScopedAssetSummary,
   listAssetIdsWithReviewableDetections,
   listPeople,
+  listPeopleReviewQueue,
   processPeopleAsset,
   removeManualPersonTag,
+  reviewFaceDetection,
   type PeopleScopedAssetSummaryResponse
 } from './api/peoplePipelineApi';
 import {
@@ -3865,6 +3867,7 @@ export default function App() {
     () => readSessionStorageJson<PeopleRecognitionRunSummary>(peopleRunSummaryStorageKey)
   );
   const [runSummaryRefreshing, setRunSummaryRefreshing] = useState(false);
+  const [runSummaryConfirmingSuggested, setRunSummaryConfirmingSuggested] = useState(false);
   const [mediaTypeFilters, setMediaTypeFilters] = useState<MediaType[]>([]);
   const [libraryVisiblePhotoStates, setLibraryVisiblePhotoStates] = useState<PhotoState[]>(() => {
     if (typeof window === 'undefined') {
@@ -7719,6 +7722,35 @@ export default function App() {
       scopeSourceLabel: runSummary.scopeLabel
     } satisfies ScopedPeopleReviewAssetIdsState);
     void navigate('/people/review?scopeAssetIds=active');
+  }
+
+  async function handleRunSummaryConfirmSuggested(): Promise<void> {
+    if (!runSummary || runSummary.assetIdsWithSuggestedMatches.length === 0) return;
+    setRunSummaryConfirmingSuggested(true);
+    try {
+      const { items } = await listPeopleReviewQueue({
+        statuses: ['suggested'],
+        assetIds: runSummary.assetIdsWithSuggestedMatches,
+        limit: 2000
+      });
+      await Promise.allSettled(
+        items.map((item) => {
+          const personId = item.detection.autoMatchCandidatePersonId ?? item.detection.matchedPersonId;
+          if (!personId) return Promise.resolve();
+          return reviewFaceDetection(item.detection.id, {
+            action: 'confirm',
+            personId,
+            reviewer: 'people-review-ui'
+          });
+        })
+      );
+      // Refresh summary counts to reflect the confirmations.
+      void refreshRunSummaryBuckets(runSummary);
+    } catch {
+      // Best-effort — summary will still refresh.
+    } finally {
+      setRunSummaryConfirmingSuggested(false);
+    }
   }
 
   function handleRunSummaryShowNoFaceAssets(): void {
@@ -12714,6 +12746,8 @@ export default function App() {
           isRefreshing={runSummaryRefreshing}
           onClose={dismissRunSummary}
           onReview={handleRunSummaryReview}
+          onConfirmSuggestedMatches={() => { void handleRunSummaryConfirmSuggested(); }}
+          isConfirmingSuggested={runSummaryConfirmingSuggested}
           onShowNoFaceAssets={handleRunSummaryShowNoFaceAssets}
           onShowFailedAssets={handleRunSummaryShowFailedAssets}
         />

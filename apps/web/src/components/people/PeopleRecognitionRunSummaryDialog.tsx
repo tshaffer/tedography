@@ -7,6 +7,8 @@ interface PeopleRecognitionRunSummaryDialogProps {
   isRefreshing?: boolean;
   onClose: () => void;
   onReview: () => void;
+  onConfirmSuggestedMatches: () => void;
+  isConfirmingSuggested?: boolean;
   onShowNoFaceAssets: () => void;
   onShowFailedAssets: () => void;
 }
@@ -141,6 +143,8 @@ export function PeopleRecognitionRunSummaryDialog({
   isRefreshing = false,
   onClose,
   onReview,
+  onConfirmSuggestedMatches,
+  isConfirmingSuggested = false,
   onShowNoFaceAssets,
   onShowFailedAssets
 }: PeopleRecognitionRunSummaryDialogProps) {
@@ -238,6 +242,14 @@ export function PeopleRecognitionRunSummaryDialog({
               onClick={onReview}
             >
               Review ({pendingAttentionCount})
+            </button>
+            <button
+              type="button"
+              style={suggested > 0 && !isRefreshing && !isConfirmingSuggested ? buttonStyle : disabledButtonStyle}
+              disabled={suggested === 0 || isRefreshing || isConfirmingSuggested}
+              onClick={onConfirmSuggestedMatches}
+            >
+              {isConfirmingSuggested ? 'Confirming…' : `Confirm Suggested Matches (${suggested})`}
             </button>
             <button
               type="button"
