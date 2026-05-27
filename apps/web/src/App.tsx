@@ -7894,7 +7894,7 @@ export default function App() {
       const results = await Promise.allSettled(
         summary.processedAssetIds.map(async (assetId) => {
           const state = await getPeoplePipelineAssetState(assetId);
-          return { assetId, detections: state.detections, reviews: state.reviews };
+          return { assetId, state };
         })
       );
 
@@ -7906,6 +7906,8 @@ export default function App() {
       const assetIdsWithPipelineIgnoredFaces: string[] = [];
       const assetIdsWithNoFacesDetected: string[] = [];
 
+      const succeededResults = new Map<string, { assetId: string; state: ListAssetFaceDetectionsResponse }>();
+
       results.forEach((result, index) => {
         const assetId = summary.processedAssetIds[index];
         if (assetId === undefined || result.status === 'rejected') {
@@ -7913,7 +7915,9 @@ export default function App() {
           return;
         }
 
-        const { detections, reviews } = result.value;
+        const { state } = result.value;
+        const { detections, reviews } = state;
+        succeededResults.set(assetId, result.value);
         console.log(`[refreshBuckets] asset ${assetId}: ${detections.length} detections —`, detections.map((d) => ({ id: d.id, matchStatus: d.matchStatus })));
         if (detections.length === 0) {
           assetIdsWithNoFacesDetected.push(assetId);
@@ -7967,6 +7971,46 @@ export default function App() {
       } else {
         writeSessionStorageJson(peopleRunSummaryStorageKey, refreshed);
         setRunSummary(refreshed);
+      }
+
+      // Update the asset grid and detail panel with the fresh people data so
+      // the People section reflects confirmations without requiring a re-select.
+      if (succeededResults.size > 0) {
+        setAssets((previous) =>
+          previous.map((asset) => {
+            const entry = succeededResults.get(asset.id);
+            if (!entry) return asset;
+            const { detections } = entry.state;
+            return {
+              ...asset,
+              people: entry.state.people,
+              detectionsCount: detections.length,
+              reviewableDetectionsCount: detections.filter(
+                (d) => d.matchStatus === 'unmatched' || d.matchStatus === 'suggested' || d.matchStatus === 'autoMatched'
+              ).length,
+              confirmedDetectionsCount: detections.filter((d) => d.matchStatus === 'confirmed').length
+            };
+          })
+        );
+        setSelectedAssetDetails((current) => {
+          if (!current) return current;
+          const entry = succeededResults.get(current.id);
+          if (!entry) return current;
+          const { detections } = entry.state;
+          return {
+            ...current,
+            people: entry.state.people,
+            detectionsCount: detections.length,
+            reviewableDetectionsCount: detections.filter(
+              (d) => d.matchStatus === 'unmatched' || d.matchStatus === 'suggested' || d.matchStatus === 'autoMatched'
+            ).length,
+            confirmedDetectionsCount: detections.filter((d) => d.matchStatus === 'confirmed').length
+          };
+        });
+        const selectedEntry = selectedAssetId ? succeededResults.get(selectedAssetId) : undefined;
+        if (selectedEntry) {
+          setSelectedAssetPeopleStatus(selectedEntry.state);
+        }
       }
     } catch (err) {
       console.error('[refreshBuckets] error during refresh:', err);
