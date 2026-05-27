@@ -6683,33 +6683,53 @@ export default function App() {
 
   /**
    * For each Group, compute a rollup status badge to show on the Group row.
-   * A rollup is shown only when ALL direct Album children share the same
-   * non-null value for that status type. Sub-group children are not counted.
+   * A rollup is shown only when ALL descendant Albums (recursively through
+   * sub-groups) share the same non-null value for that status type.
    */
   const groupStatusRollup = useMemo(() => {
     const keyword = new Map<string, AlbumKeywordAssignmentStatus>();
     const review = new Map<string, AlbumReviewAssignmentStatus>();
     const people = new Map<string, AlbumPeopleAssignmentStatus>();
 
-    const groups = albumTreeNodes.filter((n) => n.nodeType === 'Group');
-    for (const group of groups) {
-      const albumChildren = albumTreeNodes.filter(
-        (n) => n.nodeType === 'Album' && n.parentId === group.id
-      );
-      if (albumChildren.length === 0) continue;
+    // Build a parent → children index once for efficient traversal.
+    const childrenByParent = new Map<string, AlbumTreeNode[]>();
+    for (const node of albumTreeNodes) {
+      if (node.parentId !== null) {
+        const siblings = childrenByParent.get(node.parentId) ?? [];
+        siblings.push(node);
+        childrenByParent.set(node.parentId, siblings);
+      }
+    }
 
-      const kwFirst = albumChildren[0]?.keywordAssignmentStatus ?? null;
-      if (kwFirst !== null && albumChildren.every((a) => a.keywordAssignmentStatus === kwFirst)) {
+    // Collect all descendant Album nodes for a given group id.
+    function collectDescendantAlbums(groupId: string): AlbumTreeNode[] {
+      const result: AlbumTreeNode[] = [];
+      for (const child of childrenByParent.get(groupId) ?? []) {
+        if (child.nodeType === 'Album') {
+          result.push(child);
+        } else {
+          result.push(...collectDescendantAlbums(child.id));
+        }
+      }
+      return result;
+    }
+
+    for (const group of albumTreeNodes.filter((n) => n.nodeType === 'Group')) {
+      const allAlbums = collectDescendantAlbums(group.id);
+      if (allAlbums.length === 0) continue;
+
+      const kwFirst = allAlbums[0]?.keywordAssignmentStatus ?? null;
+      if (kwFirst !== null && allAlbums.every((a) => a.keywordAssignmentStatus === kwFirst)) {
         keyword.set(group.id, kwFirst);
       }
 
-      const rvFirst = albumChildren[0]?.reviewAssignmentStatus ?? null;
-      if (rvFirst !== null && albumChildren.every((a) => a.reviewAssignmentStatus === rvFirst)) {
+      const rvFirst = allAlbums[0]?.reviewAssignmentStatus ?? null;
+      if (rvFirst !== null && allAlbums.every((a) => a.reviewAssignmentStatus === rvFirst)) {
         review.set(group.id, rvFirst);
       }
 
-      const ppFirst = albumChildren[0]?.peopleAssignmentStatus ?? null;
-      if (ppFirst !== null && albumChildren.every((a) => a.peopleAssignmentStatus === ppFirst)) {
+      const ppFirst = allAlbums[0]?.peopleAssignmentStatus ?? null;
+      if (ppFirst !== null && allAlbums.every((a) => a.peopleAssignmentStatus === ppFirst)) {
         people.set(group.id, ppFirst);
       }
     }
