@@ -64,25 +64,6 @@ function getOriginalFileFormat(asset: MediaAsset): string {
   return asset.originalFileFormat.trim().toLowerCase();
 }
 
-async function ensureBackupTargetDoesNotExist(backupAbsolutePath: string): Promise<void> {
-  try {
-    await fs.stat(backupAbsolutePath);
-    throw new AssetRotationServiceError(
-      'CONFLICT',
-      `Cannot rotate asset because backup target already exists: ${backupAbsolutePath}`
-    );
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return;
-    }
-
-    if (error instanceof AssetRotationServiceError) {
-      throw error;
-    }
-
-    throw error;
-  }
-}
 
 async function buildUpdatedSourceData(asset: MediaAsset, originalAbsolutePath: string) {
   const originalContentHash = await computeSha256ForFile(originalAbsolutePath);
@@ -193,47 +174,104 @@ export async function rotateAsset(assetId: string, direction: AssetRotationDirec
 
   const originalAbsolutePath = resolveOriginalAbsolutePathForAsset(asset);
   const backupAbsolutePath = path.join(config.unrotatedRoot, asset.originalArchivePath);
-  await ensureBackupTargetDoesNotExist(backupAbsolutePath);
-  await fs.mkdir(path.dirname(backupAbsolutePath), { recursive: true });
 
-  await fs.rename(originalAbsolutePath, backupAbsolutePath);
-  let originalRewritten = false;
-
-  try {
-    await execFilePromise(
-      'sips',
-      ['--rotate', getSipsRotateDegrees(direction), backupAbsolutePath, '--out', originalAbsolutePath]
-    );
-    originalRewritten = true;
-
-    const updatedSourceData = await buildUpdatedSourceData(asset, originalAbsolutePath);
-    const updatedAsset = await updateMediaAssetSourceData({
-      id: asset.id,
-      ...updatedSourceData
+  // Determine whether a pre-rotation backup already exists from a prior rotation.
+  // If it does we skip the rename so the original-state backup is never overwritten.
+  const alreadyBacked = await fs.stat(backupAbsolutePath)
+    .then(() => true)
+    .catch((e: NodeJS.ErrnoException) => {
+      if (e.code === 'ENOENT') return false;
+      throw e;
     });
 
-    if (!updatedAsset) {
-      throw new Error(`Asset not found after rotate update: ${asset.id}`);
-    }
+  await fs.mkdir(path.dirname(backupAbsolutePath), { recursive: true });
 
-    return updatedAsset;
-  } catch (error) {
-    if (!originalRewritten) {
-      try {
-        await fs.rename(backupAbsolutePath, originalAbsolutePath);
-      } catch {
-        // Preserve original error; rollback failure only affects manual recovery.
+  if (alreadyBacked) {
+    // Subsequent rotation — rotate the current file via a temp path so sips
+    // never reads and writes the same file. The backup in unrotatedRoot is
+    // intentionally left untouched (it holds the pre-first-rotation original).
+    const tempPath = `${originalAbsolutePath}.rotating`;
+    let tempWritten = false;
+
+    try {
+      await execFilePromise(
+        'sips',
+        ['--rotate', getSipsRotateDegrees(direction), originalAbsolutePath, '--out', tempPath]
+      );
+      tempWritten = true;
+
+      await fs.rename(tempPath, originalAbsolutePath);
+
+      const updatedSourceData = await buildUpdatedSourceData(asset, originalAbsolutePath);
+      const updatedAsset = await updateMediaAssetSourceData({
+        id: asset.id,
+        ...updatedSourceData
+      });
+
+      if (!updatedAsset) {
+        throw new Error(`Asset not found after rotate update: ${asset.id}`);
       }
-    }
 
-    if (error instanceof AssetRotationServiceError) {
-      throw error;
-    }
+      return updatedAsset;
+    } catch (error) {
+      if (tempWritten) {
+        // temp was written but rename/DB update failed — clean up the temp file.
+        // The original is still the pre-this-rotation file so no data is lost.
+        try { await fs.unlink(tempPath); } catch { /* best-effort */ }
+      }
 
-    throw new AssetRotationServiceError(
-      'CONFLICT',
-      error instanceof Error ? error.message : 'Failed to rotate asset'
-    );
+      if (error instanceof AssetRotationServiceError) {
+        throw error;
+      }
+
+      throw new AssetRotationServiceError(
+        'CONFLICT',
+        error instanceof Error ? error.message : 'Failed to rotate asset'
+      );
+    }
+  } else {
+    // First rotation — move the original to the backup location so sips can
+    // write the rotated result back to the original path.
+    await fs.rename(originalAbsolutePath, backupAbsolutePath);
+    let originalRewritten = false;
+
+    try {
+      await execFilePromise(
+        'sips',
+        ['--rotate', getSipsRotateDegrees(direction), backupAbsolutePath, '--out', originalAbsolutePath]
+      );
+      originalRewritten = true;
+
+      const updatedSourceData = await buildUpdatedSourceData(asset, originalAbsolutePath);
+      const updatedAsset = await updateMediaAssetSourceData({
+        id: asset.id,
+        ...updatedSourceData
+      });
+
+      if (!updatedAsset) {
+        throw new Error(`Asset not found after rotate update: ${asset.id}`);
+      }
+
+      return updatedAsset;
+    } catch (error) {
+      if (!originalRewritten) {
+        // sips never wrote the output — restore the original from the backup.
+        try {
+          await fs.rename(backupAbsolutePath, originalAbsolutePath);
+        } catch {
+          // Preserve the original error; rollback failure only affects manual recovery.
+        }
+      }
+
+      if (error instanceof AssetRotationServiceError) {
+        throw error;
+      }
+
+      throw new AssetRotationServiceError(
+        'CONFLICT',
+        error instanceof Error ? error.message : 'Failed to rotate asset'
+      );
+    }
   }
 }
 
