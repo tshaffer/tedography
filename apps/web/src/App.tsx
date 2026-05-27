@@ -6681,6 +6681,42 @@ export default function App() {
       .map((node) => node.id);
   }, [albumTreeNodes, albumTreeSortMode, checkedAlbumIds]);
 
+  /**
+   * For each Group, compute a rollup status badge to show on the Group row.
+   * A rollup is shown only when ALL direct Album children share the same
+   * non-null value for that status type. Sub-group children are not counted.
+   */
+  const groupStatusRollup = useMemo(() => {
+    const keyword = new Map<string, AlbumKeywordAssignmentStatus>();
+    const review = new Map<string, AlbumReviewAssignmentStatus>();
+    const people = new Map<string, AlbumPeopleAssignmentStatus>();
+
+    const groups = albumTreeNodes.filter((n) => n.nodeType === 'Group');
+    for (const group of groups) {
+      const albumChildren = albumTreeNodes.filter(
+        (n) => n.nodeType === 'Album' && n.parentId === group.id
+      );
+      if (albumChildren.length === 0) continue;
+
+      const kwFirst = albumChildren[0]?.keywordAssignmentStatus ?? null;
+      if (kwFirst !== null && albumChildren.every((a) => a.keywordAssignmentStatus === kwFirst)) {
+        keyword.set(group.id, kwFirst);
+      }
+
+      const rvFirst = albumChildren[0]?.reviewAssignmentStatus ?? null;
+      if (rvFirst !== null && albumChildren.every((a) => a.reviewAssignmentStatus === rvFirst)) {
+        review.set(group.id, rvFirst);
+      }
+
+      const ppFirst = albumChildren[0]?.peopleAssignmentStatus ?? null;
+      if (ppFirst !== null && albumChildren.every((a) => a.peopleAssignmentStatus === ppFirst)) {
+        people.set(group.id, ppFirst);
+      }
+    }
+
+    return { keyword, review, people };
+  }, [albumTreeNodes]);
+
   useEffect(() => {
     checkedAlbumRevealIndexRef.current = -1;
     pendingCheckedAlbumRevealIdRef.current = null;
@@ -9954,6 +9990,16 @@ export default function App() {
                         }}
                       />
                     ) : null}
+                    {isGroup && showAlbumKeywordStatusBadge && groupStatusRollup.keyword.get(node.id) ? (
+                      <LabelIcon
+                        titleAccess={`Keyword status: ${getAlbumKeywordStatusTitle(groupStatusRollup.keyword.get(node.id)!)} (all albums)`}
+                        style={{
+                          flex: '0 0 auto',
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(groupStatusRollup.keyword.get(node.id)!)
+                        }}
+                      />
+                    ) : null}
                     {!isGroup && showAlbumReviewStatusBadge && node.reviewAssignmentStatus ? (
                       <RateReviewIcon
                         titleAccess={getAlbumReviewStatusTitle(node.reviewAssignmentStatus)}
@@ -9964,6 +10010,16 @@ export default function App() {
                         }}
                       />
                     ) : null}
+                    {isGroup && showAlbumReviewStatusBadge && groupStatusRollup.review.get(node.id) ? (
+                      <RateReviewIcon
+                        titleAccess={`Review status: ${getAlbumReviewStatusTitle(groupStatusRollup.review.get(node.id)!)} (all albums)`}
+                        style={{
+                          flex: '0 0 auto',
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(groupStatusRollup.review.get(node.id)!)
+                        }}
+                      />
+                    ) : null}
                     {!isGroup && showAlbumPeopleStatusBadge && node.peopleAssignmentStatus ? (
                       <PeopleIcon
                         titleAccess={getAlbumPeopleStatusTitle(node.peopleAssignmentStatus)}
@@ -9971,6 +10027,16 @@ export default function App() {
                           flex: '0 0 auto',
                           fontSize: '12px',
                           color: getAlbumStatusIconColor(node.peopleAssignmentStatus)
+                        }}
+                      />
+                    ) : null}
+                    {isGroup && showAlbumPeopleStatusBadge && groupStatusRollup.people.get(node.id) ? (
+                      <PeopleIcon
+                        titleAccess={`People status: ${getAlbumPeopleStatusTitle(groupStatusRollup.people.get(node.id)!)} (all albums)`}
+                        style={{
+                          flex: '0 0 auto',
+                          fontSize: '12px',
+                          color: getAlbumStatusIconColor(groupStatusRollup.people.get(node.id)!)
                         }}
                       />
                     ) : null}
