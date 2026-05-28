@@ -25,7 +25,6 @@ type Phase =
 
 type Source = 'selected' | 'view';
 type UploadVersion = 'original' | 'display';
-type IfExists = 'add' | 'replace';
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -178,7 +177,6 @@ export function PublishToGooglePhotosDialog({
   const [albumTitle, setAlbumTitle] = useState('');
   const [source, setSource] = useState<Source>('selected');
   const [uploadVersion, setUploadVersion] = useState<UploadVersion>('original');
-  const [ifExists, setIfExists] = useState<IfExists>('add');
   const [result, setResult] = useState<PublishResult | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -259,7 +257,6 @@ export function PublishToGooglePhotosDialog({
         assetIds: assetIdsForPublish,
         albumTitle: albumTitle.trim(),
         uploadVersion,
-        ifExists,
       });
       setResult(res);
       setPhase('done');
@@ -324,7 +321,7 @@ export function PublishToGooglePhotosDialog({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={successBoxStyle}>
             <strong>{result.uploadedCount}</strong> photo{result.uploadedCount !== 1 ? 's' : ''}{' '}
-            {result.albumCreated ? 'published to new album' : ifExists === 'replace' ? 'replaced contents of' : 'added to'}{' '}
+            {result.albumCreated ? 'published to new album' : 'added to'}{' '}
             <strong>{result.albumTitle}</strong>.
             {result.errorCount > 0 && (
               <> ({result.errorCount} error{result.errorCount !== 1 ? 's' : ''}.)</>
@@ -431,32 +428,6 @@ export function PublishToGooglePhotosDialog({
                 onChange={() => setUploadVersion('display')}
               />
               Display JPEG (always)
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <span style={labelStyle}>If album already exists</span>
-          <div style={radioGroupStyle}>
-            <label style={radioLabelStyle}>
-              <input
-                type="radio"
-                name="gp-if-exists"
-                value="add"
-                checked={ifExists === 'add'}
-                onChange={() => setIfExists('add')}
-              />
-              Add photos to existing album
-            </label>
-            <label style={radioLabelStyle}>
-              <input
-                type="radio"
-                name="gp-if-exists"
-                value="replace"
-                checked={ifExists === 'replace'}
-                onChange={() => setIfExists('replace')}
-              />
-              Replace — remove existing photos, then add new ones
             </label>
           </div>
         </div>

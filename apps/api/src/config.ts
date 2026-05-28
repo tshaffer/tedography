@@ -261,5 +261,6 @@ export const config = {
     clientSecret: process.env.GOOGLE_PHOTOS_CLIENT_SECRET?.trim() || null,
     redirectUri: process.env.GOOGLE_PHOTOS_REDIRECT_URI?.trim() || 'http://localhost:4000/api/google-photos/callback',
     tokenPath: process.env.GOOGLE_PHOTOS_TOKEN_PATH?.trim() || path.resolve(process.cwd(), 'google-photos-tokens.json'),
+    albumRegistryPath: process.env.GOOGLE_PHOTOS_ALBUM_REGISTRY_PATH?.trim() || path.resolve(process.cwd(), 'google-photos-albums.json'),
   },
 };

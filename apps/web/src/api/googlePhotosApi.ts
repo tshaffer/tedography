@@ -39,7 +39,6 @@ export function publishToGooglePhotos(params: {
   assetIds: string[];
   albumTitle: string;
   uploadVersion: 'original' | 'display';
-  ifExists: 'add' | 'replace';
 }): Promise<PublishResult> {
   return fetchJson<PublishResult>('/api/google-photos/publish', {
     method: 'POST',

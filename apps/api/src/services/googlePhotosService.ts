@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 import { log } from '../logger.js';
@@ -7,11 +6,11 @@ import { log } from '../logger.js';
 const OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const PHOTOS_UPLOAD_URL = 'https://photoslibrary.googleapis.com/v1/uploads';
 const PHOTOS_API_BASE = 'https://photoslibrary.googleapis.com/v1';
-// photoslibrary (full access) is required to:
-//   - list ALL albums (not just ones created by this app)
-//   - list media items within an album
-//   - remove media items from an album (needed for "replace" mode)
-const SCOPE = 'openid email https://www.googleapis.com/auth/photoslibrary';
+// photoslibrary.appendonly: create albums, upload media, add media to albums.
+// We avoid photoslibrary (full access) because albums.list is restricted/deprecated
+// by Google and returns 403 even for authorised tokens. Instead we maintain a local
+// album registry (google-photos-albums.json) to resolve album titles → IDs.
+const SCOPE = 'openid email https://www.googleapis.com/auth/photoslibrary.appendonly';
 
 interface StoredTokens {
   accessToken: string;
@@ -195,109 +194,57 @@ export async function uploadMedia(filePath: string, mimeType: string, filename: 
   return res.text();
 }
 
-/**
- * Search all albums for one whose title exactly matches `title`.
- * Returns the album id, or null if not found.
- * Paginates through the full album list (50 per page) until a match is found
- * or all pages are exhausted.
- */
-export async function findAlbumByTitle(title: string): Promise<string | null> {
-  const accessToken = await getValidAccessToken();
+// ─── Local album registry ────────────────────────────────────────────────────
+//
+// The Google Photos Library API albums.list endpoint is restricted/deprecated
+// and returns 403 for most apps. Instead we keep a local JSON file that maps
+// album title → album ID for every album Tedography has created.
+
+interface AlbumRegistry {
+  [title: string]: string;
+}
+
+async function loadAlbumRegistry(): Promise<AlbumRegistry> {
+  try {
+    const raw = await fs.readFile(config.googlePhotos.albumRegistryPath, 'utf-8');
+    return JSON.parse(raw) as AlbumRegistry;
+  } catch {
+    return {};
+  }
+}
+
+async function saveAlbumRegistry(registry: AlbumRegistry): Promise<void> {
+  await fs.mkdir(path.dirname(config.googlePhotos.albumRegistryPath), { recursive: true });
+  await fs.writeFile(config.googlePhotos.albumRegistryPath, JSON.stringify(registry, null, 2), 'utf-8');
+}
+
+/** Returns the Google Photos album ID for a title, or null if unknown. */
+export async function lookupAlbumByTitle(title: string): Promise<string | null> {
+  const registry = await loadAlbumRegistry();
   const normalised = title.trim().toLowerCase();
-  let pageToken: string | undefined;
-
-  do {
-    const url = new URL(`${PHOTOS_API_BASE}/albums`);
-    url.searchParams.set('pageSize', '50');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
-
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Failed to list albums: ${res.status} ${text}`);
-    }
-
-    const data = await res.json() as {
-      albums?: Array<{ id: string; title?: string }>;
-      nextPageToken?: string;
-    };
-
-    for (const album of data.albums ?? []) {
-      if ((album.title ?? '').trim().toLowerCase() === normalised) {
-        return album.id;
-      }
-    }
-
-    pageToken = data.nextPageToken;
-  } while (pageToken);
-
+  for (const [t, id] of Object.entries(registry)) {
+    if (t.trim().toLowerCase() === normalised) return id;
+  }
   return null;
 }
 
-/**
- * Remove all media items from an album.
- * Used by "replace" mode before uploading the new set of photos.
- */
-export async function clearAlbum(albumId: string): Promise<void> {
-  const accessToken = await getValidAccessToken();
-  const mediaItemIds: string[] = [];
-  let pageToken: string | undefined;
+/** Record a title → albumId mapping in the local registry. */
+export async function registerAlbum(title: string, albumId: string): Promise<void> {
+  const registry = await loadAlbumRegistry();
+  registry[title.trim()] = albumId;
+  await saveAlbumRegistry(registry);
+}
 
-  // 1. Collect every media item ID currently in the album.
-  do {
-    const res = await fetch(`${PHOTOS_API_BASE}/mediaItems:search`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        albumId,
-        pageSize: 100,
-        ...(pageToken ? { pageToken } : {}),
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Failed to list album media items: ${res.status} ${text}`);
-    }
-
-    const data = await res.json() as {
-      mediaItems?: Array<{ id: string }>;
-      nextPageToken?: string;
-    };
-
-    for (const item of data.mediaItems ?? []) {
-      mediaItemIds.push(item.id);
-    }
-
-    pageToken = data.nextPageToken;
-  } while (pageToken);
-
-  if (mediaItemIds.length === 0) return;
-
-  // 2. Remove in batches of 50 (API limit).
-  const BATCH = 50;
-  for (let i = 0; i < mediaItemIds.length; i += BATCH) {
-    const batch = mediaItemIds.slice(i, i + BATCH);
-    const res = await fetch(`${PHOTOS_API_BASE}/albums/${albumId}:removeMediaItems`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ mediaItemIds: batch }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Failed to remove media items from album: ${res.status} ${text}`);
+/** Remove a title from the local registry (used when recreating an album). */
+export async function unregisterAlbum(title: string): Promise<void> {
+  const registry = await loadAlbumRegistry();
+  const normalised = title.trim().toLowerCase();
+  for (const t of Object.keys(registry)) {
+    if (t.trim().toLowerCase() === normalised) {
+      delete registry[t];
     }
   }
+  await saveAlbumRegistry(registry);
 }
 
 export async function createAlbum(title: string): Promise<string> {

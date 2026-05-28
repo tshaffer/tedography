@@ -10,15 +10,15 @@ import {
 import {
   batchAddToAlbum,
   buildAuthUrl,
-  clearAlbum,
   createAlbum,
   disconnect,
   exchangeCode,
-  findAlbumByTitle,
   getAlbumUrl,
   getConnectionStatus,
   isNativelyUploadable,
+  lookupAlbumByTitle,
   mimeTypeForFormat,
+  registerAlbum,
   uploadMedia,
 } from '../services/googlePhotosService.js';
 
@@ -79,8 +79,6 @@ export interface PublishRequest {
   assetIds: string[];
   albumTitle: string;
   uploadVersion: 'original' | 'display';
-  /** What to do when an album with this title already exists. Default: 'add'. */
-  ifExists: 'add' | 'replace';
 }
 
 googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) => {
@@ -95,7 +93,6 @@ googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) =
     return;
   }
   const uploadVersion = body.uploadVersion ?? 'original';
-  const ifExists = body.ifExists ?? 'add';
 
   if (!(await getConnectionStatus()).connected) {
     res.status(401).json({ error: 'Not connected to Google Photos. Connect first.' });
@@ -162,23 +159,22 @@ googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) =
 
     const trimmedTitle = body.albumTitle.trim();
 
-    // Resolve the album to use — reuse an existing one or create a new one.
+    // Resolve the album to use via the local registry (albums.list is restricted
+    // by Google and cannot be used). For "replace" mode we forget the old album ID
+    // and create a fresh album — the old album stays in Google Photos but is no
+    // longer updated by Tedography.
     let albumId: string;
     let albumCreated: boolean;
-    const existingAlbumId = await findAlbumByTitle(trimmedTitle);
+    const existingAlbumId = await lookupAlbumByTitle(trimmedTitle);
 
     if (existingAlbumId) {
       albumId = existingAlbumId;
       albumCreated = false;
-      if (ifExists === 'replace') {
-        log.info(`Clearing existing album "${trimmedTitle}" before replace`);
-        await clearAlbum(albumId);
-      } else {
-        log.info(`Adding to existing album "${trimmedTitle}"`);
-      }
+      log.info(`Adding to existing album "${trimmedTitle}" (id: ${albumId})`);
     } else {
       log.info(`Creating new album "${trimmedTitle}"`);
       albumId = await createAlbum(trimmedTitle);
+      await registerAlbum(trimmedTitle, albumId);
       albumCreated = true;
     }
 
