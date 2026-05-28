@@ -17,6 +17,7 @@ export interface PublishResult {
   albumId: string | null;
   albumTitle: string;
   albumUrl: string | null;
+  albumCreated: boolean;
   uploadedCount: number;
   errorCount: number;
   errors: Array<{ filename: string; error: string }>;
@@ -38,6 +39,7 @@ export function publishToGooglePhotos(params: {
   assetIds: string[];
   albumTitle: string;
   uploadVersion: 'original' | 'display';
+  ifExists: 'add' | 'replace';
 }): Promise<PublishResult> {
   return fetchJson<PublishResult>('/api/google-photos/publish', {
     method: 'POST',

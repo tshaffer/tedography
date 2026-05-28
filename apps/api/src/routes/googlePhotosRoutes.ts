@@ -10,9 +10,11 @@ import {
 import {
   batchAddToAlbum,
   buildAuthUrl,
+  clearAlbum,
   createAlbum,
   disconnect,
   exchangeCode,
+  findAlbumByTitle,
   getAlbumUrl,
   getConnectionStatus,
   isNativelyUploadable,
@@ -77,6 +79,8 @@ export interface PublishRequest {
   assetIds: string[];
   albumTitle: string;
   uploadVersion: 'original' | 'display';
+  /** What to do when an album with this title already exists. Default: 'add'. */
+  ifExists: 'add' | 'replace';
 }
 
 googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) => {
@@ -91,6 +95,7 @@ googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) =
     return;
   }
   const uploadVersion = body.uploadVersion ?? 'original';
+  const ifExists = body.ifExists ?? 'add';
 
   if (!(await getConnectionStatus()).connected) {
     res.status(401).json({ error: 'Not connected to Google Photos. Connect first.' });
@@ -155,7 +160,28 @@ googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) =
       return;
     }
 
-    const albumId = await createAlbum(body.albumTitle.trim());
+    const trimmedTitle = body.albumTitle.trim();
+
+    // Resolve the album to use — reuse an existing one or create a new one.
+    let albumId: string;
+    let albumCreated: boolean;
+    const existingAlbumId = await findAlbumByTitle(trimmedTitle);
+
+    if (existingAlbumId) {
+      albumId = existingAlbumId;
+      albumCreated = false;
+      if (ifExists === 'replace') {
+        log.info(`Clearing existing album "${trimmedTitle}" before replace`);
+        await clearAlbum(albumId);
+      } else {
+        log.info(`Adding to existing album "${trimmedTitle}"`);
+      }
+    } else {
+      log.info(`Creating new album "${trimmedTitle}"`);
+      albumId = await createAlbum(trimmedTitle);
+      albumCreated = true;
+    }
+
     const { uploadedCount, errors: batchErrors } = await batchAddToAlbum(albumId, uploadTokens);
     const albumUrl = await getAlbumUrl(albumId);
 
@@ -163,6 +189,7 @@ googlePhotosRoutes.post('/publish', requireFeature('import'), async (req, res) =
       albumId,
       albumTitle: body.albumTitle,
       albumUrl,
+      albumCreated,
       uploadedCount,
       errorCount: uploadErrors.length + batchErrors.length,
       errors: [...uploadErrors, ...batchErrors],
