@@ -119,20 +119,22 @@ import {
   type PeopleScopedAssetSummaryResponse
 } from './api/peoplePipelineApi';
 import {
-  type AiQueueEntryWithFilename,
-  addToAiQueue,
-  clearAiQueue,
-  exportAiQueue,
-  getAiQueue,
-  processAiQueueWithGemini,
-  removeFromAiQueue,
-} from './api/aiQueueApi';
-import { AddToAiQueueDialog } from './components/aiQueue/AddToAiQueueDialog';
-import { AiHistoryDialog } from './components/aiQueue/AiHistoryDialog';
-import { AiQueueDialog } from './components/aiQueue/AiQueueDialog';
+  type EditQueueEntryWithFilename,
+  type ImportEditedResult,
+  addToEditQueue,
+  clearEditQueue,
+  exportEditQueue,
+  getEditQueue,
+  importEditedFiles,
+  removeFromEditQueue,
+  clearEditFolder,
+} from './api/editQueueApi';
+import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
+import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
+import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
-import { getAiHistory } from './api/aiHistoryApi';
+import { getEditHistory } from './api/editHistoryApi';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
@@ -324,7 +326,7 @@ const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const peopleReviewSimplifiedViewStorageKey = 'tedography.peopleReview.simplifiedView';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
-const showThumbnailAiQueueBadgesStorageKey = 'tedography.showThumbnailAiQueueBadges';
+const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
@@ -1299,7 +1301,7 @@ const cardKeywordBadgeStyle: CSSProperties = {
   pointerEvents: 'none'
 };
 
-const cardAiQueueBadgeStyle: CSSProperties = {
+const cardEditQueueBadgeStyle: CSSProperties = {
   position: 'absolute',
   bottom: '5px',
   zIndex: 2,
@@ -3150,7 +3152,7 @@ function AssetCard({
         {showAiQueueBadge && isInAiQueue ? (
           <span
             style={{
-              ...cardAiQueueBadgeStyle,
+              ...cardEditQueueBadgeStyle,
               right: showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? '22px' : '8px'
             }}
             title="In AI queue"
@@ -4003,22 +4005,24 @@ export default function App() {
   const [createTopLevelGroupDialogOpen, setCreateTopLevelGroupDialogOpen] = useState(false);
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
-  const [aiQueueEntries, setAiQueueEntries] = useState<AiQueueEntryWithFilename[]>([]);
-  const [aiQueueLoading, setAiQueueLoading] = useState(false);
-  const [aiQueueError, setAiQueueError] = useState<string | null>(null);
-  const [addToAiQueueDialogOpen, setAddToAiQueueDialogOpen] = useState(false);
-  const [aiQueueDialogOpen, setAiQueueDialogOpen] = useState(false);
-  const [aiQueueExportNotice, setAiQueueExportNotice] = useState<string | null>(null);
-  const [aiQueueExportError, setAiQueueExportError] = useState<string | null>(null);
-  const [aiQueueProcessNotice, setAiQueueProcessNotice] = useState<string | null>(null);
-  const [aiQueueProcessError, setAiQueueProcessError] = useState<string | null>(null);
-  const [aiQueueProcessing, setAiQueueProcessing] = useState(false);
+  const [editQueueEntries, setEditQueueEntries] = useState<EditQueueEntryWithFilename[]>([]);
+  const [editQueueLoading, setEditQueueLoading] = useState(false);
+  const [editQueueError, setEditQueueError] = useState<string | null>(null);
+  const [addToEditQueueDialogOpen, setAddToEditQueueDialogOpen] = useState(false);
+  const [editQueueDialogOpen, setEditQueueDialogOpen] = useState(false);
+  const [editQueueExportNotice, setEditQueueExportNotice] = useState<string | null>(null);
+  const [editQueueExportError, setEditQueueExportError] = useState<string | null>(null);
+  const [editQueueImportResults, setEditQueueImportResults] = useState<ImportEditedResult[] | null>(null);
+  const [editQueueImportError, setEditQueueImportError] = useState<string | null>(null);
+  const [editQueueImporting, setEditQueueImporting] = useState(false);
+  const [editQueueClearFolderNotice, setEditQueueClearFolderNotice] = useState<string | null>(null);
+  const [editQueueClearFolderError, setEditQueueClearFolderError] = useState<string | null>(null);
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [aiHistoryDialogOpen, setAiHistoryDialogOpen] = useState(false);
-  const [aiHistoryEntries, setAiHistoryEntries] = useState<import('@tedography/domain').AiEditHistoryEntry[]>([]);
-  const [aiHistoryLoading, setAiHistoryLoading] = useState(false);
-  const [aiHistoryError, setAiHistoryError] = useState<string | null>(null);
+  const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
+  const [editHistoryEntries, setEditHistoryEntries] = useState<import('@tedography/domain').EditHistoryEntry[]>([]);
+  const [editHistoryLoading, setEditHistoryLoading] = useState(false);
+  const [editHistoryError, setEditHistoryError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
   const [changePinOpen, setChangePinOpen] = useState(false);
@@ -4379,12 +4383,12 @@ export default function App() {
 
     return window.localStorage.getItem(showThumbnailKeywordBadgesStorageKey) === 'true';
   });
-  const [showThumbnailAiQueueBadges, setShowThumbnailAiQueueBadges] = useState<boolean>(() => {
+  const [showThumbnailEditQueueBadges, setShowThumbnailEditQueueBadges] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
     }
 
-    const stored = window.localStorage.getItem(showThumbnailAiQueueBadgesStorageKey);
+    const stored = window.localStorage.getItem(showThumbnailEditQueueBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
   const [showThumbnailPeopleBadges, setShowThumbnailPeopleBadges] = useState<boolean>(() => {
@@ -4846,10 +4850,10 @@ export default function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
-      showThumbnailAiQueueBadgesStorageKey,
-      showThumbnailAiQueueBadges ? 'true' : 'false'
+      showThumbnailEditQueueBadgesStorageKey,
+      showThumbnailEditQueueBadges ? 'true' : 'false'
     );
-  }, [showThumbnailAiQueueBadges]);
+  }, [showThumbnailEditQueueBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -5297,16 +5301,16 @@ export default function App() {
     }
   }
 
-  async function loadAiQueue(): Promise<void> {
-    setAiQueueLoading(true);
-    setAiQueueError(null);
+  async function loadEditQueue(): Promise<void> {
+    setEditQueueLoading(true);
+    setEditQueueError(null);
     try {
-      const entries = await getAiQueue();
-      setAiQueueEntries(entries);
+      const entries = await getEditQueue();
+      setEditQueueEntries(entries);
     } catch (err) {
-      setAiQueueError(err instanceof Error ? err.message : 'Failed to load AI queue');
+      setEditQueueError(err instanceof Error ? err.message : 'Failed to load edit queue');
     } finally {
-      setAiQueueLoading(false);
+      setEditQueueLoading(false);
     }
   }
 
@@ -5351,7 +5355,7 @@ export default function App() {
 
     void loadKeywords({ showLoading: true });
     void loadSmartAlbums({ showLoading: true });
-    void loadAiQueue();
+    void loadEditQueue();
   }, []);
 
   useEffect(() => {
@@ -5520,9 +5524,9 @@ export default function App() {
       ),
     [assets]
   );
-  const aiQueueAssetIdSet = useMemo(
-    () => new Set<string>(aiQueueEntries.map((e) => e.assetId)),
-    [aiQueueEntries]
+  const editQueueAssetIdSet = useMemo(
+    () => new Set<string>(editQueueEntries.map((e) => e.assetId)),
+    [editQueueEntries]
   );
   const selectedTreeNode = useMemo(
     () => (selectedTreeNodeId ? albumNodesById.get(selectedTreeNodeId) ?? null : null),
@@ -7403,83 +7407,87 @@ export default function App() {
     }
   }
 
-  async function handleAddToAiQueue(prompt: string): Promise<void> {
+  async function handleAddToEditQueue(prompt: string): Promise<void> {
     if (!selectedAsset) return;
     try {
-      await addToAiQueue(selectedAsset.id, prompt);
-      await loadAiQueue();
+      await addToEditQueue(selectedAsset.id, prompt);
+      await loadEditQueue();
     } catch (err) {
-      console.error('Failed to add to AI queue', err);
+      console.error('Failed to add to edit queue', err);
     }
   }
 
-  async function handleRemoveFromAiQueue(assetId: string): Promise<void> {
+  async function handleRemoveFromEditQueue(assetId: string): Promise<void> {
     try {
-      await removeFromAiQueue(assetId);
-      await loadAiQueue();
+      await removeFromEditQueue(assetId);
+      await loadEditQueue();
     } catch (err) {
-      console.error('Failed to remove from AI queue', err);
+      console.error('Failed to remove from edit queue', err);
     }
   }
 
-  async function handleClearAiQueue(): Promise<void> {
+  async function handleClearEditQueue(): Promise<void> {
     try {
-      await clearAiQueue();
-      setAiQueueEntries([]);
+      await clearEditQueue();
+      setEditQueueEntries([]);
     } catch (err) {
-      console.error('Failed to clear AI queue', err);
+      console.error('Failed to clear edit queue', err);
     }
   }
 
-  async function handleExportAiQueue(assetIds: string[]): Promise<void> {
-    setAiQueueExportNotice(null);
-    setAiQueueExportError(null);
+  async function handleExportEditQueue(assetIds: string[]): Promise<void> {
+    setEditQueueExportNotice(null);
+    setEditQueueExportError(null);
     try {
-      const result = await exportAiQueue(assetIds);
-      setAiQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.exportPath}`);
+      const result = await exportEditQueue(assetIds);
+      setEditQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.editPath}`);
     } catch (err) {
-      setAiQueueExportError(err instanceof Error ? err.message : 'Export failed');
+      setEditQueueExportError(err instanceof Error ? err.message : 'Export failed');
     }
   }
 
-  async function handleProcessAiQueue(assetIds: string[]): Promise<void> {
-    setAiQueueProcessNotice(null);
-    setAiQueueProcessError(null);
-    setAiQueueProcessing(true);
+  async function handleImportEditedFiles(): Promise<void> {
+    setEditQueueImportResults(null);
+    setEditQueueImportError(null);
+    setEditQueueImporting(true);
     try {
-      const { results } = await processAiQueueWithGemini(assetIds);
-      const succeeded = results.filter((r) => r.outputPath !== null).length;
-      const failed = results.filter((r) => r.error !== null).length;
-      if (failed === 0) {
-        setAiQueueProcessNotice(`Processed ${succeeded} image${succeeded !== 1 ? 's' : ''} with Gemini`);
-      } else {
-        setAiQueueProcessNotice(`${succeeded} succeeded, ${failed} failed`);
-        const firstError = results.find((r) => r.error)?.error ?? 'Unknown error';
-        setAiQueueProcessError(firstError);
-      }
+      const { results } = await importEditedFiles();
+      setEditQueueImportResults(results);
+      await loadEditQueue();
     } catch (err) {
-      setAiQueueProcessError(err instanceof Error ? err.message : 'Processing failed');
+      setEditQueueImportError(err instanceof Error ? err.message : 'Import failed');
     } finally {
-      setAiQueueProcessing(false);
+      setEditQueueImporting(false);
     }
   }
 
-  async function handleSaveAiQueuePrompt(assetId: string, prompt: string): Promise<void> {
-    await addToAiQueue(assetId, prompt);
-    await loadAiQueue();
+  async function handleClearEditFolder(): Promise<void> {
+    setEditQueueClearFolderNotice(null);
+    setEditQueueClearFolderError(null);
+    try {
+      const result = await clearEditFolder();
+      setEditQueueClearFolderNotice(`Deleted ${result.deletedCount} file${result.deletedCount !== 1 ? 's' : ''} from edit folder`);
+    } catch (err) {
+      setEditQueueClearFolderError(err instanceof Error ? err.message : 'Failed to clear edit folder');
+    }
   }
 
-  async function handleOpenAiHistory(): Promise<void> {
-    setAiHistoryDialogOpen(true);
-    setAiHistoryLoading(true);
-    setAiHistoryError(null);
+  async function handleSaveEditQueuePrompt(assetId: string, prompt: string): Promise<void> {
+    await addToEditQueue(assetId, prompt);
+    await loadEditQueue();
+  }
+
+  async function handleOpenEditHistory(): Promise<void> {
+    setEditHistoryDialogOpen(true);
+    setEditHistoryLoading(true);
+    setEditHistoryError(null);
     try {
-      const entries = await getAiHistory();
-      setAiHistoryEntries(entries);
+      const entries = await getEditHistory();
+      setEditHistoryEntries(entries);
     } catch (err) {
-      setAiHistoryError(err instanceof Error ? err.message : 'Failed to load history');
+      setEditHistoryError(err instanceof Error ? err.message : 'Failed to load history');
     } finally {
-      setAiHistoryLoading(false);
+      setEditHistoryLoading(false);
     }
   }
 
@@ -11421,21 +11429,21 @@ export default function App() {
 
   const toolbarBrowseMode = isLibraryArea ? libraryBrowseMode : null;
 
-  function renderAiQueuePanel(): ReactElement | null {
-    if (aiQueueEntries.length === 0 && !aiQueueLoading && !aiQueueError) return null;
+  function renderEditQueuePanel(): ReactElement | null {
+    if (editQueueEntries.length === 0 && !editQueueLoading && !editQueueError) return null;
 
     return (
       <section style={sidePanelSectionStyle}>
         <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>AI Edit Queue {aiQueueEntries.length > 0 ? `(${aiQueueEntries.length})` : ''}</h2>
+          <h2 style={sidePanelTitleStyle}>Edit Queue {editQueueEntries.length > 0 ? `(${editQueueEntries.length})` : ''}</h2>
         </div>
-        {aiQueueLoading ? (
+        {editQueueLoading ? (
           <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading...</p>
-        ) : aiQueueError ? (
-          <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{aiQueueError}</p>
+        ) : editQueueError ? (
+          <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{editQueueError}</p>
         ) : (
           <div style={{ display: 'grid', gap: '6px', marginTop: '6px' }}>
-            {aiQueueEntries.map((entry) => (
+            {editQueueEntries.map((entry) => (
               <div
                 key={entry.assetId}
                 style={{
@@ -11456,7 +11464,7 @@ export default function App() {
                   <button
                     type="button"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', padding: '0 2px', flexShrink: 0 }}
-                    onClick={() => void handleRemoveFromAiQueue(entry.assetId)}
+                    onClick={() => void handleRemoveFromEditQueue(entry.assetId)}
                     title="Remove from queue"
                   >
                     ×
@@ -11474,42 +11482,27 @@ export default function App() {
         <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={aiQueueEntries.length === 0 || aiQueueProcessing ? { ...compareButtonStyle, opacity: 0.5, cursor: 'default' } : { ...compareButtonStyle, backgroundColor: '#1a56db', color: '#fff', borderColor: '#1a56db' }}
-            onClick={() => void handleProcessAiQueue(aiQueueEntries.map((e) => e.assetId))}
-            disabled={aiQueueEntries.length === 0 || aiQueueProcessing}
-            title="Send each queued photo to Gemini and save the edited result"
-          >
-            {aiQueueProcessing ? 'Processing…' : 'Process with Gemini'}
-          </button>
-          <button
-            type="button"
             style={compareButtonStyle}
-            onClick={() => void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId))}
-            disabled={aiQueueEntries.length === 0}
-            title="Copy files to export folder and write prompts.txt"
+            onClick={() => void handleExportEditQueue(editQueueEntries.map((e) => e.assetId))}
+            disabled={editQueueEntries.length === 0}
+            title="Copy files to export folder and write manifest.json"
           >
             Export Queue
           </button>
           <button
             type="button"
             style={compareButtonStyle}
-            onClick={() => void handleClearAiQueue()}
-            disabled={aiQueueEntries.length === 0}
+            onClick={() => void handleClearEditQueue()}
+            disabled={editQueueEntries.length === 0}
           >
             Clear
           </button>
         </div>
-        {aiQueueProcessNotice ? (
-          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{aiQueueProcessNotice}</p>
+        {editQueueExportNotice ? (
+          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{editQueueExportNotice}</p>
         ) : null}
-        {aiQueueProcessError ? (
-          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{aiQueueProcessError}</p>
-        ) : null}
-        {aiQueueExportNotice ? (
-          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{aiQueueExportNotice}</p>
-        ) : null}
-        {aiQueueExportError ? (
-          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{aiQueueExportError}</p>
+        {editQueueExportError ? (
+          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{editQueueExportError}</p>
         ) : null}
       </section>
     );
@@ -11643,22 +11636,16 @@ export default function App() {
                 onSetKeywordAssignmentStatus={can('keyword-management') ? handleSetAssetKeywordAssignmentStatus : undefined}
               />
             }
-            aiQueueEntry={
+            editQueueEntry={
               selectedAsset
-                ? (aiQueueEntries.find((e) => e.assetId === selectedAsset.id) ?? null)
+                ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id) ?? null)
                 : null
             }
-            onSaveAiPrompt={
+            onSaveEditPrompt={
               selectedAsset
-                ? async (prompt) => handleSaveAiQueuePrompt(selectedAsset.id, prompt)
+                ? async (prompt) => handleSaveEditQueuePrompt(selectedAsset.id, prompt)
                 : undefined
             }
-            onProcessWithGemini={
-              selectedAsset
-                ? () => { void handleProcessAiQueue([selectedAsset.id]); }
-                : undefined
-            }
-            aiProcessing={aiQueueProcessing}
           />
         </section>
       </aside>
@@ -12024,21 +12011,21 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* AI Queue toolbar button — maintenance feature, admin only */}
+          {/* Edit Queue toolbar button — maintenance feature, admin only */}
           {can('maintenance') ? <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
-            <Tooltip title={aiQueueEntries.length > 0 ? `AI Queue (${aiQueueEntries.length})` : 'AI Queue'}>
+            <Tooltip title={editQueueEntries.length > 0 ? `Edit Queue (${editQueueEntries.length})` : 'Edit Queue'}>
               <span>
                 <button
                   type="button"
                   style={toolbarIconButtonStyle}
                   data-selected={aiMenuOpen ? 'true' : undefined}
                   onClick={() => setAiMenuOpen((prev) => !prev)}
-                  aria-label="AI Queue"
+                  aria-label="Edit Queue"
                 >
-                  <PsychologyIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: aiQueueEntries.length > 0 ? '#9333ea' : undefined }} />
-                  {aiQueueEntries.length > 0 ? (
+                  <PsychologyIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: editQueueEntries.length > 0 ? '#9333ea' : undefined }} />
+                  {editQueueEntries.length > 0 ? (
                     <span style={{ fontSize: '10px', lineHeight: 1, marginLeft: '2px', color: '#9333ea', fontWeight: 600 }}>
-                      {aiQueueEntries.length}
+                      {editQueueEntries.length}
                     </span>
                   ) : null}
                 </button>
@@ -12056,37 +12043,37 @@ export default function App() {
                 }}
               >
                 <div className="tdg-overflow-section">
-                  AI Edit Queue{aiQueueEntries.length > 0 ? ` (${aiQueueEntries.length})` : ''}
+                  Edit Queue{editQueueEntries.length > 0 ? ` (${editQueueEntries.length})` : ''}
                 </div>
                 <button
                   type="button"
                   className="tdg-overflow-item"
-                  onClick={() => { setAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                 >
                   View Queue
                 </button>
                 <button
                   type="button"
                   className="tdg-overflow-item"
-                  onClick={() => { void handleOpenAiHistory(); setAiMenuOpen(false); }}
+                  onClick={() => { void handleOpenEditHistory(); setAiMenuOpen(false); }}
                 >
-                  View AI History
+                  View Edit History
                 </button>
                 {selectedAssetIds.length === 1 && selectedAsset ? (() => {
-                  const queueEntry = aiQueueEntries.find((e) => e.assetId === selectedAsset.id);
+                  const queueEntry = editQueueEntries.find((e) => e.assetId === selectedAsset.id);
                   return queueEntry ? (
                     <>
                       <button
                         type="button"
                         className="tdg-overflow-item"
-                        onClick={() => { setAddToAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                        onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                       >
                         Edit Prompt
                       </button>
                       <button
                         type="button"
                         className="tdg-overflow-item"
-                        onClick={() => { void handleRemoveFromAiQueue(selectedAsset.id); setAiMenuOpen(false); }}
+                        onClick={() => { void handleRemoveFromEditQueue(selectedAsset.id); setAiMenuOpen(false); }}
                       >
                         Remove from Queue
                       </button>
@@ -12095,28 +12082,28 @@ export default function App() {
                     <button
                       type="button"
                       className="tdg-overflow-item"
-                      onClick={() => { setAddToAiQueueDialogOpen(true); setAiMenuOpen(false); }}
+                      onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                     >
-                      Add to AI Queue
+                      Add to Edit Queue
                     </button>
                   );
                 })() : null}
-                {aiQueueEntries.length > 0 ? (
+                {editQueueEntries.length > 0 ? (
                   <>
                     <div className="tdg-overflow-divider" />
                     <button
                       type="button"
                       className="tdg-overflow-item"
-                      onClick={() => { void handleExportAiQueue(aiQueueEntries.map((e) => e.assetId)); setAiMenuOpen(false); }}
+                      onClick={() => { void handleExportEditQueue(editQueueEntries.map((e) => e.assetId)); setAiMenuOpen(false); }}
                     >
-                      Export AI Queue
+                      Export Queue
                     </button>
                     <button
                       type="button"
                       className="tdg-overflow-item"
-                      onClick={() => { void handleClearAiQueue(); setAiMenuOpen(false); }}
+                      onClick={() => { void handleClearEditQueue(); setAiMenuOpen(false); }}
                     >
-                      Clear AI Queue
+                      Clear Queue
                     </button>
                   </>
                 ) : null}
@@ -12195,8 +12182,8 @@ export default function App() {
                 <label style={toggleOptionLabelStyle}>
                   <input
                     type="checkbox"
-                    checked={showThumbnailAiQueueBadges}
-                    onChange={(event) => setShowThumbnailAiQueueBadges(event.target.checked)}
+                    checked={showThumbnailEditQueueBadges}
+                    onChange={(event) => setShowThumbnailEditQueueBadges(event.target.checked)}
                   />
                   AI Queue Indicator
                 </label>
@@ -12962,9 +12949,9 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
-                          showAiQueueBadge={showThumbnailAiQueueBadges}
+                          showAiQueueBadge={showThumbnailEditQueueBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
-                          isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                          isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -12995,9 +12982,9 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
-                          showAiQueueBadge={showThumbnailAiQueueBadges}
+                          showAiQueueBadge={showThumbnailEditQueueBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
-                          isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                          isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -13019,9 +13006,9 @@ export default function App() {
                     isUpdating={updatingAssetIds[asset.id] === true}
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
-                    showAiQueueBadge={showThumbnailAiQueueBadges}
+                    showAiQueueBadge={showThumbnailEditQueueBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
-                    isInAiQueue={aiQueueAssetIdSet.has(asset.id)}
+                    isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                     touchSelectionMode={touchSelectionMode}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
@@ -13196,36 +13183,39 @@ export default function App() {
         onClose={() => setSetCaptureDateDialogOpen(false)}
         onSave={handleUpdateSelectedAssetsCaptureDateTime}
       />
-      <AddToAiQueueDialog
-        open={addToAiQueueDialogOpen}
+      <AddToEditQueueDialog
+        open={addToEditQueueDialogOpen}
         assetFilename={selectedAsset?.filename ?? ''}
-        existingPrompt={selectedAsset ? (aiQueueEntries.find((e) => e.assetId === selectedAsset.id)?.prompt ?? '') : ''}
-        onClose={() => setAddToAiQueueDialogOpen(false)}
-        onConfirm={(prompt) => void handleAddToAiQueue(prompt)}
+        existingPrompt={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.prompt ?? '') : ''}
+        onClose={() => setAddToEditQueueDialogOpen(false)}
+        onConfirm={(prompt) => void handleAddToEditQueue(prompt)}
       />
-      <AiQueueDialog
-        open={aiQueueDialogOpen}
-        entries={aiQueueEntries}
-        loading={aiQueueLoading}
-        error={aiQueueError}
-        exportNotice={aiQueueExportNotice}
-        exportError={aiQueueExportError}
-        processNotice={aiQueueProcessNotice}
-        processError={aiQueueProcessError}
-        processing={aiQueueProcessing}
-        onClose={() => setAiQueueDialogOpen(false)}
-        onRemove={(assetId) => void handleRemoveFromAiQueue(assetId)}
-        onExport={(assetIds) => void handleExportAiQueue(assetIds)}
-        onProcess={(assetIds) => void handleProcessAiQueue(assetIds)}
-        onClear={() => void handleClearAiQueue()}
-        onSavePrompt={(assetId, prompt) => handleSaveAiQueuePrompt(assetId, prompt)}
+      <EditQueueDialog
+        open={editQueueDialogOpen}
+        entries={editQueueEntries}
+        loading={editQueueLoading}
+        error={editQueueError}
+        exportNotice={editQueueExportNotice}
+        exportError={editQueueExportError}
+        importResults={editQueueImportResults}
+        importError={editQueueImportError}
+        importing={editQueueImporting}
+        clearFolderNotice={editQueueClearFolderNotice}
+        clearFolderError={editQueueClearFolderError}
+        onClose={() => setEditQueueDialogOpen(false)}
+        onRemove={(assetId) => void handleRemoveFromEditQueue(assetId)}
+        onExport={(assetIds) => void handleExportEditQueue(assetIds)}
+        onImport={() => void handleImportEditedFiles()}
+        onClearQueue={() => void handleClearEditQueue()}
+        onClearFolder={() => void handleClearEditFolder()}
+        onSavePrompt={(assetId, prompt) => handleSaveEditQueuePrompt(assetId, prompt)}
       />
-      <AiHistoryDialog
-        open={aiHistoryDialogOpen}
-        entries={aiHistoryEntries}
-        loading={aiHistoryLoading}
-        error={aiHistoryError}
-        onClose={() => setAiHistoryDialogOpen(false)}
+      <EditHistoryDialog
+        open={editHistoryDialogOpen}
+        entries={editHistoryEntries}
+        loading={editHistoryLoading}
+        error={editHistoryError}
+        onClose={() => setEditHistoryDialogOpen(false)}
       />
       <PublishToGooglePhotosDialog
         open={publishToGooglePhotosOpen}

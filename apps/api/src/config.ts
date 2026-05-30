@@ -253,7 +253,10 @@ export const config = {
 
   sessionSecret: requireEnv('TEDOGRAPHY_SESSION_SECRET'),
   port: Number(process.env.PORT ?? 4000),
-  aiQueueExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
+  // TEDOGRAPHY_EDIT_PATH is the new name; fall back to the old TEDOGRAPHY_AI_QUEUE_EXPORT_PATH
+  // so existing .env files keep working without changes.
+  editPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_EDIT_PATH') ??
+    parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,
   printOrdersRoot: parseOptionalAbsolutePathEnv('TEDOGRAPHY_PRINT_ORDERS_ROOT'),
   googlePhotos: {

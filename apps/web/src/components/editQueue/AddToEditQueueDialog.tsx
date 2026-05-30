@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
 
-interface AddToAiQueueDialogProps {
+interface AddToEditQueueDialogProps {
   open: boolean;
   assetFilename: string;
   existingPrompt?: string;
@@ -101,13 +101,13 @@ const confirmButtonStyle: CSSProperties = {
   fontWeight: 500,
 };
 
-export function AddToAiQueueDialog({
+export function AddToEditQueueDialog({
   open,
   assetFilename,
   existingPrompt,
   onClose,
   onConfirm,
-}: AddToAiQueueDialogProps): ReactElement | null {
+}: AddToEditQueueDialogProps): ReactElement | null {
   const [prompt, setPrompt] = useState(existingPrompt ?? '');
 
   if (!open) return null;
@@ -121,7 +121,7 @@ export function AddToAiQueueDialog({
     <div style={overlayStyle} onClick={onClose}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Add to AI Edit Queue</h2>
+          <h2 style={titleStyle}>Add to Edit Queue</h2>
           <p style={filenameStyle}>{assetFilename}</p>
         </div>
         <div style={bodyStyle}>

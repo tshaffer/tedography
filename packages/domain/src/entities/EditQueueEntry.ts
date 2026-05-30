@@ -1,4 +1,4 @@
-export interface AiEditQueueEntry {
+export interface EditQueueEntry {
   id: string;
   assetId: string;
   prompt: string;

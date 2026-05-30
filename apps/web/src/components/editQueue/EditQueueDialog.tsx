@@ -1,21 +1,24 @@
 import { useState, useEffect, useRef, type CSSProperties, type ReactElement } from 'react';
-import type { AiQueueEntryWithFilename } from '../../api/aiQueueApi.js';
+import type { EditQueueEntryWithFilename, ImportEditedResult } from '../../api/editQueueApi.js';
 
-interface AiQueueDialogProps {
+interface EditQueueDialogProps {
   open: boolean;
-  entries: AiQueueEntryWithFilename[];
+  entries: EditQueueEntryWithFilename[];
   loading: boolean;
   error: string | null;
   exportNotice: string | null;
   exportError: string | null;
-  processNotice: string | null;
-  processError: string | null;
-  processing: boolean;
+  importResults: ImportEditedResult[] | null;
+  importError: string | null;
+  importing: boolean;
+  clearFolderNotice: string | null;
+  clearFolderError: string | null;
   onClose: () => void;
   onRemove: (assetId: string) => void;
   onExport: (assetIds: string[]) => void;
-  onProcess: (assetIds: string[]) => void;
-  onClear: () => void;
+  onImport: () => void;
+  onClearQueue: () => void;
+  onClearFolder: () => void;
   onSavePrompt: (assetId: string, prompt: string) => Promise<void>;
 }
 
@@ -105,6 +108,12 @@ const footerStyle: CSSProperties = {
   padding: '12px 18px',
   borderTop: '1px solid #ececec',
   display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+};
+
+const footerButtonRowStyle: CSSProperties = {
+  display: 'flex',
   alignItems: 'center',
   gap: '8px',
   flexWrap: 'wrap',
@@ -173,29 +182,38 @@ const smallPrimaryButtonStyle: CSSProperties = {
   borderColor: '#1a56db',
 };
 
-export function AiQueueDialog({
+const dangerButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  borderColor: '#f87171',
+  color: '#dc2626',
+};
+
+export function EditQueueDialog({
   open,
   entries,
   loading,
   error,
   exportNotice,
   exportError,
-  processNotice,
-  processError,
-  processing,
+  importResults,
+  importError,
+  importing,
+  clearFolderNotice,
+  clearFolderError,
   onClose,
   onRemove,
   onExport,
-  onProcess,
-  onClear,
+  onImport,
+  onClearQueue,
+  onClearFolder,
   onSavePrompt,
-}: AiQueueDialogProps): ReactElement | null {
+}: EditQueueDialogProps): ReactElement | null {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
+  const [confirmClearFolder, setConfirmClearFolder] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  // Prune selections and close editor when entries change
   useEffect(() => {
     const validIds = new Set(entries.map((e) => e.assetId));
     setSelectedIds((prev) => {
@@ -207,7 +225,6 @@ export function AiQueueDialog({
     }
   }, [entries, editingAssetId]);
 
-  // Indeterminate state for select-all checkbox
   useEffect(() => {
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate =
@@ -228,16 +245,13 @@ export function AiQueueDialog({
   function toggleEntry(assetId: string): void {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(assetId)) {
-        next.delete(assetId);
-      } else {
-        next.add(assetId);
-      }
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
       return next;
     });
   }
 
-  function startEdit(entry: AiQueueEntryWithFilename): void {
+  function startEdit(entry: EditQueueEntryWithFilename): void {
     setEditingAssetId(entry.assetId);
     setEditDraft(entry.prompt ?? '');
   }
@@ -252,17 +266,19 @@ export function AiQueueDialog({
     setEditingAssetId(null);
   }
 
+  const importedCount = importResults?.filter((r) => r.status === 'imported').length ?? 0;
+  const importErrorCount = importResults?.filter((r) => r.status === 'error').length ?? 0;
+  const importErrors = importResults?.filter((r) => r.status === 'error') ?? [];
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
 
         <div style={headerStyle}>
           <h2 style={titleStyle}>
-            AI Edit Queue{entries.length > 0 ? ` (${entries.length})` : ''}
+            Edit Queue{entries.length > 0 ? ` (${entries.length})` : ''}
           </h2>
-          <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">
-            ×
-          </button>
+          <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div style={bodyStyle}>
@@ -335,26 +351,17 @@ export function AiQueueDialog({
                           onChange={(e) => setEditDraft(e.target.value)}
                           rows={3}
                           style={textareaStyle}
-                          // eslint-disable-next-line jsx-a11y/no-autofocus
                           autoFocus
                         />
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button type="button" style={smallPrimaryButtonStyle} onClick={() => void saveEdit()}>
-                            Save
-                          </button>
-                          <button type="button" style={smallButtonStyle} onClick={cancelEdit}>
-                            Cancel
-                          </button>
+                          <button type="button" style={smallPrimaryButtonStyle} onClick={() => void saveEdit()}>Save</button>
+                          <button type="button" style={smallButtonStyle} onClick={cancelEdit}>Cancel</button>
                         </div>
                       </div>
                     ) : entry.prompt ? (
-                      <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>
-                        {entry.prompt}
-                      </span>
+                      <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.prompt}</span>
                     ) : (
-                      <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>
-                        no prompt
-                      </span>
+                      <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
                     )}
                   </div>
                 );
@@ -364,48 +371,77 @@ export function AiQueueDialog({
         </div>
 
         <div style={footerStyle}>
-          <button
-            type="button"
-            style={selectedCount === 0 || processing ? disabledButtonStyle : primaryButtonStyle}
-            onClick={() => onProcess(selectedAssetIds)}
-            disabled={selectedCount === 0 || processing}
-            title="Send selected photos to Gemini and save the edited results"
-          >
-            {processing
-              ? 'Processing…'
-              : selectedCount > 0
-                ? `Process with Gemini (${selectedCount})`
-                : 'Process with Gemini'}
-          </button>
-          <button
-            type="button"
-            style={selectedCount === 0 ? disabledButtonStyle : actionButtonStyle}
-            onClick={() => onExport(selectedAssetIds)}
-            disabled={selectedCount === 0}
-            title="Copy selected files to export folder and write prompts.txt"
-          >
-            Export Queue
-          </button>
-          <button
-            type="button"
-            style={entries.length === 0 ? disabledButtonStyle : actionButtonStyle}
-            onClick={onClear}
-            disabled={entries.length === 0}
-          >
-            Clear
-          </button>
-          {processNotice ? (
-            <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{processNotice}</span>
+          {/* Primary action row */}
+          <div style={footerButtonRowStyle}>
+            <button
+              type="button"
+              style={selectedCount === 0 ? disabledButtonStyle : primaryButtonStyle}
+              onClick={() => onExport(selectedAssetIds)}
+              disabled={selectedCount === 0}
+              title="Copy selected files and write manifest.json to edit folder"
+            >
+              {selectedCount > 0 ? `Export (${selectedCount})` : 'Export'}
+            </button>
+            <button
+              type="button"
+              style={importing ? disabledButtonStyle : actionButtonStyle}
+              onClick={onImport}
+              disabled={importing}
+              title="Scan edit folder for _edited files and import them"
+            >
+              {importing ? 'Importing…' : 'Import Edited Files'}
+            </button>
+            <button
+              type="button"
+              style={entries.length === 0 ? disabledButtonStyle : actionButtonStyle}
+              onClick={onClearQueue}
+              disabled={entries.length === 0}
+            >
+              Clear Queue
+            </button>
+          </div>
+
+          {/* Clear folder — two-step confirm */}
+          <div style={footerButtonRowStyle}>
+            {confirmClearFolder ? (
+              <>
+                <span style={{ fontSize: '12px', color: '#374151' }}>Delete all files in edit folder?</span>
+                <button
+                  type="button"
+                  style={{ ...dangerButtonStyle, backgroundColor: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                  onClick={() => { setConfirmClearFolder(false); onClearFolder(); }}
+                >
+                  Yes, delete
+                </button>
+                <button type="button" style={smallButtonStyle} onClick={() => setConfirmClearFolder(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button type="button" style={dangerButtonStyle} onClick={() => setConfirmClearFolder(true)}>
+                Clear Edit Folder
+              </button>
+            )}
+          </div>
+
+          {/* Status messages */}
+          {exportNotice ? <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{exportNotice}</span> : null}
+          {exportError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{exportError}</span> : null}
+          {importResults && !importError ? (
+            <div>
+              <span style={{ fontSize: '12px', color: importErrorCount > 0 ? '#b97316' : '#2f6f3e' }}>
+                {importedCount} imported{importErrorCount > 0 ? `, ${importErrorCount} error${importErrorCount !== 1 ? 's' : ''}` : ''}
+              </span>
+              {importErrors.map((r) => (
+                <div key={r.filename} style={{ fontSize: '11px', color: '#b00020', marginTop: '2px' }}>
+                  {r.filename}: {r.message}
+                </div>
+              ))}
+            </div>
           ) : null}
-          {processError ? (
-            <span style={{ fontSize: '12px', color: '#b00020' }}>{processError}</span>
-          ) : null}
-          {exportNotice ? (
-            <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{exportNotice}</span>
-          ) : null}
-          {exportError ? (
-            <span style={{ fontSize: '12px', color: '#b00020' }}>{exportError}</span>
-          ) : null}
+          {importError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{importError}</span> : null}
+          {clearFolderNotice ? <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{clearFolderNotice}</span> : null}
+          {clearFolderError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{clearFolderError}</span> : null}
         </div>
 
       </div>

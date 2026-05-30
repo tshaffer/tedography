@@ -1,10 +1,10 @@
-export interface AiEditHistoryEntry {
+export interface EditHistoryEntry {
   id: string;
   sourceAssetId: string;
   sourceFilename: string;
   prompt: string;
-  generatedFilename: string;
-  generatedAssetId: string | null;
+  editedFilename: string;
+  editedAssetId: string | null;
   status: 'succeeded' | 'failed';
   errorMessage: string | null;
   processedAt: string;

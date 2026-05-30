@@ -5,12 +5,12 @@ export type StorageRootWithAvailability = StorageRootConfig & {
   isAvailable: boolean;
 };
 
-const AI_QUEUE_ROOT_ID = 'ai-queue';
+const EDIT_QUEUE_ROOT_ID = 'edit-queue';
 
 function allRoots(): StorageRootConfig[] {
   const roots = [...config.storageRoots];
-  if (config.aiQueueExportPath) {
-    roots.push({ id: AI_QUEUE_ROOT_ID, label: 'AI Import Queue', absolutePath: config.aiQueueExportPath });
+  if (config.editPath) {
+    roots.push({ id: EDIT_QUEUE_ROOT_ID, label: 'Edit Queue', absolutePath: config.editPath });
   }
   return roots;
 }

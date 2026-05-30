@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactElement } from 'react';
-import type { AiEditHistoryEntry } from '@tedography/domain';
+import type { EditHistoryEntry } from '@tedography/domain';
 
-interface AiHistoryDialogProps {
+interface EditHistoryDialogProps {
   open: boolean;
-  entries: AiEditHistoryEntry[];
+  entries: EditHistoryEntry[];
   loading: boolean;
   error: string | null;
   onClose: () => void;
@@ -78,26 +78,28 @@ const entryStyle: CSSProperties = {
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return (
+    d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' ' +
+    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  );
 }
 
-export function AiHistoryDialog({
+export function EditHistoryDialog({
   open,
   entries,
   loading,
   error,
   onClose,
-}: AiHistoryDialogProps): ReactElement | null {
+}: EditHistoryDialogProps): ReactElement | null {
   if (!open) return null;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
-
         <div style={headerStyle}>
           <h2 style={titleStyle}>
-            AI Edit History{entries.length > 0 ? ` (${entries.length})` : ''}
+            Edit History{entries.length > 0 ? ` (${entries.length})` : ''}
           </h2>
           <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">
             ×
@@ -116,32 +118,30 @@ export function AiHistoryDialog({
           ) : (
             entries.map((entry) => (
               <div key={entry.id} style={entryStyle}>
-                {/* Status icon column */}
+                {/* Status icon */}
                 <div style={{ paddingTop: '1px', fontSize: '13px' }}>
                   {entry.status === 'succeeded'
                     ? <span style={{ color: '#2f6f3e' }}>✓</span>
                     : <span style={{ color: '#b00020' }}>✗</span>}
                 </div>
 
-                {/* Content column */}
+                {/* Content */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                  {/* Source → Generated */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                     <span style={{ fontWeight: 500, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {entry.sourceFilename}
                     </span>
                     <span style={{ color: '#9ca3af', flexShrink: 0 }}>→</span>
                     <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {entry.generatedFilename || '—'}
+                      {entry.editedFilename || '—'}
                     </span>
-                    {entry.generatedAssetId ? (
+                    {entry.editedAssetId ? (
                       <span style={{ flexShrink: 0, fontSize: '10px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '4px', padding: '1px 5px' }}>
                         imported
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Prompt */}
                   {entry.prompt ? (
                     <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.prompt}>
                       {entry.prompt}
@@ -150,14 +150,12 @@ export function AiHistoryDialog({
                     <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
                   )}
 
-                  {/* Error message */}
                   {entry.errorMessage ? (
                     <span style={{ color: '#b00020', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.errorMessage}>
                       {entry.errorMessage}
                     </span>
                   ) : null}
 
-                  {/* Date */}
                   <span style={{ color: '#9ca3af', fontSize: '10px' }}>
                     {formatDate(entry.processedAt)}
                   </span>
@@ -166,7 +164,6 @@ export function AiHistoryDialog({
             ))
           )}
         </div>
-
       </div>
     </div>
   );

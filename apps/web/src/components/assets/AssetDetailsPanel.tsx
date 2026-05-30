@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { type MediaAsset, type MediaAssetPerson, type Person } from '@tedography/domain';
-import type { AiQueueEntryWithFilename } from '../../api/aiQueueApi';
+import type { EditQueueEntryWithFilename } from '../../api/editQueueApi';
 import Chip from '@mui/material/Chip';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -38,10 +38,8 @@ interface AssetDetailsPanelProps {
   onRemoveManualPerson?: ((personId: string) => Promise<void>) | undefined;
   bulkPersonTag?: { count: number; commonPeople: MediaAssetPerson[]; onTag: (personId: string) => Promise<void> } | undefined;
   keywordsSlot?: ReactNode;
-  aiQueueEntry?: AiQueueEntryWithFilename | null;
-  onSaveAiPrompt?: ((prompt: string) => Promise<void>) | undefined;
-  onProcessWithGemini?: (() => void) | undefined;
-  aiProcessing?: boolean;
+  editQueueEntry?: EditQueueEntryWithFilename | null;
+  onSaveEditPrompt?: ((prompt: string) => Promise<void>) | undefined;
 }
 
 const panelStyle: CSSProperties = {
@@ -281,10 +279,8 @@ export function AssetDetailsPanel({
   onRemoveManualPerson,
   bulkPersonTag,
   keywordsSlot,
-  aiQueueEntry = null,
-  onSaveAiPrompt,
-  onProcessWithGemini,
-  aiProcessing = false
+  editQueueEntry = null,
+  onSaveEditPrompt,
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
@@ -505,15 +501,15 @@ export function AssetDetailsPanel({
         </section>
       ) : null}
 
-      {/* AI Queue */}
-      {aiQueueEntry ? (
+      {/* Edit Queue */}
+      {editQueueEntry ? (
         <section style={subSectionStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>AI</h4>
+            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>Edit Queue</h4>
             {!promptEditing && (
               <button
                 type="button"
-                onClick={() => { setPromptDraft(aiQueueEntry.prompt); setPromptEditing(true); }}
+                onClick={() => { setPromptDraft(editQueueEntry.prompt); setPromptEditing(true); }}
                 style={{ ...buttonStyle, padding: '2px 8px', fontSize: '11px' }}
               >
                 Edit
@@ -537,7 +533,7 @@ export function AssetDetailsPanel({
                   onClick={async () => {
                     setPromptSaving(true);
                     try {
-                      await onSaveAiPrompt?.(promptDraft);
+                      await onSaveEditPrompt?.(promptDraft);
                       setPromptEditing(false);
                     } finally {
                       setPromptSaving(false);
@@ -556,18 +552,8 @@ export function AssetDetailsPanel({
               </div>
             </>
           ) : (
-            <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{aiQueueEntry.prompt}</p>
+            <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.prompt}</p>
           )}
-          <div style={{ marginTop: '8px' }}>
-            <button
-              type="button"
-              onClick={onProcessWithGemini}
-              disabled={aiProcessing || promptEditing}
-              style={aiProcessing || promptEditing ? disabledButtonStyle : buttonStyle}
-            >
-              {aiProcessing ? 'Processing...' : 'Process with Gemini'}
-            </button>
-          </div>
         </section>
       ) : null}
 

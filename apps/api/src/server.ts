@@ -27,8 +27,8 @@ import {
   updatePhotoState
 } from './repositories/assetRepository.js';
 import { listAssetIdsWithReviewableDetections } from './repositories/faceDetectionRepository.js';
-import { aiHistoryRoutes } from './routes/aiHistoryRoutes.js';
-import { aiQueueRoutes } from './routes/aiQueueRoutes.js';
+import { editHistoryRoutes } from './routes/editHistoryRoutes.js';
+import { editQueueRoutes } from './routes/editQueueRoutes.js';
 import { googlePhotosRoutes } from './routes/googlePhotosRoutes.js';
 import { printRoutes } from './routes/printRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
@@ -141,8 +141,8 @@ export function createServer(): Express {
   app.use('/api/smart-albums', smartAlbumRoutes);
   app.use('/api/assets', assetKeywordRoutes);
   app.use('/api/people-pipeline', peoplePipelineRoutes);
-  app.use('/api/ai-queue', aiQueueRoutes);
-  app.use('/api/ai-history', aiHistoryRoutes);
+  app.use('/api/edit-queue', editQueueRoutes);
+  app.use('/api/edit-history', editHistoryRoutes);
   app.use('/api/google-photos', googlePhotosRoutes);
   app.use('/api/print', printRoutes);
 

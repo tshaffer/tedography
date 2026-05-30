@@ -1,4 +1,4 @@
-import type { AiEditHistoryEntry } from '@tedography/domain';
+import type { EditHistoryEntry } from '@tedography/domain';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: 'no-store' });
@@ -9,6 +9,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getAiHistory(): Promise<AiEditHistoryEntry[]> {
-  return fetchJson<AiEditHistoryEntry[]>('/api/ai-history');
+export function getEditHistory(): Promise<EditHistoryEntry[]> {
+  return fetchJson<EditHistoryEntry[]>('/api/edit-history');
 }
