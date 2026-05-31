@@ -20,6 +20,7 @@ interface EditQueueDialogProps {
   onClearQueue: () => void;
   onClearFolder: () => void;
   onSavePrompt: (assetId: string, prompt: string) => Promise<void>;
+  onNavigate: (assetId: string, albumId: string | null) => void;
 }
 
 const overlayStyle: CSSProperties = {
@@ -207,6 +208,7 @@ export function EditQueueDialog({
   onClearQueue,
   onClearFolder,
   onSavePrompt,
+  onNavigate,
 }: EditQueueDialogProps): ReactElement | null {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
@@ -323,9 +325,14 @@ export function EditQueueDialog({
                         onChange={() => toggleEntry(entry.assetId)}
                         style={{ cursor: 'pointer', flexShrink: 0 }}
                       />
-                      <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1f2937' }}>
+                      <button
+                        type="button"
+                        style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit' }}
+                        title="Navigate to this photo"
+                        onClick={() => { onNavigate(entry.assetId, entry.albumId); }}
+                      >
                         {entry.filename}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         style={{ ...iconButtonStyle, color: isEditing ? '#1a56db' : '#9ca3af' }}
@@ -343,6 +350,10 @@ export function EditQueueDialog({
                         ×
                       </button>
                     </div>
+
+                    {entry.albumPath ? (
+                      <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
+                    ) : null}
 
                     {isEditing ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>

@@ -12,6 +12,7 @@ import {
   updateMediaAssetAlbumIds,
   updateMediaAssetPeople,
 } from '../repositories/assetRepository.js';
+import { listAlbumTreeNodes } from '../repositories/albumTreeRepository.js';
 import {
   clearQueue,
   getQueueEntries,
@@ -79,18 +80,40 @@ function basenameWithoutExt(filename: string): string {
   return ext ? filename.slice(0, -ext.length) : filename;
 }
 
-// ─── GET / — list queue entries with filenames ────────────────────────────────
+type AlbumNodeMap = Map<string, { label: string; parentId: string | null }>;
+
+function buildAlbumPath(albumId: string, nodesById: AlbumNodeMap): string | null {
+  const parts: string[] = [];
+  let currentId: string | null = albumId;
+  let depth = 0;
+  while (currentId && depth < 20) {
+    const node = nodesById.get(currentId);
+    if (!node) break;
+    parts.unshift(node.label);
+    currentId = node.parentId;
+    depth++;
+  }
+  return parts.length > 0 ? parts.join(' → ') : null;
+}
+
+// ─── GET / — list queue entries with filenames and album path ────────────────
 
 editQueueRoutes.get('/', async (_req, res) => {
   try {
-    const entries = await getQueueEntries();
-    const withFilenames = await Promise.all(
+    const [entries, allNodes] = await Promise.all([getQueueEntries(), listAlbumTreeNodes()]);
+    const nodesById = new Map(allNodes.map((n) => [n.id, n]));
+
+    const withDetails = await Promise.all(
       entries.map(async (entry) => {
         const asset = await findById(entry.assetId);
-        return { ...entry, filename: asset?.filename ?? entry.assetId };
+        const filename = asset?.filename ?? entry.assetId;
+        const albumIds = asset?.albumIds ?? [];
+        const albumId = albumIds[0] ?? null;
+        const albumPath = albumId ? buildAlbumPath(albumId, nodesById) : null;
+        return { ...entry, filename, albumId, albumPath };
       })
     );
-    res.json(withFilenames);
+    res.json(withDetails);
   } catch (error) {
     log.error('Failed to get edit queue', error);
     res.status(500).json({ error: 'Failed to get edit queue' });

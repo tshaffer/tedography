@@ -2,6 +2,8 @@ import type { EditQueueEntry } from '@tedography/domain';
 
 export interface EditQueueEntryWithFilename extends EditQueueEntry {
   filename: string;
+  albumId: string | null;
+  albumPath: string | null;
 }
 
 export interface ImportEditedResult {

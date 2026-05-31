@@ -134,7 +134,7 @@ import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
 import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
-import { getEditHistory } from './api/editHistoryApi';
+import { getEditHistory, type EditHistoryEntryWithNavigation } from './api/editHistoryApi';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
@@ -4020,7 +4020,7 @@ export default function App() {
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
-  const [editHistoryEntries, setEditHistoryEntries] = useState<import('@tedography/domain').EditHistoryEntry[]>([]);
+  const [editHistoryEntries, setEditHistoryEntries] = useState<EditHistoryEntryWithNavigation[]>([]);
   const [editHistoryLoading, setEditHistoryLoading] = useState(false);
   const [editHistoryError, setEditHistoryError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
@@ -7470,6 +7470,21 @@ export default function App() {
     } catch (err) {
       setEditQueueClearFolderError(err instanceof Error ? err.message : 'Failed to clear edit folder');
     }
+  }
+
+  function handleNavigateToEditQueueAsset(assetId: string, albumId: string | null): void {
+    setEditQueueDialogOpen(false);
+    setEditHistoryDialogOpen(false);
+    if (albumId) {
+      setCheckedAlbumIds([albumId]);
+      setSelectedTreeNodeId(albumId);
+      setLibraryBrowseMode('Albums');
+      setPrimaryArea('Library');
+    }
+    // Must be in Grid mode — the grid-reveal effect clears the ref immediately if viewerMode !== 'Grid'
+    setViewerMode('Grid');
+    pendingGridRevealAssetIdRef.current = assetId;
+    setSelectedAssetId(assetId);
   }
 
   async function handleSaveEditQueuePrompt(assetId: string, prompt: string): Promise<void> {
@@ -13209,6 +13224,7 @@ export default function App() {
         onClearQueue={() => void handleClearEditQueue()}
         onClearFolder={() => void handleClearEditFolder()}
         onSavePrompt={(assetId, prompt) => handleSaveEditQueuePrompt(assetId, prompt)}
+        onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
       />
       <EditHistoryDialog
         open={editHistoryDialogOpen}
@@ -13216,6 +13232,7 @@ export default function App() {
         loading={editHistoryLoading}
         error={editHistoryError}
         onClose={() => setEditHistoryDialogOpen(false)}
+        onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
       />
       <PublishToGooglePhotosDialog
         open={publishToGooglePhotosOpen}

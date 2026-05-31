@@ -1,12 +1,13 @@
 import type { CSSProperties, ReactElement } from 'react';
-import type { EditHistoryEntry } from '@tedography/domain';
+import type { EditHistoryEntryWithNavigation } from '../../api/editHistoryApi.js';
 
 interface EditHistoryDialogProps {
   open: boolean;
-  entries: EditHistoryEntry[];
+  entries: EditHistoryEntryWithNavigation[];
   loading: boolean;
   error: string | null;
   onClose: () => void;
+  onNavigate: (assetId: string, albumId: string | null) => void;
 }
 
 const overlayStyle: CSSProperties = {
@@ -91,6 +92,7 @@ export function EditHistoryDialog({
   loading,
   error,
   onClose,
+  onNavigate,
 }: EditHistoryDialogProps): ReactElement | null {
   if (!open) return null;
 
@@ -127,20 +129,40 @@ export function EditHistoryDialog({
 
                 {/* Content */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                    <span style={{ fontWeight: 500, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      style={{ fontWeight: 500, color: '#1a56db', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit', maxWidth: '200px' }}
+                      title="Navigate to source photo"
+                      onClick={() => { onNavigate(entry.sourceAssetId, entry.albumId); }}
+                    >
                       {entry.sourceFilename}
-                    </span>
+                    </button>
                     <span style={{ color: '#9ca3af', flexShrink: 0 }}>→</span>
-                    <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {entry.editedFilename || '—'}
-                    </span>
+                    {entry.editedAssetId ? (
+                      <button
+                        type="button"
+                        style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit', maxWidth: '200px' }}
+                        title="Navigate to edited photo"
+                        onClick={() => { onNavigate(entry.editedAssetId!, entry.albumId); }}
+                      >
+                        {entry.editedFilename || '—'}
+                      </button>
+                    ) : (
+                      <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.editedFilename || '—'}
+                      </span>
+                    )}
                     {entry.editedAssetId ? (
                       <span style={{ flexShrink: 0, fontSize: '10px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '4px', padding: '1px 5px' }}>
                         imported
                       </span>
                     ) : null}
                   </div>
+
+                  {entry.albumPath ? (
+                    <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
+                  ) : null}
 
                   {entry.prompt ? (
                     <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.prompt}>
