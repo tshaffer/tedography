@@ -126,6 +126,23 @@ editQueueRoutes.delete('/', requireFeature('maintenance'), async (_req, res) => 
   }
 });
 
+// ─── DELETE /edit-folder — clear all files from edit path ────────────────────
+
+editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_req, res) => {
+  const editPath = requireEditPath(res);
+  if (!editPath) return;
+
+  try {
+    const entries = await fs.readdir(editPath, { withFileTypes: true });
+    const fileEntries = entries.filter((e) => e.isFile());
+    await Promise.all(fileEntries.map((e) => fs.unlink(path.join(editPath, e.name))));
+    res.json({ ok: true, deletedCount: fileEntries.length });
+  } catch (error) {
+    log.error('Failed to clear edit folder', error);
+    res.status(500).json({ error: 'Failed to clear edit folder' });
+  }
+});
+
 // ─── DELETE /:assetId — remove one entry ─────────────────────────────────────
 
 editQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, res) => {
@@ -442,20 +459,4 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
   const importedCount = results.filter((r) => r.status === 'imported').length;
   const errorCount = results.filter((r) => r.status === 'error').length;
   res.json({ results, importedCount, errorCount });
-});
-
-// ─── DELETE /edit-folder — clear all files from edit path ────────────────────
-
-editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
-
-  try {
-    const files = await fs.readdir(editPath);
-    await Promise.all(files.map((f) => fs.unlink(path.join(editPath, f))));
-    res.json({ ok: true, deletedCount: files.length });
-  } catch (error) {
-    log.error('Failed to clear edit folder', error);
-    res.status(500).json({ error: 'Failed to clear edit folder' });
-  }
 });
