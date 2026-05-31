@@ -4301,6 +4301,7 @@ export default function App() {
   }, [location.pathname, location.search, navigate]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [pendingNavigateAssetId, setPendingNavigateAssetId] = useState<string | null>(null);
   const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
   const [selectedAssetPeopleStatus, setSelectedAssetPeopleStatus] = useState<ListAssetFaceDetectionsResponse | null>(null);
   const [selectedAssetPeopleStatusLoading, setSelectedAssetPeopleStatusLoading] = useState(false);
@@ -6905,6 +6906,28 @@ export default function App() {
     }
   }, [selectionAnchorAssetId, visibleAssets, selectedAssetId, selectedAssetIds]);
 
+  // Deferred navigation: once the target asset appears in visibleAssets (after album
+  // switch + React commit), select it and scroll it into view.  Defined after the
+  // selection-pruning effect above so our setSelectedAssetId call wins the batch.
+  useEffect(() => {
+    if (!pendingNavigateAssetId) return;
+    const isVisible = visibleAssets.some((a) => a.id === pendingNavigateAssetId);
+    if (!isVisible) return;
+
+    const assetId = pendingNavigateAssetId;
+    setPendingNavigateAssetId(null);
+    setSelectedAssetId(assetId);
+    setSelectedAssetIds([assetId]);
+
+    // Scroll after the selection state commits to the DOM.
+    requestAnimationFrame(() => {
+      const card = mainColumnRef.current?.querySelector<HTMLElement>(
+        `[data-grid-card="true"][data-asset-id="${assetId}"]`
+      );
+      card?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [pendingNavigateAssetId, visibleAssets]);
+
   useEffect(() => {
     if (immersiveOpen && !selectedAsset) {
       closeImmersive();
@@ -7481,10 +7504,10 @@ export default function App() {
       setLibraryBrowseMode('Albums');
       setPrimaryArea('Library');
     }
-    // Must be in Grid mode — the grid-reveal effect clears the ref immediately if viewerMode !== 'Grid'
     setViewerMode('Grid');
-    pendingGridRevealAssetIdRef.current = assetId;
-    setSelectedAssetId(assetId);
+    // Selection + scroll handled by the pendingNavigateAssetId effect once the
+    // album's assets are committed to visibleAssets.
+    setPendingNavigateAssetId(assetId);
   }
 
   async function handleSaveEditQueuePrompt(assetId: string, prompt: string): Promise<void> {
