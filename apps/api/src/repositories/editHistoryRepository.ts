@@ -5,7 +5,7 @@ import { EditHistoryModel } from '../models/editHistoryModel.js';
 export interface CreateEditHistoryEntryInput {
   sourceAssetId: string;
   sourceFilename: string;
-  prompt: string;
+  note: string;
   editedFilename: string;
   status: 'succeeded' | 'failed';
   errorMessage: string | null;
@@ -17,7 +17,7 @@ export async function createEditHistoryEntry(input: CreateEditHistoryEntryInput)
     id: randomUUID(),
     sourceAssetId: input.sourceAssetId,
     sourceFilename: input.sourceFilename,
-    prompt: input.prompt,
+    note: input.note,
     editedFilename: input.editedFilename,
     editedAssetId: input.editedAssetId ?? null,
     status: input.status,

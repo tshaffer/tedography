@@ -27,11 +27,11 @@ export function getEditQueue(): Promise<EditQueueEntryWithFilename[]> {
   return fetchJson<EditQueueEntryWithFilename[]>('/api/edit-queue');
 }
 
-export function addToEditQueue(assetId: string, prompt: string): Promise<EditQueueEntry> {
+export function addToEditQueue(assetId: string, note: string): Promise<EditQueueEntry> {
   return fetchJson<EditQueueEntry>('/api/edit-queue', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assetId, prompt }),
+    body: JSON.stringify({ assetId, note }),
   });
 }
 

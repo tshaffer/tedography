@@ -42,7 +42,7 @@ interface ManifestEntry {
   sourceAssetId: string;
   originalFilename: string;
   originalBasename: string;
-  prompt: string;
+  note: string;
 }
 
 interface Manifest {
@@ -139,13 +139,13 @@ editQueueRoutes.get('/', async (_req, res) => {
 // ─── POST / — add/upsert asset ────────────────────────────────────────────────
 
 editQueueRoutes.post('/', requireFeature('maintenance'), async (req, res) => {
-  const { assetId, prompt } = req.body as { assetId?: string; prompt?: string };
+  const { assetId, note } = req.body as { assetId?: string; note?: string };
   if (!assetId) {
     res.status(400).json({ error: 'assetId is required' });
     return;
   }
   try {
-    const entry = await upsertQueueEntry(assetId, prompt ?? '');
+    const entry = await upsertQueueEntry(assetId, note ?? '');
     res.json(entry);
   } catch (error) {
     log.error('Failed to add to edit queue', error);
@@ -194,7 +194,7 @@ editQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, r
   }
 });
 
-// ─── POST /export — copy files + write manifest.json + prompts.txt ───────────
+// ─── POST /export — copy files + write manifest.json + notes.txt ────────────
 
 editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) => {
   const editPath = requireEditPath(res);
@@ -211,7 +211,7 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
     const entries = await getQueueEntries();
     const entryMap = new Map(entries.map((e) => [e.assetId, e]));
 
-    const promptLines: string[] = [];
+    const noteLines: string[] = [];
     const manifestEntries: ManifestEntry[] = [];
 
     for (const assetId of assetIds) {
@@ -224,22 +224,22 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
         const srcPath = resolveOriginalAbsolutePathForAsset(asset);
         const destPath = path.join(editPath, asset.filename);
         await fs.copyFile(srcPath, destPath);
-        promptLines.push(`${asset.filename}: ${entry.prompt || '(no prompt)'}`);
+        noteLines.push(`${asset.filename}: ${entry.note || '(no note)'}`);
         manifestEntries.push({
           sourceAssetId: asset.id,
           originalFilename: asset.filename,
           originalBasename: basenameWithoutExt(asset.filename),
-          prompt: entry.prompt,
+          note: entry.note,
         });
       } catch (err) {
         log.error(`Failed to copy asset ${assetId}`, err);
-        promptLines.push(`${asset.filename}: ERROR - could not copy file`);
+        noteLines.push(`${asset.filename}: ERROR - could not copy file`);
       }
     }
 
     await fs.writeFile(
-      path.join(editPath, 'prompts.txt'),
-      promptLines.join('\n') + '\n',
+      path.join(editPath, 'notes.txt'),
+      noteLines.join('\n') + '\n',
       'utf-8'
     );
 
@@ -479,7 +479,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
       await createEditHistoryEntry({
         sourceAssetId: sourceAsset.id,
         sourceFilename: sourceAsset.filename,
-        prompt: manifestEntry.prompt,
+        note: manifestEntry.note,
         editedFilename,
         status: 'succeeded',
         errorMessage: null,
@@ -494,7 +494,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
       await createEditHistoryEntry({
         sourceAssetId: manifestEntry.sourceAssetId,
         sourceFilename: manifestEntry.originalFilename,
-        prompt: manifestEntry.prompt,
+        note: manifestEntry.note,
         editedFilename,
         status: 'failed',
         errorMessage: message,

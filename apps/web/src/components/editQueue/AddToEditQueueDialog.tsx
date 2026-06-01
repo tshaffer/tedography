@@ -3,9 +3,9 @@ import { useState, type CSSProperties, type ReactElement } from 'react';
 interface AddToEditQueueDialogProps {
   open: boolean;
   assetFilename: string;
-  existingPrompt?: string;
+  existingNote?: string;
   onClose: () => void;
-  onConfirm: (prompt: string) => void;
+  onConfirm: (note: string) => void;
 }
 
 const overlayStyle: CSSProperties = {
@@ -104,16 +104,16 @@ const confirmButtonStyle: CSSProperties = {
 export function AddToEditQueueDialog({
   open,
   assetFilename,
-  existingPrompt,
+  existingNote,
   onClose,
   onConfirm,
 }: AddToEditQueueDialogProps): ReactElement | null {
-  const [prompt, setPrompt] = useState(existingPrompt ?? '');
+  const [note, setNote] = useState(existingNote ?? '');
 
   if (!open) return null;
 
   function handleConfirm(): void {
-    onConfirm(prompt.trim());
+    onConfirm(note.trim());
     onClose();
   }
 
@@ -126,17 +126,17 @@ export function AddToEditQueueDialog({
         </div>
         <div style={bodyStyle}>
           <label style={labelStyle}>
-            Prompt (optional)
+            Note (optional)
           </label>
           <textarea
             style={textareaStyle}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="e.g. make the sky more dramatic, black and white high contrast…"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. remove power lines, boost sky contrast, try black and white…"
             autoFocus
           />
           <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>
-            Leave blank to queue without a specific editing prompt.
+            Leave blank to queue without a note.
           </p>
         </div>
         <div style={footerStyle}>

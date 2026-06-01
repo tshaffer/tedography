@@ -7533,10 +7533,10 @@ export default function App() {
     }
   }
 
-  async function handleAddToEditQueue(prompt: string): Promise<void> {
+  async function handleAddToEditQueue(note: string): Promise<void> {
     if (!selectedAsset) return;
     try {
-      await addToEditQueue(selectedAsset.id, prompt);
+      await addToEditQueue(selectedAsset.id, note);
       await loadEditQueue();
     } catch (err) {
       console.error('Failed to add to edit queue', err);
@@ -7613,8 +7613,8 @@ export default function App() {
     setPendingNavigateAssetId(assetId);
   }
 
-  async function handleSaveEditQueuePrompt(assetId: string, prompt: string): Promise<void> {
-    await addToEditQueue(assetId, prompt);
+  async function handleSaveEditQueueNote(assetId: string, note: string): Promise<void> {
+    await addToEditQueue(assetId, note);
     await loadEditQueue();
   }
 
@@ -11660,10 +11660,10 @@ export default function App() {
                     ×
                   </button>
                 </div>
-                {entry.prompt ? (
-                  <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.prompt}</span>
+                {entry.note ? (
+                  <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.note}</span>
                 ) : (
-                  <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
+                  <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
                 )}
               </div>
             ))}
@@ -11831,9 +11831,9 @@ export default function App() {
                 ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id) ?? null)
                 : null
             }
-            onSaveEditPrompt={
+            onSaveEditNote={
               selectedAsset
-                ? async (prompt) => handleSaveEditQueuePrompt(selectedAsset.id, prompt)
+                ? async (note) => handleSaveEditQueueNote(selectedAsset.id, note)
                 : undefined
             }
           />
@@ -12282,7 +12282,7 @@ export default function App() {
                         className="tdg-overflow-item"
                         onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                       >
-                        Edit Prompt
+                        Edit Note
                       </button>
                       <button
                         type="button"
@@ -13403,9 +13403,9 @@ export default function App() {
       <AddToEditQueueDialog
         open={addToEditQueueDialogOpen}
         assetFilename={selectedAsset?.filename ?? ''}
-        existingPrompt={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.prompt ?? '') : ''}
+        existingNote={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.note ?? '') : ''}
         onClose={() => setAddToEditQueueDialogOpen(false)}
-        onConfirm={(prompt) => void handleAddToEditQueue(prompt)}
+        onConfirm={(note) => void handleAddToEditQueue(note)}
       />
       <EditQueueDialog
         open={editQueueDialogOpen}
@@ -13425,7 +13425,7 @@ export default function App() {
         onImport={() => void handleImportEditedFiles()}
         onClearQueue={() => void handleClearEditQueue()}
         onClearFolder={() => void handleClearEditFolder()}
-        onSavePrompt={(assetId, prompt) => handleSaveEditQueuePrompt(assetId, prompt)}
+        onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
       />
       <EditHistoryDialog

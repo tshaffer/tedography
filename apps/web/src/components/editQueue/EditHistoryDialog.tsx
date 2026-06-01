@@ -164,12 +164,12 @@ export function EditHistoryDialog({
                     <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
                   ) : null}
 
-                  {entry.prompt ? (
-                    <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.prompt}>
-                      {entry.prompt}
+                  {entry.note ? (
+                    <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.note}>
+                      {entry.note}
                     </span>
                   ) : (
-                    <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
+                    <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
                   )}
 
                   {entry.errorMessage ? (

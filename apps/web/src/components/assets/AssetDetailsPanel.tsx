@@ -39,7 +39,7 @@ interface AssetDetailsPanelProps {
   bulkPersonTag?: { count: number; commonPeople: MediaAssetPerson[]; onTag: (personId: string) => Promise<void> } | undefined;
   keywordsSlot?: ReactNode;
   editQueueEntry?: EditQueueEntryWithFilename | null;
-  onSaveEditPrompt?: ((prompt: string) => Promise<void>) | undefined;
+  onSaveEditNote?: ((note: string) => Promise<void>) | undefined;
 }
 
 const panelStyle: CSSProperties = {
@@ -280,17 +280,17 @@ export function AssetDetailsPanel({
   bulkPersonTag,
   keywordsSlot,
   editQueueEntry = null,
-  onSaveEditPrompt,
+  onSaveEditNote,
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [personPickerBusy, setPersonPickerBusy] = useState(false);
   const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
   const [bulkPickerBusy, setBulkPickerBusy] = useState(false);
-  const [promptEditing, setPromptEditing] = useState(false);
-  const [promptDraft, setPromptDraft] = useState('');
-  const [promptSaving, setPromptSaving] = useState(false);
-  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   if (!asset) {
     return (
@@ -506,53 +506,53 @@ export function AssetDetailsPanel({
         <section style={subSectionStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>Edit Queue</h4>
-            {!promptEditing && (
+            {!noteEditing && (
               <button
                 type="button"
-                onClick={() => { setPromptDraft(editQueueEntry.prompt); setPromptEditing(true); }}
+                onClick={() => { setNoteDraft(editQueueEntry.note); setNoteEditing(true); }}
                 style={{ ...buttonStyle, padding: '2px 8px', fontSize: '11px' }}
               >
                 Edit
               </button>
             )}
           </div>
-          {promptEditing ? (
+          {noteEditing ? (
             <>
               <textarea
-                ref={promptTextareaRef}
-                value={promptDraft}
-                onChange={(e) => setPromptDraft(e.target.value)}
+                ref={noteTextareaRef}
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
                 rows={4}
                 style={{ width: '100%', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical' }}
               />
               <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
                 <button
                   type="button"
-                  style={promptSaving ? disabledButtonStyle : buttonStyle}
-                  disabled={promptSaving}
+                  style={noteSaving ? disabledButtonStyle : buttonStyle}
+                  disabled={noteSaving}
                   onClick={async () => {
-                    setPromptSaving(true);
+                    setNoteSaving(true);
                     try {
-                      await onSaveEditPrompt?.(promptDraft);
-                      setPromptEditing(false);
+                      await onSaveEditNote?.(noteDraft);
+                      setNoteEditing(false);
                     } finally {
-                      setPromptSaving(false);
+                      setNoteSaving(false);
                     }
                   }}
                 >
-                  {promptSaving ? 'Saving...' : 'Save'}
+                  {noteSaving ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   type="button"
                   style={buttonStyle}
-                  onClick={() => setPromptEditing(false)}
+                  onClick={() => setNoteEditing(false)}
                 >
                   Cancel
                 </button>
               </div>
             </>
           ) : (
-            <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.prompt}</p>
+            <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.note}</p>
           )}
         </section>
       ) : null}

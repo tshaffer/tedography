@@ -19,7 +19,7 @@ interface EditQueueDialogProps {
   onImport: () => void;
   onClearQueue: () => void;
   onClearFolder: () => void;
-  onSavePrompt: (assetId: string, prompt: string) => Promise<void>;
+  onSaveNote: (assetId: string, note: string) => Promise<void>;
   onNavigate: (assetId: string, albumId: string | null) => void;
 }
 
@@ -207,7 +207,7 @@ export function EditQueueDialog({
   onImport,
   onClearQueue,
   onClearFolder,
-  onSavePrompt,
+  onSaveNote,
   onNavigate,
 }: EditQueueDialogProps): ReactElement | null {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -255,7 +255,7 @@ export function EditQueueDialog({
 
   function startEdit(entry: EditQueueEntryWithFilename): void {
     setEditingAssetId(entry.assetId);
-    setEditDraft(entry.prompt ?? '');
+    setEditDraft(entry.note ?? '');
   }
 
   function cancelEdit(): void {
@@ -264,7 +264,7 @@ export function EditQueueDialog({
 
   async function saveEdit(): Promise<void> {
     if (editingAssetId === null) return;
-    await onSavePrompt(editingAssetId, editDraft);
+    await onSaveNote(editingAssetId, editDraft);
     setEditingAssetId(null);
   }
 
@@ -337,7 +337,7 @@ export function EditQueueDialog({
                         type="button"
                         style={{ ...iconButtonStyle, color: isEditing ? '#1a56db' : '#9ca3af' }}
                         onClick={() => isEditing ? cancelEdit() : startEdit(entry)}
-                        title={isEditing ? 'Cancel edit' : 'Edit prompt'}
+                        title={isEditing ? 'Cancel edit' : 'Edit note'}
                       >
                         ✎
                       </button>
@@ -369,10 +369,10 @@ export function EditQueueDialog({
                           <button type="button" style={smallButtonStyle} onClick={cancelEdit}>Cancel</button>
                         </div>
                       </div>
-                    ) : entry.prompt ? (
-                      <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.prompt}</span>
+                    ) : entry.note ? (
+                      <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.note}</span>
                     ) : (
-                      <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no prompt</span>
+                      <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
                     )}
                   </div>
                 );
