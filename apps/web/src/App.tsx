@@ -330,6 +330,7 @@ const peopleReviewSimplifiedViewStorageKey = 'tedography.peopleReview.simplified
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
+const showThumbnailEditedImportBadgesStorageKey = 'tedography.showThumbnailEditedImportBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
@@ -1304,6 +1305,25 @@ const cardKeywordBadgeStyle: CSSProperties = {
   height: '10px',
   borderRadius: '50%',
   boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+  pointerEvents: 'none'
+};
+
+const cardEditedImportBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  top: '36px',
+  left: '8px',
+  zIndex: 2,
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '2px 6px',
+  borderRadius: '999px',
+  backgroundColor: '#0d9488',
+  color: '#fff',
+  fontSize: '9px',
+  fontWeight: 700,
+  lineHeight: 1,
+  letterSpacing: '0.03em',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.22)',
   pointerEvents: 'none'
 };
 
@@ -3001,6 +3021,7 @@ type AssetCardProps = {
   showPhotoStateBadge: boolean;
   showKeywordAssignmentBadge: boolean;
   showAiQueueBadge: boolean;
+  showEditedImportBadge: boolean;
   showPeopleBadge: boolean;
   isInAiQueue: boolean;
   touchSelectionMode: boolean;
@@ -3017,6 +3038,7 @@ function AssetCard({
   showPhotoStateBadge,
   showKeywordAssignmentBadge,
   showAiQueueBadge,
+  showEditedImportBadge,
   showPeopleBadge,
   isInAiQueue,
   touchSelectionMode,
@@ -3153,6 +3175,11 @@ function AssetCard({
         {showPhotoStateBadge ? (
           <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
             {photoStateLabel}
+          </span>
+        ) : null}
+        {showEditedImportBadge && asset.sourceAssetId != null ? (
+          <span style={cardEditedImportBadgeStyle} title="Imported from Edit Queue">
+            Edited
           </span>
         ) : null}
         {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
@@ -4423,6 +4450,12 @@ export default function App() {
     const stored = window.localStorage.getItem(showThumbnailEditQueueBadgesStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showThumbnailEditedImportBadges, setShowThumbnailEditedImportBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.localStorage.getItem(showThumbnailEditedImportBadgesStorageKey) === 'true';
+  });
   const [showThumbnailPeopleBadges, setShowThumbnailPeopleBadges] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -4886,6 +4919,13 @@ export default function App() {
       showThumbnailEditQueueBadges ? 'true' : 'false'
     );
   }, [showThumbnailEditQueueBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailEditedImportBadgesStorageKey,
+      showThumbnailEditedImportBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailEditedImportBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -12340,6 +12380,14 @@ export default function App() {
                 <label style={toggleOptionLabelStyle}>
                   <input
                     type="checkbox"
+                    checked={showThumbnailEditedImportBadges}
+                    onChange={(event) => setShowThumbnailEditedImportBadges(event.target.checked)}
+                  />
+                  Edited Import
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
                     checked={showThumbnailPeopleBadges}
                     onChange={(event) => setShowThumbnailPeopleBadges(event.target.checked)}
                   />
@@ -13100,6 +13148,7 @@ export default function App() {
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
+                          showEditedImportBadge={showThumbnailEditedImportBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
@@ -13133,6 +13182,7 @@ export default function App() {
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
+                          showEditedImportBadge={showThumbnailEditedImportBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
@@ -13157,6 +13207,7 @@ export default function App() {
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                     showAiQueueBadge={showThumbnailEditQueueBadges}
+                    showEditedImportBadge={showThumbnailEditedImportBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
                     isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                     touchSelectionMode={touchSelectionMode}
