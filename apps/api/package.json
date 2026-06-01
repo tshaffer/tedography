@@ -13,6 +13,7 @@
     "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",
     "thumbnails:repair": "tsx src/tools/thumbnailMaintenance.ts --mode repair",
     "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",
+    "edited:migrate": "tsx src/tools/migrateEditedFilesToSourceFolder.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "tsx --test src/**/*.test.ts",
