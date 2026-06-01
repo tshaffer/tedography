@@ -7117,6 +7117,16 @@ export default function App() {
     setSelectedAssetId(loupeAssets[0]?.id ?? null);
   }, [isLoupeMode, loupeAssets, selectedAssetId]);
 
+  // In Loupe mode the displayed asset is always the "selected" asset.
+  // Keep selectedAssetIds in sync with selectedAssetId so that all toolbar
+  // and details-panel actions gated on selectedAssetIds.length === 1 work
+  // correctly when navigating with arrow keys without an explicit grid click.
+  useEffect(() => {
+    if (!isLoupeMode || !selectedAssetId) return;
+    if (selectedAssetIds.length === 1 && selectedAssetIds[0] === selectedAssetId) return;
+    setSelectedAssetIds([selectedAssetId]);
+  }, [isLoupeMode, selectedAssetId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!slideshowActive || !slideshowPlaying || slideshowAssets.length < 2) {
       return;
