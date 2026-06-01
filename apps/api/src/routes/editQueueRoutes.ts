@@ -28,7 +28,7 @@ import {
   buildThumbnailDerivedRelativePath,
   resolveDerivedAbsolutePath,
 } from '../import/derivedStorage.js';
-import { getStorageRoots } from '../import/storageRoots.js';
+import { getStorageRoots, getStorageRootById } from '../import/storageRoots.js';
 import { getMediaSupport } from '../import/supportedMedia.js';
 import { generateJpegThumbnail } from '../import/thumbnailGeneration.js';
 
@@ -78,6 +78,20 @@ function findStorageRootForEditPath(editPath: string): { id: string; absolutePat
 function basenameWithoutExt(filename: string): string {
   const ext = path.extname(filename);
   return ext ? filename.slice(0, -ext.length) : filename;
+}
+
+/** Move a file, falling back to copy+delete if src and dest are on different volumes. */
+async function moveFile(src: string, dest: string): Promise<void> {
+  try {
+    await fs.rename(src, dest);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
+      await fs.copyFile(src, dest);
+      await fs.unlink(src);
+    } else {
+      throw err;
+    }
+  }
 }
 
 type AlbumNodeMap = Map<string, { label: string; parentId: string | null }>;
@@ -157,15 +171,9 @@ editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_re
 
   try {
     const entries = await fs.readdir(editPath, { withFileTypes: true });
-    // Never delete _edited.* files — they are the originals backing imported MediaAssets.
-    // Only delete the exported source copies, manifest.json, and prompts.txt.
-    const toDelete = entries.filter((e) => {
-      if (!e.isFile()) return false;
-      const base = basenameWithoutExt(e.name).toLowerCase();
-      return !base.endsWith('_edited');
-    });
-    await Promise.all(toDelete.map((e) => fs.unlink(path.join(editPath, e.name))));
-    res.json({ ok: true, deletedCount: toDelete.length });
+    const fileEntries = entries.filter((e) => e.isFile());
+    await Promise.all(fileEntries.map((e) => fs.unlink(path.join(editPath, e.name))));
+    res.json({ ok: true, deletedCount: fileEntries.length });
   } catch (error) {
     log.error('Failed to clear edit folder', error);
     res.status(500).json({ error: 'Failed to clear edit folder' });
@@ -263,16 +271,6 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
     return;
   }
 
-  // 2. Determine which storage root contains the edit path
-  const storageRoot = findStorageRootForEditPath(editPath);
-  if (!storageRoot) {
-    res.status(400).json({
-      error: `Edit path (${editPath}) is not within any registered storage root. ` +
-        'Ensure TEDOGRAPHY_STORAGE_ROOTS includes a root that is a parent of the edit path.',
-    });
-    return;
-  }
-
   // Build a basename → manifest entry map for fast lookup
   const byBasename = new Map<string, ManifestEntry>();
   for (const entry of manifest.entries) {
@@ -329,20 +327,29 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
     }
 
     try {
-      // Hash
+      // Resolve the storage root that owns the source asset — the edited file moves there
+      const sourceStorageRoot = getStorageRootById(sourceAsset.originalStorageRootId);
+      if (!sourceStorageRoot) {
+        results.push({ filename: editedFilename, status: 'error', message: `Storage root "${sourceAsset.originalStorageRootId}" for source asset not found` });
+        continue;
+      }
+
+      // Destination: same folder as the source file, keeping the edited filename
+      const sourceFileDir = path.dirname(path.join(sourceStorageRoot.absolutePath, sourceAsset.originalArchivePath));
+      const destAbsolutePath = path.join(sourceFileDir, editedFilename);
+      const relativeToRoot = path.relative(sourceStorageRoot.absolutePath, destAbsolutePath);
+
+      // Hash + stat from the edit folder (before moving)
       const originalContentHash = await computeSha256ForFile(absolutePath);
       const fileStat = await fs.stat(absolutePath);
       const originalFileFormat = (mediaSupport.extension ?? 'jpg').replace('.', '').toLowerCase();
 
-      // Relative path within the storage root
-      const relativeToRoot = path.relative(storageRoot.absolutePath, absolutePath);
-
       // EXIF metadata — fall back to source asset where edited file likely stripped it
       const exif = await extractImportMetadata(absolutePath);
 
-      // Display file plan
+      // Display file plan — uses the destination root/path so display references are correct
       const displayPlan = buildDisplayFilePlan({
-        originalStorageRootId: storageRoot.id,
+        originalStorageRootId: sourceStorageRoot.id,
         originalArchivePath: relativeToRoot,
         originalContentHash,
         originalFileFormat,
@@ -411,6 +418,9 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
       // Inherit keywords
       const keywordIds = Array.isArray(sourceAsset.keywordIds) ? [...sourceAsset.keywordIds] : [];
 
+      // Move the edited file from the edit folder to the source asset's folder
+      await moveFile(absolutePath, destAbsolutePath);
+
       // Create asset — photoState starts as New
       const newAsset = await createMediaAsset({
         filename: editedFilename,
@@ -426,7 +436,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         state,
         country,
         importedAt: new Date(),
-        originalStorageRootId: storageRoot.id,
+        originalStorageRootId: sourceStorageRoot.id,
         originalArchivePath: relativeToRoot,
         originalFileSizeBytes: fileStat.size,
         originalContentHash,
