@@ -131,10 +131,22 @@ import {
 } from './api/editQueueApi';
 import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
 import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
+import { EditHistoryArchivesDialog } from './components/editQueue/EditHistoryArchivesDialog';
+import { EditHistoryArchiveViewDialog } from './components/editQueue/EditHistoryArchiveViewDialog';
 import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
-import { getEditHistory, type EditHistoryEntryWithNavigation } from './api/editHistoryApi';
+import {
+  getEditHistory,
+  getEditHistoryArchives,
+  createEditHistoryArchive,
+  appendToEditHistoryArchive,
+  getEditHistoryArchiveEntries,
+  renameEditHistoryArchive,
+  deleteEditHistoryArchive,
+  type EditHistoryEntryWithNavigation,
+} from './api/editHistoryApi';
+import type { EditHistoryArchive } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
@@ -4065,6 +4077,15 @@ export default function App() {
   const [editHistoryEntries, setEditHistoryEntries] = useState<EditHistoryEntryWithNavigation[]>([]);
   const [editHistoryLoading, setEditHistoryLoading] = useState(false);
   const [editHistoryError, setEditHistoryError] = useState<string | null>(null);
+  const [editHistoryArchives, setEditHistoryArchives] = useState<EditHistoryArchive[]>([]);
+  const [editHistoryArchivesDialogOpen, setEditHistoryArchivesDialogOpen] = useState(false);
+  const [editHistoryArchivesLoading, setEditHistoryArchivesLoading] = useState(false);
+  const [editHistoryArchivesError, setEditHistoryArchivesError] = useState<string | null>(null);
+  const [editHistoryArchiveViewDialogOpen, setEditHistoryArchiveViewDialogOpen] = useState(false);
+  const [editHistoryArchiveViewName, setEditHistoryArchiveViewName] = useState('');
+  const [editHistoryArchiveViewEntries, setEditHistoryArchiveViewEntries] = useState<EditHistoryEntryWithNavigation[]>([]);
+  const [editHistoryArchiveViewLoading, setEditHistoryArchiveViewLoading] = useState(false);
+  const [editHistoryArchiveViewError, setEditHistoryArchiveViewError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
   const [changePinOpen, setChangePinOpen] = useState(false);
@@ -7623,13 +7644,70 @@ export default function App() {
     setEditHistoryLoading(true);
     setEditHistoryError(null);
     try {
-      const entries = await getEditHistory();
+      const [entries, archives] = await Promise.all([getEditHistory(), getEditHistoryArchives()]);
       setEditHistoryEntries(entries);
+      setEditHistoryArchives(archives);
     } catch (err) {
       setEditHistoryError(err instanceof Error ? err.message : 'Failed to load history');
     } finally {
       setEditHistoryLoading(false);
     }
+  }
+
+  async function handleOpenEditHistoryArchives(): Promise<void> {
+    setEditHistoryArchivesDialogOpen(true);
+    setEditHistoryArchivesLoading(true);
+    setEditHistoryArchivesError(null);
+    try {
+      const archives = await getEditHistoryArchives();
+      setEditHistoryArchives(archives);
+    } catch (err) {
+      setEditHistoryArchivesError(err instanceof Error ? err.message : 'Failed to load archives');
+    } finally {
+      setEditHistoryArchivesLoading(false);
+    }
+  }
+
+  async function handleCreateEditHistoryArchive(entryIds: string[], name?: string): Promise<void> {
+    await createEditHistoryArchive(entryIds, name);
+    // Refresh active history and archives list
+    const [entries, archives] = await Promise.all([getEditHistory(), getEditHistoryArchives()]);
+    setEditHistoryEntries(entries);
+    setEditHistoryArchives(archives);
+  }
+
+  async function handleAppendToEditHistoryArchive(entryIds: string[], archiveId: string): Promise<void> {
+    await appendToEditHistoryArchive(archiveId, entryIds);
+    const [entries, archives] = await Promise.all([getEditHistory(), getEditHistoryArchives()]);
+    setEditHistoryEntries(entries);
+    setEditHistoryArchives(archives);
+  }
+
+  async function handleViewEditHistoryArchive(archiveId: string, archiveName: string): Promise<void> {
+    setEditHistoryArchiveViewName(archiveName);
+    setEditHistoryArchiveViewDialogOpen(true);
+    setEditHistoryArchiveViewLoading(true);
+    setEditHistoryArchiveViewError(null);
+    try {
+      const { entries } = await getEditHistoryArchiveEntries(archiveId);
+      setEditHistoryArchiveViewEntries(entries);
+    } catch (err) {
+      setEditHistoryArchiveViewError(err instanceof Error ? err.message : 'Failed to load archive');
+    } finally {
+      setEditHistoryArchiveViewLoading(false);
+    }
+  }
+
+  async function handleRenameEditHistoryArchive(archiveId: string, newName: string): Promise<void> {
+    await renameEditHistoryArchive(archiveId, newName);
+    const archives = await getEditHistoryArchives();
+    setEditHistoryArchives(archives);
+  }
+
+  async function handleDeleteEditHistoryArchive(archiveId: string): Promise<void> {
+    await deleteEditHistoryArchive(archiveId);
+    const archives = await getEditHistoryArchives();
+    setEditHistoryArchives(archives);
   }
 
   async function handleMoveSelectedAssetWithinAlbum(
@@ -13431,9 +13509,32 @@ export default function App() {
       <EditHistoryDialog
         open={editHistoryDialogOpen}
         entries={editHistoryEntries}
+        archives={editHistoryArchives}
         loading={editHistoryLoading}
         error={editHistoryError}
         onClose={() => setEditHistoryDialogOpen(false)}
+        onArchive={(entryIds, name) => handleCreateEditHistoryArchive(entryIds, name)}
+        onAppendToArchive={(entryIds, archiveId) => handleAppendToEditHistoryArchive(entryIds, archiveId)}
+        onOpenArchives={() => handleOpenEditHistoryArchives()}
+        onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
+      />
+      <EditHistoryArchivesDialog
+        open={editHistoryArchivesDialogOpen}
+        archives={editHistoryArchives}
+        loading={editHistoryArchivesLoading}
+        error={editHistoryArchivesError}
+        onClose={() => setEditHistoryArchivesDialogOpen(false)}
+        onView={(archiveId, archiveName) => void handleViewEditHistoryArchive(archiveId, archiveName)}
+        onRename={(archiveId, newName) => handleRenameEditHistoryArchive(archiveId, newName)}
+        onDelete={(archiveId) => handleDeleteEditHistoryArchive(archiveId)}
+      />
+      <EditHistoryArchiveViewDialog
+        open={editHistoryArchiveViewDialogOpen}
+        archiveName={editHistoryArchiveViewName}
+        entries={editHistoryArchiveViewEntries}
+        loading={editHistoryArchiveViewLoading}
+        error={editHistoryArchiveViewError}
+        onClose={() => setEditHistoryArchiveViewDialogOpen(false)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
       />
       <PublishToGooglePhotosDialog

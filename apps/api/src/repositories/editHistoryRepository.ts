@@ -30,10 +30,29 @@ export async function createEditHistoryEntry(input: CreateEditHistoryEntryInput)
 
 export async function getHistoryEntries(limit = 200): Promise<EditHistoryEntry[]> {
   return EditHistoryModel
-    .find()
+    .find({ archiveId: null })
     .sort({ processedAt: -1 })
     .limit(limit)
     .lean<EditHistoryEntry[]>();
+}
+
+export async function getEntriesByArchiveId(archiveId: string): Promise<EditHistoryEntry[]> {
+  return EditHistoryModel
+    .find({ archiveId })
+    .sort({ processedAt: -1 })
+    .lean<EditHistoryEntry[]>();
+}
+
+export async function archiveEntries(entryIds: string[], archiveId: string): Promise<number> {
+  const result = await EditHistoryModel.updateMany(
+    { id: { $in: entryIds }, archiveId: null },
+    { $set: { archiveId } }
+  );
+  return result.modifiedCount;
+}
+
+export async function deleteEntriesByArchiveId(archiveId: string): Promise<void> {
+  await EditHistoryModel.deleteMany({ archiveId });
 }
 
 export async function linkEditedAsset(

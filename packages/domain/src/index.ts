@@ -1,3 +1,4 @@
+export * from './entities/EditHistoryArchive.js';
 export * from './entities/EditHistoryEntry.js';
 export * from './entities/EditQueueEntry.js';
 export * from './entities/Album.js';

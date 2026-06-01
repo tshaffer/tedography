@@ -8,4 +8,6 @@ export interface EditHistoryEntry {
   status: 'succeeded' | 'failed';
   errorMessage: string | null;
   processedAt: string;
+  // Set when this entry has been archived. Null means active (visible in main history).
+  archiveId?: string | null;
 }

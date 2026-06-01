@@ -12,6 +12,7 @@ const editHistorySchema = new Schema<EditHistoryEntry>(
     status: { type: String, required: true, enum: ['succeeded', 'failed'] },
     errorMessage: { type: String, default: null },
     processedAt: { type: String, required: true, trim: true },
+    archiveId: { type: String, required: false, default: null },
   },
   {
     collection: 'editHistory',
