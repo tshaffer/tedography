@@ -12292,15 +12292,7 @@ export default function App() {
                         Remove from Queue
                       </button>
                     </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="tdg-overflow-item"
-                      onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
-                    >
-                      Add to Edit Queue
-                    </button>
-                  );
+                  ) : null;
                 })() : null}
                 {editQueueEntries.length > 0 ? (
                   <>

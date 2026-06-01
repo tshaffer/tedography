@@ -27,13 +27,19 @@ fi
 
 EXPORT_COLLECTIONS=(
   albumTreeNodes
+  editHistory
+  editQueue
   faceDetections
   faceMatchReviews
   imageAnalyses
+  keywordChangeEvents
   keywords
   people
   personFaceExamples
+  roles
+  sessions
   smartAlbums
+  users
 )
 
 echo "Backing up Tedography to: $OUTPUT_DIR"
