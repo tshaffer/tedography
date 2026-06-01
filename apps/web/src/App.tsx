@@ -224,6 +224,9 @@ const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasConfirmedPeopleStorageKey = 'tedography.search.hasConfirmedPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
 const searchHasKeywordsStorageKey = 'tedography.search.hasKeywords';
+const searchIsEditedImportStorageKey = 'tedography.search.isEditedImport';
+const searchHasEditedVersionStorageKey = 'tedography.search.hasEditedVersion';
+const searchInEditQueueStorageKey = 'tedography.search.inEditQueue';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
 const searchKeywordIncludeModeStorageKey = 'tedography.search.keyword.includeMode';
 const searchKeywordExcludeStorageKey = 'tedography.search.keyword.exclude';
@@ -372,6 +375,9 @@ type SearchFilters = {
   hasReviewableFaces: boolean;
   hasKeywords: boolean;
   keywordQuery: KeywordQueryState;
+  isEditedImport: boolean;
+  hasEditedVersion: boolean;
+  inEditQueue: boolean;
 };
 
 type AssetsBootstrapScope =
@@ -2767,7 +2773,10 @@ function getDefaultSearchFilters(): SearchFilters {
     hasConfirmedPeople: false,
     hasReviewableFaces: false,
     hasKeywords: false,
-    keywordQuery: { include: [], includeMode: 'all', exclude: [] }
+    keywordQuery: { include: [], includeMode: 'all', exclude: [] },
+    isEditedImport: false,
+    hasEditedVersion: false,
+    inEditQueue: false,
   };
 }
 
@@ -2803,7 +2812,10 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
       (c, i) =>
         c.keywordId === right.keywordQuery.exclude[i]?.keywordId &&
         c.includeDescendants === right.keywordQuery.exclude[i]?.includeDescendants
-    )
+    ) &&
+    left.isEditedImport === right.isEditedImport &&
+    left.hasEditedVersion === right.hasEditedVersion &&
+    left.inEditQueue === right.inEditQueue
   );
 }
 
@@ -2823,7 +2835,10 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.hasReviewableFaces ||
     filters.hasKeywords ||
     filters.keywordQuery.include.length > 0 ||
-    filters.keywordQuery.exclude.length > 0
+    filters.keywordQuery.exclude.length > 0 ||
+    filters.isEditedImport ||
+    filters.hasEditedVersion ||
+    filters.inEditQueue
   );
 }
 
@@ -4178,6 +4193,18 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasKeywordsStorageKey));
   });
+  const [searchIsEditedImport, setSearchIsEditedImport] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return parseBooleanFromStorage(window.localStorage.getItem(searchIsEditedImportStorageKey));
+  });
+  const [searchHasEditedVersion, setSearchHasEditedVersion] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return parseBooleanFromStorage(window.localStorage.getItem(searchHasEditedVersionStorageKey));
+  });
+  const [searchInEditQueue, setSearchInEditQueue] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return parseBooleanFromStorage(window.localStorage.getItem(searchInEditQueueStorageKey));
+  });
   const [reviewableDetectionAssetIds, setReviewableDetectionAssetIds] = useState<Set<string> | null>(null);
   const [searchKeywordInclude, setSearchKeywordInclude] = useState<KeywordQueryClause[]>(() =>
     typeof window !== 'undefined'
@@ -4223,6 +4250,10 @@ export default function App() {
   });
   const [searchGroupsSectionCollapsed, setSearchGroupsSectionCollapsed] = useState(() => {
     const stored = localStorage.getItem('tdg-search-section-groups-collapsed');
+    return stored === null ? true : stored === 'true';
+  });
+  const [searchEditQueueSectionCollapsed, setSearchEditQueueSectionCollapsed] = useState(() => {
+    const stored = localStorage.getItem('tdg-search-section-edit-queue-collapsed');
     return stored === null ? true : stored === 'true';
   });
   const searchPeopleAttemptedRef = useRef(false);
@@ -5024,6 +5055,18 @@ export default function App() {
   }, [searchHasKeywords]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchIsEditedImportStorageKey, String(searchIsEditedImport));
+  }, [searchIsEditedImport]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasEditedVersionStorageKey, String(searchHasEditedVersion));
+  }, [searchHasEditedVersion]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchInEditQueueStorageKey, String(searchInEditQueue));
+  }, [searchInEditQueue]);
+
+  useEffect(() => {
     if (!searchHasReviewableFaces) {
       setReviewableDetectionAssetIds(null);
       return;
@@ -5648,7 +5691,10 @@ export default function App() {
         include: searchKeywordInclude,
         includeMode: searchKeywordIncludeMode,
         exclude: searchKeywordExclude
-      }
+      },
+      isEditedImport: searchIsEditedImport,
+      hasEditedVersion: searchHasEditedVersion,
+      inEditQueue: searchInEditQueue,
     }),
     [
       searchAlbumIds,
@@ -5667,7 +5713,10 @@ export default function App() {
       searchKeywordExclude,
       searchPeopleIds,
       searchPeopleMatchMode,
-      searchPhotoStates
+      searchPhotoStates,
+      searchIsEditedImport,
+      searchHasEditedVersion,
+      searchInEditQueue,
     ]
   );
   const searchResults = useMemo(() => {
@@ -5733,6 +5782,13 @@ export default function App() {
         includePass &&
         !excludeMatchSets.some((matchSet) => assetKeywordIds.some((id) => matchSet.has(id)));
 
+      const matchesIsEditedImport =
+        !appliedSearchFilters.isEditedImport || (asset.sourceAssetId != null);
+      const matchesHasEditedVersion =
+        !appliedSearchFilters.hasEditedVersion || (asset.editedAssetId != null);
+      const matchesInEditQueue =
+        !appliedSearchFilters.inEditQueue || editQueueAssetIdSet.has(asset.id);
+
       return (
         matchesPhotoState &&
         matchesAlbum &&
@@ -5740,7 +5796,10 @@ export default function App() {
         matchesFilename &&
         matchesCaptureDateRange &&
         matchesPeople &&
-        matchesKeyword
+        matchesKeyword &&
+        matchesIsEditedImport &&
+        matchesHasEditedVersion &&
+        matchesInEditQueue
       );
     });
 
@@ -5749,6 +5808,7 @@ export default function App() {
     appliedSearchFilters,
     albumTreeNodes,
     areaPhotoStateVisibleAssets,
+    editQueueAssetIdSet,
     keywords,
     primaryArea,
     reviewableDetectionAssetIds,
@@ -6163,7 +6223,10 @@ export default function App() {
       filters.filenamePattern.trim().length > 0 ||
       filters.hasReviewableFaces ||
       filters.photoStates.length > 1 ||
-      filters.groupIds.length > 1;
+      filters.groupIds.length > 1 ||
+      filters.isEditedImport ||
+      filters.hasEditedVersion ||
+      filters.inEditQueue;
 
     if (activeUnsupportedFilters) {
       return null;
@@ -8658,6 +8721,9 @@ export default function App() {
     setSearchKeywordInclude(filters.keywordQuery.include);
     setSearchKeywordIncludeMode(filters.keywordQuery.includeMode);
     setSearchKeywordExclude(filters.keywordQuery.exclude);
+    setSearchIsEditedImport(filters.isEditedImport);
+    setSearchHasEditedVersion(filters.hasEditedVersion);
+    setSearchInEditQueue(filters.inEditQueue);
   }
 
   function applyPendingSearchFilters(): void {
@@ -11410,6 +11476,52 @@ export default function App() {
               {albumTreeError ? <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Failed to load album tree: {albumTreeError}</p> : null}
               {!albumTreeLoading ? renderSearchGroupTreeRows() : null}
             </>
+          ) : null}
+        </div>
+        <div style={filterSubsectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Edit Queue</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchEditQueueSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-edit-queue-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchEditQueueSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchEditQueueSectionCollapsed ? (
+            <div style={filterRowStyle}>
+              <div style={filterGroupStyle}>
+                <label style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={searchIsEditedImport}
+                    onChange={() => setSearchIsEditedImport((v) => !v)}
+                  />
+                  Is edited import
+                </label>
+                <label style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={searchHasEditedVersion}
+                    onChange={() => setSearchHasEditedVersion((v) => !v)}
+                  />
+                  Has edited version
+                </label>
+                <label style={filterOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={searchInEditQueue}
+                    onChange={() => setSearchInEditQueue((v) => !v)}
+                  />
+                  In edit queue
+                </label>
+              </div>
+            </div>
           ) : null}
         </div>
       </section>
