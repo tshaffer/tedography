@@ -60,6 +60,63 @@ async function run(): Promise<void> {
   await connectToMongo();
 
   try {
+    // Load editHistory once — used by all three parts.
+    const succeededHistory = await EditHistoryModel
+      .find({ status: 'succeeded', editedAssetId: { $exists: true, $ne: null } })
+      .lean<EditHistoryEntry[]>();
+
+    // ── Part 0: MediaAsset.sourceAssetId on edited assets ─────────────────────
+
+    console.log('── Part 0: MediaAsset.sourceAssetId on edited assets ─────────────────');
+    console.log('');
+
+    let sourceIdUpdated = 0;
+    let sourceIdAlreadySet = 0;
+    let sourceIdConflict = 0;
+    let sourceIdMissing = 0;
+
+    for (const histEntry of succeededHistory) {
+      const editedAsset = await MediaAssetModel
+        .findOne({ id: histEntry.editedAssetId! })
+        .lean<MediaAsset>();
+
+      if (!editedAsset) {
+        console.warn(`  ⚠ Edited asset ${histEntry.editedAssetId} not found — skipping`);
+        sourceIdMissing++;
+        continue;
+      }
+
+      if (editedAsset.sourceAssetId) {
+        if (editedAsset.sourceAssetId === histEntry.sourceAssetId) {
+          sourceIdAlreadySet++;
+          continue;
+        }
+        console.warn(
+          `  ⚠ "${editedAsset.filename}" already has sourceAssetId="${editedAsset.sourceAssetId}" ` +
+          `(history has sourceAssetId="${histEntry.sourceAssetId}") — skipping`
+        );
+        sourceIdConflict++;
+        continue;
+      }
+
+      console.log(`  ${editedAsset.filename}  →  sourceAssetId = ${histEntry.sourceAssetId}  (${histEntry.sourceFilename})`);
+      if (apply) {
+        await MediaAssetModel.updateOne(
+          { id: histEntry.editedAssetId! },
+          { $set: { sourceAssetId: histEntry.sourceAssetId } }
+        );
+      }
+      sourceIdUpdated++;
+    }
+
+    console.log('');
+    if (apply) {
+      console.log(`MediaAsset.sourceAssetId: updated=${sourceIdUpdated}  already-set=${sourceIdAlreadySet}  conflict=${sourceIdConflict}  missing=${sourceIdMissing}`);
+    } else {
+      console.log(`MediaAsset.sourceAssetId: would-update=${sourceIdUpdated}  already-set=${sourceIdAlreadySet}  conflict=${sourceIdConflict}  missing=${sourceIdMissing}`);
+    }
+    console.log('');
+
     // ── Part 1: MediaAsset.editedAssetId ──────────────────────────────────────
 
     console.log('── Part 1: MediaAsset.editedAssetId ──────────────────────────────────');
@@ -113,10 +170,6 @@ async function run(): Promise<void> {
     }
 
     // ── 1b. Fallback path: editHistory for legacy assets ──────────────────────
-
-    const succeededHistory = await EditHistoryModel
-      .find({ status: 'succeeded', editedAssetId: { $exists: true, $ne: null } })
-      .lean<EditHistoryEntry[]>();
 
     // Filter to source assets not already handled above.
     const legacyHistory = succeededHistory.filter(
