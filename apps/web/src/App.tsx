@@ -17,7 +17,6 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
-import AddToQueueIcon from '@mui/icons-material/AddToQueue';
 import TuneIcon from '@mui/icons-material/Tune';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
@@ -12114,6 +12113,30 @@ export default function App() {
                         </button>
                       </span>
                     </Tooltip>
+                    {can('maintenance') ? (() => {
+                      const canAddToQueue =
+                        selectedAssetIds.length === 1 &&
+                        !!selectedAsset &&
+                        !editQueueAssetIdSet.has(selectedAsset.id);
+                      return (
+                        <Tooltip title="Add to Edit Queue">
+                          <span>
+                            <button
+                              type="button"
+                              style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
+                              disabled={!canAddToQueue}
+                              onClick={() => setAddToEditQueueDialogOpen(true)}
+                              aria-label="Add to Edit Queue"
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
+                                <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                              </span>
+                            </button>
+                          </span>
+                        </Tooltip>
+                      );
+                    })() : null}
                   </>
                 );
               })()}
@@ -12201,29 +12224,6 @@ export default function App() {
               </Tooltip>
             </div>
           ) : null}
-
-          {/* Add to Edit Queue direct button — enabled only when a single non-queued asset is selected */}
-          {can('maintenance') ? (() => {
-            const canAddToQueue =
-              selectedAssetIds.length === 1 &&
-              !!selectedAsset &&
-              !editQueueAssetIdSet.has(selectedAsset.id);
-            return (
-              <Tooltip title="Add to Edit Queue">
-                <span>
-                  <button
-                    type="button"
-                    style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
-                    disabled={!canAddToQueue}
-                    onClick={() => setAddToEditQueueDialogOpen(true)}
-                    aria-label="Add to Edit Queue"
-                  >
-                    <AddToQueueIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                  </button>
-                </span>
-              </Tooltip>
-            );
-          })() : null}
 
           {/* Edit Queue toolbar button — maintenance feature, admin only */}
           {can('maintenance') ? <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
