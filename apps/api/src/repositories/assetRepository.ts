@@ -649,6 +649,10 @@ export async function updateMediaAssetPeople(
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function setMediaAssetEditedAssetId(id: string, editedAssetId: string): Promise<void> {
+  await MediaAssetModel.updateOne({ id }, { $set: { editedAssetId } });
+}
+
 export async function removePersonFromAllAssets(personId: string): Promise<number> {
   const result = await MediaAssetModel.updateMany(
     { 'people.personId': personId },

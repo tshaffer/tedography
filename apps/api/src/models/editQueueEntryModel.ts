@@ -7,6 +7,7 @@ const editQueueEntrySchema = new Schema<EditQueueEntry>(
     assetId: { type: String, required: true, unique: true, index: true, trim: true },
     prompt: { type: String, required: false, trim: true, default: '' },
     createdAt: { type: String, required: true, trim: true },
+    editedAssetId: { type: String, required: false, trim: true, default: null },
   },
   {
     collection: 'editQueue',

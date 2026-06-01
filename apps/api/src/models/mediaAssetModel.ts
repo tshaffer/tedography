@@ -72,6 +72,8 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       required: false,
       default: []
     },
+    sourceAssetId: { type: String, required: false, trim: true, default: null },
+    editedAssetId: { type: String, required: false, trim: true, default: null },
     peopleRecognitionRanAt: { type: String, required: false, trim: true },
     people: {
       type: [

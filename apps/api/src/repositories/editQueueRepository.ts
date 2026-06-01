@@ -12,6 +12,7 @@ function normalize(doc: EditQueueEntry): EditQueueEntry {
     assetId: doc.assetId,
     prompt: doc.prompt,
     createdAt: doc.createdAt,
+    editedAssetId: doc.editedAssetId ?? null,
   };
 }
 
@@ -34,6 +35,10 @@ export async function upsertQueueEntry(assetId: string, prompt: string): Promise
   };
   await EditQueueEntryModel.create(entry);
   return entry;
+}
+
+export async function setQueueEntryEditedAssetId(assetId: string, editedAssetId: string): Promise<void> {
+  await EditQueueEntryModel.updateOne({ assetId }, { $set: { editedAssetId } });
 }
 
 export async function removeQueueEntry(assetId: string): Promise<void> {

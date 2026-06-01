@@ -11,12 +11,14 @@ import {
   createMediaAsset,
   updateMediaAssetAlbumIds,
   updateMediaAssetPeople,
+  setMediaAssetEditedAssetId,
 } from '../repositories/assetRepository.js';
 import { listAlbumTreeNodes } from '../repositories/albumTreeRepository.js';
 import {
   clearQueue,
   getQueueEntries,
   removeQueueEntry,
+  setQueueEntryEditedAssetId,
   upsertQueueEntry,
 } from '../repositories/editQueueRepository.js';
 import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js';
@@ -466,6 +468,12 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
       if (sourcePeople.length > 0) {
         await updateMediaAssetPeople(newAsset.id, sourcePeople);
       }
+
+      // Link the edited asset back to the source (bidirectional) and mark the queue entry.
+      await Promise.all([
+        setMediaAssetEditedAssetId(sourceAsset.id, newAsset.id),
+        setQueueEntryEditedAssetId(sourceAsset.id, newAsset.id),
+      ]);
 
       // Record in history
       await createEditHistoryEntry({

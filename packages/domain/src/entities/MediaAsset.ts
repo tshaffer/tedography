@@ -73,6 +73,9 @@ export interface MediaAsset {
   // When this asset was generated from another asset (e.g. AI editing), the source asset's id.
   sourceAssetId?: string | null;
 
+  // When an edited version of this asset has been imported, the edited asset's id.
+  editedAssetId?: string | null;
+
   // Optional capture location metadata when available.
   locationLabel?: string | null;
   locationLatitude?: number | null;
