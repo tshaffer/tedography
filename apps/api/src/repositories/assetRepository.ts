@@ -96,7 +96,9 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           keywordIds: 1,
           keywordAssignmentStatus: 1,
           albumMemberships: 1,
-          people: 1
+          people: 1,
+          sourceAssetId: 1,
+          editedAssetId: 1,
         }
       }
     )
@@ -151,7 +153,9 @@ export async function getAssetPageForLibrary(input?: {
           keywordIds: 1,
           keywordAssignmentStatus: 1,
           albumMemberships: 1,
-          people: 1
+          people: 1,
+          sourceAssetId: 1,
+          editedAssetId: 1,
         }
       }
     )
