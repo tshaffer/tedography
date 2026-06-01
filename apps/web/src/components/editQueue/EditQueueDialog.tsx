@@ -416,7 +416,7 @@ export function EditQueueDialog({
           <div style={footerButtonRowStyle}>
             {confirmClearFolder ? (
               <>
-                <span style={{ fontSize: '12px', color: '#374151' }}>Delete all files in edit folder?</span>
+                <span style={{ fontSize: '12px', color: '#374151' }}>Delete exported originals and manifest from edit folder? (_edited files are preserved.)</span>
                 <button
                   type="button"
                   style={{ ...dangerButtonStyle, backgroundColor: '#dc2626', color: '#fff', borderColor: '#dc2626' }}

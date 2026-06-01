@@ -157,9 +157,15 @@ editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_re
 
   try {
     const entries = await fs.readdir(editPath, { withFileTypes: true });
-    const fileEntries = entries.filter((e) => e.isFile());
-    await Promise.all(fileEntries.map((e) => fs.unlink(path.join(editPath, e.name))));
-    res.json({ ok: true, deletedCount: fileEntries.length });
+    // Never delete _edited.* files — they are the originals backing imported MediaAssets.
+    // Only delete the exported source copies, manifest.json, and prompts.txt.
+    const toDelete = entries.filter((e) => {
+      if (!e.isFile()) return false;
+      const base = basenameWithoutExt(e.name).toLowerCase();
+      return !base.endsWith('_edited');
+    });
+    await Promise.all(toDelete.map((e) => fs.unlink(path.join(editPath, e.name))));
+    res.json({ ok: true, deletedCount: toDelete.length });
   } catch (error) {
     log.error('Failed to clear edit folder', error);
     res.status(500).json({ error: 'Failed to clear edit folder' });

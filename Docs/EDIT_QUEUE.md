@@ -76,7 +76,7 @@ The original file is not modified.
 ### 5. After Import
 
 - **Clear Queue** — removes all entries from the edit queue (does not affect files or assets)
-- **Clear Edit Folder** — deletes all files from `TEDOGRAPHY_EDIT_PATH` (two-step confirmation required); use this after a successful import to clean up
+- **Clear Edit Folder** — deletes exported originals, `manifest.json`, and `prompts.txt` from `TEDOGRAPHY_EDIT_PATH` (two-step confirmation required); use this after a successful import to clean up. **`_edited.*` files are intentionally preserved** — they are the originals backing imported assets and serve as the full-resolution source for `GET /media/original`.
 
 ---
 
