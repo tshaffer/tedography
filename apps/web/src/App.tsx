@@ -146,6 +146,7 @@ import {
   deleteEditHistoryArchive,
   type EditHistoryEntryWithNavigation,
 } from './api/editHistoryApi';
+import { translateNaturalLanguageSearch } from './api/searchApi';
 import type { EditHistoryArchive } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
@@ -4273,6 +4274,9 @@ export default function App() {
       : []
   );
   const [appliedSearchFilters, setAppliedSearchFilters] = useState<SearchFilters | null>(null);
+  const [nlSearchQuery, setNlSearchQuery] = useState('');
+  const [nlSearchLoading, setNlSearchLoading] = useState(false);
+  const [nlSearchError, setNlSearchError] = useState<string | null>(null);
   const [searchPeopleQuery, setSearchPeopleQuery] = useState('');
   const [searchPeopleOptions, setSearchPeopleOptions] = useState<Person[]>([]);
   const [searchPeopleLoading, setSearchPeopleLoading] = useState(false);
@@ -8863,6 +8867,46 @@ export default function App() {
     setSelectionAnchorAssetId(null);
   }
 
+  async function handleNaturalLanguageSearch(): Promise<void> {
+    const query = nlSearchQuery.trim();
+    if (!query) return;
+    setNlSearchLoading(true);
+    setNlSearchError(null);
+    try {
+      const result = await translateNaturalLanguageSearch(query);
+      // Merge Claude's result over default filters, then apply immediately
+      const defaults = getDefaultSearchFilters();
+      const merged: SearchFilters = {
+        ...defaults,
+        photoStates: (result.photoStates as PhotoState[] | undefined) ?? defaults.photoStates,
+        albumIds: result.albumIds ?? defaults.albumIds,
+        groupIds: result.groupIds ?? defaults.groupIds,
+        filenamePattern: result.filenamePattern ?? defaults.filenamePattern,
+        captureDateFrom: result.captureDateFrom ?? defaults.captureDateFrom,
+        captureDateTo: result.captureDateTo ?? defaults.captureDateTo,
+        captureDateAvailability: result.captureDateAvailability ?? defaults.captureDateAvailability,
+        peopleIds: result.peopleIds ?? defaults.peopleIds,
+        peopleMatchMode: result.peopleMatchMode ?? defaults.peopleMatchMode,
+        excludedPeopleIds: result.excludedPeopleIds ?? defaults.excludedPeopleIds,
+        hasNoPeople: result.hasNoPeople ?? defaults.hasNoPeople,
+        hasKeywords: result.hasKeywords ?? defaults.hasKeywords,
+        keywordQuery: result.keywordQuery ?? defaults.keywordQuery,
+        isEditedImport: result.isEditedImport ?? defaults.isEditedImport,
+        hasEditedVersion: result.hasEditedVersion ?? defaults.hasEditedVersion,
+        inEditQueue: result.inEditQueue ?? defaults.inEditQueue,
+      };
+      setPendingSearchFilters(merged);
+      setAppliedSearchFilters(merged);
+      setSelectedAssetId(null);
+      setSelectedAssetIds([]);
+      setSelectionAnchorAssetId(null);
+    } catch (err) {
+      setNlSearchError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setNlSearchLoading(false);
+    }
+  }
+
   function clearFilters(): void {
     const defaultStates = getDefaultPhotoStatesForPrimaryArea(primaryArea);
     if (defaultStates) {
@@ -10976,6 +11020,31 @@ export default function App() {
               Reset
             </button>
           </div>
+        </div>
+        <div style={filterSubsectionStyle}>
+          <h3 style={filterSubsectionTitleStyle}>Natural Language Search</h3>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+            <input
+              type="text"
+              value={nlSearchQuery}
+              onChange={(e) => setNlSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleNaturalLanguageSearch(); }}
+              placeholder='e.g. "photos of Ted at Point Reyes in 2022 I kept"'
+              disabled={nlSearchLoading}
+              style={{ flex: 1, minWidth: 0, fontSize: '13px', padding: '4px 6px' }}
+            />
+            <button
+              type="button"
+              style={nlSearchLoading ? disabledToolbarActionButtonStyle : compareButtonStyle}
+              onClick={() => void handleNaturalLanguageSearch()}
+              disabled={nlSearchLoading || !nlSearchQuery.trim()}
+            >
+              {nlSearchLoading ? '…' : 'Go'}
+            </button>
+          </div>
+          {nlSearchError ? (
+            <p style={{ margin: '4px 0 0', color: '#b00020', fontSize: '12px' }}>{nlSearchError}</p>
+          ) : null}
         </div>
         <div style={filterSubsectionStyle}>
           <h3 style={filterSubsectionTitleStyle}>Smart Album</h3>
