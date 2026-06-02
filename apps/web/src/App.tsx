@@ -6460,17 +6460,17 @@ export default function App() {
   );
 
   const slideshowAssets = useMemo(
-    () => (selectedAssetIds.length > 0 ? compareAssets : visibleAssets),
+    () => (selectedAssetIds.length > 1 ? compareAssets : visibleAssets),
     [compareAssets, selectedAssetIds.length, visibleAssets]
   );
 
   const loupeAssets = useMemo(
-    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    () => (compareAssets.length > 1 ? compareAssets : visibleAssets),
     [compareAssets, visibleAssets]
   );
 
   const immersiveAssets = useMemo(
-    () => (compareAssets.length > 0 ? compareAssets : visibleAssets),
+    () => (compareAssets.length > 1 ? compareAssets : visibleAssets),
     [compareAssets, visibleAssets]
   );
 
@@ -7123,7 +7123,7 @@ export default function App() {
   // correctly when navigating with arrow keys without an explicit grid click.
   useEffect(() => {
     if (!isLoupeMode || !selectedAssetId) return;
-    if (selectedAssetIds.length === 1 && selectedAssetIds[0] === selectedAssetId) return;
+    if (selectedAssetIds.includes(selectedAssetId)) return;
     setSelectedAssetIds([selectedAssetId]);
   }, [isLoupeMode, selectedAssetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
