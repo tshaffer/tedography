@@ -8874,26 +8874,26 @@ export default function App() {
     setNlSearchError(null);
     try {
       const result = await translateNaturalLanguageSearch(query);
-      // Merge Claude's result over default filters, then apply immediately
-      const defaults = getDefaultSearchFilters();
+      // Merge Claude's result over current pending filters — fields Claude
+      // didn't mention (undefined) fall back to whatever is already set.
       const merged: SearchFilters = {
-        ...defaults,
-        photoStates: (result.photoStates as PhotoState[] | undefined) ?? defaults.photoStates,
-        albumIds: result.albumIds ?? defaults.albumIds,
-        groupIds: result.groupIds ?? defaults.groupIds,
-        filenamePattern: result.filenamePattern ?? defaults.filenamePattern,
-        captureDateFrom: result.captureDateFrom ?? defaults.captureDateFrom,
-        captureDateTo: result.captureDateTo ?? defaults.captureDateTo,
-        captureDateAvailability: result.captureDateAvailability ?? defaults.captureDateAvailability,
-        peopleIds: result.peopleIds ?? defaults.peopleIds,
-        peopleMatchMode: result.peopleMatchMode ?? defaults.peopleMatchMode,
-        excludedPeopleIds: result.excludedPeopleIds ?? defaults.excludedPeopleIds,
-        hasNoPeople: result.hasNoPeople ?? defaults.hasNoPeople,
-        hasKeywords: result.hasKeywords ?? defaults.hasKeywords,
-        keywordQuery: result.keywordQuery ?? defaults.keywordQuery,
-        isEditedImport: result.isEditedImport ?? defaults.isEditedImport,
-        hasEditedVersion: result.hasEditedVersion ?? defaults.hasEditedVersion,
-        inEditQueue: result.inEditQueue ?? defaults.inEditQueue,
+        ...pendingSearchFilters,
+        ...(result.photoStates !== undefined && { photoStates: result.photoStates as PhotoState[] }),
+        ...(result.albumIds !== undefined && { albumIds: result.albumIds }),
+        ...(result.groupIds !== undefined && { groupIds: result.groupIds }),
+        ...(result.filenamePattern !== undefined && { filenamePattern: result.filenamePattern }),
+        ...(result.captureDateFrom !== undefined && { captureDateFrom: result.captureDateFrom }),
+        ...(result.captureDateTo !== undefined && { captureDateTo: result.captureDateTo }),
+        ...(result.captureDateAvailability !== undefined && { captureDateAvailability: result.captureDateAvailability }),
+        ...(result.peopleIds !== undefined && { peopleIds: result.peopleIds }),
+        ...(result.peopleMatchMode !== undefined && { peopleMatchMode: result.peopleMatchMode }),
+        ...(result.excludedPeopleIds !== undefined && { excludedPeopleIds: result.excludedPeopleIds }),
+        ...(result.hasNoPeople !== undefined && { hasNoPeople: result.hasNoPeople }),
+        ...(result.hasKeywords !== undefined && { hasKeywords: result.hasKeywords }),
+        ...(result.keywordQuery !== undefined && { keywordQuery: result.keywordQuery }),
+        ...(result.isEditedImport !== undefined && { isEditedImport: result.isEditedImport }),
+        ...(result.hasEditedVersion !== undefined && { hasEditedVersion: result.hasEditedVersion }),
+        ...(result.inEditQueue !== undefined && { inEditQueue: result.inEditQueue }),
       };
       setPendingSearchFilters(merged);
       setAppliedSearchFilters(merged);
