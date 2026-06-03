@@ -268,9 +268,11 @@ export function EditQueueDialog({
     setEditingAssetId(null);
   }
 
-  const importedCount = importResults?.filter((r) => r.status === 'imported').length ?? 0;
-  const importErrorCount = importResults?.filter((r) => r.status === 'error').length ?? 0;
-  const importErrors = importResults?.filter((r) => r.status === 'error') ?? [];
+  const importedResults = importResults?.filter((r) => r.status === 'imported') ?? [];
+  const skippedResults = importResults?.filter((r) => r.status === 'skipped') ?? [];
+  const errorResults = importResults?.filter((r) => r.status === 'error') ?? [];
+  const importedCount = importedResults.length;
+  const importErrorCount = errorResults.length;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -439,15 +441,51 @@ export function EditQueueDialog({
           {exportNotice ? <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{exportNotice}</span> : null}
           {exportError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{exportError}</span> : null}
           {importResults && !importError ? (
-            <div>
-              <span style={{ fontSize: '12px', color: importErrorCount > 0 ? '#b97316' : '#2f6f3e' }}>
-                {importedCount} imported{importErrorCount > 0 ? `, ${importErrorCount} error${importErrorCount !== 1 ? 's' : ''}` : ''}
-              </span>
-              {importErrors.map((r) => (
-                <div key={r.filename} style={{ fontSize: '11px', color: '#b00020', marginTop: '2px' }}>
-                  {r.filename}: {r.message}
+            <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {importedCount === 0 && importErrorCount === 0 ? (
+                <span style={{ color: '#6b7280' }}>No _edited files found in edit folder.</span>
+              ) : null}
+              {importedResults.length > 0 ? (
+                <div>
+                  <span style={{ fontWeight: 600, color: '#2f6f3e' }}>
+                    Imported ({importedCount}):
+                  </span>
+                  {importedResults.map((r) => (
+                    <div key={r.filename} style={{ marginTop: '3px', paddingLeft: '10px' }}>
+                      <span style={{ color: '#1f2937' }}>{r.filename}</span>
+                      {r.destPath ? (
+                        <div style={{ fontSize: '11px', color: '#6b7280', fontFamily: 'monospace', marginTop: '1px' }}>
+                          → {r.destPath}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : null}
+              {skippedResults.length > 0 ? (
+                <div>
+                  <span style={{ fontWeight: 600, color: '#6b7280' }}>
+                    Skipped ({skippedResults.length}):
+                  </span>
+                  {skippedResults.map((r) => (
+                    <div key={r.filename} style={{ marginTop: '3px', paddingLeft: '10px', color: '#6b7280' }}>
+                      {r.filename}{r.message ? ` — ${r.message}` : ''}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {errorResults.length > 0 ? (
+                <div>
+                  <span style={{ fontWeight: 600, color: '#b00020' }}>
+                    Errors ({errorResults.length}):
+                  </span>
+                  {errorResults.map((r) => (
+                    <div key={r.filename} style={{ marginTop: '3px', paddingLeft: '10px', color: '#b00020' }}>
+                      {r.filename}{r.message ? ` — ${r.message}` : ''}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
           {importError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{importError}</span> : null}

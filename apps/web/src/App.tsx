@@ -7616,6 +7616,9 @@ export default function App() {
       const { results } = await importEditedFiles();
       setEditQueueImportResults(results);
       await loadEditQueue();
+      if (results.some((r) => r.status === 'imported')) {
+        await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+      }
     } catch (err) {
       setEditQueueImportError(err instanceof Error ? err.message : 'Import failed');
     } finally {

@@ -11,6 +11,7 @@ export interface ImportEditedResult {
   filename: string;
   status: 'imported' | 'skipped' | 'error';
   assetId?: string;
+  destPath?: string;
   message?: string;
 }
 

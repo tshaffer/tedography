@@ -302,6 +302,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
     filename: string;
     status: 'imported' | 'skipped' | 'error';
     assetId?: string;
+    destPath?: string;
     message?: string;
   }> = [];
 
@@ -487,7 +488,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
       });
 
       log.info(`Imported edited file ${editedFilename} as asset ${newAsset.id}`);
-      results.push({ filename: editedFilename, status: 'imported', assetId: newAsset.id });
+      results.push({ filename: editedFilename, status: 'imported', assetId: newAsset.id, destPath: sourceFileDir });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error(`Failed to import ${editedFilename}`, err);
