@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { TedographyPageShell } from '../shared/TedographyPageShell';
 import type { FaceDetectionIgnoredReason, FaceDetectionMatchStatus } from '@tedography/domain';
@@ -10,7 +11,7 @@ import {
   listPeopleReviewQueue,
   reviewFaceDetection
 } from '../../api/peoplePipelineApi';
-import { getFaceDetectionPreviewUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { getFaceDetectionPreviewUrl, getDisplayMediaUrl, getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 import { getAssignmentActionState, getExampleActionState, getFaceReviewActionState } from './peopleReviewActionState';
 
 const pageStyle: CSSProperties = {
@@ -245,6 +246,79 @@ interface AssetThumbnailWithFaceBoxesProps {
   currentDetectionId: string | null;
 }
 
+function FaceBoxOverlay({
+  items,
+  currentDetectionId,
+  imageLayout
+}: {
+  items: PeopleReviewQueueItem[];
+  currentDetectionId: string | null;
+  imageLayout: { offsetLeftFrac: number; offsetTopFrac: number; scaleX: number; scaleY: number } | null;
+}) {
+  return (
+    <div style={overlaySurfaceStyle}>
+      {items.map((item) => {
+        const suggestedPersonName = item.suggestedPerson?.displayName ?? '';
+        const matchedPersonName = item.matchedPerson?.displayName ?? '';
+        const { boundingBox, matchStatus, faceIndex } = item.detection;
+        const isCurrent = item.detection.id === currentDetectionId;
+        return (
+          <div
+            key={item.detection.id}
+            style={{
+              ...overlayBoxBaseStyle,
+              ...getDetectionOverlayPalette(matchStatus, isCurrent),
+              left: imageLayout
+                ? `${(imageLayout.offsetLeftFrac + boundingBox.left * imageLayout.scaleX) * 100}%`
+                : `${boundingBox.left * 100}%`,
+              top: imageLayout
+                ? `${(imageLayout.offsetTopFrac + boundingBox.top * imageLayout.scaleY) * 100}%`
+                : `${boundingBox.top * 100}%`,
+              width: imageLayout
+                ? `${boundingBox.width * imageLayout.scaleX * 100}%`
+                : `${boundingBox.width * 100}%`,
+              height: imageLayout
+                ? `${boundingBox.height * imageLayout.scaleY * 100}%`
+                : `${boundingBox.height * 100}%`
+            }}
+            title={`${getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)} • Face #${faceIndex}`}
+          >
+            <span style={overlayLabelStyle}>
+              {getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+type ImageLayout = { offsetLeftFrac: number; offsetTopFrac: number; scaleX: number; scaleY: number };
+
+function computeObjectContainLayout(img: HTMLImageElement): ImageLayout | null {
+  const cw = img.clientWidth;
+  const ch = img.clientHeight;
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  if (!cw || !ch || !nw || !nh) return null;
+  const containerAspect = cw / ch;
+  const imageAspect = nw / nh;
+  let displayedWidth: number, displayedHeight: number;
+  if (imageAspect >= containerAspect) {
+    displayedWidth = cw;
+    displayedHeight = cw / imageAspect;
+  } else {
+    displayedHeight = ch;
+    displayedWidth = ch * imageAspect;
+  }
+  return {
+    offsetLeftFrac: (cw - displayedWidth) / 2 / cw,
+    offsetTopFrac: (ch - displayedHeight) / 2 / ch,
+    scaleX: displayedWidth / cw,
+    scaleY: displayedHeight / ch
+  };
+}
+
 function AssetThumbnailWithFaceBoxes({
   assetId,
   filename,
@@ -253,37 +327,22 @@ function AssetThumbnailWithFaceBoxes({
   onShowFaceBoxesChange,
   currentDetectionId
 }: AssetThumbnailWithFaceBoxesProps) {
-  const [imageLayout, setImageLayout] = useState<{
-    offsetLeftFrac: number;
-    offsetTopFrac: number;
-    scaleX: number;
-    scaleY: number;
-  } | null>(null);
+  const [imageLayout, setImageLayout] = useState<ImageLayout | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const handleImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>): void => {
-    const img = event.currentTarget;
-    const cw = img.clientWidth;
-    const ch = img.clientHeight;
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
-    if (!cw || !ch || !nw || !nh) { setImageLayout(null); return; }
-    const containerAspect = cw / ch;
-    const imageAspect = nw / nh;
-    let displayedWidth: number, displayedHeight: number;
-    if (imageAspect >= containerAspect) {
-      displayedWidth = cw;
-      displayedHeight = cw / imageAspect;
-    } else {
-      displayedHeight = ch;
-      displayedWidth = ch * imageAspect;
-    }
-    setImageLayout({
-      offsetLeftFrac: (cw - displayedWidth) / 2 / cw,
-      offsetTopFrac: (ch - displayedHeight) / 2 / ch,
-      scaleX: displayedWidth / cw,
-      scaleY: displayedHeight / ch
-    });
+    setImageLayout(computeObjectContainLayout(event.currentTarget));
   }, []);
+
+  // Close lightbox on Escape
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLightboxOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxOpen]);
 
   const currentItem = items.find((item) => item.detection.id === currentDetectionId) ?? null;
 
@@ -296,16 +355,39 @@ function AssetThumbnailWithFaceBoxes({
               <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{filename}</span>
               <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#94a3b8' }}>{assetId}</span>
             </div>
-            <label style={{ ...inlineRowStyle, gap: '6px', fontSize: '13px', color: '#163246', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={showFaceBoxes}
-                onChange={(event) => onShowFaceBoxesChange(event.target.checked)}
-              />
-              Show Face Boxes
-            </label>
+            <div style={inlineRowStyle}>
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                style={{
+                  border: '1px solid #c6d0da',
+                  borderRadius: '6px',
+                  backgroundColor: '#f7f9fb',
+                  color: '#163246',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '4px 8px',
+                  cursor: 'pointer'
+                }}
+                title="Enlarge image (Escape to close)"
+              >
+                ⛶ Enlarge
+              </button>
+              <label style={{ ...inlineRowStyle, gap: '6px', fontSize: '13px', color: '#163246', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showFaceBoxes}
+                  onChange={(event) => onShowFaceBoxesChange(event.target.checked)}
+                />
+                Show Face Boxes
+              </label>
+            </div>
           </div>
-          <div style={sourcePreviewFigureStyle}>
+          <div
+            style={{ ...sourcePreviewFigureStyle, cursor: 'zoom-in' }}
+            onClick={() => setLightboxOpen(true)}
+            title="Click to enlarge"
+          >
             <img
               src={getThumbnailMediaUrl(assetId)}
               alt={`${filename} source thumbnail`}
@@ -313,40 +395,7 @@ function AssetThumbnailWithFaceBoxes({
               onLoad={handleImageLoad}
             />
             {showFaceBoxes ? (
-              <div style={overlaySurfaceStyle}>
-                {items.map((item) => {
-                  const suggestedPersonName = item.suggestedPerson?.displayName ?? '';
-                  const matchedPersonName = item.matchedPerson?.displayName ?? '';
-                  const { boundingBox, matchStatus, faceIndex } = item.detection;
-                  const isCurrent = item.detection.id === currentDetectionId;
-                  return (
-                    <div
-                      key={item.detection.id}
-                      style={{
-                        ...overlayBoxBaseStyle,
-                        ...getDetectionOverlayPalette(matchStatus, isCurrent),
-                        left: imageLayout
-                          ? `${(imageLayout.offsetLeftFrac + boundingBox.left * imageLayout.scaleX) * 100}%`
-                          : `${boundingBox.left * 100}%`,
-                        top: imageLayout
-                          ? `${(imageLayout.offsetTopFrac + boundingBox.top * imageLayout.scaleY) * 100}%`
-                          : `${boundingBox.top * 100}%`,
-                        width: imageLayout
-                          ? `${boundingBox.width * imageLayout.scaleX * 100}%`
-                          : `${boundingBox.width * 100}%`,
-                        height: imageLayout
-                          ? `${boundingBox.height * imageLayout.scaleY * 100}%`
-                          : `${boundingBox.height * 100}%`
-                      }}
-                      title={`${getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)} • Face #${faceIndex}`}
-                    >
-                      <span style={overlayLabelStyle}>
-                        {getDetectionOverlayLabel(matchStatus, suggestedPersonName, matchedPersonName)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              <FaceBoxOverlay items={items} currentDetectionId={currentDetectionId} imageLayout={imageLayout} />
             ) : null}
           </div>
         </div>
@@ -368,6 +417,124 @@ function AssetThumbnailWithFaceBoxes({
               : 'The current face is highlighted with a white outline.'}
           </div>
         </div>
+      </div>
+
+      {lightboxOpen ? createPortal(
+        <LightboxOverlay
+          assetId={assetId}
+          filename={filename}
+          items={items}
+          showFaceBoxes={showFaceBoxes}
+          currentDetectionId={currentDetectionId}
+          onClose={() => setLightboxOpen(false)}
+        />,
+        document.body
+      ) : null}
+    </div>
+  );
+}
+
+function LightboxOverlay({
+  assetId,
+  filename,
+  items,
+  showFaceBoxes,
+  currentDetectionId,
+  onClose
+}: {
+  assetId: string;
+  filename: string;
+  items: PeopleReviewQueueItem[];
+  showFaceBoxes: boolean;
+  currentDetectionId: string | null;
+  onClose: () => void;
+}) {
+  // Lightbox image fills available space without letterboxing, so
+  // face-box coordinates are direct fractions — no offset computation needed.
+  const [lbLayout, setLbLayout] = useState<ImageLayout | null>(null);
+
+  const handleLoad = useCallback((event: SyntheticEvent<HTMLImageElement>): void => {
+    setLbLayout(computeObjectContainLayout(event.currentTarget));
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        backgroundColor: 'rgba(0, 0, 0, 0.88)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'zoom-out'
+      }}
+      onClick={onClose}
+    >
+      {/* Header bar */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          cursor: 'default'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>{filename}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: '6px',
+            color: '#e2e8f0',
+            fontSize: '14px',
+            fontWeight: 700,
+            padding: '4px 12px',
+            cursor: 'pointer'
+          }}
+        >
+          ✕ Close
+        </button>
+      </div>
+
+      {/* Image + overlays — stopPropagation so clicks inside don't close */}
+      <div
+        style={{ position: 'relative', maxWidth: '92vw', maxHeight: '88vh', cursor: 'default' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={getDisplayMediaUrl(assetId)}
+          alt={filename}
+          style={{
+            display: 'block',
+            maxWidth: '92vw',
+            maxHeight: '88vh',
+            width: 'auto',
+            height: 'auto',
+            borderRadius: '8px'
+          }}
+          onLoad={handleLoad}
+        />
+        {showFaceBoxes ? (
+          <FaceBoxOverlay items={items} currentDetectionId={currentDetectionId} imageLayout={lbLayout} />
+        ) : null}
+      </div>
+
+      <div
+        style={{ marginTop: '10px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', cursor: 'default' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        Click outside image or press Esc to close
       </div>
     </div>
   );
