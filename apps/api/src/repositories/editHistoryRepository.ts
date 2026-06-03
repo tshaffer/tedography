@@ -43,6 +43,11 @@ export async function getEntriesByArchiveId(archiveId: string): Promise<EditHist
     .lean<EditHistoryEntry[]>();
 }
 
+export async function updateEntryNote(entryId: string, note: string): Promise<boolean> {
+  const result = await EditHistoryModel.updateOne({ id: entryId }, { $set: { note } });
+  return result.modifiedCount > 0;
+}
+
 export async function archiveEntries(entryIds: string[], archiveId: string): Promise<number> {
   const result = await EditHistoryModel.updateMany(
     { id: { $in: entryIds }, archiveId: null },

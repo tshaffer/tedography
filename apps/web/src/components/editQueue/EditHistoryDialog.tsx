@@ -13,6 +13,7 @@ interface EditHistoryDialogProps {
   onAppendToArchive: (entryIds: string[], archiveId: string) => Promise<void>;
   onOpenArchives: () => void;
   onNavigate: (assetId: string, albumId: string | null) => void;
+  onSaveNote: (entryId: string, note: string) => Promise<void>;
 }
 
 const overlayStyle: CSSProperties = {
@@ -102,12 +103,16 @@ export function EditHistoryDialog({
   onAppendToArchive,
   onOpenArchives,
   onNavigate,
+  onSaveNote,
 }: EditHistoryDialogProps): ReactElement | null {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [archiveMode, setArchiveMode] = useState<'none' | 'create' | 'append'>('none');
   const [archiveNameDraft, setArchiveNameDraft] = useState('');
   const [appendTargetId, setAppendTargetId] = useState('');
   const [archiving, setArchiving] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Keep selection valid when entries change
@@ -126,16 +131,37 @@ export function EditHistoryDialog({
     }
   }, [selectedIds.size, entries.length]);
 
-  // Reset archive mode when dialog closes
+  // Reset archive mode and note edit when dialog closes
   useEffect(() => {
     if (!open) {
       setSelectedIds(new Set());
       setArchiveMode('none');
       setArchiveNameDraft('');
+      setEditingNoteId(null);
     }
   }, [open]);
 
   if (!open) return null;
+
+  function startEditNote(entry: EditHistoryEntryWithNavigation): void {
+    setEditingNoteId(entry.id);
+    setNoteDraft(entry.note ?? '');
+  }
+
+  function cancelEditNote(): void {
+    setEditingNoteId(null);
+  }
+
+  async function saveNote(): Promise<void> {
+    if (!editingNoteId) return;
+    setNoteSaving(true);
+    try {
+      await onSaveNote(editingNoteId, noteDraft);
+      setEditingNoteId(null);
+    } finally {
+      setNoteSaving(false);
+    }
+  }
 
   const allSelected = entries.length > 0 && selectedIds.size === entries.length;
   const selectedEntryIds = Array.from(selectedIds);
@@ -289,15 +315,50 @@ export function EditHistoryDialog({
                           imported
                         </span>
                       ) : null}
+                      {/* Edit note button */}
+                      <button
+                        type="button"
+                        title={editingNoteId === entry.id ? 'Cancel edit' : 'Edit note'}
+                        onClick={() => editingNoteId === entry.id ? cancelEditNote() : startEditNote(entry)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: editingNoteId === entry.id ? '#1a56db' : '#9ca3af', fontSize: '13px', padding: '0 2px', lineHeight: 1, flexShrink: 0, marginLeft: 'auto' }}
+                      >
+                        ✎
+                      </button>
                     </div>
                     {entry.albumPath ? (
                       <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
                     ) : null}
-                    {entry.note ? (
+                    {editingNoteId === entry.id ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+                        <textarea
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraft(e.target.value)}
+                          rows={2}
+                          style={{ width: '100%', fontSize: '11px', border: '1px solid #d1d5db', borderRadius: '4px', padding: '4px 6px', resize: 'vertical', fontFamily: 'inherit', color: '#374151', boxSizing: 'border-box' }}
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Escape') cancelEditNote(); }}
+                        />
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                          <button
+                            type="button"
+                            style={{ ...buttonStyle, backgroundColor: '#1a56db', color: '#fff', borderColor: '#1a56db', padding: '2px 8px', fontSize: '11px', opacity: noteSaving ? 0.5 : 1, cursor: noteSaving ? 'default' : 'pointer' }}
+                            disabled={noteSaving}
+                            onClick={() => void saveNote()}
+                          >
+                            {noteSaving ? 'Saving…' : 'Save'}
+                          </button>
+                          <button type="button" style={{ ...buttonStyle, padding: '2px 8px', fontSize: '11px' }} onClick={cancelEditNote}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : entry.note ? (
                       <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.note}>
                         {entry.note}
                       </span>
-                    ) : null}
+                    ) : (
+                      <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
+                    )}
                     {entry.errorMessage ? (
                       <span style={{ color: '#b00020', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.errorMessage}>
                         {entry.errorMessage}

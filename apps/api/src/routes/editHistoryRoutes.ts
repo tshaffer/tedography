@@ -6,6 +6,7 @@ import {
   getEntriesByArchiveId,
   archiveEntries,
   deleteEntriesByArchiveId,
+  updateEntryNote,
 } from '../repositories/editHistoryRepository.js';
 import {
   createArchive,
@@ -62,6 +63,28 @@ editHistoryRoutes.get('/', async (_req, res) => {
   } catch (error) {
     log.error('Failed to get edit history', error);
     res.status(500).json({ error: 'Failed to get edit history' });
+  }
+});
+
+// ─── PATCH /:entryId — update note on an active entry ────────────────────────
+
+editHistoryRoutes.patch('/:entryId', async (req, res) => {
+  const { entryId } = req.params as { entryId: string };
+  const { note } = req.body as { note?: string };
+  if (typeof note !== 'string') {
+    res.status(400).json({ error: 'note must be a string' });
+    return;
+  }
+  try {
+    const updated = await updateEntryNote(entryId, note);
+    if (!updated) {
+      res.status(404).json({ error: 'Entry not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    log.error('Failed to update edit history note', error);
+    res.status(500).json({ error: 'Failed to update edit history note' });
   }
 });
 

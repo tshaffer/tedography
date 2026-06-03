@@ -146,6 +146,7 @@ import {
   renameEditHistoryArchive,
   deleteEditHistoryArchive,
   type EditHistoryEntryWithNavigation,
+  updateEditHistoryNote,
 } from './api/editHistoryApi';
 import { translateNaturalLanguageSearch } from './api/searchApi';
 import type { EditHistoryArchive } from '@tedography/domain';
@@ -7679,6 +7680,13 @@ export default function App() {
     await loadEditQueue();
   }
 
+  async function handleSaveEditHistoryNote(entryId: string, note: string): Promise<void> {
+    await updateEditHistoryNote(entryId, note);
+    setEditHistoryEntries((prev) =>
+      prev.map((e) => (e.id === entryId ? { ...e, note } : e))
+    );
+  }
+
   async function handleOpenEditHistory(): Promise<void> {
     setEditHistoryDialogOpen(true);
     setEditHistoryLoading(true);
@@ -13641,6 +13649,7 @@ export default function App() {
         onAppendToArchive={(entryIds, archiveId) => handleAppendToEditHistoryArchive(entryIds, archiveId)}
         onOpenArchives={() => handleOpenEditHistoryArchives()}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
+        onSaveNote={(entryId, note) => handleSaveEditHistoryNote(entryId, note)}
       />
       <EditHistoryArchivesDialog
         open={editHistoryArchivesDialogOpen}

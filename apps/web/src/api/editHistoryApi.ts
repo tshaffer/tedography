@@ -19,6 +19,14 @@ export function getEditHistory(): Promise<EditHistoryEntryWithNavigation[]> {
   return fetchJson<EditHistoryEntryWithNavigation[]>('/api/edit-history');
 }
 
+export function updateEditHistoryNote(entryId: string, note: string): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`/api/edit-history/${encodeURIComponent(entryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note }),
+  });
+}
+
 export function getEditHistoryArchives(): Promise<EditHistoryArchive[]> {
   return fetchJson<EditHistoryArchive[]>('/api/edit-history/archives');
 }
