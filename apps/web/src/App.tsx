@@ -45,6 +45,7 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TagIcon from '@mui/icons-material/Tag';
 import DownloadIcon from '@mui/icons-material/Download';
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
 import LockIcon from '@mui/icons-material/Lock';
@@ -7633,6 +7634,28 @@ export default function App() {
     }
   }
 
+  function handleShowInLibrary(): void {
+    // Collect album IDs from all selected assets (first album per asset).
+    const albumIds = selectedAssetIds
+      .map((id) => assetsById.get(id)?.albumIds?.[0])
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const uniqueAlbumIds = [...new Set(albumIds)];
+    if (uniqueAlbumIds.length === 0) return;
+
+    // Navigate to Library / Albums mode with those albums checked.
+    setCheckedAlbumIds(uniqueAlbumIds);
+    setSelectedTreeNodeId(uniqueAlbumIds[0] ?? null);
+    setLibraryBrowseMode('Albums');
+    setPrimaryArea('Library');
+    setViewerMode('Grid');
+
+    // Scroll to and select the first selected asset once it appears in visibleAssets.
+    const firstAssetId = selectedAssetIds[0];
+    if (firstAssetId) {
+      setPendingNavigateAssetId(firstAssetId);
+    }
+  }
+
   function handleNavigateToEditQueueAsset(assetId: string, albumId: string | null): void {
     setEditQueueDialogOpen(false);
     setEditHistoryDialogOpen(false);
@@ -12109,6 +12132,25 @@ export default function App() {
                     aria-label="Move to Album"
                   >
                     <ArrowForwardIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
+          {/* Actions: Show in Library — Search only */}
+          {isSearchArea ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip title={hasSelectedAssets ? 'Show selected photo(s) in Library' : 'Select one or more photos to show in Library'}>
+                <span>
+                  <button
+                    type="button"
+                    style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                    onClick={handleShowInLibrary}
+                    disabled={!hasSelectedAssets}
+                    aria-label="Show in Library"
+                  >
+                    <PhotoLibraryIcon fontSize="inherit" style={toolbarIconContentStyle} />
                   </button>
                 </span>
               </Tooltip>
