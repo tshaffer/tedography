@@ -8,62 +8,197 @@ Tedography is a personal photo archive and curation system. The primary workflow
 
 ## Table of Contents
 
-1. [Viewing and Browsing](#1-viewing-and-browsing)
-   - 1.1 [Library and Viewing Modes](#11-library-and-viewing-modes)
-   - 1.2 [Selection Behavior](#12-selection-behavior)
-   - 1.3 [Album Ordering](#13-album-ordering)
-   - 1.4 [Slideshow](#14-slideshow)
-2. [Organizing Your Library](#2-organizing-your-library)
-   - 2.1 [Keywords](#21-keywords)
-   - 2.2 [Smart Albums](#22-smart-albums)
-3. [Searching](#3-searching)
-   - 3.1 [Search Filters](#31-search-filters)
-   - 3.2 [People Search](#32-people-search)
-   - 3.3 [Natural Language Search](#33-natural-language-search)
-4. [People](#4-people)
-   - 4.1 [Core Concepts](#41-core-concepts)
-   - 4.2 [People in Library](#42-people-in-library)
-   - 4.3 [Asset Review Dialog](#43-asset-review-dialog)
-   - 4.4 [People Browse](#44-people-browse)
-   - 4.5 [Person Detail](#45-person-detail)
-   - 4.6 [People Review Queue](#46-people-review-queue)
-   - 4.7 [Scoped People Work](#47-scoped-people-work)
-   - 4.8 [Recognition Run Summary](#48-recognition-run-summary)
-   - 4.9 [Enrollment and Recognition Quality](#49-enrollment-and-recognition-quality)
-   - 4.10 [People Maintenance](#410-people-maintenance)
-   - 4.11 [Getting Started with a Large Library](#411-getting-started-with-a-large-library)
-5. [Editing Photos](#5-editing-photos)
-   - 5.1 [Edit Queue](#51-edit-queue)
-   - 5.2 [AI Edit Queue](#52-ai-edit-queue)
-6. [Duplicate Management](#6-duplicate-management)
-   - 6.1 [Duplicate Group Review](#61-duplicate-group-review)
-   - 6.2 [Duplicate Pair Review](#62-duplicate-pair-review)
-   - 6.3 [Needs Re-review](#63-needs-re-review)
-   - 6.4 [Effect on Library](#64-effect-on-library)
-   - 6.5 [Recommended Workflow](#65-recommended-workflow)
-7. [Users and Permissions](#7-users-and-permissions)
-   - 7.1 [Roles](#71-roles)
-   - 7.2 [Logging In and Managing Your Account](#72-logging-in-and-managing-your-account)
-   - 7.3 [What Each Role Can Do](#73-what-each-role-can-do)
-   - 7.4 [Admin Tools](#74-admin-tools)
+1. [Importing Photos](#1-importing-photos)
+2. [Reviewing Photos](#2-reviewing-photos)
+   - 2.1 [Photo States](#21-photo-states)
+   - 2.2 [Setting Photo State](#22-setting-photo-state)
+   - 2.3 [Keyboard Shortcuts](#23-keyboard-shortcuts)
+3. [Viewing and Browsing](#3-viewing-and-browsing)
+   - 3.1 [Library Browse Modes](#31-library-browse-modes)
+   - 3.2 [Viewing Modes](#32-viewing-modes)
+   - 3.3 [Selection Behavior](#33-selection-behavior)
+   - 3.4 [Timeline Navigation and Thumbnail Size](#34-timeline-navigation-and-thumbnail-size)
+   - 3.5 [Albums Mode Options](#35-albums-mode-options)
+   - 3.6 [Thumbnail Badges](#36-thumbnail-badges)
+   - 3.7 [Slideshow](#37-slideshow)
+   - 3.8 [Presentation Mode](#38-presentation-mode)
+4. [Album Management](#4-album-management)
+   - 4.1 [Album Tree Structure](#41-album-tree-structure)
+   - 4.2 [Creating Groups and Albums](#42-creating-groups-and-albums)
+   - 4.3 [Album Tree Context Menu](#43-album-tree-context-menu)
+   - 4.4 [Moving Albums in the Tree](#44-moving-albums-in-the-tree)
+   - 4.5 [Album Tree Sort Mode](#45-album-tree-sort-mode)
+   - 4.6 [Album Photo Ordering](#46-album-photo-ordering)
+   - 4.7 [Show in Album](#47-show-in-album)
+5. [Organizing Your Library](#5-organizing-your-library)
+   - 5.1 [Keywords](#51-keywords)
+   - 5.2 [Smart Albums](#52-smart-albums)
+6. [Searching](#6-searching)
+   - 6.1 [Search Filters](#61-search-filters)
+   - 6.2 [People Search](#62-people-search)
+   - 6.3 [Natural Language Search](#63-natural-language-search)
+   - 6.4 [Show in Library from Search](#64-show-in-library-from-search)
+7. [Photo Adjustments](#7-photo-adjustments)
+   - 7.1 [Rotate](#71-rotate)
+   - 7.2 [Crop](#72-crop)
+   - 7.3 [Set Capture Date](#73-set-capture-date)
+8. [Sharing and Printing](#8-sharing-and-printing)
+   - 8.1 [Publish to Google Photos](#81-publish-to-google-photos)
+   - 8.2 [Print](#82-print)
+9. [People](#9-people)
+   - 9.1 [Core Concepts](#91-core-concepts)
+   - 9.2 [People in Library](#92-people-in-library)
+   - 9.3 [Asset Review Dialog](#93-asset-review-dialog)
+   - 9.4 [People Browse](#94-people-browse)
+   - 9.5 [Person Detail](#95-person-detail)
+   - 9.6 [People Review Queue](#96-people-review-queue)
+   - 9.7 [Scoped People Work](#97-scoped-people-work)
+   - 9.8 [Recognition Run Summary](#98-recognition-run-summary)
+   - 9.9 [Enrollment and Recognition Quality](#99-enrollment-and-recognition-quality)
+   - 9.10 [People Maintenance](#910-people-maintenance)
+   - 9.11 [Getting Started with a Large Library](#911-getting-started-with-a-large-library)
+10. [Editing Photos](#10-editing-photos)
+    - 10.1 [Edit Queue](#101-edit-queue)
+    - 10.2 [Edit History](#102-edit-history)
+11. [Duplicate Management *(not yet available)*](#11-duplicate-management)
+12. [Maintenance](#12-maintenance)
+    - 12.1 [Maintenance Dialog](#121-maintenance-dialog)
+    - 12.2 [Per-Asset Inspector Actions](#122-per-asset-inspector-actions)
+13. [Users and Permissions](#13-users-and-permissions)
+    - 13.1 [Roles](#131-roles)
+    - 13.2 [Logging In and Managing Your Account](#132-logging-in-and-managing-your-account)
+    - 13.3 [What Each Role Can Do](#133-what-each-role-can-do)
+    - 13.4 [Admin Tools](#134-admin-tools)
 
 ---
 
-## 1. Viewing and Browsing
+## 1. Importing Photos
 
-### 1.1 Library and Viewing Modes
+Photos enter Tedography through the Import dialog. Click the **Import** button (cloud-download icon) in the toolbar to open it.
 
-The **Library** is the main browsing area. It supports several viewing modes accessible from the toolbar:
+**Step-by-step:**
 
-- **Grid** — thumbnail grid of all visible photos
-- **Loupe** — single-photo full-size view with arrow-key navigation
-- **Survey** — multi-photo comparison view
-- **Slideshow** — full-screen playback (see [Section 1.4](#14-slideshow))
-- **Filmstrip** — loupe view with a horizontal strip of thumbnails below
+**1. Choose a source folder**
 
-In Grid and Loupe modes the **Inspector** panel on the right shows metadata for the currently selected photo: filename, capture date, location, keywords, people, album membership, and order information.
+The left panel shows your configured storage roots — the top-level directories where your photos live. Click any root to expand it, then navigate into subdirectories to select the folder you want to import from.
 
-### 1.2 Selection Behavior
+**2. Scan the folder**
+
+Click **Scan**. Tedography reads the selected folder and shows you what it found: total files, media files it recognizes, and any files that will be skipped (unsupported formats, already-imported files, etc.).
+
+**3. Assign to an album**
+
+In the right panel, choose where to put the imported photos:
+- **No album** — photos are imported without an album assignment
+- **Existing album** — pick a destination album from the tree
+- **New album** — enter a name; Tedography creates the album under the selected parent group
+
+**4. Register**
+
+Click **Import**. For each photo Tedography:
+1. Computes a SHA-256 hash and checks for duplicates
+2. Extracts EXIF metadata (capture date/time, camera info, GPS coordinates with reverse-geocoding to city/state/country)
+3. Converts HEIC files to display JPEG (stored in the derived root)
+4. Generates a JPEG thumbnail
+5. Creates a record in the database
+6. Schedules the People pipeline for the new asset (if enabled)
+
+**5. After import**
+
+Imported photos appear in Library with the state **New** — the starting point of the review workflow. The import dialog shows a results summary (imported / skipped / errors) before you close it.
+
+**Note:** Import only picks up new files. If you have already-imported photos whose source files have changed (e.g. you moved them on disk), use **Maintenance → Reimport** rather than Import.
+
+---
+
+## 2. Reviewing Photos
+
+### 2.1 Photo States
+
+Every photo in Tedography has one of four states:
+
+| State | Meaning |
+|---|---|
+| **New** | Freshly imported; not yet reviewed |
+| **Pending** | Deferred — you want to decide later |
+| **Keep** | Confirmed keeper |
+| **Discard** | Rejected — hidden from normal browsing but not deleted |
+
+Photos start as **New**. The review workflow moves them toward **Keep** or **Discard**. **Pending** is a holding state for photos you are not ready to decide on yet. Discarded photos are hidden by default but can be found by searching for the Discard state; the original file is never deleted.
+
+### 2.2 Setting Photo State
+
+With one or more photos selected, use the state buttons in the toolbar (Keep, Pending, Discard, New) or the keyboard shortcuts below. The buttons can be shown as icon-only or with text labels — toggle between the two from **⋯ → Show State Labels / Show Icons Only**.
+
+In **Survey mode** (multi-photo side-by-side view), the state buttons apply to the currently focused photo in the survey, not to the whole selection.
+
+### 2.3 Keyboard Shortcuts
+
+These shortcuts work throughout Library and in Survey and Loupe modes when focus is not in a text field.
+
+**Photo state:**
+
+| Key | Action |
+|---|---|
+| `s` | Set selected photo to Keep |
+| `p` | Set selected photo to Pending |
+| `r` | Set selected photo to Discard |
+| `Delete` / `Backspace` | Discard (same as `r`; applies to all selected photos if multiple are selected) |
+| `u` | Reset selected photo to New |
+
+**Navigation:**
+
+| Key | Context | Action |
+|---|---|---|
+| `←` `→` `↑` `↓` | Grid | Move selection one cell in that direction |
+| `←` `→` | Loupe / Filmstrip | Previous / next photo |
+| `Home` | Any | Jump to first visible photo |
+| `End` | Any | Jump to last visible photo |
+| `Enter` or `Space` | Grid / Loupe | Open the selected photo in the Immersive (full-screen overlay) |
+| `Escape` | Immersive open | Close Immersive |
+| `Escape` | Survey open | Close Survey |
+| `Escape` | Slideshow active | Exit Slideshow |
+| `Escape` | Photos selected | Clear selection |
+| `Cmd+A` / `Ctrl+A` | Grid | Select all visible photos |
+
+**Immersive overlay navigation:**
+
+| Key | Action |
+|---|---|
+| `←` `→` | Previous / next photo |
+| `s` `p` `r` `u` `Delete` | Same state shortcuts as above |
+
+---
+
+## 3. Viewing and Browsing
+
+### 3.1 Library Browse Modes
+
+The Library has three fundamentally different **browse modes**, switchable from **⋯ → Browse Mode** in the toolbar overflow:
+
+**Timeline** (default) — photos are grouped by capture month, displayed in chronological sections with sticky month/year headers. This is the best mode for a broad chronological view of your archive.
+
+**Albums** — shows photos from whichever albums you have checked in the left sidebar. You can check one album or many. Useful for focused work within a specific event or time period.
+
+**Flat** — all currently visible photos in a single unsectioned grid, with no grouping. Useful when you have filters active and just want a plain list.
+
+### 3.2 Viewing Modes
+
+Within whichever browse mode is active, the toolbar lets you switch how photos are displayed:
+
+| Mode | Description |
+|---|---|
+| **Grid** | Thumbnail grid — the default browsing view |
+| **Loupe** | Single photo, full-size, with arrow-key navigation through the visible set |
+| **Filmstrip** | Loupe view with a horizontal strip of thumbnails below for quick jumping |
+| **Survey** | Side-by-side comparison of selected photos; each photo can be zoomed independently |
+| **Slideshow** | Full-screen auto-advancing playback (see [Section 3.7](#37-slideshow)) |
+
+In Grid and Loupe modes the **Inspector** panel on the right shows metadata for the selected photo: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset action buttons.
+
+Double-clicking a photo in Grid mode, or pressing `Enter` / `Space`, opens the **Immersive overlay** — a full-screen view of that photo with arrow-key navigation. Press `Escape` to close it.
+
+### 3.3 Selection Behavior
 
 Tedography maintains an ordered list of selected photos.
 
@@ -73,63 +208,165 @@ Tedography maintains an ordered list of selected photos.
 | Cmd/Ctrl + click | Adds or removes that photo from the selection |
 | Shift + click | Range-selects from the last selected photo to the clicked photo |
 | Cmd+A / Ctrl+A | Selects all currently visible photos |
+| Long-press (touch) | Enters touch multi-select mode; subsequent taps toggle without needing Cmd/Ctrl |
+| Drag across grid | Drag-selects all photos the drag rectangle passes over |
 
-**Important:** When you use Cmd/Ctrl to build a selection incrementally, photos are added in click order. When you use Shift or Cmd+A, the selection is built in the current visible display order. Features that consume the selection (such as the first photo in Loupe mode) use display order, not click order.
+When you use Cmd/Ctrl to build a selection incrementally, photos are added in click order. When you use Shift or Cmd+A, the selection follows the current visible display order. Features that use the selection (e.g. the first photo in Loupe mode) use display order, not click order.
 
-### 1.3 Album Ordering
+### 3.4 Timeline Navigation and Thumbnail Size
 
-Albums use a hybrid ordering model:
+In **Timeline** browse mode, the left sidebar shows a year/month navigator. Each year can be expanded to reveal its months. Click any month entry to scroll the main grid to that section.
 
-- Photos with a usable capture date sort **chronologically** first.
-- Photos without a capture date, or photos you have manually moved, appear in the **manual** section after the chronological section.
+**Thumbnail size** is adjustable in Timeline and Albums modes. Open **⋯ → Thumbnail Size** and choose a size level. The setting persists across sessions.
 
-When you have exactly one album checked and one photo selected, the Inspector shows the current ordering mode for that photo in that album: `Capture Time`, `Manual`, or `Manual (No Capture Time)`.
+### 3.5 Albums Mode Options
 
-**Changing ordering for a photo:**
+When in **Albums** browse mode with one or more albums checked:
 
-- **Use Manual Order** — moves the selected photo from the chronological section into the manual section for this album.
-- **Use Capture Time** — moves the selected photo back to chronological ordering.
+**Presentation** — from **⋯ → Albums Presentation** (or equivalent in the overflow) you can choose:
+- **Merged** — all selected albums shown as a single combined grid, sorted by the album ordering rules
+- **Grouped by Album** — each checked album appears as its own section with a header showing the album name and photo count
 
-Once a photo is in the manual section, the toolbar shows move controls: **Move to Top**, **Move Up**, **Move Down**, **Move to Bottom**. These affect only the manual section of the current album and only when one album and one photo are selected.
+**Album tree sort mode** — controls the order of albums in the left sidebar tree. Choose from **⋯ → Album Sort**:
+- **Custom** — the manually assigned order (drag-to-reorder)
+- **Name** — alphabetical by album name
+- **Month/Name** — alphabetical treating names that start with month numbers numerically first
 
-Ordering choices are album-specific. The same photo can use capture-time ordering in one album and manual ordering in another.
+### 3.6 Thumbnail Badges
 
-### 1.4 Slideshow
+Photo thumbnails in the grid can show small status badges. The visible badges are:
 
-Slideshow mode plays photos full-screen.
+| Badge | Meaning |
+|---|---|
+| State badge | Small colored indicator showing Keep (green), Discard (red), or Pending (blue). New photos show no badge. |
+| Keyword badge | Indicates the photo has keywords assigned |
+| Edit Queue badge | Photo is currently in the (human) Edit Queue — awaiting export/editing |
+| Edited import badge | This photo was imported via the Edit Queue as an `_edited` file |
+| People badge | Photo has confirmed people data |
 
-**First release controls:**
+Badges can be toggled on or off individually from the toolbar overflow menu under **Badges**.
+
+### 3.7 Slideshow
+
+Slideshow plays photos full-screen with auto-advance. Start it from **⋯ → Slideshow**. If photos are selected, the slideshow plays the selection; otherwise it plays all visible photos.
 
 | Control | Description |
 |---|---|
 | Play / Pause | Start or pause playback |
 | Next / Previous | Move one photo forward or back |
 | Skip to first / last | Jump to the beginning or end |
-| Adjustable speed | Choose time per slide (e.g. 2s, 5s, 10s) |
+| Adjustable speed | Time per slide (e.g. 2s, 5s, 10s) |
 | Loop toggle | Loop continuously or stop at the end |
 | Shuffle | Play in random order |
-| Info overlay | Show title, date, location, people, and keywords; fades in on hover |
-| Progress bar | Shows current position in the slideshow |
-| Fullscreen | Maintains aspect ratio of each photo |
+| Info overlay | Shows title, date, location, people, keywords; fades in on hover |
+| Progress bar | Position in the slideshow |
 
-**Keyboard shortcuts during playback:**
+**Keyboard shortcuts during slideshow:**
 
 | Key | Action |
 |---|---|
-| Space | Pause / resume |
-| Arrow keys | Next / previous |
-| F | Toggle fullscreen |
-| S | Toggle shuffle |
+| `Space` | Pause / resume |
+| `←` `→` | Previous / next |
+| `Home` / `End` | First / last |
+| `F` | Toggle browser fullscreen |
+| `S` | Toggle shuffle |
+| `Escape` | Exit slideshow |
 
-Click a photo to pause and see details. Originals are never modified during slideshow playback.
+Originals are never modified. **Planned for a future release:** transitions (fade, crossfade, Ken Burns), background music, export to video, screensaver mode.
 
-**Planned for future releases:** transitions (fade, crossfade, Ken Burns effect), background music, export to video, and a screensaver mode.
+### 3.8 Presentation Mode
+
+**Presentation** is a separate second-window mode designed for displaying photos on an external screen (e.g. a TV). Open it from **⋯ → Present**. A new popup window opens at `/present`.
+
+Drag the presentation window to your TV or external display, then make it fullscreen. As you navigate photos in the main Library window, the presentation window updates automatically to show the currently selected photo. This lets you control what's shown on the big screen from your laptop without the audience seeing your browser UI.
+
+The two windows stay connected via a browser BroadcastChannel — no server round-trips required. Closing the presentation window or the main window ends the connection.
 
 ---
 
-## 2. Organizing Your Library
+## 4. Album Management
 
-### 2.1 Keywords
+### 4.1 Album Tree Structure
+
+The album tree is hierarchical:
+- **Groups** are folders that contain albums or other groups. Assets cannot be directly placed in a group.
+- **Albums** are leaf nodes that hold photos.
+
+Photos belong to albums, not groups. Groups exist only to organize the tree.
+
+### 4.2 Creating Groups and Albums
+
+**From the toolbar** (when in Library → Albums mode):
+- **New Group** — creates a top-level group, or a child group under the currently selected tree node
+- **New Album** — creates an album under the currently selected group
+
+**From the album tree context menu** (right-click any node):
+- **Create Child Album** — creates an album directly under the right-clicked group
+- **Create Top-Level Group** — creates a new root-level group
+
+When importing photos you can also create a new album inline in the Import dialog without leaving it.
+
+### 4.3 Album Tree Context Menu
+
+Right-clicking any album tree node opens a context menu with:
+
+| Action | Description |
+|---|---|
+| Rename | Edit the album or group label inline |
+| Delete | Delete the node; albums must be empty before they can be deleted |
+| Move… | Open the Move dialog to reposition this node elsewhere in the tree |
+| Reorder Up / Down | Move this node one position within its parent |
+| Set Child Order Mode | Set how children of this group are sorted (Custom, Name, NumericThenName) |
+| Import Photos Here | Open the Import dialog pre-targeted to this album |
+| Manage Writers… | (Admin only) Grant or revoke per-album write access for Limited users |
+
+**Child order modes for groups:**
+- **Custom** — drag-to-reorder; children stay in the order you set
+- **Name** — alphabetical by label
+- **NumericThenName** — entries that start with numbers sort first numerically, then alphabetically
+
+### 4.4 Moving Albums in the Tree
+
+Right-click a node and choose **Move…** to open the Move dialog. Select the destination parent group (or root level) and confirm. The node and all its contents move to the new location.
+
+You can also reorder siblings within a group using **Reorder Up** and **Reorder Down** from the context menu, or by dragging (when the group's child order mode is Custom).
+
+### 4.5 Album Tree Sort Mode
+
+The left sidebar tree itself can be sorted differently from the child-order-mode of individual groups. Choose from **⋯ → Album Sort** in the toolbar overflow:
+- **Custom** — manual order as set in the tree
+- **Name** — alphabetical
+- **Month/Name** — numeric-month-first, then alphabetical
+
+This affects only the sidebar display order; it does not change where photos appear in the grid.
+
+### 4.6 Album Photo Ordering
+
+Albums use a hybrid ordering model. See the full details in the album ordering section (formerly §1.3, content preserved here):
+
+- Photos with a usable capture date sort **chronologically** first.
+- Photos without a capture date, or photos you have manually moved, appear in the **manual** section after the chronological section.
+
+When exactly one album is checked and one photo is selected, the Inspector shows the current ordering mode: `Capture Time`, `Manual`, or `Manual (No Capture Time)`.
+
+**Changing ordering:**
+- **⋯ → Order in Album → Use Manual Order** — moves the selected photo from chronological into the manual section
+- **⋯ → Order in Album → Use Capture Time** — returns it to chronological ordering
+
+**Repositioning within the manual section** (available when the photo uses manual ordering):
+- Move to Top, Move Up, Move Down, Move to Bottom — all in **⋯ → Order in Album**
+
+Ordering is album-specific. The same photo can use capture-time in one album and manual in another.
+
+### 4.7 Show in Album
+
+When one photo is selected in Library and that photo belongs to an album, the Inspector shows a **Show in Album** link. Clicking it navigates to Albums mode with that album checked and scrolls the grid to the selected photo. Useful for quickly finding where a photo lives in your album tree after navigating to it from Search or a Smart Album.
+
+---
+
+## 5. Organizing Your Library
+
+### 5.1 Keywords
 
 Keywords are descriptive metadata attached to photos, separate from albums. A photo can belong to any album and simultaneously have any number of keywords.
 
@@ -156,22 +393,25 @@ Keyword names are globally unique (case-insensitive, whitespace-normalized). You
 
 Select one or more photos, then use the **Keywords** section in the Inspector.
 
-- Existing keywords on the selected photo are shown as chips. Click **×** on a chip to remove it.
-- Use the **Add Keywords** field to search for and add existing keywords, or type a new keyword name to create one inline.
-- Inline-created keywords are created as root keywords. Use Maintenance to reparent them afterward if needed.
+- Existing keywords are shown as chips. Click **×** on a chip to remove it.
+- Use the **Add Keywords** field to search for and add existing keywords, or type a new name to create one inline. Inline-created keywords are root keywords; reparent them in Maintenance if needed.
 
 When **multiple photos** are selected:
 - Only keywords common to all selected photos are shown.
 - Adding a keyword applies it to all selected photos.
 - Removing a shown keyword removes it from all selected photos.
 
-The Inspector also shows a **Recent Keywords** section — up to 8 keywords you have most recently assigned, shown as clickable chips for fast re-use.
+The Inspector also shows a **Recent Keywords** section — up to 8 keywords you have most recently assigned, shown as clickable chips for fast re-use. Recent keywords are stored locally in your browser.
 
-### 2.2 Smart Albums
+**Keyword search is hierarchy-aware:**
+- Searching for a leaf keyword matches only that keyword.
+- Searching for a parent keyword matches that parent and all its descendants.
 
-Smart Albums are saved searches. They let you reopen a filtered result set with one click.
+### 5.2 Smart Albums
 
-**Supported filters in Smart Albums:**
+Smart Albums are saved searches that reopen a filtered result set with one click.
+
+**Supported filters:**
 - Keyword
 - Photo state
 - Year group
@@ -181,70 +421,148 @@ Smart Albums are saved searches. They let you reopen a filtered result set with 
 2. Click **Save as Smart Album**.
 
 **Managing Smart Albums:**
-Open **Maintenance → Smart Albums** to rename, edit filters for, open, or delete any Smart Album.
+Open **Maintenance → Smart Albums** to rename, edit, open, or delete any Smart Album.
 
-When a Smart Album is active in Search, the header shows **Smart Album: \<label\>**. If you modify the filters after opening a Smart Album, the header changes to **Search (from Smart Album: \<label\>)** to indicate your view has diverged from the saved version. Use **Exit Smart Album** to return to ordinary search.
+When a Smart Album is active in Search, the header shows **Smart Album: \<label\>**. If you modify the filters, it changes to **Search (from Smart Album: \<label\>)** — your view has diverged. Use **Exit Smart Album** to return to ordinary search.
 
-Photos are not stored in a Smart Album — it is a saved filter, not a manual album. Album membership actions still target manual albums.
+Photos are not stored in a Smart Album — it is a saved filter, not a manual album.
 
 ---
 
-## 3. Searching
+## 6. Searching
 
-### 3.1 Search Filters
+### 6.1 Search Filters
 
-Open **Search** from the top navigation. Filters available include:
+Open **Search** from the top navigation. Available filters:
 
-- **Photo state** — New, Pending, Keep, Discard
+- **Photo state** — New, Pending, Keep, Discard (select one or more)
 - **Album** — one or more albums from the album tree
-- **Keyword** — one keyword (hierarchy-aware; selecting a parent matches all descendants)
+- **Keyword** — one keyword (hierarchy-aware: parent matches all descendants)
 - **People** — one or more confirmed people, with Any or All matching
-- **Date range** — From and/or To
+- **Date range** — From and/or To (capture date)
+- **Capture date availability** — filter to photos with a capture date, photos without, or either
+- **Has edited version** — show only photos that have an `_edited` file imported from the Edit Queue
+- **In edit queue** — show only photos currently queued in the Edit Queue
 - **Filename pattern**
 - **Publication status**
 
-When a keyword filter is active, a **Keyword: …** chip appears above the results. Clear it with the chip's remove control or the **Clear Keyword** button.
+**Capture date availability** is especially useful for finding undated photos that may need their date set manually. The three options are:
+- **Dated only** — show only photos that have a capture date (default)
+- **Undated only** — show only photos with no capture date
+- **Dated or undated** — show all photos regardless of date
+
+When a keyword filter is active, a **Keyword: …** chip appears above the results. Clear it with the chip's remove control or **Clear Keyword**.
 
 The results header shows context:
 - **Search** — ordinary ad hoc search
 - **Smart Album: \<label\>** — an exact saved Smart Album
-- **Search (from Smart Album: \<label\>)** — a search that started from a Smart Album but no longer exactly matches it
+- **Search (from Smart Album: \<label\>)** — a search derived from a Smart Album with modified filters
 
-### 3.2 People Search
+### 6.2 People Search
 
 The **People** section in Search lets you find photos by confirmed person data and face-review state.
 
 | Filter | What it finds |
 |---|---|
 | Has person | Photos where one selected person is confirmed |
-| Has any of these people | Photos where at least one of the selected people is confirmed (Match: Any) |
-| Has all of these people | Photos where every selected person is confirmed (Match: All) |
+| Has any of these people | At least one of the selected people is confirmed (Match: Any) |
+| Has all of these people | Every selected person is confirmed in the same photo (Match: All) |
 | Has no confirmed people | Photos with no confirmed people data yet |
 | Has reviewable faces | Photos that still have unresolved face detections needing review |
 
 **Examples:**
 - *Show me photos with Lori* — select Lori
-- *Show me Ted and Lori together* — select Ted and Lori, set Match: All
+- *Show me Ted and Lori together* — select both, set Match: All
 - *Show me photos that still need people review* — enable Has reviewable faces
 
-People filters operate on confirmed derived people only. "Has reviewable faces" is a separate flag for unresolved work.
+### 6.3 Natural Language Search
 
-### 3.3 Natural Language Search
-
-The Search panel includes a natural language input at the top. Type a plain-English description of what you want to find and press Enter (or click the search button). Tedography translates your query into search filters using the Claude AI and overlays the result onto your current filters.
-
-Only fields that Claude could identify in your query are changed — filters you have set manually and that are not mentioned in the query are preserved.
+The Search panel includes a natural language input at the top. Type a plain-English description and press Enter. Tedography translates the query into search filters using Claude AI and overlays the result onto your current filters — only the fields Claude could identify in your query are changed.
 
 Examples:
 - *Show me kept photos of Lori from Hawaii*
 - *Find photos from 2019 with the keyword Nature*
 - *Photos that are still pending review*
 
+### 6.4 Show in Library from Search
+
+When you have one or more photos selected in Search results, the toolbar shows a **Show in Library** button (library/album icon). Clicking it:
+
+1. Switches to Library → Albums mode
+2. Checks the album(s) that contain the selected photos
+3. Scrolls to the first selected photo
+
+This is useful for finding out where a search result lives in your album tree, or for doing album-context work (like reordering) on a photo you found via search.
+
 ---
 
-## 4. People
+## 7. Photo Adjustments
 
-### 4.1 Core Concepts
+### 7.1 Rotate
+
+Select one or more photos and use the **Rotate** controls in the toolbar (or the Inspector). Three options are available:
+
+- **Rotate Clockwise** — 90° clockwise
+- **Rotate Counterclockwise** — 90° counterclockwise
+- **Rotate 180°** — flip upside down
+
+Rotation is a non-destructive metadata operation — the original file is updated in-place and derived files (display JPEG and thumbnail) are regenerated. Multiple selected photos are all rotated simultaneously.
+
+### 7.2 Crop
+
+Crop is available from the toolbar when one photo is selected. Clicking **Crop** opens the photo's source file in **macOS Preview**.
+
+Make your crop in Preview and save the file (`Cmd+S`). Tedography watches the file for changes. When it detects the save, it updates the asset's stored file and regenerates the display JPEG and thumbnail automatically. Close Preview when you are done.
+
+**Important:** Crop modifies the original source file on disk. It is a destructive operation. Tedography does not keep a copy of the pre-crop original unless you export one beforehand via the Edit Queue.
+
+### 7.3 Set Capture Date
+
+If a photo has a missing or incorrect capture date, you can set it manually. Select one or more photos and choose **⋯ → Set Capture Date…**.
+
+In the dialog you can:
+- Enter a date and time to assign as the capture date
+- Clear the capture date entirely
+
+Setting a capture date affects how the photo appears in Timeline mode and how album ordering works for that photo. The change is written to the database; the original file's EXIF data is not modified.
+
+---
+
+## 8. Sharing and Printing
+
+### 8.1 Publish to Google Photos
+
+Click the **Publish** button in the toolbar (or **⋯ → Publish to Google Photos**) to upload photos to a new Google Photos album.
+
+**Steps:**
+
+1. **Connect** — on first use, authorize Tedography to access your Google Photos account.
+2. **Configure the upload:**
+   - **Album title** — the name for the new Google Photos album
+   - **Source** — upload the current selection, or all photos in the current view
+   - **Upload version** — Original file (HEIC originals fall back to the display JPEG when the original cannot be uploaded), or Display JPEG (always converts to JPEG)
+3. Click **Publish**. Tedography uploads the photos and creates the album.
+
+To share the resulting album, open it in Google Photos and use the Share button there — Tedography does not manage sharing links directly.
+
+### 8.2 Print
+
+Click the **Print** button in the toolbar (or **⋯ → Print**) with one or more photos selected.
+
+**Steps:**
+
+1. **Choose a print provider** — select a provider from the list.
+2. **Configure defaults** — set the default size, finish, and quantity that apply to all photos in this order.
+3. **Per-photo adjustments** — each photo is listed with its own size/finish/quantity controls. You can also set a crop mode for each photo (fill vs. fit).
+4. **Review and order** — click **Order** to export the photos to the print provider, or **Go to Crop** if you want to adjust crops before ordering.
+
+The Print feature is subject to role-based permissions. Limited users can print only in albums where they have been granted write access.
+
+---
+
+## 9. People
+
+### 9.1 Core Concepts
 
 Tedography uses three related but distinct concepts for People:
 
@@ -256,7 +574,7 @@ Tedography uses three related but distinct concepts for People:
 
 The key rule: **confirmed = trusted; reviewable = still needs work.** Only confirmed data flows into search results and the Inspector's people list.
 
-### 4.2 People in Library
+### 9.2 People in Library
 
 When one photo is selected in **Library**, the Inspector shows a **People** section with:
 - Number of face detections
@@ -271,9 +589,9 @@ The top toolbar in Library also supports:
 - **Run People Recognition** — run face detection and matching on the current selection
 - **People Scope** — open scoped people tools for the current selection or checked album
 
-### 4.3 Asset Review Dialog
+### 9.3 Asset Review Dialog
 
-From Library, clicking **Review Faces** opens an in-context review dialog for the selected photo. Use this when you want to review faces without leaving your current Library view.
+From Library, clicking **Review Faces** opens an in-context review dialog for the selected photo.
 
 **Actions available per face:**
 - Confirm suggested/current person
@@ -287,7 +605,7 @@ From Library, clicking **Review Faces** opens an in-context review dialog for th
 
 Use the in-context dialog for one-photo review while staying in Library. Use the **standalone People Review page** when you want to work through many photos at once.
 
-### 4.4 People Browse
+### 9.4 People Browse
 
 The People browse page at `/people` shows a card for every known person with:
 - Display name
@@ -303,16 +621,16 @@ The People browse page at `/people` shows a card for every known person with:
 - Show or hide archived people
 - Show or hide hidden people
 
-Clicking **View Photos** on a person card opens the main app in Search with that person applied as a People filter, showing all photos confirmed to contain them.
+Clicking **View Photos** on a person card opens the main app in Search with that person applied as a People filter.
 
-### 4.5 Person Detail
+### 9.5 Person Detail
 
 Each person has a detail page at `/people/:personId`. Reach it by clicking any person card in People Browse.
 
 **The page shows:**
 - Display name, representative image, confirmed photo count, last-seen date
 - Review-needed count (unresolved faces still associated with this person)
-- A grid of confirmed photos (based on derived `mediaAsset.people`, not unresolved suggestions)
+- A grid of confirmed photos
 - An example-face strip
 - Enrollment status: `Not enrolled`, `Enrolled: N examples`, or `Enrolled: N examples (thin set)`
 
@@ -326,11 +644,11 @@ Each person has a detail page at `/people/:personId`. Reach it by clicking any p
 - Add a confirmed face as an example
 - Remove a confirmed face from this person
 - Reassign a confirmed face to another person
-- **Split Selected Faces** — move a subset of confirmed faces to a different person (see [Section 4.10](#410-people-maintenance))
-- **Merge Person** — merge this person record into another (see [Section 4.10](#410-people-maintenance))
+- **Split Selected Faces** — move a subset of confirmed faces to a different person (see [Section 9.10](#910-people-maintenance))
+- **Merge Person** — merge this person record into another (see [Section 9.10](#910-people-maintenance))
 - **Reprocess Related Assets** — re-run recognition on a bounded set of recent confirmed assets for this person
 
-### 4.6 People Review Queue
+### 9.6 People Review Queue
 
 The standalone People Review page at `/people/review` is a queue-based workbench for reviewing many face detections at once.
 
@@ -369,9 +687,7 @@ The standalone People Review page at `/people/review` is a queue-based workbench
 - Person filter within the current queue
 - Auto-advance after action (optional)
 
-The queue defaults to showing suggested, auto-matched, and unmatched faces. When opened for a single asset, confirmed detections are included so you can see the whole state.
-
-### 4.7 Scoped People Work
+### 9.7 Scoped People Work
 
 Rather than processing your entire library at once, use **People Scope** to work on a manageable subset.
 
@@ -384,7 +700,7 @@ Rather than processing your entire library at once, use **People Scope** to work
 **To start scoped work:**
 1. In Library, select assets — or switch to Albums mode and check albums — or go to Search and set filters.
 2. Click **People Scope** in the toolbar.
-3. The dialog shows a summary: scope type, scope label, asset count, confirmed people count, reviewable faces count.
+3. The dialog shows: scope type, scope label, asset count, confirmed people count, reviewable faces count.
 4. Choose an action:
    - **Run People Recognition** — detect and match faces for the scope
    - **Reprocess People Recognition** — re-run recognition on already-processed assets
@@ -392,11 +708,9 @@ Rather than processing your entire library at once, use **People Scope** to work
 
 For large scopes, the dialog asks for confirmation before processing.
 
-### 4.8 Recognition Run Summary
+### 9.8 Recognition Run Summary
 
 After **Run People Recognition** or **Reprocess People Recognition** completes, Tedography shows a **People Recognition Run Summary** dialog.
-
-**The dialog shows counts for:**
 
 | Bucket | Meaning |
 |---|---|
@@ -410,7 +724,7 @@ After **Run People Recognition** or **Reprocess People Recognition** completes, 
 | Failed | Recognition threw an error (shown in red) |
 | Not processed | Engine skipped (already processed, force not set) |
 
-**Note:** "No faces detected" is different from "Not processed" — the former means the engine ran and found nothing; the latter means it did not run at all.
+"No faces detected" ≠ "Not processed" — the former means the engine ran and found nothing; the latter means it did not run at all.
 
 **Action buttons:**
 - **Review Suggested Matches (n)** — go to People Review for suggested-match assets
@@ -420,158 +734,104 @@ After **Run People Recognition** or **Reprocess People Recognition** completes, 
 - **Show Failed Assets (n)** — select failed assets in the current grid
 - **Return to Album** — dismiss
 
-The summary persists across navigation. If you click **Review Suggested Matches** and then return to Library, the summary reappears so you can access the remaining bucket actions. It is cleared only when explicitly dismissed.
+The summary persists across navigation. If you click **Review Suggested Matches** and return to Library, the summary reappears. It is cleared only when explicitly dismissed.
 
-### 4.9 Enrollment and Recognition Quality
+### 9.9 Enrollment and Recognition Quality
 
-Every confirmed face *can* also be promoted to an **example face** that the recognition engine uses to match future photos. Better examples lead to better suggestions.
+Every confirmed face *can* be promoted to an **example face** that the recognition engine uses to improve future matching.
 
-**Enrollment status shown on Person Detail:**
-- `Not enrolled` — confirmed photos exist but no example faces yet
+**Enrollment status on Person Detail:**
+- `Not enrolled` — no example faces yet
 - `Enrolled: N examples` — actively used examples
-- `Enrolled: N examples (thin set)` — only a small number of active examples
+- `Enrolled: N examples (thin set)` — very few active examples
 
 **Adding an example:**
 1. Confirm a face as belonging to a person.
 2. Click **Add As Example** (available in People Review, the asset review dialog, and Person Detail).
-3. Tedography stores the example and updates the recognition engine. The action is idempotent — clicking the same confirmed face multiple times does not create duplicates.
+3. The action is idempotent — clicking the same confirmed face multiple times does not create duplicates.
 
 **Removing a bad example:**
-From Person Detail, click the remove control on an example face. This removes it from the active example set and updates recognition enrollment, but does not erase the original confirmed detection.
+From Person Detail, click the remove control on an example face. This removes it from recognition enrollment but does not erase the original confirmed detection.
 
 **Reprocessing after example changes:**
-Use **Reprocess Related Assets** on Person Detail to re-run recognition on a bounded set of recent confirmed assets for that person. This is intentionally scoped — it is not a full-library reprocess.
+Use **Reprocess Related Assets** on Person Detail to re-run recognition on a bounded set of recent confirmed assets. This is intentionally scoped — it is not a full-library reprocess.
 
-### 4.10 People Maintenance
-
-As your archive grows, mistakes happen. Tedography provides maintenance tools to keep people data correct.
+### 9.10 People Maintenance
 
 #### Merge Duplicate People
 
 Use **Merge Person** on Person Detail when two person records represent the same real person.
 
-What merge does:
 - The target person survives.
-- Confirmed detections from the source person are reassigned to the target.
+- Confirmed detections from the source are reassigned to the target.
 - Example faces from the source are moved to the target when possible.
-- Affected `mediaAsset.people` values are recomputed.
 - The source person is hidden and archived (not deleted).
 
 #### Split Person
 
 Use **Split Selected Faces** on Person Detail when a person record is mostly correct but some confirmed faces belong to a different person.
 
-1. Open a person detail page.
-2. In **Confirmed Faces**, check the faces you want to move.
-3. Click **Split Selected Faces**.
-4. Choose an existing destination person or enter a new person name.
-5. Confirm.
-
-Split is the right tool when the current person is mostly correct and you only need to move a subset of faces.
+1. In **Confirmed Faces**, check the faces you want to move.
+2. Click **Split Selected Faces**.
+3. Choose an existing destination person or enter a new person name.
+4. Confirm.
 
 #### Reassign or Remove a Confirmed Face
 
-On Person Detail, individual confirmed faces support:
-- **Reassign** — move this face assignment to another person
-- **Remove from Person** — remove the confirmation (updates derived asset people)
+Individual confirmed faces on Person Detail support:
+- **Reassign** — move this face to another person
+- **Remove from Person** — remove the confirmation (updates the asset's derived people list)
 - **Add as Example** — promote to an example face
 
-#### Correct Mistaken Confirmed Assignments
+### 9.11 Getting Started with a Large Library
 
-If a face was confirmed to the wrong person:
-1. Open that person's detail page.
-2. Find the face in **Confirmed Faces**.
-3. Use **Reassign** to move it to the correct person, or **Remove from Person** if it should not be assigned to anyone yet.
+Work in small, inspectable chunks — do not run People recognition across thousands of photos in one pass.
 
-These actions keep example management and confirmed-detection history separate. Removing a confirmed detection updates the asset's derived people list.
-
-### 4.11 Getting Started with a Large Library
-
-If you have thousands of existing photos, do not try to run People recognition across the whole archive in one pass. Work in small, inspectable chunks.
-
-**Good starting scopes:** one small album, one trip, one year/month date range, or a small Library selection.
+**Good starting scopes:** one small album, one trip, one year/month date range.
 
 **Recommended first pass:**
-1. Pick a small, familiar scope.
-2. Use **People Scope**.
-3. Run **Run People Recognition** for that scope.
-4. Open **Review Faces In Scope**.
-5. Confirm only people you are confident about.
-6. For important people, add a few clean confirmed faces as examples — prefer sharp, front-facing, well-lit images.
-7. Reject wrong suggestions. Ignore non-useful faces.
-8. Check how many assets still have reviewable faces.
+1. Pick a small familiar scope. Use **People Scope**.
+2. Run **Run People Recognition**.
+3. Open **Review Faces In Scope**.
+4. Confirm only people you are confident about.
+5. For important people, add a few clean confirmed faces as examples (sharp, front-facing, well-lit).
+6. Reject wrong suggestions. Ignore non-useful faces.
 
-**Building good example sets:**
-- Aim for several clear, varied examples per important person.
-- Include some variation over time (same person across different years/events).
-- Remove weak examples if they are blurry, tiny, occluded, or belong to someone else.
-
-**Reprocess after improving examples:**
-Once you have better examples, use **Reprocess Related Assets** on Person Detail, or run scoped reprocessing on a related album or date range. Then review the new suggestions.
-
-**Progress checks:**
-- In People Review, confirm the unresolved queue is shrinking for the current scope.
+**After each chunk:**
 - In Search, filter by a person and spot-check that returned photos really contain them.
 - Use **Has no confirmed people** to find photos that may still need processing.
 - Use **Has reviewable faces** to find photos with unresolved detections.
-- Sort People Browse by **Needs Review** to find people with remaining work.
-
-**Suggested chunk size:** start with 25–100 photos when building initial examples. Expand to a full album or date slice only after Search spot-checks look consistently clean.
+- On Person Detail, check example faces before reprocessing more assets.
 
 **Hide vs. Archive:**
-- **Hidden** — excluded from normal People Browse results unless "Show hidden people" is enabled. Useful for minor or transient people.
-- **Archived** — treated as inactive in People Browse unless "Show archived people" is enabled. Useful for merged source records and historical records.
+- **Hidden** — excluded from normal People Browse unless "Show hidden people" is enabled.
+- **Archived** — treated as inactive in People Browse unless "Show archived people" is enabled.
 
-Neither action deletes the person or removes them from confirmed photos.
+Neither deletes the person or removes them from confirmed photos.
 
 ---
 
-## 5. Editing Photos
+## 10. Editing Photos
 
-### 5.1 Edit Queue
+### 10.1 Edit Queue
 
-The Edit Queue lets you export original photos to an external folder, edit them with any tool, and import the edited results back into Tedography. Imported files inherit key metadata from their source.
+The Edit Queue exports original photos to an external folder so you can edit them in any tool, then imports the results back into Tedography. Imported files inherit key metadata from their source.
 
 **Setup:** add to `apps/api/.env`:
 ```
 TEDOGRAPHY_EDIT_PATH=/absolute/path/to/your/edit/folder
 ```
-The folder is created automatically. The path must be within (or the same as) one of your registered storage roots.
+The folder is created automatically. The path must be within one of your registered storage roots.
 
-**Step-by-step workflow:**
+**Workflow:**
 
-**1. Add photos to the queue**
+**1. Add to queue** — Select a photo, click the **Edit Queue** toolbar button (brain icon), choose **Add to Edit Queue**. Optionally add an editing note. To update an existing note, choose **Edit Prompt**.
 
-With a photo selected, click the **Edit Queue** toolbar button (brain icon):
-- **Add to Edit Queue** — adds the selected photo, optionally with an editing note/prompt
-- **Edit Prompt** — update the note for a photo already in the queue
+**2. Export** — Open the **Edit Queue** dialog (View Queue). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `prompts.txt` and `manifest.json` (do not delete or rename the manifest).
 
-You can also open the **Edit Queue** dialog (View Queue) to see all queued photos, edit notes inline, and remove entries.
+**3. Edit externally** — Open the exported files in any tool. Save results with the naming convention `<originalBasename>_edited.<ext>` (e.g. `IMG_1234_edited.jpg`). Save to the same edit folder.
 
-**2. Export**
-
-In the Edit Queue dialog, check the photos you want to export (or click **Select all**), then click **Export (N)**. This copies the original files to your edit folder and writes:
-- `prompts.txt` — one line per file: `filename: prompt`
-- `manifest.json` — used during import; **do not delete or rename this file**
-
-**3. Edit externally**
-
-Open the exported files in any editing tool. Save your results using this naming convention:
-
-| Original | Edited file name |
-|---|---|
-| `IMG_1234.HEIC` | `IMG_1234_edited.jpg` |
-| `IMG_1234.HEIC` | `IMG_1234_edited.png` |
-
-Rules:
-- The base name before `_edited` must match the original filename's base (case-insensitive)
-- `_edited` must appear immediately before the file extension
-- Any supported format is accepted as output (JPEG, PNG, HEIC, etc.)
-- Save the edited file to the same edit folder — do not move it elsewhere
-
-**4. Import**
-
-In the Edit Queue dialog, click **Import Edited Files**. Tedography scans the edit folder for `*_edited.*` files, matches each to its source, and imports it as a new asset inheriting:
+**4. Import** — Back in the Edit Queue dialog, click **Import Edited Files**. Each `_edited` file is matched to its source and imported as a new asset inheriting:
 
 | Property | Source |
 |---|---|
@@ -584,10 +844,7 @@ In the Edit Queue dialog, click **Import Edited Files**. Tedography scans the ed
 
 The original file is never modified.
 
-**5. After import**
-
-- **Clear Queue** — removes all entries from the edit queue (does not affect files or assets)
-- **Clear Edit Folder** — deletes all files from the edit folder (two-step confirmation required); safe to use after a successful import since edited files are moved to their destination folder during import
+**5. Clean up** — Use **Clear Queue** to remove queue entries (does not affect files). Use **Clear Edit Folder** (two-step confirmation) to delete files from the edit folder after a successful import.
 
 **Import result statuses:**
 
@@ -597,151 +854,62 @@ The original file is never modified.
 | `skipped` | No matching manifest entry, or unsupported format |
 | `error` | Import failed (duplicate, missing storage root, etc.) |
 
-Edit history is recorded for every file processed, including failures. View it via **Edit Queue → View Edit History**.
+### 10.2 Edit History
 
-**Multiple edits of the same photo:** only one `_edited` file per source photo per import pass is supported. To import two different edited versions, do two separate export → edit → import cycles.
+Every file processed by Import (succeeded or failed) is recorded in **Edit History**. Open it from **Edit Queue → View Edit History**.
 
-**Manifest file:** `manifest.json` links edited filenames to their source assets. Do not delete or rename it until after import is complete.
+The Edit History dialog shows each entry with its source filename, edited filename, import status, and a Note field. You can **edit the Note** on any entry (click the ✎ button) to record what you actually did during editing. Notes are saved to the database immediately.
 
-### 5.2 AI Edit Queue
+**Edit History Archives** let you move completed entries out of the active list into named, read-only archives. From the Edit History dialog:
+- Select one or more entries and click **Archive Selected** to move them into a new or existing archive.
+- Use **View Archives** to open the archives list, browse entries in any archive, rename an archive, append more entries to it, or delete it entirely.
 
-The AI Edit Queue lets you mark photos for AI-assisted editing using a natural-language prompt, then send them to the Gemini API. Tedography handles the upload and saves edited results automatically.
+Archives are useful for keeping the active Edit History list focused on recent work while preserving the full record of past edits.
 
-**Setup:** add to `apps/api/.env`:
-```
-GOOGLE_API_KEY=your-google-api-key-here
-TEDOGRAPHY_AI_QUEUE_EXPORT_PATH=/absolute/path/to/ai-queue-output-folder
-```
-
-**Step-by-step workflow:**
-
-**1. Queue a photo**
-
-While browsing, select a photo. Open the **More** menu (overflow button in the toolbar) and choose **Add to AI Queue…**. A dialog shows the filename and a text field for your prompt. Type what you want done and click **Add to Queue**.
-
-Prompt examples: `make the sky more dramatic`, `convert to black and white, high contrast`, `remove the background clutter`
-
-To change a queued photo's prompt, select it again and choose **Edit AI Queue Prompt…**.
-
-**2. Review the queue**
-
-The **AI Edit Queue** panel appears in the sidebar whenever items are queued. Each entry shows the filename, prompt (or *no prompt*), and a **×** remove button.
-
-**3. Process with Gemini**
-
-Click **Process with Gemini** in the queue panel. Tedography processes the **first entry** in the queue:
-1. Reads the photo from disk
-2. Sends the image and prompt to the Gemini API
-3. Saves the result as `<original-filename>_gemini.jpg` in the configured output folder
-
-When processing completes, the panel reports success or failure. Click **Process with Gemini** again to process the next entry. HEIC/HEIF originals are sent directly — no conversion needed.
-
-**4. Review the results**
-
-Open the configured output folder in Finder to review Gemini-edited versions alongside the originals. **Originals are never modified.**
-
-**5. Export Queue (manual alternative)**
-
-Click **Export Queue** to copy the original files and a `prompts.txt` file to the output folder without calling the API. Use this if you want to upload to an external AI service manually.
-
-**6. Clear the queue**
-
-Click **Clear** to empty the queue. This does not delete any output files.
-
-**Notes:**
-- Output filenames: `photo.jpg` → `photo_gemini.jpg`. If two queued photos from different folders share the same filename, the second will overwrite the first in the output folder.
-- Each click of **Process with Gemini** sends only the first queued entry — one at a time.
-- Queue entries are stored in MongoDB and survive app restarts.
 
 ---
 
-## 6. Duplicate Management
+## 11. Duplicate Management
 
-Tedography has two duplicate review surfaces. The **Duplicate Group Review** is the primary workflow; **Duplicate Pair Review** is for lower-level cleanup.
-
-### 6.1 Duplicate Group Review
-
-Route: `/duplicates/groups`
-
-The left sidebar lists provisional duplicate groups ordered by priority:
-1. **Needs Re-review** — a previously resolved group now needs revisiting
-2. **Unresolved** — not yet reviewed
-3. **Resolved** — a confirmed resolution exists
-
-Within each bucket, larger groups appear first. Page-level counts show totals for each bucket across the whole queue.
-
-**Group detail:**
-When a group is selected, the detail pane shows review status, asset count, current canonical asset (if resolved), and a Resolution Rules summary (keeper, duplicates, not in group, unclassified).
-
-**Classifying assets in a group:**
-
-Each asset can be marked:
-- **Keeper** — exactly one asset must be the keeper
-- **Duplicate** — this asset is a non-canonical copy
-- **Not In Group** — this asset is excluded from this particular duplicate set (it may still appear in other groups)
-
-All assets must be classified before the group can be saved.
-
-**Grid Mode vs. Focus Mode:**
-
-- **Grid Mode** — shows the whole group at once; best for quick classification and choosing a keeper while seeing all members
-- **Focus Mode** — shows one asset large with a candidate list on the right; supports Up/Down navigation, wraparound, and a compare subset
-
-**Compare subset in Focus Mode:**
-Add specific assets to a **Compare** set and switch to **Compare Set** view to narrow the candidate list and navigation to just those assets. This is a temporary session state and does not affect the duplicate resolution itself.
-
-**Historical hints:**
-Click **Load Historical Hints** to see best-effort counts of how often each asset has historically appeared as keeper, duplicate, or not-duplicate. These are informational only.
-
-**Saving and reopening:**
-- **Save Group Resolution** — confirms the keeper and duplicates, marks excluded assets as Not In Group, and updates Library duplicate visibility
-- **Reopen Group** — clears the current confirmed resolution and returns the group to active review
-- **Refresh Groups** — reloads the provisional group queue from current duplicate-candidate connectivity; useful after a series of saves to catch regrouping of excluded assets
-
-### 6.2 Duplicate Pair Review
-
-Route: `/duplicates/review`
-
-The pair-review page shows one candidate pair at a time. Actions:
-- Keep left / keep right / keep both
-- Not duplicate
-- Uncertain / Ignore
-
-If a pair-review action touches an asset that belongs to an already-confirmed duplicate group, Tedography saves the pair review but marks the affected group for **Needs Re-review** rather than silently overriding the group resolution. A notice on the pair-review page directs you to Duplicate Group Review to resolve the conflict.
-
-### 6.3 Needs Re-review
-
-A group is marked **Needs Re-review** when:
-- New candidate connectivity appears that changes the group composition
-- A pair-review action conflicts with an already-confirmed group resolution
-
-The current confirmed resolution still exists — Tedography is telling you to revisit it in `/duplicates/groups`. It does not silently merge the new candidate into the old result.
-
-### 6.4 Effect on Library
-
-Confirmed duplicate resolutions affect the main Library:
-- The **canonical (keeper)** asset is shown normally
-- Confirmed **non-canonical (duplicate)** members are hidden or marked as duplicates
-
-Library duplicate visibility is refreshed after saving or reopening a group resolution. The UI uses optimistic updates so the change is reflected promptly.
-
-`Keeper` and `Duplicate` badges in Library are driven by confirmed group resolutions, not by unresolved candidate relationships.
-
-### 6.5 Recommended Workflow
-
-1. Open `/duplicates/groups`
-2. Work through **Needs Re-review** groups first
-3. Then work through **Unresolved** groups
-4. Use **Grid Mode** for broad classification across the whole set
-5. Use **Focus Mode** and the Compare subset for careful visual comparison of specific candidates
-6. Save the authoritative group resolution
-7. Use `/duplicates/review` only for lower-level pair cleanup or edge cases
+> **Not yet available.** Duplicate detection tooling exists in the codebase (`apps/duplicate-cli`, `apps/duplicate-worker`, `apps/duplicate-review-web`) but is not integrated into the main Tedography app. The CLI can scan assets and generate candidate pairs; the review web app is currently a placeholder. This feature is planned for a future release.
 
 ---
 
-## 7. Users and Permissions
+## 12. Maintenance
 
-### 7.1 Roles
+### 12.1 Maintenance Dialog
+
+Open the **Maintenance** dialog from **⋯ → Maintenance** (Admin only). It provides folder-level operations for keeping already-imported assets healthy.
+
+**Source Browser (left panel)**
+
+Navigate your storage roots to select a target folder. Maintenance only operates on already-known assets — for new files, use Import.
+
+**Verify Known Assets in Folder** — scans the selected folder and checks that each known asset's source file and derived files (display JPEG, thumbnail) are present and intact. Non-mutating: nothing is changed. Results list each asset with its verification status.
+
+**Reimport Known Assets in Folder** — re-reads the source files for all known assets in the selected folder and updates their metadata (EXIF, dimensions, location, etc.) from the current file state. Use this after moving files on disk or after external metadata changes. Mutates existing asset records.
+
+**Rebuild Derived Files in Folder** — regenerates the display JPEG and thumbnail for all known assets in the selected folder. Use after derived files become corrupted or after rotating images that need their thumbnails refreshed. Mutates derived files.
+
+**Smart Albums** — the Maintenance dialog also contains the Smart Albums management section (create, rename, edit, delete saved Smart Albums).
+
+**Keyword Hierarchy** — accessible from the Maintenance dialog: create, rename, reparent, and organize your keyword tree.
+
+### 12.2 Per-Asset Inspector Actions
+
+When one photo is selected, the Inspector includes two asset-level maintenance actions (Admin only):
+
+**Reimport** — re-reads this specific asset's source file and updates its metadata record. Equivalent to the folder-level reimport but for a single asset.
+
+**Rebuild Derived Files** — regenerates the display JPEG and thumbnail for this specific asset.
+
+Both actions are available directly in the Inspector without opening the full Maintenance dialog, making them convenient for fixing individual assets you notice while browsing.
+
+---
+
+## 13. Users and Permissions
+
+### 13.1 Roles
 
 Tedography supports multiple users with role-based access control. Every action is tied to a **feature**, and each role has one of three permission values for each feature:
 
@@ -766,9 +934,9 @@ Tedography supports multiple users with role-based access control. Every action 
 | Print | allow | allow | per-album |
 | Maintenance | allow | deny | deny |
 
-Custom roles can also be created with any combination of permissions.
+Custom roles can be created with any combination of permissions.
 
-### 7.2 Logging In and Managing Your Account
+### 13.2 Logging In and Managing Your Account
 
 A login screen appears before the application loads. Select your name from the list and enter your PIN.
 
@@ -777,29 +945,29 @@ Once logged in:
 - **Log out** ends your session and returns to the login screen.
 - **Change PIN** opens a dialog to update your PIN. You must supply your current PIN; the new PIN must be at least 4 characters.
 
-### 7.3 What Each Role Can Do
+### 13.3 What Each Role Can Do
 
 **All users** (regardless of role):
 - See the login screen and log in
 - Change their own PIN
 
-**Limited users** see locked albums where they have no write access (🔒 icon). Controls for state changes, moving/removing photos, rotating, printing, and people review are enabled only in albums they have been explicitly granted write access to. Import, keyword management, and maintenance tools are hidden entirely.
+**Limited users** see locked albums (🔒 icon) where they have no write access. Controls for state changes, moving/removing photos, rotating, printing, and people review are enabled only in albums they have been explicitly granted write access to. Import, keyword management, and maintenance tools are hidden entirely.
 
 **Full users** have access to all features except Maintenance. The Maintenance menu item and the Reimport/Rebuild Derived Files buttons in the Inspector are hidden.
 
-**Admin users** have access to all features, including Maintenance, all import operations, AI queue processing, and user/role management.
+**Admin users** have access to all features, including Maintenance, all import operations, and user/role management.
 
-### 7.4 Admin Tools
+### 13.4 Admin Tools
 
 **Managing album writers:**
 Right-click any album in the album tree and choose **Manage Writers…**. This dialog shows Admin and Full users (always have access) and lets you grant or revoke write access for Limited users on that album.
 
 **Users page (`/admin/users`):**
-Accessible from the overflow (⋯) menu for Admin users only. Capabilities:
+Accessible from **⋯ → Users** for Admin users only.
 - View all users (name, role, ID)
 - Change a user's role — select a new role in the inline dropdown and click Save; an admin cannot change their own role
 - Create a user — enter display name, role, and initial PIN (minimum 4 characters)
 - Delete a user — click × and confirm; an admin cannot delete their own account
 
 **Roles page (`/admin/roles`):**
-Accessible via **Manage Roles →** in the Users page header. Shows every role as a card with a full permission grid. Click **Edit** to modify a role's name and permissions inline. The three built-in roles (admin, full, limited) can be edited but not deleted. Custom roles can be deleted when no users are assigned to them. Create new roles with a custom ID, display name, and permission grid.
+Accessible via **Manage Roles →** in the Users page header. Shows every role as a card with a full permission grid. Click **Edit** to modify a role's name and permissions inline. The three built-in roles (admin, full, limited) can be edited but not deleted. Custom roles can be deleted when no users are assigned to them.
