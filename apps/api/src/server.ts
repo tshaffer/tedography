@@ -23,6 +23,7 @@ import {
   findById,
   getAssetPageForLibrary,
   updateCaptureDatesPreservingTimes,
+  bulkUpdatePhotoState,
   updateCaptureDateTimes,
   updatePhotoState
 } from './repositories/assetRepository.js';
@@ -203,6 +204,30 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to read asset details', error);
       res.status(500).json({ error: 'Failed to load asset details' });
+    }
+  });
+
+  app.patch('/api/assets/photoState/bulk', requireFeature('set-photo-state', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds) ? (body.assetIds as string[]) : [];
+  }), async (req, res) => {
+    const body = req.body as { assetIds?: unknown; photoState?: unknown };
+    const photoState = parsePhotoState(body.photoState);
+    if (!photoState) {
+      res.status(400).json({ error: 'photoState must be one of New, Pending, Keep, Discard' });
+      return;
+    }
+    if (!Array.isArray(body.assetIds) || body.assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must be a non-empty array' });
+      return;
+    }
+
+    try {
+      const updatedAssets = await bulkUpdatePhotoState(body.assetIds as string[], photoState);
+      res.json(updatedAssets);
+    } catch (error) {
+      log.error('Failed to bulk update asset photoState', error);
+      res.status(500).json({ error: 'Failed to update assets' });
     }
   });
 

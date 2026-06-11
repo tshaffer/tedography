@@ -418,6 +418,22 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
+export async function bulkUpdatePhotoState(assetIds: string[], photoState: PhotoState): Promise<MediaAsset[]> {
+  const normalized = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))];
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalized } },
+    { $set: { photoState } },
+    { runValidators: true }
+  );
+
+  const assets = await MediaAssetModel.find({ id: { $in: normalized } }, { _id: 0 }).lean<MediaAsset[]>();
+  return assets.map(normalizeMediaAsset);
+}
+
 export async function updateCaptureDateTimes(
   assetIds: string[],
   captureDateTime: Date | null

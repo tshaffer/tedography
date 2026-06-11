@@ -7303,23 +7303,19 @@ export default function App() {
     setUpdateError(null);
 
     try {
-      const updatedAssets = await Promise.all(
-        assetIds.map(async (assetId) => {
-          const response = await fetch(`/api/assets/${assetId}/photoState`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ photoState })
-          });
+      const response = await fetch('/api/assets/photoState/bulk', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ assetIds, photoState })
+      });
 
-          if (!response.ok) {
-            throw new Error(`Request failed with status ${response.status}`);
-          }
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
 
-          return (await response.json()) as MediaAsset;
-        })
-      );
+      const updatedAssets = (await response.json()) as MediaAsset[];
 
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
       setAssets((previous) =>
