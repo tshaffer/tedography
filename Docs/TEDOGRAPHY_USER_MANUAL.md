@@ -342,22 +342,29 @@ This affects only the sidebar display order; it does not change where photos app
 
 ### 4.6 Album Photo Ordering
 
-Albums use a hybrid ordering model. See the full details in the album ordering section (formerly §1.3, content preserved here):
+Albums use a single interleaved timeline:
 
-- Photos with a usable capture date sort **chronologically** first.
-- Photos without a capture date, or photos you have manually moved, appear in the **manual** section after the chronological section.
+- Photos with a capture date sort **chronologically** by default.
+- Any photo can be **manually placed** anywhere in the album — including between two dated photos — and it holds that position. Undated photos you haven't placed appear at the end.
 
-When exactly one album is checked and one photo is selected, the Inspector shows the current ordering mode: `Capture Time`, `Manual`, or `Manual (No Capture Time)`.
+When exactly one album is checked and one photo is selected, the Inspector shows the current ordering mode (`Capture Time`, `Manual`, or `Manual (No Capture Time)`), and its Advanced section shows the capture date's provenance (where the date came from, the camera, the date in the file, and the marked-wrong flag).
 
-**Changing ordering:**
-- **⋯ → Order in Album → Use Manual Order** — moves the selected photo from chronological into the manual section
-- **⋯ → Order in Album → Use Capture Time** — returns it to chronological ordering
+**Drag and drop** (the primary way to reorder; requires exactly one checked album):
+- Drag any thumbnail and drop it onto any other. A blue bar on the target's left or right edge shows whether it lands before or after it. Dropping is what converts a photo to manual placement — no mode switch needed first.
+- **Drag a multi-selection as a block**: select several photos, drag any of them, and the whole selection lands together in display order.
 
-**Repositioning within the manual section** (available when the photo uses manual ordering):
-- Move to Top, Move Up, Move Down, Move to Bottom — all in **⋯ → Order in Album**
-- **Drag and drop in the grid** — with exactly one album checked, drag a manually ordered thumbnail and drop it onto another manually ordered thumbnail. A blue bar shows whether it will land before (left edge) or after (right edge) the target. Photos in the chronological section cannot be drag-reordered — switch them to manual ordering first.
+**⋯ → Order in Album** (works on multi-selections):
+- **Use Manual Order** — pins the selected photos at their current positions (nothing visibly moves).
+- **Use Capture Time** — returns the selection to chronological ordering.
+- **Arrange by Filename** — reorders the selection by filename sequence (numeric-aware; `(n)` download suffixes group as separate rolls) and keeps it where the selection starts. The roll workflow: select a roll → Arrange by Filename → drag the block into position.
+- Move to Top / Up / Down / Bottom — single-photo nudges across the whole album.
 
-Ordering is album-specific. The same photo can use capture-time in one album and manual in another.
+**Capture-date trust** (⋯ menu, next to Set Capture Date…):
+- **Mark Capture Date Wrong / Correct** — flags the selection's dates as inaccurate (e.g. a camera with a wrong clock) without changing them. Flagged photos count as "suspect" in the ordering badge.
+
+**Ordering badge** (off by default; View badges → Ordering): an amber `!` marks photos with suspect capture dates (weak EXIF pedigree, changed after import, or marked wrong); a blue pin marks photos manually placed in the checked album.
+
+Ordering is album-specific. The same photo can use capture-time in one album and manual placement in another.
 
 ### 4.7 Show in Album
 

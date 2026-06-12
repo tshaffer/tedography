@@ -347,6 +347,7 @@ const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBad
 const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
 const showThumbnailEditedImportBadgesStorageKey = 'tedography.showThumbnailEditedImportBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
+const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
@@ -1266,6 +1267,25 @@ const selectedCardStyle: CSSProperties = {
 
 const activeCardStyle: CSSProperties = {
   boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.18)'
+};
+
+const cardOrderingBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '5px',
+  right: '8px',
+  zIndex: 2,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: '16px',
+  height: '16px',
+  padding: '0 4px',
+  borderRadius: '999px',
+  color: '#fff',
+  fontSize: '10px',
+  fontWeight: 700,
+  lineHeight: 1,
+  pointerEvents: 'none'
 };
 
 const cardDropIndicatorStyle: CSSProperties = {
@@ -3054,6 +3074,7 @@ type AssetCardProps = {
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
   onLongPress: (assetId: string) => void;
+  orderingBadge?: 'suspect' | 'pinned' | null;
   manualOrderDragEnabled?: boolean;
   isManualOrderDragSource?: boolean;
   manualOrderDropEdge?: 'left' | 'right' | null;
@@ -3078,6 +3099,7 @@ function AssetCard({
   onCardClick,
   onCardDoubleClick,
   onLongPress,
+  orderingBadge = null,
   manualOrderDragEnabled = false,
   isManualOrderDragSource = false,
   manualOrderDropEdge = null,
@@ -3280,6 +3302,21 @@ function AssetCard({
             title={`People: ${asset.people.map((p) => p.displayName).join(', ')}`}
           >
             <FaceIcon style={{ fontSize: '28px' }} />
+          </span>
+        ) : null}
+        {orderingBadge ? (
+          <span
+            style={{
+              ...cardOrderingBadgeStyle,
+              backgroundColor: orderingBadge === 'suspect' ? '#b45309' : '#1f6feb'
+            }}
+            title={
+              orderingBadge === 'suspect'
+                ? 'Capture date is suspect (weak EXIF, changed after import, or marked wrong)'
+                : 'Manually placed in this album'
+            }
+          >
+            {orderingBadge === 'suspect' ? '!' : '⤓'}
           </span>
         ) : null}
         {isSelected
@@ -4547,6 +4584,13 @@ export default function App() {
 
     return window.localStorage.getItem(showThumbnailPeopleBadgesStorageKey) === 'true';
   });
+  const [showThumbnailOrderingBadges, setShowThumbnailOrderingBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showThumbnailOrderingBadgesStorageKey) === 'true';
+  });
   const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const own = window.localStorage.getItem(showAlbumKeywordStatusBadgeStorageKey);
@@ -5017,6 +5061,13 @@ export default function App() {
       showThumbnailPeopleBadges ? 'true' : 'false'
     );
   }, [showThumbnailPeopleBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailOrderingBadgesStorageKey,
+      showThumbnailOrderingBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailOrderingBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
@@ -7927,6 +7978,29 @@ export default function App() {
         setAssetUpdating(assetId, false);
       }
     }
+  }
+
+  function getOrderingBadgeForAsset(asset: MediaAsset): 'suspect' | 'pinned' | null {
+    if (!showThumbnailOrderingBadges) {
+      return null;
+    }
+
+    if (
+      asset.captureDateTimeMarkedWrong === true ||
+      asset.captureDateTimeSource === 'exif-weak' ||
+      asset.captureDateTimeSource === 'changed-after-import'
+    ) {
+      return 'suspect';
+    }
+
+    if (singleCheckedAlbumId) {
+      const mode = getAlbumOrderingModeInAlbum(asset, singleCheckedAlbumId);
+      if (mode === 'manual' || mode === 'manual-no-capture-time') {
+        return 'pinned';
+      }
+    }
+
+    return null;
   }
 
   // When the dragged photo is part of a multi-selection, the whole selection
@@ -12831,6 +12905,14 @@ export default function App() {
                   />
                   People
                 </label>
+                <label style={toggleOptionLabelStyle} title="Flag suspect capture dates and manually placed photos">
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailOrderingBadges}
+                    onChange={(event) => setShowThumbnailOrderingBadges(event.target.checked)}
+                  />
+                  Ordering
+                </label>
                 <span style={filterSubsectionTitleStyle}>Panel Visibility</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -13627,6 +13709,7 @@ export default function App() {
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
+                          orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
@@ -13661,6 +13744,7 @@ export default function App() {
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
+                          orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
@@ -13703,6 +13787,7 @@ export default function App() {
                     showAiQueueBadge={showThumbnailEditQueueBadges}
                     showEditedImportBadge={showThumbnailEditedImportBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
+                          orderingBadge={getOrderingBadgeForAsset(asset)}
                     isInAiQueue={editQueueAssetIdSet.has(asset.id)}
                     touchSelectionMode={touchSelectionMode}
                     onCardClick={handleCardClick}

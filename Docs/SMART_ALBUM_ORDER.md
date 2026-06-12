@@ -1,234 +1,133 @@
 # Smart Album Order
 
-This document describes what Tedography currently implements for album ordering and album-specific reordering.
+This document describes Tedography's interleaved album ordering model
+(Phases 0–4 of `ORDERING_PLAN.md`, implemented 2026-06).
 
 ## Purpose
 
-Tedography album ordering now uses a hybrid model:
+Album ordering uses a single timeline per album:
 
-- assets with a usable `captureDateTime` can still sort chronologically
-- assets without a usable `captureDateTime` can be manually ordered within an album
-- assets with a parseable but wrong `captureDateTime` can be forced into manual ordering for a specific album
+- assets with a trustworthy `captureDateTime` sort chronologically and keep
+  doing so automatically
+- any asset can be **manually placed** anywhere in that timeline — including
+  between two dated photos — by assigning it a virtual sort time
+- undated assets that have never been placed sort at the end of the album
 
-The goal is to make album browsing look more natural without requiring the user to first repair metadata.
+The goal: albums full of scans, phony dates, and real camera photos can be
+curated into one correct visual order without repairing metadata first.
 
-## Current Data Model
+## Data Model
 
-Album-specific ordering metadata lives on the media asset's album membership data.
-
-Current membership shape:
+Album-specific ordering metadata lives on the asset's album membership:
 
 ```ts
 albumMemberships?: Array<{
   albumId: string;
-  manualSortOrdinal?: number | null;
-  forceManualOrder?: boolean | null;
+  manualSortOrdinal?: number | null;   // legacy; tiebreaker for unseeded photos
+  forceManualOrder?: boolean | null;   // photo is manually placed in this album
+  manualSortTime?: number | null;      // virtual sort time (epoch ms, fractional ok)
 }>
 ```
 
-Meaning:
-
-- `albumId`: the album this membership metadata applies to
-- `manualSortOrdinal`: the asset's relative position in the album's manual-order section
-- `forceManualOrder`: if `true`, this asset uses manual ordering in that album even if it has a usable `captureDateTime`
-
-This is album-specific, not global. The same asset can use capture-time ordering in one album and manual ordering in another.
-
-## Current Smart Album Order Rules
-
-In album-scoped views, ordering currently works like this:
-
-1. Assets using capture-time ordering sort first by `captureDateTime` ascending.
-2. Assets using manual ordering sort after the capture-time section.
-3. Inside the manual section:
-   - `manualSortOrdinal` ascending
-   - then `importedAt`
-   - then `filename`
-   - then `id`
-
-An asset uses capture-time ordering in an album only when:
-
-- it belongs to that album
-- it has a usable `captureDateTime`
-- `forceManualOrder !== true` for that album
-
-An asset uses manual ordering in an album when either:
-
-- `forceManualOrder === true` for that album
-- or it does not have a usable `captureDateTime`
-
-## What the User Currently Sees
-
-### Album Results
-
-When browsing a single checked album, the visible asset order follows Smart Album Order.
-
-Effects the user will see:
-
-- dated assets appear first in chronological order
-- no-date assets appear after them
-- assets explicitly forced to manual order also appear in the manual section
-
-### Inspector
-
-When exactly one album is checked and exactly one asset is selected, the Inspector shows:
-
-- `Order in this Album: Capture Time`
-- `Order in this Album: Manual`
-- `Order in this Album: Manual (No Capture Time)`
-
-This is intentionally only shown in the unambiguous single-album context.
-
-### Toolbar Actions
-
-When exactly one album is checked and exactly one asset is selected, the secondary toolbar can show:
-
-- `Use Manual Order`
-- `Use Capture Time`
-- move to top
-- move up
-- move down
-- move to bottom
-
-Current behavior:
-
-- `Use Manual Order`
-  - available when the selected asset is currently using capture-time ordering in the checked album
-  - moves that asset into the album's manual section
-- `Use Capture Time`
-  - available when the selected asset is currently forced-manual in the checked album
-  - returns that asset to chronological ordering in that album
-- move controls
-  - available only for assets currently using manual ordering in the checked album
-
-## What the User Can Change Today
-
-### 1. Force an asset into manual ordering for an album
-
-In a single checked album:
-
-- select one asset
-- click `Use Manual Order`
-
-Result:
-
-- the asset leaves the chronological section for that album
-- it enters the manual section
-- if it did not already have a `manualSortOrdinal`, Tedography assigns one at the end of the current manual section
-- the change persists to MongoDB
-
-### 2. Return an asset to capture-time ordering
-
-In a single checked album:
-
-- select one asset that is currently forced-manual
-- click `Use Capture Time`
-
-Result:
-
-- the asset stops using manual ordering in that album
-- it re-enters chronological ordering based on `captureDateTime`
-- the change persists to MongoDB
-
-Current implementation choice:
-
-- `manualSortOrdinal` is preserved when switching back to capture-time ordering
-
-Reason:
-
-- this is simpler and less error-prone
-- if the user later switches the asset back to manual ordering, it can resume a stable prior position
-
-### 3. Reposition a manual-order asset
-
-In a single checked album:
-
-- select one asset that is currently using manual ordering
-- use the move buttons in the secondary toolbar
-
-Current supported moves:
-
-- move to top
-- move up
-- move down
-- move to bottom
-
-Alternatively, drag and drop in the grid:
-
-- drag a manual-section thumbnail and drop it onto another manual-section thumbnail
-- a blue indicator on the target's left or right edge shows whether the drop lands before or after it
-- capture-time assets are not draggable and cannot be drop targets
-
-Result:
-
-- only the manual section of that album is reordered
-- the updated `manualSortOrdinal` values persist to MongoDB
-
-## Current Scope and Limits
-
-This is intentionally a small, reliable slice.
-
-Current constraints:
-
-- best supported when exactly one album is checked
-- toolbar actions work only when exactly one asset is selected
-- drag-and-drop works only within the manual section of a single checked album
-- no explicit metadata-correction workflow yet
-- no explicit "capture time is wrong" flag yet
-- no thumbnail-level ordering badges were added, to keep the UI low-clutter
-
-Multi-album checked views are still intentionally conservative. Tedography does not try to invent a combined cross-album manual ordering model.
-
-## Backend / API Currently in Use
-
-Relevant routes:
-
-- `POST /api/albums/:id/manual-order`
-- `POST /api/albums/:id/ordering-mode`
-
-Conceptually:
-
-- `manual-order` persists reordered asset ids for the album's manual section
-- `ordering-mode` toggles `forceManualOrder` for a specific asset in a specific album
-
-## Likely Future Improvements
-
-The following would be natural next steps.
-
-### Better manual reordering UX
-
-- move before / move after specific item commands
-- keyboard shortcuts for manual section movement
-
-### Better visibility
-
-- subtle album-ordering hint in the action bar
-- optional lightweight thumbnail indicator in album-scoped views only
-- explicit grouping labels in the UI such as "Chronological" and "Manual"
-
-### Better handling of bad timestamps
-
-- an explicit per-album or per-asset "capture time should not be trusted" concept
-- a metadata repair workflow to update `captureDateTime`
-- side-by-side tooling to compare album ordering before/after metadata correction
-
-### Better multi-album behavior
-
-- clearer grouped display for multiple checked albums
-- more explicit handling of merged results when several albums are checked
-
-## Summary
-
-Tedography now supports a practical first version of Smart Album Order:
-
-- chronological ordering where timestamps are usable
-- manual ordering where timestamps are missing
-- manual override where timestamps are parseable but wrong
-- album-specific persistence of those choices
-
-The current UX is intentionally tight:
-
-- selected asset
-- single checked album
-- clear ordering status in the Inspector
-- simple toolbar actions to switch ordering mode and reposition manual items
+`manualSortTime` is a double, so a midpoint exists between any two distinct
+times — placement never requires renumbering neighbors. This is album-specific:
+the same asset can be chronological in one album and placed in another.
+
+## Ordering Rules
+
+Every asset gets one **effective sort time** (`getEffectiveAlbumSortTime` in
+`@tedography/shared`):
+
+1. placed photo (`forceManualOrder` + `manualSortTime`) → its virtual time
+2. chronological photo (usable `captureDateTime`, not forced) → its capture time
+3. undated photo with a `manualSortTime` (pinned) → its virtual time
+4. everything else → no time; sorts after all timed photos, ordered by the
+   legacy chain (`manualSortOrdinal`, `importedAt`, filename)
+
+Ties (e.g. identical-timestamp clumps) break by natural filename order —
+numeric-aware, with `(n)` download suffixes grouping as separate rolls — then id.
+
+## What the User Can Do
+
+All of this requires exactly one checked album.
+
+### Drag and drop (the primary gesture)
+
+- **Any photo is draggable and any photo is a drop target.** A blue edge
+  indicator shows whether the drop lands before (left) or after (right) the
+  target.
+- Dropping a photo **is** what converts it to manual placement; no mode toggle
+  needed first.
+- **Multi-select drag:** when the dragged photo is part of a multi-selection,
+  the whole selection moves as a block, preserving its display order. All block
+  members dim during the drag.
+- Dropping "after" a member of an identical-timestamp clump lands after the
+  whole clump (members of a clump are indistinguishable by time).
+
+### Order in Album menu (toolbar overflow)
+
+- **Use Manual Order** — pins the selected photos (multi-select OK) at their
+  current positions; nothing visibly moves. A dated photo pins at its capture
+  time; an undated one pins after everything timed.
+- **Use Capture Time** — returns the selection to chronological ordering.
+  `manualSortTime` is preserved so a later re-pin resumes the same position.
+- **Arrange by Filename** — sorts the selection by natural filename order
+  (rolls, numeric sequences) and re-places it as a block where the selection
+  starts. Combined with block drag this is the whole roll-curation workflow:
+  select roll → Arrange by Filename → drag block into position.
+- **Move to top / up / down / bottom** — single-photo repositioning across the
+  full album.
+
+### Capture-date trust commands (overflow menu)
+
+- **Mark Capture Date Wrong / Correct** — sets `captureDateTimeMarkedWrong` on
+  the selection without changing any dates. For genuine EXIF dates from a
+  camera whose clock was wrong.
+
+### Visibility
+
+- Inspector (single album + single asset): `Order in this Album`
+  (Capture Time / Manual / Manual (No Capture Time)), plus provenance under
+  Advanced: capture date source, camera, file EXIF date, marked-wrong flag.
+- Optional **Ordering** thumbnail badge (off by default, in the badge toggles):
+  amber `!` for suspect dates (`exif-weak`, `changed-after-import`, or
+  marked-wrong), blue pin for manually placed photos in the checked album.
+
+## Backend / API
+
+- `POST /api/albums/:id/place` — `{ assetIds, placeAfterAssetId }`; the server
+  computes virtual times (even spacing between distinct neighbors, clump-aware,
+  pin-on-demand when the anchor has no effective time) via
+  `apps/api/src/ordering/placementService.ts`.
+- `POST /api/albums/:id/ordering-mode` — `{ assetIds, forceManualOrder }`;
+  pin-in-place semantics.
+- `PATCH /api/assets/capture-date-marked-wrong` — `{ assetIds, markedWrong }`.
+
+The pre-interleaving `POST /api/albums/:id/manual-order` (ordinal rewriting)
+was removed. Legacy ordinals were migrated to seeded `manualSortTime` values by
+`pnpm manual-sort:migrate` (applied 2026-06-12; preserved the visible order).
+
+## Capture date provenance (context)
+
+Placement decisions lean on the provenance fields backfilled in Phase 1:
+`captureDateTimeSource` (`exif-original` / `exif-weak` / `changed-after-import`
+/ `manual` / `none`), `exifCaptureDateTime`, `cameraMake`/`cameraModel`, and
+the user-set `captureDateTimeMarkedWrong`. "Suspect" anywhere in the UI means
+`exif-weak` ∪ `changed-after-import` ∪ marked-wrong.
+
+## Scope and Limits
+
+- reordering requires exactly one checked album; multi-album views stay
+  conservative (no cross-album manual ordering model)
+- within an identical-timestamp clump, relative order is filename-based; to
+  fully control a clump's internal order, place its members (drag or Arrange
+  by Filename), which gives them distinct virtual times
+- placed photos hold absolute virtual times: correcting a neighbor's capture
+  date moves the neighbor, not the placed photo
+
+## Possible Future Improvements
+
+- keyboard shortcuts for repositioning
+- batch "shift capture dates by a known offset" for wrong-clock batches
+  (provenance and `exifCaptureDateTime` preserve what's needed)
+- metadata repair workflow with before/after comparison

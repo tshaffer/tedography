@@ -140,6 +140,23 @@ function formatDateTime(value: string | null | undefined): string {
   return parsed.toLocaleString();
 }
 
+function formatCaptureDateTimeSourceLabel(source: string): string {
+  switch (source) {
+    case 'exif-original':
+      return 'Camera EXIF (trusted)';
+    case 'exif-weak':
+      return 'File EXIF (weak pedigree)';
+    case 'changed-after-import':
+      return 'Changed after import';
+    case 'manual':
+      return 'Set manually in Tedography';
+    case 'none':
+      return 'No capture date';
+    default:
+      return source;
+  }
+}
+
 function formatDimensions(width?: number | null, height?: number | null): string {
   if (typeof width === 'number' && typeof height === 'number') {
     return `${width} × ${height}`;
@@ -301,11 +318,22 @@ export function AssetDetailsPanel({
     );
   }
 
+  const cameraLabel = [asset.cameraMake, asset.cameraModel].filter(Boolean).join(' ');
   const advancedRows: Array<{ label: string; value: string }> = [
     { label: 'Asset ID', value: formatValue(asset.id) },
     { label: 'Photo State', value: formatValue(asset.photoState) },
     { label: 'Dimensions', value: formatDimensions(asset.width, asset.height) },
     ...(albumOrderingModeLabel ? [{ label: 'Order in this Album', value: albumOrderingModeLabel }] : []),
+    ...(asset.captureDateTimeSource
+      ? [{ label: 'Capture Date Source', value: formatCaptureDateTimeSourceLabel(asset.captureDateTimeSource) }]
+      : []),
+    ...(asset.captureDateTimeMarkedWrong === true
+      ? [{ label: 'Capture Date Flag', value: 'Marked wrong by user' }]
+      : []),
+    ...(cameraLabel ? [{ label: 'Camera', value: cameraLabel }] : []),
+    ...(asset.exifCaptureDateTime
+      ? [{ label: 'File EXIF Date', value: formatDateTime(asset.exifCaptureDateTime) }]
+      : []),
     { label: 'Original Format', value: formatValue(asset.originalFileFormat) },
     { label: 'Original Root', value: formatValue(asset.originalStorageRootId) },
     { label: 'Original Path', value: formatValue(asset.originalArchivePath) },

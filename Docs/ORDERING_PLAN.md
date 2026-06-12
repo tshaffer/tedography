@@ -1,6 +1,7 @@
 # Plan: Flexible Photo Ordering Within Albums
 
-> Drafted 2026-06-12 with Claude. Status: Phases 0–3 complete (2026-06-12).
+> Drafted 2026-06-12 with Claude. Status: ALL PHASES (0–4) complete (2026-06-12).
+> Deferred: 2 gemini-file provenance anomalies; offset-shift tool; keyboard shortcuts.
 > Provenance backfilled (17,021 assets; 2 anomalies pending). Interleaved ordering live:
 > manualSortTime model, /place endpoint, drag-anywhere + block drag UI; migration seeded
 > 132 legacy manual photos in one album (mongodumps in ~/tedography-backups/).
