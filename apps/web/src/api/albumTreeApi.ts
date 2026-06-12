@@ -11,12 +11,13 @@ type AlbumMembershipRequest = {
   assetIds: string[];
 };
 
-type AlbumManualOrderRequest = {
-  orderedAssetIds: string[];
+type AlbumPlaceAssetsRequest = {
+  assetIds: string[];
+  placeAfterAssetId: string | null;
 };
 
 type AlbumOrderingModeRequest = {
-  assetId: string;
+  assetIds: string[];
   forceManualOrder: boolean;
 };
 
@@ -209,11 +210,11 @@ export async function moveAssetsToAlbum(
   return (await response.json()) as MediaAsset[];
 }
 
-export async function updateAlbumManualOrder(
+export async function placeAssetsInAlbum(
   albumId: string,
-  request: AlbumManualOrderRequest
+  request: AlbumPlaceAssetsRequest
 ): Promise<MediaAsset[]> {
-  const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/manual-order`, {
+  const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/place`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -230,7 +231,7 @@ export async function updateAlbumManualOrder(
 export async function updateAlbumOrderingMode(
   albumId: string,
   request: AlbumOrderingModeRequest
-): Promise<MediaAsset> {
+): Promise<MediaAsset[]> {
   const response = await fetch(`/api/albums/${encodeURIComponent(albumId)}/ordering-mode`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -242,7 +243,7 @@ export async function updateAlbumOrderingMode(
     throw new Error(buildErrorMessage(response.status, payload));
   }
 
-  return (await response.json()) as MediaAsset;
+  return (await response.json()) as MediaAsset[];
 }
 
 export async function addAlbumWriter(albumId: string, userId: string): Promise<AlbumTreeNode> {

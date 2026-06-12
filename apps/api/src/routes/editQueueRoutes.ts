@@ -421,6 +421,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         albumId,
         manualSortOrdinal: null,
         forceManualOrder: null,
+        manualSortTime: null,
       }));
       const albumIds = sourceAlbumIds;
 

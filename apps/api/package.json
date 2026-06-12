@@ -11,6 +11,7 @@
     "assets:verify": "tsx src/tools/assetIntegrityVerification.ts",
     "locations:backfill": "tsx src/tools/backfillAssetLocations.ts",
     "capture-provenance:backfill": "tsx src/tools/backfillCaptureProvenance.ts",
+    "manual-sort:migrate": "tsx src/tools/migrateManualSortTimes.ts",
     "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",
     "thumbnails:repair": "tsx src/tools/thumbnailMaintenance.ts --mode repair",
     "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",

@@ -301,6 +301,7 @@ export async function registerImportedFiles(input: {
           albumId: m.albumId,
           manualSortOrdinal: null,
           forceManualOrder: null,
+          manualSortTime: null,
         })),
         originalStorageRootId: root.id,
         originalArchivePath: normalizedRelativePath,

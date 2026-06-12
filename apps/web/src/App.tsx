@@ -84,7 +84,7 @@ import {
   setAlbumPeopleAssignmentStatus as setAlbumPeopleAssignmentStatusRequest,
   setAlbumReviewAssignmentStatus as setAlbumReviewAssignmentStatusRequest,
   updateAlbumTreeChildOrderMode,
-  updateAlbumManualOrder,
+  placeAssetsInAlbum,
   updateAlbumOrderingMode
 } from './api/albumTreeApi';
 import {
@@ -202,10 +202,7 @@ import {
 import {
   formatAlbumOrderingModeLabel,
   getAlbumOrderingModeInAlbum,
-  isForcedManualOrderInAlbum,
-  isManualOrderEligibleInAlbum,
-  sortAssetsForSmartAlbumOrder,
-  usesCaptureTimeOrderInAlbum
+  sortAssetsForSmartAlbumOrder
 } from '@tedography/shared';
 import type { ListAssetFaceDetectionsResponse, PeopleRecognitionRunSummary, ProcessPeopleAssetResponse } from '@tedography/shared';
 import { useAuth } from './context/AuthContext';
@@ -6137,50 +6134,35 @@ export default function App() {
     [checkedAlbumSections]
   );
   const singleCheckedAlbumId = singleCheckedAlbumSection?.albumId ?? null;
-  const manualOrderEligibleAssetsInCurrentAlbum = useMemo(() => {
-    if (!singleCheckedAlbumId || !singleCheckedAlbumSection) {
+  // With interleaved ordering, every photo in the single checked album is
+  // reorderable; the section's assets are already in display order.
+  const currentAlbumOrderedAssets = useMemo(
+    () => singleCheckedAlbumSection?.assets ?? [],
+    [singleCheckedAlbumSection]
+  );
+  const currentAlbumAssetIdSet = useMemo(
+    () => new Set(currentAlbumOrderedAssets.map((asset) => asset.id)),
+    [currentAlbumOrderedAssets]
+  );
+  const selectedAssetIdsInCurrentAlbum = useMemo(() => {
+    if (!singleCheckedAlbumId) {
       return [];
     }
 
-    return singleCheckedAlbumSection.assets.filter((asset) =>
-      isManualOrderEligibleInAlbum(asset, singleCheckedAlbumId)
-    );
-  }, [singleCheckedAlbumId, singleCheckedAlbumSection]);
-  const selectedManualOrderAsset = useMemo(() => {
-    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
-      return null;
-    }
-
-    return isManualOrderEligibleInAlbum(selectedAsset, singleCheckedAlbumId) ? selectedAsset : null;
-  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
-  const selectedAssetCanForceManualOrderInCurrentAlbum = useMemo(() => {
-    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
-      return false;
-    }
-
-    return usesCaptureTimeOrderInAlbum(selectedAsset, singleCheckedAlbumId);
-  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
-  const selectedAssetIsForcedManualInCurrentAlbum = useMemo(() => {
-    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
-      return false;
-    }
-
-    return isForcedManualOrderInAlbum(selectedAsset, singleCheckedAlbumId);
-  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
-  const selectedManualOrderAssetIndex = useMemo(() => {
-    if (!selectedManualOrderAsset) {
+    const selectedIdSet = new Set(selectedAssetIds);
+    // Keep display order so block placement preserves what the user sees.
+    return currentAlbumOrderedAssets
+      .filter((asset) => selectedIdSet.has(asset.id))
+      .map((asset) => asset.id);
+  }, [currentAlbumOrderedAssets, selectedAssetIds, singleCheckedAlbumId]);
+  const selectedAssetIndexInCurrentAlbum = useMemo(() => {
+    if (!selectedAsset) {
       return -1;
     }
 
-    return manualOrderEligibleAssetsInCurrentAlbum.findIndex(
-      (asset) => asset.id === selectedManualOrderAsset.id
-    );
-  }, [manualOrderEligibleAssetsInCurrentAlbum, selectedManualOrderAsset]);
-  const manualOrderEligibleAssetIdSet = useMemo(
-    () => new Set(manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id)),
-    [manualOrderEligibleAssetsInCurrentAlbum]
-  );
-  // Drag-and-drop reordering of the manual section within a single checked album.
+    return currentAlbumOrderedAssets.findIndex((asset) => asset.id === selectedAsset.id);
+  }, [currentAlbumOrderedAssets, selectedAsset]);
+  // Drag-and-drop reordering within a single checked album.
   const [manualOrderDragAssetId, setManualOrderDragAssetId] = useState<string | null>(null);
   const [manualOrderDropTarget, setManualOrderDropTarget] = useState<{
     assetId: string;
@@ -6216,14 +6198,6 @@ export default function App() {
       getAlbumOrderingModeInAlbum(selectedAsset, singleCheckedAlbumId)
     );
   }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
-  const selectedAssetAlbumOrderingMode = useMemo(() => {
-    if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
-      return null;
-    }
-
-    return getAlbumOrderingModeInAlbum(selectedAsset, singleCheckedAlbumId);
-  }, [selectedAsset, selectedAssetIds.length, singleCheckedAlbumId]);
-
   const compareAssets = useMemo(
     () => visibleAssets.filter((asset) => selectedAssetIds.includes(asset.id)),
     [visibleAssets, selectedAssetIds]
@@ -6666,35 +6640,31 @@ export default function App() {
   const showDetailsPanels = detailsPanelsVisible;
   const selectionCount = selectedAssetIds.length;
   const hasSelectedAssets = selectionCount > 0;
-  const canToggleSelectedAssetOrderingModeInCurrentAlbum =
+  const canSetOrderingModeForCurrentAlbumSelection =
     isAlbumsMode &&
     singleCheckedAlbumId !== null &&
-    selectedAssetIds.length === 1 &&
-    selectedAsset !== null &&
-    ((selectedAsset.albumIds ?? []).includes(singleCheckedAlbumId)) &&
-    (selectedAssetAlbumOrderingMode === 'capture-time' || selectedAssetAlbumOrderingMode === 'manual');
+    selectedAssetIdsInCurrentAlbum.length > 0;
   const canManuallyReorderCurrentAlbumSelection =
     isAlbumsMode &&
     singleCheckedAlbumId !== null &&
-    selectedManualOrderAsset !== null &&
-    manualOrderEligibleAssetsInCurrentAlbum.length > 1;
+    selectedAssetIds.length === 1 &&
+    selectedAssetIndexInCurrentAlbum >= 0 &&
+    currentAlbumOrderedAssets.length > 1;
   const canDragReorderInCurrentAlbum =
     isAlbumsMode &&
     singleCheckedAlbumId !== null &&
-    manualOrderEligibleAssetsInCurrentAlbum.length > 1 &&
+    currentAlbumOrderedAssets.length > 1 &&
     !touchSelectionMode;
   const canMoveCurrentAlbumSelectionToTop =
-    canManuallyReorderCurrentAlbumSelection && selectedManualOrderAssetIndex > 0;
+    canManuallyReorderCurrentAlbumSelection && selectedAssetIndexInCurrentAlbum > 0;
   const canMoveCurrentAlbumSelectionUp =
-    canManuallyReorderCurrentAlbumSelection && selectedManualOrderAssetIndex > 0;
+    canManuallyReorderCurrentAlbumSelection && selectedAssetIndexInCurrentAlbum > 0;
   const canMoveCurrentAlbumSelectionDown =
     canManuallyReorderCurrentAlbumSelection &&
-    selectedManualOrderAssetIndex >= 0 &&
-    selectedManualOrderAssetIndex < manualOrderEligibleAssetsInCurrentAlbum.length - 1;
+    selectedAssetIndexInCurrentAlbum < currentAlbumOrderedAssets.length - 1;
   const canMoveCurrentAlbumSelectionToBottom =
     canManuallyReorderCurrentAlbumSelection &&
-    selectedManualOrderAssetIndex >= 0 &&
-    selectedManualOrderAssetIndex < manualOrderEligibleAssetsInCurrentAlbum.length - 1;
+    selectedAssetIndexInCurrentAlbum < currentAlbumOrderedAssets.length - 1;
   const checkedAlbumScopeAssetIds = useMemo(
     () => Array.from(new Set(checkedAlbumSections.flatMap((section) => section.assets.map((asset) => asset.id)))),
     [checkedAlbumSections]
@@ -7830,54 +7800,62 @@ export default function App() {
   async function handleMoveSelectedAssetWithinAlbum(
     destination: 'top' | 'up' | 'down' | 'bottom'
   ): Promise<void> {
-    if (!singleCheckedAlbumId || !selectedManualOrderAsset) {
+    if (!singleCheckedAlbumId || !selectedAsset || !canManuallyReorderCurrentAlbumSelection) {
       return;
     }
 
-    const currentOrder = manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id);
-    const currentIndex = currentOrder.indexOf(selectedManualOrderAsset.id);
+    const currentOrder = currentAlbumOrderedAssets.map((asset) => asset.id);
+    const currentIndex = currentOrder.indexOf(selectedAsset.id);
     if (currentIndex < 0 || currentOrder.length < 2) {
       return;
     }
 
-    let nextIndex = currentIndex;
+    if ((destination === 'top' || destination === 'up') && currentIndex === 0) {
+      return;
+    }
+    if ((destination === 'bottom' || destination === 'down') && currentIndex === currentOrder.length - 1) {
+      return;
+    }
+
+    // Indices below are in "remaining" coordinates (order without the moved asset);
+    // elements before the moved asset keep their indices, later ones shift down one.
+    const remaining = currentOrder.filter((assetId) => assetId !== selectedAsset.id);
+    let placeAfterAssetId: string | null;
     switch (destination) {
       case 'top':
-        nextIndex = 0;
+        placeAfterAssetId = null;
         break;
       case 'up':
-        nextIndex = Math.max(0, currentIndex - 1);
+        placeAfterAssetId = currentIndex >= 2 ? (remaining[currentIndex - 2] ?? null) : null;
         break;
       case 'down':
-        nextIndex = Math.min(currentOrder.length - 1, currentIndex + 1);
+        placeAfterAssetId = remaining[currentIndex] ?? null;
         break;
       case 'bottom':
-        nextIndex = currentOrder.length - 1;
+        placeAfterAssetId = remaining[remaining.length - 1] ?? null;
         break;
     }
 
-    if (nextIndex === currentIndex) {
-      return;
-    }
-
-    const reorderedAssetIds = moveArrayItem(currentOrder, currentIndex, nextIndex);
-    await applyAlbumManualOrder(reorderedAssetIds, selectedManualOrderAsset.id);
+    await applyAlbumPlacement([selectedAsset.id], placeAfterAssetId);
   }
 
-  async function applyAlbumManualOrder(
-    reorderedAssetIds: string[],
-    movedAssetId: string
+  async function applyAlbumPlacement(
+    movedAssetIds: string[],
+    placeAfterAssetId: string | null
   ): Promise<void> {
-    if (!singleCheckedAlbumId) {
+    if (!singleCheckedAlbumId || movedAssetIds.length === 0) {
       return;
     }
 
-    setAssetUpdating(movedAssetId, true);
+    for (const assetId of movedAssetIds) {
+      setAssetUpdating(assetId, true);
+    }
     setUpdateError(null);
 
     try {
-      const updatedAssets = await updateAlbumManualOrder(singleCheckedAlbumId, {
-        orderedAssetIds: reorderedAssetIds
+      const updatedAssets = await placeAssetsInAlbum(singleCheckedAlbumId, {
+        assetIds: movedAssetIds,
+        placeAfterAssetId
       });
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
       setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
@@ -7891,15 +7869,29 @@ export default function App() {
       }
     } catch (error: unknown) {
       setUpdateError(
-        error instanceof Error ? error.message : 'Failed to reorder the selected album asset'
+        error instanceof Error ? error.message : 'Failed to reorder the selected album assets'
       );
     } finally {
-      setAssetUpdating(movedAssetId, false);
+      for (const assetId of movedAssetIds) {
+        setAssetUpdating(assetId, false);
+      }
     }
   }
 
+  // When the dragged photo is part of a multi-selection, the whole selection
+  // moves as a block, preserving its display order.
+  function getDragBlockAssetIds(draggedAssetId: string): string[] {
+    if (
+      selectedAssetIdsInCurrentAlbum.length > 1 &&
+      selectedAssetIdsInCurrentAlbum.includes(draggedAssetId)
+    ) {
+      return selectedAssetIdsInCurrentAlbum;
+    }
+    return [draggedAssetId];
+  }
+
   function handleManualOrderCardDragStart(assetId: string): void {
-    if (!canDragReorderInCurrentAlbum || !manualOrderEligibleAssetIdSet.has(assetId)) {
+    if (!canDragReorderInCurrentAlbum || !currentAlbumAssetIdSet.has(assetId)) {
       return;
     }
 
@@ -7911,14 +7903,14 @@ export default function App() {
     event: ReactDragEvent<HTMLElement>,
     assetId: string
   ): void {
-    if (!manualOrderDragAssetId || !manualOrderEligibleAssetIdSet.has(assetId)) {
+    if (!manualOrderDragAssetId || !currentAlbumAssetIdSet.has(assetId)) {
       return;
     }
 
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
 
-    if (assetId === manualOrderDragAssetId) {
+    if (getDragBlockAssetIds(manualOrderDragAssetId).includes(assetId)) {
       setManualOrderDropTarget(null);
       return;
     }
@@ -7943,29 +7935,35 @@ export default function App() {
     setManualOrderDragAssetId(null);
     setManualOrderDropTarget(null);
 
-    if (draggedAssetId === assetId || !manualOrderEligibleAssetIdSet.has(assetId)) {
+    const blockAssetIds = getDragBlockAssetIds(draggedAssetId);
+    if (blockAssetIds.includes(assetId) || !currentAlbumAssetIdSet.has(assetId)) {
       return;
     }
 
-    const currentOrder = manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id);
-    const fromIndex = currentOrder.indexOf(draggedAssetId);
-    const targetIndex = currentOrder.indexOf(assetId);
-    if (fromIndex < 0 || targetIndex < 0) {
+    const currentOrder = currentAlbumOrderedAssets.map((id) => id.id);
+    const remaining = currentOrder.filter((id) => !blockAssetIds.includes(id));
+    const targetIndex = remaining.indexOf(assetId);
+    if (targetIndex < 0) {
       return;
     }
 
     const edge = dropTarget?.assetId === assetId ? dropTarget.edge : 'left';
-    let toIndex = edge === 'left' ? targetIndex : targetIndex + 1;
-    if (fromIndex < toIndex) {
-      toIndex -= 1;
-    }
+    const placeAfterAssetId =
+      edge === 'left' ? (targetIndex > 0 ? (remaining[targetIndex - 1] ?? null) : null) : assetId;
 
-    if (toIndex === fromIndex) {
+    // Skip drops that would not change the visible order.
+    const insertionIndex =
+      placeAfterAssetId === null ? 0 : remaining.indexOf(placeAfterAssetId) + 1;
+    const simulatedOrder = [
+      ...remaining.slice(0, insertionIndex),
+      ...blockAssetIds,
+      ...remaining.slice(insertionIndex)
+    ];
+    if (simulatedOrder.every((id, index) => id === currentOrder[index])) {
       return;
     }
 
-    const reorderedAssetIds = moveArrayItem(currentOrder, fromIndex, toIndex);
-    void applyAlbumManualOrder(reorderedAssetIds, draggedAssetId);
+    void applyAlbumPlacement(blockAssetIds, placeAfterAssetId);
   }
 
   function handleManualOrderCardDragEnd(): void {
@@ -7974,32 +7972,40 @@ export default function App() {
   }
 
   async function handleSetSelectedAssetAlbumOrderingMode(forceManualOrder: boolean): Promise<void> {
-    if (!singleCheckedAlbumId || !selectedAsset || selectedAssetIds.length !== 1) {
+    if (!singleCheckedAlbumId || selectedAssetIdsInCurrentAlbum.length === 0) {
       return;
     }
 
-    setAssetUpdating(selectedAsset.id, true);
+    const assetIds = selectedAssetIdsInCurrentAlbum;
+    for (const assetId of assetIds) {
+      setAssetUpdating(assetId, true);
+    }
     setUpdateError(null);
 
     try {
-      const updatedAsset = await updateAlbumOrderingMode(singleCheckedAlbumId, {
-        assetId: selectedAsset.id,
+      const updatedAssets = await updateAlbumOrderingMode(singleCheckedAlbumId, {
+        assetIds,
         forceManualOrder
       });
-      setAssets((previous) =>
-        previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
-      );
-      setSelectedAssetDetails((previous) =>
-        previous && previous.id === updatedAsset.id ? { ...previous, ...updatedAsset } : previous
-      );
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+      if (selectedAssetId && updatesById.has(selectedAssetId)) {
+        setSelectedAssetDetails((previous) =>
+          previous && previous.id === selectedAssetId
+            ? { ...previous, ...(updatesById.get(selectedAssetId) ?? previous) }
+            : previous
+        );
+      }
     } catch (error: unknown) {
       setUpdateError(
         error instanceof Error
           ? error.message
-          : 'Failed to update album ordering mode for the selected asset'
+          : 'Failed to update album ordering mode for the selection'
       );
     } finally {
-      setAssetUpdating(selectedAsset.id, false);
+      for (const assetId of assetIds) {
+        setAssetUpdating(assetId, false);
+      }
     }
   }
 
@@ -13156,26 +13162,34 @@ export default function App() {
                             right: `${orderInAlbumMenuPosition.right}px`
                           }}
                         >
-                          {canToggleSelectedAssetOrderingModeInCurrentAlbum ? (
-                            <button
-                              type="button"
-                              className="tdg-overflow-item"
-                              onClick={() => {
-                                void handleSetSelectedAssetAlbumOrderingMode(selectedAssetAlbumOrderingMode === 'capture-time');
-                                setOrderInAlbumMenuOpen(false);
-                                setToolbarOverflowOpen(false);
-                              }}
-                              title={
-                                selectedAssetAlbumOrderingMode === 'manual'
-                                  ? 'Use capture-time ordering for the selected photo in this album'
-                                  : 'Force the selected photo to use manual ordering in this album'
-                              }
-                            >
-                              {selectedAssetAlbumOrderingMode === 'manual' ? 'Use Capture Time' : 'Use Manual Order'}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => {
+                              void handleSetSelectedAssetAlbumOrderingMode(true);
+                              setOrderInAlbumMenuOpen(false);
+                              setToolbarOverflowOpen(false);
+                            }}
+                            disabled={!canSetOrderingModeForCurrentAlbumSelection}
+                            title="Pin the selected photos at their current positions; they keep that order until you move them"
+                          >
+                            Use Manual Order
+                          </button>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => {
+                              void handleSetSelectedAssetAlbumOrderingMode(false);
+                              setOrderInAlbumMenuOpen(false);
+                              setToolbarOverflowOpen(false);
+                            }}
+                            disabled={!canSetOrderingModeForCurrentAlbumSelection}
+                            title="Return the selected photos to capture-time ordering"
+                          >
+                            Use Capture Time
+                          </button>
                           <div className="tdg-overflow-icon-row">
-                            <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one manually ordered photo to reorder'}>
+                            <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one photo to reorder'}>
                               <span>
                                 <button
                                   type="button"
@@ -13188,7 +13202,7 @@ export default function App() {
                                 </button>
                               </span>
                             </Tooltip>
-                            <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move up' : 'Select one manually ordered photo to reorder'}>
+                            <Tooltip title={canMoveCurrentAlbumSelectionUp ? 'Move up' : 'Select one photo to reorder'}>
                               <span>
                                 <button
                                   type="button"
@@ -13201,7 +13215,7 @@ export default function App() {
                                 </button>
                               </span>
                             </Tooltip>
-                            <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move down' : 'Select one manually ordered photo to reorder'}>
+                            <Tooltip title={canMoveCurrentAlbumSelectionDown ? 'Move down' : 'Select one photo to reorder'}>
                               <span>
                                 <button
                                   type="button"
@@ -13214,7 +13228,7 @@ export default function App() {
                                 </button>
                               </span>
                             </Tooltip>
-                            <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move to end of album' : 'Select one manually ordered photo to reorder'}>
+                            <Tooltip title={canMoveCurrentAlbumSelectionToBottom ? 'Move to end of album' : 'Select one photo to reorder'}>
                               <span>
                                 <button
                                   type="button"
@@ -13571,9 +13585,15 @@ export default function App() {
                           onCardDoubleClick={openImmersiveForAsset}
                           onLongPress={handleLongPress}
                           manualOrderDragEnabled={
-                            canDragReorderInCurrentAlbum && manualOrderEligibleAssetIdSet.has(asset.id)
+                            canDragReorderInCurrentAlbum && currentAlbumAssetIdSet.has(asset.id)
                           }
-                          isManualOrderDragSource={manualOrderDragAssetId === asset.id}
+                          isManualOrderDragSource={
+                            manualOrderDragAssetId !== null &&
+                            (manualOrderDragAssetId === asset.id ||
+                              (selectedAssetIdsInCurrentAlbum.length > 1 &&
+                                selectedAssetIdsInCurrentAlbum.includes(manualOrderDragAssetId) &&
+                                selectedAssetIdsInCurrentAlbum.includes(asset.id)))
+                          }
                           manualOrderDropEdge={
                             manualOrderDropTarget?.assetId === asset.id ? manualOrderDropTarget.edge : null
                           }
@@ -13607,9 +13627,15 @@ export default function App() {
                     onCardDoubleClick={openImmersiveForAsset}
                     onLongPress={handleLongPress}
                     manualOrderDragEnabled={
-                      canDragReorderInCurrentAlbum && manualOrderEligibleAssetIdSet.has(asset.id)
+                      canDragReorderInCurrentAlbum && currentAlbumAssetIdSet.has(asset.id)
                     }
-                    isManualOrderDragSource={manualOrderDragAssetId === asset.id}
+                    isManualOrderDragSource={
+                      manualOrderDragAssetId !== null &&
+                      (manualOrderDragAssetId === asset.id ||
+                        (selectedAssetIdsInCurrentAlbum.length > 1 &&
+                          selectedAssetIdsInCurrentAlbum.includes(manualOrderDragAssetId) &&
+                          selectedAssetIdsInCurrentAlbum.includes(asset.id)))
+                    }
                     manualOrderDropEdge={
                       manualOrderDropTarget?.assetId === asset.id ? manualOrderDropTarget.edge : null
                     }

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareFilenamesNatural, sortAssetsForSmartAlbumOrder } from '@tedography/shared';
+import {
+  compareFilenamesNatural,
+  getEffectiveAlbumSortTime,
+  sortAssetsForSmartAlbumOrder
+} from '@tedography/shared';
 import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
 
 function sortFilenames(filenames: string[]): string[] {
@@ -68,6 +72,90 @@ test('sortAssetsForSmartAlbumOrder breaks identical capture-time ties with natur
   assert.deepEqual(
     sorted.map((asset) => asset.filename),
     ['Agf00001.jpg', 'Agf00002.jpg', 'Agf00010.jpg']
+  );
+});
+
+test('a placed photo interleaves between capture-time photos at its manualSortTime', () => {
+  const assets = [
+    makeAsset({ id: 'jan', filename: 'jan.jpg', captureDateTime: '1998-01-05T12:00:00.000Z' }),
+    makeAsset({ id: 'mar', filename: 'mar.jpg', captureDateTime: '1998-03-10T12:00:00.000Z' }),
+    makeAsset({
+      id: 'placed',
+      filename: 'undated-roll.jpg',
+      albumMemberships: [
+        {
+          albumId: 'album-1',
+          manualSortOrdinal: null,
+          forceManualOrder: true,
+          manualSortTime: Date.parse('1998-02-01T00:00:00.000Z')
+        }
+      ]
+    })
+  ];
+
+  const sorted = sortAssetsForSmartAlbumOrder(assets, 'album-1');
+  assert.deepEqual(
+    sorted.map((asset) => asset.id),
+    ['jan', 'placed', 'mar']
+  );
+});
+
+test('a dated photo dragged to a manual position sorts by its manualSortTime, not its date', () => {
+  const assets = [
+    makeAsset({ id: 'a', filename: 'a.jpg', captureDateTime: '1998-01-01T00:00:00.000Z' }),
+    makeAsset({
+      id: 'moved',
+      filename: 'moved.jpg',
+      captureDateTime: '1998-12-31T00:00:00.000Z',
+      albumMemberships: [
+        {
+          albumId: 'album-1',
+          manualSortOrdinal: null,
+          forceManualOrder: true,
+          manualSortTime: Date.parse('1998-01-02T00:00:00.000Z')
+        }
+      ]
+    }),
+    makeAsset({ id: 'b', filename: 'b.jpg', captureDateTime: '1998-06-01T00:00:00.000Z' })
+  ];
+
+  const sorted = sortAssetsForSmartAlbumOrder(assets, 'album-1');
+  assert.deepEqual(
+    sorted.map((asset) => asset.id),
+    ['a', 'moved', 'b']
+  );
+});
+
+test('an undated pinned photo uses its manualSortTime even without forceManualOrder', () => {
+  const pinned = makeAsset({
+    id: 'pinned',
+    filename: 'pinned.jpg',
+    albumMemberships: [
+      { albumId: 'album-1', manualSortOrdinal: null, forceManualOrder: null, manualSortTime: 1000 }
+    ]
+  });
+  assert.equal(getEffectiveAlbumSortTime(pinned, 'album-1'), 1000);
+});
+
+test('legacy manual photos without manualSortTime stay after all timed photos, ordered by ordinal', () => {
+  const assets = [
+    makeAsset({
+      id: 'legacy-2',
+      filename: 'legacy-2.jpg',
+      albumMemberships: [{ albumId: 'album-1', manualSortOrdinal: 1, forceManualOrder: true }]
+    }),
+    makeAsset({ id: 'dated', filename: 'dated.jpg', captureDateTime: '2020-01-01T00:00:00.000Z' }),
+    makeAsset({
+      id: 'legacy-1',
+      filename: 'legacy-1.jpg',
+      albumMemberships: [{ albumId: 'album-1', manualSortOrdinal: 0, forceManualOrder: true }]
+    })
+  ];
+
+  const sorted = sortAssetsForSmartAlbumOrder(assets, 'album-1');
+  assert.deepEqual(
+    sorted.map((asset) => asset.id),
+    ['dated', 'legacy-1', 'legacy-2']
   );
 });
 

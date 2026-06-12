@@ -1,8 +1,10 @@
 # Plan: Flexible Photo Ordering Within Albums
 
-> Drafted 2026-06-12 with Claude. Status: Phases 0 and 1 complete (2026-06-12).
-> Provenance backfill applied to all 17,021 classifiable assets (mongodump taken first;
-> 2 anomalies pending). Next: Phase 2 (interleaved ordering model).
+> Drafted 2026-06-12 with Claude. Status: Phases 0, 1, and 2 complete (2026-06-12).
+> Provenance backfilled (17,021 assets; 2 anomalies pending). Interleaved ordering live:
+> manualSortTime model, /place endpoint, drag-anywhere + block drag UI; migration seeded
+> 132 legacy manual photos in one album (mongodumps in ~/tedography-backups/).
+> Next: Phase 3 (bulk tools — filename sequences, mark-wrong command).
 
 ## Goal State
 

@@ -26,8 +26,14 @@ export type CaptureDateTimeSource =
 
 export interface MediaAssetAlbumMembership {
   albumId: string;
+  // Legacy two-bucket ordering (pre-interleaving); still used as a fallback
+  // tiebreaker for memberships that have no manualSortTime.
   manualSortOrdinal?: number | null;
   forceManualOrder?: boolean | null;
+  // Virtual sort timestamp (epoch ms; fractional values allowed so midpoints
+  // between any two distinct times always exist). A photo with a manualSortTime
+  // sorts interleaved with capture-time photos at this instant.
+  manualSortTime?: number | null;
 }
 
 export interface MediaAssetPerson {

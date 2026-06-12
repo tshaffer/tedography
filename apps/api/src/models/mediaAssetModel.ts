@@ -74,7 +74,8 @@ const mediaAssetSchema = new Schema<MediaAsset>(
           {
             albumId: { type: String, required: true, trim: true },
             manualSortOrdinal: { type: Number, required: false },
-            forceManualOrder: { type: Boolean, required: false }
+            forceManualOrder: { type: Boolean, required: false },
+            manualSortTime: { type: Number, required: false }
           },
           { _id: false }
         )

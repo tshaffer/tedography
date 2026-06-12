@@ -136,25 +136,59 @@ export function compareFilenamesNatural(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
+/**
+ * The single effective sort key for a photo within an album:
+ * - an explicitly placed photo (forceManualOrder + manualSortTime) sorts at its
+ *   virtual time, interleaved with chronological photos;
+ * - a chronological photo sorts at its real captureDateTime;
+ * - an undated photo that has been pinned (manualSortTime without a capture date)
+ *   sorts at its virtual time;
+ * - everything else (legacy manual photos without a manualSortTime, undated
+ *   unplaced photos) returns null and sorts after all timed photos, ordered by
+ *   the legacy chain (manualSortOrdinal, importedAt, filename).
+ */
+export function getEffectiveAlbumSortTime(asset: MediaAsset, albumId: string): number | null {
+  const membership = getAlbumMembership(asset, albumId);
+  const capture = getUsableCaptureTimestamp(asset);
+  const manualSortTime =
+    typeof membership?.manualSortTime === 'number' && Number.isFinite(membership.manualSortTime)
+      ? membership.manualSortTime
+      : null;
+  const forced = membership?.forceManualOrder === true;
+
+  if (forced && manualSortTime !== null) {
+    return manualSortTime;
+  }
+
+  if (!forced && capture !== null) {
+    return capture;
+  }
+
+  if (capture === null && manualSortTime !== null) {
+    return manualSortTime;
+  }
+
+  return null;
+}
+
 export function sortAssetsForSmartAlbumOrder(
   assets: MediaAsset[],
   albumId: string
 ): MediaAsset[] {
   return [...assets].sort((left, right) => {
-    const leftCapture = getUsableCaptureTimestamp(left);
-    const rightCapture = getUsableCaptureTimestamp(right);
-    const leftUsesCaptureTime = leftCapture !== null && !isForcedManualOrderInAlbum(left, albumId);
-    const rightUsesCaptureTime = rightCapture !== null && !isForcedManualOrderInAlbum(right, albumId);
+    const leftTime = getEffectiveAlbumSortTime(left, albumId);
+    const rightTime = getEffectiveAlbumSortTime(right, albumId);
 
-    if (leftUsesCaptureTime && rightUsesCaptureTime) {
-      if (leftCapture !== rightCapture) {
-        return leftCapture - rightCapture;
+    if (leftTime !== null && rightTime !== null) {
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
       }
-    } else if (leftUsesCaptureTime && !rightUsesCaptureTime) {
+    } else if (leftTime !== null) {
       return -1;
-    } else if (!leftUsesCaptureTime && rightUsesCaptureTime) {
+    } else if (rightTime !== null) {
       return 1;
     } else {
+      // Legacy / unplaced section: preserve the historical ordering chain.
       const leftManualOrder = getAlbumMembership(left, albumId)?.manualSortOrdinal;
       const rightManualOrder = getAlbumMembership(right, albumId)?.manualSortOrdinal;
       const leftHasManualOrder = typeof leftManualOrder === 'number' && Number.isFinite(leftManualOrder);

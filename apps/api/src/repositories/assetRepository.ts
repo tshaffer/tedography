@@ -9,7 +9,7 @@ import {
   type DisplayStorageType,
   type MediaAsset
 } from '@tedography/domain';
-import { isManualOrderEligibleInAlbum } from '@tedography/shared';
+import { getEffectiveAlbumSortTime, hasUsableCaptureDateTime } from '@tedography/shared';
 import { randomUUID } from 'node:crypto';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
@@ -40,7 +40,11 @@ function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
               : null,
           forceManualOrder:
             (membership as MediaAssetAlbumMembership & { forceManualOrder?: boolean | null })
-              .forceManualOrder === true
+              .forceManualOrder === true,
+          manualSortTime:
+            typeof membership.manualSortTime === 'number' && Number.isFinite(membership.manualSortTime)
+              ? membership.manualSortTime
+              : null
         }))
         .sort((left, right) => left.albumId.localeCompare(right.albumId))
     : [];
@@ -877,7 +881,12 @@ export async function moveAssetsToAlbum(assetIds: string[], albumId: string): Pr
                         Number.isFinite(destinationMembership.manualSortOrdinal)
                           ? destinationMembership.manualSortOrdinal
                           : null,
-                      forceManualOrder: destinationMembership.forceManualOrder === true
+                      forceManualOrder: destinationMembership.forceManualOrder === true,
+                      manualSortTime:
+                        typeof destinationMembership.manualSortTime === 'number' &&
+                        Number.isFinite(destinationMembership.manualSortTime)
+                          ? destinationMembership.manualSortTime
+                          : null
                     }
                   ]
                 : []
@@ -912,32 +921,49 @@ export async function removeAlbumIdFromAllAssets(albumId: string): Promise<void>
   );
 }
 
-export async function updateAlbumManualSortOrdinals(
+export async function findAssetsByAlbumId(albumId: string): Promise<MediaAsset[]> {
+  const assets = await MediaAssetModel.find({ albumIds: albumId }, { _id: 0 }).lean<MediaAsset[]>();
+  return normalizeMediaAssets(assets);
+}
+
+/**
+ * Persist virtual sort times computed by the placement service. Sets
+ * forceManualOrder on each placed membership; other membership fields are
+ * preserved.
+ */
+export async function applyAlbumPlacementUpdates(
   albumId: string,
-  orderedAssetIds: string[]
+  updates: Array<{ assetId: string; manualSortTime: number }>
 ): Promise<MediaAsset[]> {
-  if (orderedAssetIds.length === 0) {
+  if (updates.length === 0) {
     return [];
   }
 
-  const assets = await findByIds(orderedAssetIds);
+  const assetIds = updates.map((update) => update.assetId);
+  const assets = await findByIds(assetIds);
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
 
   await MediaAssetModel.bulkWrite(
-    orderedAssetIds.map((assetId, index) => {
-      const asset = assetsById.get(assetId);
-      const otherMemberships = (asset?.albumMemberships ?? []).filter((membership) => membership.albumId !== albumId);
+    updates.map((update) => {
+      const asset = assetsById.get(update.assetId);
+      const otherMemberships = (asset?.albumMemberships ?? []).filter(
+        (membership) => membership.albumId !== albumId
+      );
+      const currentMembership = asset?.albumMemberships?.find(
+        (membership) => membership.albumId === albumId
+      );
       return {
         updateOne: {
-          filter: { id: assetId },
+          filter: { id: update.assetId },
           update: {
             $set: {
               albumMemberships: [
                 ...otherMemberships,
                 {
                   albumId,
-                  manualSortOrdinal: index,
-                  forceManualOrder: true
+                  manualSortOrdinal: currentMembership?.manualSortOrdinal ?? null,
+                  forceManualOrder: true,
+                  manualSortTime: update.manualSortTime
                 }
               ]
             }
@@ -945,67 +971,84 @@ export async function updateAlbumManualSortOrdinals(
           runValidators: true
         }
       };
-    })
+    }),
+    { ordered: false }
   );
 
-  return findByIds(orderedAssetIds);
+  return findByIds(assetIds);
 }
 
+/**
+ * Toggle ordering mode for one or more assets in an album. Switching to manual
+ * pins each photo at its current effective position (its capture time when it
+ * has one, otherwise after everything timed in the album), so the toggle never
+ * visibly moves the photo. Switching back to capture time preserves
+ * manualSortTime so a later re-toggle resumes the same manual position.
+ */
 export async function updateAlbumMembershipOrderingMode(
   albumId: string,
-  assetId: string,
+  assetIds: string[],
   forceManualOrder: boolean
-): Promise<MediaAsset | null> {
-  const asset = await findById(assetId);
-  if (!asset) {
-    return null;
+): Promise<MediaAsset[]> {
+  const assets = await findByIds(assetIds);
+  if (assets.length === 0) {
+    return [];
   }
 
-  const otherMemberships = (asset.albumMemberships ?? []).filter(
-    (membership) => membership.albumId !== albumId
-  );
-  const currentMembership = asset.albumMemberships?.find((membership) => membership.albumId === albumId);
+  let nextOpenEndTime: number | null = null;
+  if (forceManualOrder) {
+    const albumAssets = await findAssetsByAlbumId(albumId);
+    const maxEffectiveTime = albumAssets.reduce<number | null>((max, albumAsset) => {
+      const time = getEffectiveAlbumSortTime(albumAsset, albumId);
+      return time !== null && (max === null || time > max) ? time : max;
+    }, null);
+    nextOpenEndTime = (maxEffectiveTime ?? Date.now()) + 1000;
+  }
 
-  let nextManualSortOrdinal = currentMembership?.manualSortOrdinal ?? null;
-  if (forceManualOrder && nextManualSortOrdinal === null) {
-    const albumAssets = await MediaAssetModel.find(
-      { albumIds: albumId },
-      { _id: 0 }
-    ).lean<MediaAsset[]>();
-    const maxManualSortOrdinal = albumAssets.reduce<number>(
-      (maxValue: number, albumAsset: MediaAsset) => {
-        if (isManualOrderEligibleInAlbum(albumAsset, albumId)) {
-          const ordinal = albumAsset.albumMemberships?.find(
-            (candidate: MediaAssetAlbumMembership) => candidate.albumId === albumId
-          )?.manualSortOrdinal;
-          if (typeof ordinal === 'number' && Number.isFinite(ordinal)) {
-            return Math.max(maxValue, ordinal);
-          }
+  await MediaAssetModel.bulkWrite(
+    assets.map((asset) => {
+      const otherMemberships = (asset.albumMemberships ?? []).filter(
+        (membership) => membership.albumId !== albumId
+      );
+      const currentMembership = asset.albumMemberships?.find(
+        (membership) => membership.albumId === albumId
+      );
+
+      let nextManualSortTime = currentMembership?.manualSortTime ?? null;
+      if (forceManualOrder && nextManualSortTime === null) {
+        const captureTime = hasUsableCaptureDateTime(asset.captureDateTime)
+          ? new Date(asset.captureDateTime as string).getTime()
+          : null;
+        if (captureTime !== null) {
+          nextManualSortTime = captureTime;
+        } else if (nextOpenEndTime !== null) {
+          nextManualSortTime = nextOpenEndTime;
+          nextOpenEndTime += 1000;
         }
-
-        return maxValue;
-      },
-      -1
-    );
-    nextManualSortOrdinal = maxManualSortOrdinal + 1;
-  }
-
-  await MediaAssetModel.updateOne(
-    { id: assetId },
-    {
-      $set: {
-        albumMemberships: [
-          ...otherMemberships,
-          {
-            albumId,
-            manualSortOrdinal: nextManualSortOrdinal,
-            forceManualOrder
-          }
-        ]
       }
-    },
-    { runValidators: true }
+
+      return {
+        updateOne: {
+          filter: { id: asset.id },
+          update: {
+            $set: {
+              albumMemberships: [
+                ...otherMemberships,
+                {
+                  albumId,
+                  manualSortOrdinal: currentMembership?.manualSortOrdinal ?? null,
+                  forceManualOrder,
+                  manualSortTime: nextManualSortTime
+                }
+              ]
+            }
+          },
+          runValidators: true
+        }
+      };
+    }),
+    { ordered: false }
   );
 
-  return findById(assetId);
+  return findByIds(assetIds);
 }
