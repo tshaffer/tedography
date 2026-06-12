@@ -72,3 +72,16 @@ export async function updateAssetsCaptureDateTime(request: {
     body: JSON.stringify(request)
   });
 }
+
+export async function updateAssetsCaptureDateMarkedWrong(request: {
+  assetIds: string[];
+  markedWrong: boolean;
+}): Promise<MediaAsset[]> {
+  return fetchJson<MediaAsset[]>('/api/assets/capture-date-marked-wrong', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}

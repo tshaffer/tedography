@@ -24,6 +24,7 @@ import {
   getAssetPageForLibrary,
   updateCaptureDatesPreservingTimes,
   bulkUpdatePhotoState,
+  updateCaptureDateTimeMarkedWrong,
   updateCaptureDateTimes,
   updatePhotoState
 } from './repositories/assetRepository.js';
@@ -298,6 +299,36 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to update asset captureDateTime', error);
       res.status(500).json({ error: 'Failed to update asset capture date' });
+    }
+  });
+
+  app.patch('/api/assets/capture-date-marked-wrong', requireFeature('set-photo-state', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds)
+      ? body.assetIds.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      : [];
+  }), async (req, res) => {
+    const payload = req.body as { assetIds?: unknown; markedWrong?: unknown };
+    const assetIds = Array.isArray(payload.assetIds)
+      ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must contain at least one asset id' });
+      return;
+    }
+
+    if (typeof payload.markedWrong !== 'boolean') {
+      res.status(400).json({ error: 'markedWrong is required' });
+      return;
+    }
+
+    try {
+      const updatedAssets = await updateCaptureDateTimeMarkedWrong(assetIds, payload.markedWrong);
+      res.json(updatedAssets);
+    } catch (error) {
+      log.error('Failed to update captureDateTimeMarkedWrong', error);
+      res.status(500).json({ error: 'Failed to update capture date marked-wrong flag' });
     }
   });
 

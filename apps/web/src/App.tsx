@@ -95,7 +95,8 @@ import {
   rotateAssetClockwise,
   rotateAssetCounterclockwise,
   rotateAsset180,
-  updateAssetsCaptureDateTime
+  updateAssetsCaptureDateTime,
+  updateAssetsCaptureDateMarkedWrong
 } from './api/assetApi';
 import {
   addKeywordsToAssets as addKeywordsToAssetsRequest,
@@ -200,6 +201,7 @@ import {
   type PresentationMessage,
 } from './utilities/presentationChannel';
 import {
+  compareFilenamesNatural,
   formatAlbumOrderingModeLabel,
   getAlbumOrderingModeInAlbum,
   sortAssetsForSmartAlbumOrder
@@ -7609,6 +7611,55 @@ export default function App() {
     }
   }
 
+  async function handleSetCaptureDateMarkedWrong(markedWrong: boolean): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    setUpdateError(null);
+
+    try {
+      const updatedAssets = await updateAssetsCaptureDateMarkedWrong({ assetIds, markedWrong });
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+
+      if (selectedAssetId && updatesById.has(selectedAssetId)) {
+        setSelectedAssetDetails((previous) =>
+          previous && previous.id === selectedAssetId
+            ? { ...previous, ...(updatesById.get(selectedAssetId) ?? previous) }
+            : previous
+        );
+      }
+    } catch (error: unknown) {
+      setUpdateError(
+        error instanceof Error ? error.message : 'Failed to update the capture-date wrong flag'
+      );
+    }
+  }
+
+  async function handleArrangeSelectionByFilename(): Promise<void> {
+    if (!singleCheckedAlbumId || selectedAssetIdsInCurrentAlbum.length < 2) {
+      return;
+    }
+
+    const selectedIdSet = new Set(selectedAssetIdsInCurrentAlbum);
+    const selectedAssetsInAlbum = currentAlbumOrderedAssets.filter((asset) =>
+      selectedIdSet.has(asset.id)
+    );
+    const arrangedAssetIds = [...selectedAssetsInAlbum]
+      .sort((left, right) => compareFilenamesNatural(left.filename, right.filename))
+      .map((asset) => asset.id);
+
+    // Keep the block where the selection currently starts.
+    const currentOrder = currentAlbumOrderedAssets.map((asset) => asset.id);
+    const firstSelectedIndex = currentOrder.findIndex((assetId) => selectedIdSet.has(assetId));
+    const placeAfterAssetId =
+      firstSelectedIndex > 0 ? (currentOrder[firstSelectedIndex - 1] ?? null) : null;
+
+    await applyAlbumPlacement(arrangedAssetIds, placeAfterAssetId);
+  }
+
   async function handleAddToEditQueue(note: string): Promise<void> {
     if (!selectedAsset) return;
     try {
@@ -13133,6 +13184,24 @@ export default function App() {
                     >
                       Set Capture Date…
                     </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleSetCaptureDateMarkedWrong(true); setToolbarOverflowOpen(false); }}
+                      disabled={!hasSelectedAssets}
+                      title="Flag the selection's capture dates as inaccurate (e.g. wrong camera clock) without changing them"
+                    >
+                      Mark Capture Date Wrong
+                    </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleSetCaptureDateMarkedWrong(false); setToolbarOverflowOpen(false); }}
+                      disabled={!hasSelectedAssets}
+                      title="Clear the capture-date-wrong flag on the selection"
+                    >
+                      Mark Capture Date Correct
+                    </button>
 
                   </>
                 ) : null}
@@ -13187,6 +13256,19 @@ export default function App() {
                             title="Return the selected photos to capture-time ordering"
                           >
                             Use Capture Time
+                          </button>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => {
+                              void handleArrangeSelectionByFilename();
+                              setOrderInAlbumMenuOpen(false);
+                              setToolbarOverflowOpen(false);
+                            }}
+                            disabled={!singleCheckedAlbumId || selectedAssetIdsInCurrentAlbum.length < 2}
+                            title="Reorder the selected photos by filename sequence (numeric-aware; (n) download suffixes group as separate rolls) and keep them where the selection starts"
+                          >
+                            Arrange by Filename
                           </button>
                           <div className="tdg-overflow-icon-row">
                             <Tooltip title={canMoveCurrentAlbumSelectionToTop ? 'Move to start of album' : 'Select one photo to reorder'}>

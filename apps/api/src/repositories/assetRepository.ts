@@ -463,6 +463,24 @@ export async function updateCaptureDateTimes(
   return findByIds(normalizedAssetIds);
 }
 
+export async function updateCaptureDateTimeMarkedWrong(
+  assetIds: string[],
+  markedWrong: boolean
+): Promise<MediaAsset[]> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    { $set: { captureDateTimeMarkedWrong: markedWrong } },
+    { runValidators: true }
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
 export async function updateCaptureDatesPreservingTimes(
   assetIds: string[],
   captureDate: { year: number; month: number; day: number }

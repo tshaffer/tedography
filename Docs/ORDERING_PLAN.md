@@ -1,10 +1,13 @@
 # Plan: Flexible Photo Ordering Within Albums
 
-> Drafted 2026-06-12 with Claude. Status: Phases 0, 1, and 2 complete (2026-06-12).
+> Drafted 2026-06-12 with Claude. Status: Phases 0–3 complete (2026-06-12).
 > Provenance backfilled (17,021 assets; 2 anomalies pending). Interleaved ordering live:
 > manualSortTime model, /place endpoint, drag-anywhere + block drag UI; migration seeded
 > 132 legacy manual photos in one album (mongodumps in ~/tedography-backups/).
-> Next: Phase 3 (bulk tools — filename sequences, mark-wrong command).
+> Phase 3 note: 3.1–3.3 collapsed into one "Arrange by Filename" command — the Phase 0
+> natural comparator already encodes roll semantics ((n)-suffix-major, numeric), so a
+> separate sequence-detection module wasn't needed; "place sequence here" = block drag +
+> Arrange by Filename. Next: Phase 4 (inspector provenance, optional badge, docs).
 
 ## Goal State
 
