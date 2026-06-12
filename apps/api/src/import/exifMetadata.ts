@@ -1,5 +1,22 @@
-export interface ExtractedImportMetadata {
+export const captureDateTagOrder = [
+  'DateTimeOriginal',
+  'CreateDate',
+  'MediaCreateDate',
+  'SubSecDateTimeOriginal',
+  'TrackCreateDate',
+  'ModifyDate'
+] as const;
+
+export type CaptureDateTag = (typeof captureDateTagOrder)[number];
+
+export interface ExtractedCaptureDateFields {
   captureDateTime: Date | null;
+  captureDateTimeTag: CaptureDateTag | null;
+  cameraMake: string | null;
+  cameraModel: string | null;
+}
+
+export interface ExtractedImportMetadata extends ExtractedCaptureDateFields {
   width: number | null;
   height: number | null;
   locationLabel: string | null;
@@ -310,6 +327,9 @@ export async function reverseGeocodeCoordinates(
 function emptyExtractedImportMetadata(): ExtractedImportMetadata {
   return {
     captureDateTime: null,
+    captureDateTimeTag: null,
+    cameraMake: null,
+    cameraModel: null,
     width: null,
     height: null,
     locationLabel: null,
@@ -318,6 +338,28 @@ function emptyExtractedImportMetadata(): ExtractedImportMetadata {
     city: null,
     state: null,
     country: null
+  };
+}
+
+export function extractCaptureDateFieldsFromTags(
+  tags: Record<string, unknown>
+): ExtractedCaptureDateFields {
+  let captureDateTime: Date | null = null;
+  let captureDateTimeTag: CaptureDateTag | null = null;
+  for (const tag of captureDateTagOrder) {
+    const parsed = toDate(tags[tag]);
+    if (parsed) {
+      captureDateTime = parsed;
+      captureDateTimeTag = tag;
+      break;
+    }
+  }
+
+  return {
+    captureDateTime,
+    captureDateTimeTag,
+    cameraMake: toTrimmedString(tags.Make),
+    cameraModel: toTrimmedString(tags.Model)
   };
 }
 
@@ -346,13 +388,7 @@ export async function extractImportMetadata(
       toFiniteNumber(tags.SourceImageHeight) ??
       sizePair.height;
 
-    const captureDateTime =
-      toDate(tags.DateTimeOriginal) ??
-      toDate(tags.CreateDate) ??
-      toDate(tags.MediaCreateDate) ??
-      toDate(tags.SubSecDateTimeOriginal) ??
-      toDate(tags.TrackCreateDate) ??
-      toDate(tags.ModifyDate);
+    const captureDateFields = extractCaptureDateFieldsFromTags(tags);
 
     const locationLatitude =
       parseGpsCoordinate(tags['GPSLatitude#']) ??
@@ -379,7 +415,7 @@ export async function extractImportMetadata(
     }
 
     return {
-      captureDateTime,
+      ...captureDateFields,
       width,
       height,
       locationLabel,

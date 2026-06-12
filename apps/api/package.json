@@ -10,6 +10,7 @@
     "roles:seed": "tsx src/tools/seedRoles.ts",
     "assets:verify": "tsx src/tools/assetIntegrityVerification.ts",
     "locations:backfill": "tsx src/tools/backfillAssetLocations.ts",
+    "capture-provenance:backfill": "tsx src/tools/backfillCaptureProvenance.ts",
     "thumbnails:verify": "tsx src/tools/thumbnailMaintenance.ts --mode verify",
     "thumbnails:repair": "tsx src/tools/thumbnailMaintenance.ts --mode repair",
     "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",

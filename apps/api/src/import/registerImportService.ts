@@ -15,6 +15,7 @@ import { linkEditedAsset } from '../repositories/editHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
+import { classifyExtractedCaptureDate } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
 import {
   buildThumbnailDerivedRelativePath,
@@ -276,6 +277,14 @@ export async function registerImportedFiles(input: {
         captureDateTime: sourceAsset?.captureDateTime
           ? new Date(sourceAsset.captureDateTime)
           : metadata.captureDateTime,
+        // When the date is inherited from the AI-edit source asset, inherit its
+        // provenance too; otherwise classify what the file itself provided.
+        captureDateTimeSource: sourceAsset?.captureDateTime
+          ? (sourceAsset.captureDateTimeSource ?? null)
+          : classifyExtractedCaptureDate(metadata),
+        exifCaptureDateTime: metadata.captureDateTime,
+        cameraMake: metadata.cameraMake,
+        cameraModel: metadata.cameraModel,
         width: metadata.width,
         height: metadata.height,
         locationLabel: sourceAsset?.locationLabel ?? metadata.locationLabel,

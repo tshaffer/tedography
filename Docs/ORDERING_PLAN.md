@@ -1,6 +1,8 @@
 # Plan: Flexible Photo Ordering Within Albums
 
-> Drafted 2026-06-12 with Claude. Status: Phase 0 complete (2026-06-12); Phase 1 not yet started.
+> Drafted 2026-06-12 with Claude. Status: Phases 0 and 1 complete (2026-06-12).
+> Provenance backfill applied to all 17,021 classifiable assets (mongodump taken first;
+> 2 anomalies pending). Next: Phase 2 (interleaved ordering model).
 
 ## Goal State
 
@@ -83,8 +85,12 @@ them in separate fields.
   - `cameraMake`, `cameraModel`
   - `captureDateTimeMarkedWrong` — user judgment flag, independent of provenance
 - **1.2 Keep it from going stale.** Import pipeline records which EXIF tag the date came
-  from (`extractMetadata` must return the winning tag instead of collapsing the fallback
-  chain). Set Capture Date endpoint stamps `'manual'` on every future edit.
+  from. Set Capture Date endpoint stamps `'manual'` on every future edit.
+  *Implementation note: the live extraction path is `apps/api/src/import/exifMetadata.ts`
+  (`extractImportMetadata`), not the `@tedography/media-metadata` package — that package
+  has no live consumers. The winning-tag extraction and the classifier live in
+  `apps/api/src/import/` (`exifMetadata.ts`, `captureProvenance.ts`). Reimport
+  (refreshService) also refreshes provenance; rebuild-derived does not touch it.*
 - **1.3 Backfill script** `capture-provenance:backfill` (modeled on `locations:backfill`):
   - Dry-run by default: writes nothing; emits a JSON report
     (`reports/capture-provenance-<timestamp>.json`) with per-asset classification,

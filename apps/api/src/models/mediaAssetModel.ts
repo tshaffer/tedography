@@ -11,6 +11,16 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     mediaType: { type: String, required: true, enum: Object.values(MediaType) },
     photoState: { type: String, required: true, enum: Object.values(PhotoState) },
     captureDateTime: { type: String, required: false, trim: true },
+    captureDateTimeSource: {
+      type: String,
+      required: false,
+      enum: ['exif-original', 'exif-weak', 'changed-after-import', 'manual', 'none'],
+      default: null
+    },
+    exifCaptureDateTime: { type: String, required: false, trim: true },
+    cameraMake: { type: String, required: false, trim: true },
+    cameraModel: { type: String, required: false, trim: true },
+    captureDateTimeMarkedWrong: { type: Boolean, required: false },
     width: { type: Number, required: false },
     height: { type: Number, required: false },
     locationLabel: { type: String, required: false, trim: true },

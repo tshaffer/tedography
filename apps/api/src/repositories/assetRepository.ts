@@ -3,6 +3,7 @@ import {
   PhotoState,
   normalizePhotoState,
   type AssetKeywordAssignmentStatus,
+  type CaptureDateTimeSource,
   type MediaAssetAlbumMembership,
   type MediaAssetPerson,
   type DisplayStorageType,
@@ -312,6 +313,10 @@ export interface CreateMediaAssetInput {
   mediaType: MediaType;
   photoState: PhotoState;
   captureDateTime: Date | null;
+  captureDateTimeSource?: CaptureDateTimeSource | null;
+  exifCaptureDateTime?: Date | null;
+  cameraMake?: string | null;
+  cameraModel?: string | null;
   width: number | null;
   height: number | null;
   locationLabel: string | null;
@@ -350,6 +355,10 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     mediaType: input.mediaType,
     photoState: input.photoState,
     captureDateTime: input.captureDateTime?.toISOString() ?? null,
+    captureDateTimeSource: input.captureDateTimeSource ?? null,
+    exifCaptureDateTime: input.exifCaptureDateTime?.toISOString() ?? null,
+    cameraMake: input.cameraMake ?? null,
+    cameraModel: input.cameraModel ?? null,
     width: input.width,
     height: input.height,
     locationLabel: input.locationLabel,
@@ -438,7 +447,12 @@ export async function updateCaptureDateTimes(
 
   await MediaAssetModel.updateMany(
     { id: { $in: normalizedAssetIds } },
-    { $set: { captureDateTime: captureDateTime?.toISOString() ?? null } },
+    {
+      $set: {
+        captureDateTime: captureDateTime?.toISOString() ?? null,
+        captureDateTimeSource: 'manual'
+      }
+    },
     { runValidators: true }
   );
 
@@ -480,7 +494,8 @@ export async function updateCaptureDatesPreservingTimes(
           filter: { id: asset.id },
           update: {
             $set: {
-              captureDateTime: nextCaptureDate.toISOString()
+              captureDateTime: nextCaptureDate.toISOString(),
+              captureDateTimeSource: 'manual'
             }
           }
         }
@@ -517,6 +532,12 @@ export interface UpdateMediaAssetSourceDataInput {
   filename: string;
   mediaType: MediaType;
   captureDateTime: Date | null;
+  // Provenance fields are refreshed only when provided (reimport re-reads the file;
+  // rebuild-derived must not clobber them).
+  captureDateTimeSource?: CaptureDateTimeSource | null;
+  exifCaptureDateTime?: Date | null;
+  cameraMake?: string | null;
+  cameraModel?: string | null;
   width: number | null;
   height: number | null;
   locationLabel: string | null;
@@ -567,6 +588,19 @@ export async function updateMediaAssetSourceData(
     thumbnailFileFormat: input.thumbnailFileFormat,
     thumbnailUrl: input.thumbnailUrl
   };
+
+  if (input.captureDateTimeSource !== undefined) {
+    updatePayload.captureDateTimeSource = input.captureDateTimeSource;
+  }
+  if (input.exifCaptureDateTime !== undefined) {
+    updatePayload.exifCaptureDateTime = input.exifCaptureDateTime?.toISOString() ?? null;
+  }
+  if (input.cameraMake !== undefined) {
+    updatePayload.cameraMake = input.cameraMake;
+  }
+  if (input.cameraModel !== undefined) {
+    updatePayload.cameraModel = input.cameraModel;
+  }
 
   const asset = await MediaAssetModel.findOneAndUpdate(
     { id: input.id },

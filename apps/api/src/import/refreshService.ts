@@ -18,6 +18,7 @@ import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaP
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertHeicToJpeg } from './heicConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
+import { classifyExtractedCaptureDate } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
 import {
   buildThumbnailDerivedRelativePath,
@@ -251,26 +252,37 @@ async function processAssetRefresh(
       thumbnailFileFormat = 'jpg';
     }
 
-    const metadata =
+    const reimportMetadata =
       mode === 'reimport'
         ? await extractImportMetadata(originalAbsolutePath, { includeReverseGeocode: true })
-        : {
-            captureDateTime: asset.captureDateTime ? new Date(asset.captureDateTime) : null,
-            width: asset.width ?? null,
-            height: asset.height ?? null,
-            locationLabel: asset.locationLabel ?? null,
-            locationLatitude: asset.locationLatitude ?? null,
-            locationLongitude: asset.locationLongitude ?? null,
-            city: asset.city ?? null,
-            state: asset.state ?? null,
-            country: asset.country ?? null
-          };
+        : null;
+    const metadata =
+      reimportMetadata ?? {
+        captureDateTime: asset.captureDateTime ? new Date(asset.captureDateTime) : null,
+        width: asset.width ?? null,
+        height: asset.height ?? null,
+        locationLabel: asset.locationLabel ?? null,
+        locationLatitude: asset.locationLatitude ?? null,
+        locationLongitude: asset.locationLongitude ?? null,
+        city: asset.city ?? null,
+        state: asset.state ?? null,
+        country: asset.country ?? null
+      };
 
     const updatedAsset = await updateMediaAssetSourceData({
       id: asset.id,
       filename: path.basename(relativePath),
       mediaType: mediaSupport.mediaType === 'Unknown' ? asset.mediaType : mediaSupport.mediaType,
       captureDateTime: metadata.captureDateTime,
+      // Reimport re-reads the file, so refresh provenance; rebuild-derived leaves it alone.
+      ...(reimportMetadata
+        ? {
+            captureDateTimeSource: classifyExtractedCaptureDate(reimportMetadata),
+            exifCaptureDateTime: reimportMetadata.captureDateTime,
+            cameraMake: reimportMetadata.cameraMake,
+            cameraModel: reimportMetadata.cameraModel
+          }
+        : {}),
       width: metadata.width,
       height: metadata.height,
       locationLabel: metadata.locationLabel,

@@ -9,6 +9,21 @@ export type MediaAssetPersonSource =
   | 'imported-shafferography'
   | 'manual-asset-tag';
 
+/**
+ * Where captureDateTime came from (see Docs/ORDERING_PLAN.md Phase 1).
+ * - 'exif-original': trustworthy camera date (DateTimeOriginal, or CreateDate family with camera Make/Model)
+ * - 'exif-weak': date matches the file but its EXIF pedigree is dubious (ModifyDate, or CreateDate family without camera tags)
+ * - 'changed-after-import': the stored date no longer matches the original file's EXIF
+ * - 'manual': set through tedography's Set Capture Date after provenance stamping began
+ * - 'none': no capture date
+ */
+export type CaptureDateTimeSource =
+  | 'exif-original'
+  | 'exif-weak'
+  | 'changed-after-import'
+  | 'manual'
+  | 'none';
+
 export interface MediaAssetAlbumMembership {
   albumId: string;
   manualSortOrdinal?: number | null;
@@ -29,6 +44,15 @@ export interface MediaAsset {
   mediaType: MediaType;
   photoState: PhotoState;
   captureDateTime?: string | null;
+  captureDateTimeSource?: CaptureDateTimeSource | null;
+  // The capture date as it exists in the original file's EXIF; preserved evidence,
+  // independent of captureDateTime edits.
+  exifCaptureDateTime?: string | null;
+  cameraMake?: string | null;
+  cameraModel?: string | null;
+  // User judgment that a genuine EXIF date is inaccurate (e.g. wrong camera clock).
+  // Independent of captureDateTimeSource.
+  captureDateTimeMarkedWrong?: boolean | null;
   width?: number | null;
   height?: number | null;
   importedAt: string;

@@ -11,6 +11,7 @@
     "thumbnails:repair": "pnpm --filter @tedography/api thumbnails:repair",
     "thumbnails:rebuild": "pnpm --filter @tedography/api thumbnails:rebuild",
     "locations:backfill": "pnpm --filter @tedography/api locations:backfill",
+    "capture-provenance:backfill": "pnpm --filter @tedography/api capture-provenance:backfill",
     "photo-state-poc": "pnpm --filter @tedography/api exec tsx ../../scripts/photo-state-poc.ts",
     "canon-import-plan": "pnpm --filter @tedography/api exec tsx ../../scripts/canon-to-tedography-plan.ts",
     "duplicate-cli": "pnpm --filter @tedography/duplicate-cli exec tsx src/index.ts",

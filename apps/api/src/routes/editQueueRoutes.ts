@@ -25,6 +25,7 @@ import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js
 import { buildDisplayFilePlan } from '../import/displayFilePlanning.js';
 import { convertHeicToJpeg } from '../import/heicConversion.js';
 import { extractImportMetadata } from '../import/exifMetadata.js';
+import { classifyExtractedCaptureDate } from '../import/captureProvenance.js';
 import { computeSha256ForFile } from '../import/fileHash.js';
 import {
   buildThumbnailDerivedRelativePath,
@@ -407,6 +408,11 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         return Number.isNaN(d.getTime()) ? null : d;
       })();
       const captureDateTime = exif.captureDateTime ?? sourceCaptureDateTime;
+      // Edited files often have stripped EXIF; when the date is inherited from the
+      // source asset, inherit its provenance too.
+      const captureDateTimeSource = exif.captureDateTime
+        ? classifyExtractedCaptureDate(exif)
+        : (sourceAsset.captureDateTimeSource ?? null);
 
       // Inherit album memberships from source.
       // Use albumIds directly since albumMemberships may not be populated for older assets.
@@ -430,6 +436,10 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         mediaType: mediaSupport.mediaType as MediaType,
         photoState: PhotoState.New,
         captureDateTime,
+        captureDateTimeSource,
+        exifCaptureDateTime: exif.captureDateTime,
+        cameraMake: exif.cameraMake,
+        cameraModel: exif.cameraModel,
         width: exif.width ?? null,
         height: exif.height ?? null,
         locationLabel,
