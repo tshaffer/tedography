@@ -1,6 +1,6 @@
 # Plan: Flexible Photo Ordering Within Albums
 
-> Drafted 2026-06-12 with Claude. Status: approved for implementation, Phase 0 not yet started.
+> Drafted 2026-06-12 with Claude. Status: Phase 0 complete (2026-06-12); Phase 1 not yet started.
 
 ## Goal State
 

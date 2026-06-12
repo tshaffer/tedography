@@ -8,6 +8,7 @@ import {
   type DisplayStorageType,
   type MediaAsset
 } from '@tedography/domain';
+import { isManualOrderEligibleInAlbum } from '@tedography/shared';
 import { randomUUID } from 'node:crypto';
 import { log } from '../logger.js';
 import { MediaAssetModel } from '../models/mediaAssetModel.js';
@@ -53,14 +54,6 @@ function normalizeMediaAsset(asset: MediaAsset): MediaAsset {
 
 function normalizeMediaAssets(assets: MediaAsset[]): MediaAsset[] {
   return assets.map(normalizeMediaAsset);
-}
-
-function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    return false;
-  }
-
-  return !Number.isNaN(new Date(value).getTime());
 }
 
 export async function getAllAssets(): Promise<MediaAsset[]> {
@@ -947,15 +940,10 @@ export async function updateAlbumMembershipOrderingMode(
     ).lean<MediaAsset[]>();
     const maxManualSortOrdinal = albumAssets.reduce<number>(
       (maxValue: number, albumAsset: MediaAsset) => {
-        const membership = albumAsset.albumMemberships?.find(
-          (candidate: MediaAssetAlbumMembership) => candidate.albumId === albumId
-        );
-        if (
-          ((membership as (MediaAssetAlbumMembership & { forceManualOrder?: boolean | null }) | undefined)
-            ?.forceManualOrder === true) ||
-          !hasUsableCaptureDateTime(albumAsset.captureDateTime)
-        ) {
-          const ordinal = membership?.manualSortOrdinal;
+        if (isManualOrderEligibleInAlbum(albumAsset, albumId)) {
+          const ordinal = albumAsset.albumMemberships?.find(
+            (candidate: MediaAssetAlbumMembership) => candidate.albumId === albumId
+          )?.manualSortOrdinal;
           if (typeof ordinal === 'number' && Number.isFinite(ordinal)) {
             return Math.max(maxValue, ordinal);
           }

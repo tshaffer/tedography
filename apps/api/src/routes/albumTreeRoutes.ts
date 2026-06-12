@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { isManualOrderEligibleInAlbum } from '@tedography/shared';
 import { requireFeature } from '../middleware/requireFeature.js';
 import type {
   AlbumKeywordAssignmentStatus,
@@ -114,14 +115,6 @@ function parseAssetIds(value: unknown): string[] | null {
   }
 
   return Array.from(new Set(parsed));
-}
-
-function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    return false;
-  }
-
-  return !Number.isNaN(new Date(value).getTime());
 }
 
 function parseReorderDirection(value: unknown): 'up' | 'down' | null {
@@ -606,15 +599,7 @@ albumMembershipRoutes.post('/:id/manual-order', async (req, res) => {
     return;
   }
 
-  const invalidAsset = assets.find(
-    (asset) =>
-      !(asset.albumIds ?? []).includes(albumNode.id) ||
-      !(
-        (asset.albumMemberships?.find((membership) => membership.albumId === albumNode.id)?.forceManualOrder ===
-          true) ||
-        !hasUsableCaptureDateTime(asset.captureDateTime)
-      )
-  );
+  const invalidAsset = assets.find((asset) => !isManualOrderEligibleInAlbum(asset, albumNode.id));
   if (invalidAsset) {
     const errorResponse: AlbumTreeErrorResponse = {
       error: `Asset "${invalidAsset.filename}" cannot be manually ordered in "${albumNode.label}"`

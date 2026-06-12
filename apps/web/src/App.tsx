@@ -206,7 +206,7 @@ import {
   isManualOrderEligibleInAlbum,
   sortAssetsForSmartAlbumOrder,
   usesCaptureTimeOrderInAlbum
-} from './utilities/smartAlbumOrder';
+} from '@tedography/shared';
 import type { ListAssetFaceDetectionsResponse, PeopleRecognitionRunSummary, ProcessPeopleAssetResponse } from '@tedography/shared';
 import { useAuth } from './context/AuthContext';
 

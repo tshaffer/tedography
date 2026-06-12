@@ -5,6 +5,14 @@ export type AlbumOrderingMode =
   | 'manual'
   | 'manual-no-capture-time';
 
+export function hasUsableCaptureDateTime(value: string | null | undefined): boolean {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(value).getTime());
+}
+
 function parseDate(value?: string | null): Date | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
@@ -89,6 +97,45 @@ export function isManualOrderEligibleInAlbum(asset: MediaAsset, albumId: string)
   return isForcedManualOrderInAlbum(asset, albumId) || getUsableCaptureTimestamp(asset) === null;
 }
 
+/**
+ * Filenames like "07(2).jpg" carry a "(n)" duplicate-name suffix added by download
+ * tools when names collide. The suffix identifies a parallel batch (e.g. a separate
+ * film roll), not a position within the batch, so it must order before the numeric
+ * part of the name: 00.jpg..27.jpg, then 00(1).jpg..27(1).jpg, and so on.
+ */
+function parseFilenameForOrdering(filename: string): { stem: string; duplicateSuffix: number } {
+  const dotIndex = filename.lastIndexOf('.');
+  const stem = dotIndex > 0 ? filename.slice(0, dotIndex) : filename;
+  const matched = stem.match(/^(.*?)\s*\((\d+)\)$/);
+  const base = matched?.[1];
+  const suffix = matched?.[2];
+
+  if (base !== undefined && suffix !== undefined) {
+    return { stem: base, duplicateSuffix: Number(suffix) };
+  }
+
+  return { stem, duplicateSuffix: 0 };
+}
+
+export function compareFilenamesNatural(left: string, right: string): number {
+  const parsedLeft = parseFilenameForOrdering(left);
+  const parsedRight = parseFilenameForOrdering(right);
+
+  if (parsedLeft.duplicateSuffix !== parsedRight.duplicateSuffix) {
+    return parsedLeft.duplicateSuffix - parsedRight.duplicateSuffix;
+  }
+
+  const stemComparison = parsedLeft.stem.localeCompare(parsedRight.stem, undefined, {
+    numeric: true,
+    sensitivity: 'base'
+  });
+  if (stemComparison !== 0) {
+    return stemComparison;
+  }
+
+  return left.localeCompare(right);
+}
+
 export function sortAssetsForSmartAlbumOrder(
   assets: MediaAsset[],
   albumId: string
@@ -140,7 +187,7 @@ export function sortAssetsForSmartAlbumOrder(
       }
     }
 
-    const filenameComparison = left.filename.localeCompare(right.filename);
+    const filenameComparison = compareFilenamesNatural(left.filename, right.filename);
     if (filenameComparison !== 0) {
       return filenameComparison;
     }
