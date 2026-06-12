@@ -20,9 +20,7 @@ tedography/
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── main.tsx          # React entry point
-│   │       ├── App.tsx           # Root React component
-│   │       └── app/
-│   │           └── store.ts      # Redux store configuration
+│   │       └── App.tsx           # Root React component
 │   │
 │   └── api/
 │       ├── package.json

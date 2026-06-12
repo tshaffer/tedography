@@ -1,9 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
-import { store } from './app/store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { PeopleBrowsePage } from './components/people/PeopleBrowsePage';
@@ -28,23 +26,21 @@ function AuthGate({ children }: { children: React.ReactNode }): React.ReactEleme
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <Provider store={store}>
-    <AuthProvider>
-      <AuthGate>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<App />} />
-            <Route path="/people" element={<PeopleBrowsePage />} />
-            <Route path="/people/:personId" element={<PersonDetailPage />} />
-            <Route path="/people/dev" element={<PeopleDevPage />} />
-            <Route path="/people/review" element={<PeopleReviewPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/admin/users" element={<UsersPage />} />
-            <Route path="/admin/roles" element={<RolesPage />} />
-            <Route path="/present" element={<PresentationPage />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthGate>
-    </AuthProvider>
-  </Provider>
+  <AuthProvider>
+    <AuthGate>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<App />} />
+          <Route path="/people" element={<PeopleBrowsePage />} />
+          <Route path="/people/:personId" element={<PersonDetailPage />} />
+          <Route path="/people/dev" element={<PeopleDevPage />} />
+          <Route path="/people/review" element={<PeopleReviewPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/roles" element={<RolesPage />} />
+          <Route path="/present" element={<PresentationPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthGate>
+  </AuthProvider>
 );

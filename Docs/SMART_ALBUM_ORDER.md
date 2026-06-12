@@ -153,6 +153,12 @@ Current supported moves:
 - move down
 - move to bottom
 
+Alternatively, drag and drop in the grid:
+
+- drag a manual-section thumbnail and drop it onto another manual-section thumbnail
+- a blue indicator on the target's left or right edge shows whether the drop lands before or after it
+- capture-time assets are not draggable and cannot be drop targets
+
 Result:
 
 - only the manual section of that album is reordered
@@ -166,7 +172,7 @@ Current constraints:
 
 - best supported when exactly one album is checked
 - toolbar actions work only when exactly one asset is selected
-- no drag-and-drop yet
+- drag-and-drop works only within the manual section of a single checked album
 - no explicit metadata-correction workflow yet
 - no explicit "capture time is wrong" flag yet
 - no thumbnail-level ordering badges were added, to keep the UI low-clutter
@@ -191,7 +197,6 @@ The following would be natural next steps.
 
 ### Better manual reordering UX
 
-- drag-and-drop inside a single checked album
 - move before / move after specific item commands
 - keyboard shortcuts for manual section movement
 

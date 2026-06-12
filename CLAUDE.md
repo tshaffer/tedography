@@ -32,7 +32,7 @@ pnpm locations:backfill   # backfill location metadata on existing assets
 ## Repo Structure
 
 ```
-apps/web          React 19 + Redux Toolkit + MUI frontend
+apps/web          React 19 + MUI frontend
 apps/api          Express 5 backend
 apps/duplicate-*  Duplicate detection tooling
 packages/domain   Canonical data model — entities, enums, types
@@ -92,12 +92,11 @@ Each domain area has its own route file mounted in `server.ts`:
 
 ```
 api/           Typed fetch wrappers (one file per domain area, mirrors route files)
-app/           Redux slices and store (subdirs: albums, assets, import, maintenance, people)
-components/    React components (subdirs match app/ structure)
+components/    React components (subdirs match api/ structure)
 App.tsx        Top-level component — all major views and state live here
 ```
 
-Redux state and API calls are organized by the same domain areas (albums, assets, import, people). When adding a feature, touch all three layers: `api/`, `app/`, and `components/`.
+API calls and components are organized by the same domain areas (albums, assets, import, people). State lives in React component state (mostly in `App.tsx`) — there is no Redux store. When adding a feature, touch both layers: `api/` and `components/`.
 
 ---
 

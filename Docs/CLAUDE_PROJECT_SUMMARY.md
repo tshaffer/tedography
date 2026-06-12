@@ -22,7 +22,7 @@ Import → Review → Keep / Pending / Discard → Organize → Browse
 
 | Path | Purpose |
 |---|---|
-| `apps/web` | React 19 + Redux Toolkit + Material UI frontend (Webpack) |
+| `apps/web` | React 19 + Material UI frontend (Webpack) |
 | `apps/api` | Express 5 backend (runs via `tsx`) |
 | `apps/duplicate-cli` | CLI tool for duplicate detection |
 | `apps/duplicate-review-web` | Web UI for reviewing duplicates |
@@ -140,7 +140,7 @@ The main `App.tsx` is a large single-component UI managing:
 
 Hierarchical Groups + Albums. Assets belong **only to leaf albums** — parent nodes are organizational only. Supports:
 
-- Manual drag-and-drop ordering within albums
+- Manual ordering of assets within albums via toolbar move commands (top / up / down / bottom) or drag-and-drop in the grid (single checked album, manual section only)
 - Child order modes: `Custom`, `Name`, `NumericThenName`
 - Move assets between albums
 - Move album nodes within the tree

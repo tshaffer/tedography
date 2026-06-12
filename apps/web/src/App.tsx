@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
@@ -1266,6 +1267,17 @@ const selectedCardStyle: CSSProperties = {
 
 const activeCardStyle: CSSProperties = {
   boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.18)'
+};
+
+const cardDropIndicatorStyle: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  width: '4px',
+  backgroundColor: '#1f6feb',
+  borderRadius: '2px',
+  zIndex: 2,
+  pointerEvents: 'none'
 };
 
 const thumbnailFrameStyle: CSSProperties = {
@@ -3043,6 +3055,13 @@ type AssetCardProps = {
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
   onLongPress: (assetId: string) => void;
+  manualOrderDragEnabled?: boolean;
+  isManualOrderDragSource?: boolean;
+  manualOrderDropEdge?: 'left' | 'right' | null;
+  onManualOrderDragStart?: (assetId: string) => void;
+  onManualOrderDragOver?: (event: ReactDragEvent<HTMLElement>, assetId: string) => void;
+  onManualOrderDrop?: (event: ReactDragEvent<HTMLElement>, assetId: string) => void;
+  onManualOrderDragEnd?: () => void;
 };
 
 function AssetCard({
@@ -3059,7 +3078,14 @@ function AssetCard({
   touchSelectionMode,
   onCardClick,
   onCardDoubleClick,
-  onLongPress
+  onLongPress,
+  manualOrderDragEnabled = false,
+  isManualOrderDragSource = false,
+  manualOrderDropEdge = null,
+  onManualOrderDragStart,
+  onManualOrderDragOver,
+  onManualOrderDrop,
+  onManualOrderDragEnd
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -3170,11 +3196,21 @@ function AssetCard({
               ...cardStyle,
               ...(isSelected ? selectedCardStyle : {}),
               ...activeCardStyle,
-              touchAction: 'manipulation'
+              touchAction: 'manipulation',
+              ...(isManualOrderDragSource ? { opacity: 0.4 } : {})
             }
           : isSelected
-            ? { ...cardStyle, ...selectedCardStyle, touchAction: 'manipulation' }
-            : { ...cardStyle, touchAction: 'manipulation' }
+            ? {
+                ...cardStyle,
+                ...selectedCardStyle,
+                touchAction: 'manipulation',
+                ...(isManualOrderDragSource ? { opacity: 0.4 } : {})
+              }
+            : {
+                ...cardStyle,
+                touchAction: 'manipulation',
+                ...(isManualOrderDragSource ? { opacity: 0.4 } : {})
+              }
       }
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -3185,7 +3221,29 @@ function AssetCard({
       onTouchEnd={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
       title={asset.filename}
+      draggable={manualOrderDragEnabled}
+      onDragStart={
+        manualOrderDragEnabled && onManualOrderDragStart
+          ? (event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              onManualOrderDragStart(asset.id);
+            }
+          : undefined
+      }
+      onDragOver={
+        onManualOrderDragOver ? (event) => onManualOrderDragOver(event, asset.id) : undefined
+      }
+      onDrop={onManualOrderDrop ? (event) => onManualOrderDrop(event, asset.id) : undefined}
+      onDragEnd={onManualOrderDragEnd}
     >
+      {manualOrderDropEdge ? (
+        <span
+          style={{
+            ...cardDropIndicatorStyle,
+            ...(manualOrderDropEdge === 'left' ? { left: 0 } : { right: 0 })
+          }}
+        />
+      ) : null}
       <div style={thumbnailFrameStyle}>
         {showPhotoStateBadge ? (
           <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
@@ -6118,6 +6176,16 @@ export default function App() {
       (asset) => asset.id === selectedManualOrderAsset.id
     );
   }, [manualOrderEligibleAssetsInCurrentAlbum, selectedManualOrderAsset]);
+  const manualOrderEligibleAssetIdSet = useMemo(
+    () => new Set(manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id)),
+    [manualOrderEligibleAssetsInCurrentAlbum]
+  );
+  // Drag-and-drop reordering of the manual section within a single checked album.
+  const [manualOrderDragAssetId, setManualOrderDragAssetId] = useState<string | null>(null);
+  const [manualOrderDropTarget, setManualOrderDropTarget] = useState<{
+    assetId: string;
+    edge: 'left' | 'right';
+  } | null>(null);
   const selectedAssetForDetails = useMemo(() => {
     if (!selectedAsset) {
       return null;
@@ -6610,6 +6678,11 @@ export default function App() {
     singleCheckedAlbumId !== null &&
     selectedManualOrderAsset !== null &&
     manualOrderEligibleAssetsInCurrentAlbum.length > 1;
+  const canDragReorderInCurrentAlbum =
+    isAlbumsMode &&
+    singleCheckedAlbumId !== null &&
+    manualOrderEligibleAssetsInCurrentAlbum.length > 1 &&
+    !touchSelectionMode;
   const canMoveCurrentAlbumSelectionToTop =
     canManuallyReorderCurrentAlbumSelection && selectedManualOrderAssetIndex > 0;
   const canMoveCurrentAlbumSelectionUp =
@@ -7788,7 +7861,18 @@ export default function App() {
     }
 
     const reorderedAssetIds = moveArrayItem(currentOrder, currentIndex, nextIndex);
-    setAssetUpdating(selectedManualOrderAsset.id, true);
+    await applyAlbumManualOrder(reorderedAssetIds, selectedManualOrderAsset.id);
+  }
+
+  async function applyAlbumManualOrder(
+    reorderedAssetIds: string[],
+    movedAssetId: string
+  ): Promise<void> {
+    if (!singleCheckedAlbumId) {
+      return;
+    }
+
+    setAssetUpdating(movedAssetId, true);
     setUpdateError(null);
 
     try {
@@ -7810,8 +7894,83 @@ export default function App() {
         error instanceof Error ? error.message : 'Failed to reorder the selected album asset'
       );
     } finally {
-      setAssetUpdating(selectedManualOrderAsset.id, false);
+      setAssetUpdating(movedAssetId, false);
     }
+  }
+
+  function handleManualOrderCardDragStart(assetId: string): void {
+    if (!canDragReorderInCurrentAlbum || !manualOrderEligibleAssetIdSet.has(assetId)) {
+      return;
+    }
+
+    setManualOrderDragAssetId(assetId);
+    setManualOrderDropTarget(null);
+  }
+
+  function handleManualOrderCardDragOver(
+    event: ReactDragEvent<HTMLElement>,
+    assetId: string
+  ): void {
+    if (!manualOrderDragAssetId || !manualOrderEligibleAssetIdSet.has(assetId)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    if (assetId === manualOrderDragAssetId) {
+      setManualOrderDropTarget(null);
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const edge: 'left' | 'right' = event.clientX < rect.left + rect.width / 2 ? 'left' : 'right';
+    setManualOrderDropTarget((previous) =>
+      previous && previous.assetId === assetId && previous.edge === edge
+        ? previous
+        : { assetId, edge }
+    );
+  }
+
+  function handleManualOrderCardDrop(event: ReactDragEvent<HTMLElement>, assetId: string): void {
+    if (!manualOrderDragAssetId) {
+      return;
+    }
+
+    event.preventDefault();
+    const draggedAssetId = manualOrderDragAssetId;
+    const dropTarget = manualOrderDropTarget;
+    setManualOrderDragAssetId(null);
+    setManualOrderDropTarget(null);
+
+    if (draggedAssetId === assetId || !manualOrderEligibleAssetIdSet.has(assetId)) {
+      return;
+    }
+
+    const currentOrder = manualOrderEligibleAssetsInCurrentAlbum.map((asset) => asset.id);
+    const fromIndex = currentOrder.indexOf(draggedAssetId);
+    const targetIndex = currentOrder.indexOf(assetId);
+    if (fromIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const edge = dropTarget?.assetId === assetId ? dropTarget.edge : 'left';
+    let toIndex = edge === 'left' ? targetIndex : targetIndex + 1;
+    if (fromIndex < toIndex) {
+      toIndex -= 1;
+    }
+
+    if (toIndex === fromIndex) {
+      return;
+    }
+
+    const reorderedAssetIds = moveArrayItem(currentOrder, fromIndex, toIndex);
+    void applyAlbumManualOrder(reorderedAssetIds, draggedAssetId);
+  }
+
+  function handleManualOrderCardDragEnd(): void {
+    setManualOrderDragAssetId(null);
+    setManualOrderDropTarget(null);
   }
 
   async function handleSetSelectedAssetAlbumOrderingMode(forceManualOrder: boolean): Promise<void> {
@@ -13411,6 +13570,17 @@ export default function App() {
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                           onLongPress={handleLongPress}
+                          manualOrderDragEnabled={
+                            canDragReorderInCurrentAlbum && manualOrderEligibleAssetIdSet.has(asset.id)
+                          }
+                          isManualOrderDragSource={manualOrderDragAssetId === asset.id}
+                          manualOrderDropEdge={
+                            manualOrderDropTarget?.assetId === asset.id ? manualOrderDropTarget.edge : null
+                          }
+                          onManualOrderDragStart={handleManualOrderCardDragStart}
+                          onManualOrderDragOver={handleManualOrderCardDragOver}
+                          onManualOrderDrop={handleManualOrderCardDrop}
+                          onManualOrderDragEnd={handleManualOrderCardDragEnd}
                         />
                       ))}
                     </div>
@@ -13436,6 +13606,17 @@ export default function App() {
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
                     onLongPress={handleLongPress}
+                    manualOrderDragEnabled={
+                      canDragReorderInCurrentAlbum && manualOrderEligibleAssetIdSet.has(asset.id)
+                    }
+                    isManualOrderDragSource={manualOrderDragAssetId === asset.id}
+                    manualOrderDropEdge={
+                      manualOrderDropTarget?.assetId === asset.id ? manualOrderDropTarget.edge : null
+                    }
+                    onManualOrderDragStart={handleManualOrderCardDragStart}
+                    onManualOrderDragOver={handleManualOrderCardDragOver}
+                    onManualOrderDrop={handleManualOrderCardDrop}
+                    onManualOrderDragEnd={handleManualOrderCardDragEnd}
                   />
                 ))}
               </div>

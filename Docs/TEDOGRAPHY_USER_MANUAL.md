@@ -228,7 +228,7 @@ When in **Albums** browse mode with one or more albums checked:
 - **Grouped by Album** — each checked album appears as its own section with a header showing the album name and photo count
 
 **Album tree sort mode** — controls the order of albums in the left sidebar tree. Choose from **⋯ → Album Sort**:
-- **Custom** — the manually assigned order (drag-to-reorder)
+- **Custom** — the manually assigned order (set via Reorder Up / Down in the context menu)
 - **Name** — alphabetical by album name
 - **Month/Name** — alphabetical treating names that start with month numbers numerically first
 
@@ -321,7 +321,7 @@ Right-clicking any album tree node opens a context menu with:
 | Manage Writers… | (Admin only) Grant or revoke per-album write access for Limited users |
 
 **Child order modes for groups:**
-- **Custom** — drag-to-reorder; children stay in the order you set
+- **Custom** — children stay in the order you set with Reorder Up / Down
 - **Name** — alphabetical by label
 - **NumericThenName** — entries that start with numbers sort first numerically, then alphabetically
 
@@ -329,7 +329,7 @@ Right-clicking any album tree node opens a context menu with:
 
 Right-click a node and choose **Move…** to open the Move dialog. Select the destination parent group (or root level) and confirm. The node and all its contents move to the new location.
 
-You can also reorder siblings within a group using **Reorder Up** and **Reorder Down** from the context menu, or by dragging (when the group's child order mode is Custom).
+You can also reorder siblings within a group using **Reorder Up** and **Reorder Down** from the context menu (when the group's child order mode is Custom).
 
 ### 4.5 Album Tree Sort Mode
 
@@ -355,6 +355,7 @@ When exactly one album is checked and one photo is selected, the Inspector shows
 
 **Repositioning within the manual section** (available when the photo uses manual ordering):
 - Move to Top, Move Up, Move Down, Move to Bottom — all in **⋯ → Order in Album**
+- **Drag and drop in the grid** — with exactly one album checked, drag a manually ordered thumbnail and drop it onto another manually ordered thumbnail. A blue bar shows whether it will land before (left edge) or after (right edge) the target. Photos in the chronological section cannot be drag-reordered — switch them to manual ordering first.
 
 Ordering is album-specific. The same photo can use capture-time in one album and manual in another.
 
