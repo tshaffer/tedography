@@ -8096,6 +8096,48 @@ export default function App() {
     setManualOrderDropTarget(null);
   }
 
+  useEffect(() => {
+    if (!manualOrderDragAssetId) return;
+    const container = mainColumnRef.current;
+    if (!container) return;
+
+    const SCROLL_ZONE = 80; // px from edge to trigger scroll
+    const MAX_SPEED = 12;   // px per frame at edge
+    let rafId: number | null = null;
+    let lastClientY = 0;
+
+    function scroll() {
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const distFromTop = lastClientY - rect.top;
+      const distFromBottom = rect.bottom - lastClientY;
+
+      let speed = 0;
+      if (distFromTop < SCROLL_ZONE && distFromTop >= 0) {
+        speed = -MAX_SPEED * (1 - distFromTop / SCROLL_ZONE);
+      } else if (distFromBottom < SCROLL_ZONE && distFromBottom >= 0) {
+        speed = MAX_SPEED * (1 - distFromBottom / SCROLL_ZONE);
+      }
+
+      if (speed !== 0) {
+        container.scrollTop += speed;
+      }
+      rafId = requestAnimationFrame(scroll);
+    }
+
+    function onDragOver(event: DragEvent) {
+      lastClientY = event.clientY;
+    }
+
+    container.addEventListener('dragover', onDragOver);
+    rafId = requestAnimationFrame(scroll);
+
+    return () => {
+      container.removeEventListener('dragover', onDragOver);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [manualOrderDragAssetId]);
+
   async function handleSetSelectedAssetAlbumOrderingMode(forceManualOrder: boolean): Promise<void> {
     if (!singleCheckedAlbumId || selectedAssetIdsInCurrentAlbum.length === 0) {
       return;
