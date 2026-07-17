@@ -45,30 +45,31 @@ Tedography is a personal photo archive and curation system. The primary workflow
 8. [Sharing and Printing](#8-sharing-and-printing)
    - 8.1 [Publish to Google Photos](#81-publish-to-google-photos)
    - 8.2 [Print](#82-print)
-9. [People](#9-people)
+9. [People — Concepts and Browsing](#9-people--concepts-and-browsing)
    - 9.1 [Core Concepts](#91-core-concepts)
    - 9.2 [People in Library](#92-people-in-library)
    - 9.3 [Asset Review Dialog](#93-asset-review-dialog)
    - 9.4 [People Browse](#94-people-browse)
    - 9.5 [Person Detail](#95-person-detail)
-   - 9.6 [People Review Queue](#96-people-review-queue)
-   - 9.7 [Scoped People Work](#97-scoped-people-work)
-   - 9.8 [Recognition Run Summary](#98-recognition-run-summary)
-   - 9.9 [Enrollment and Recognition Quality](#99-enrollment-and-recognition-quality)
-   - 9.10 [People Maintenance](#910-people-maintenance)
-   - 9.11 [Getting Started with a Large Library](#911-getting-started-with-a-large-library)
-10. [Editing Photos](#10-editing-photos)
-    - 10.1 [Edit Queue](#101-edit-queue)
-    - 10.2 [Edit History](#102-edit-history)
-11. [Duplicate Management *(not yet available)*](#11-duplicate-management)
-12. [Maintenance](#12-maintenance)
-    - 12.1 [Maintenance Dialog](#121-maintenance-dialog)
-    - 12.2 [Per-Asset Inspector Actions](#122-per-asset-inspector-actions)
-13. [Users and Permissions](#13-users-and-permissions)
-    - 13.1 [Roles](#131-roles)
-    - 13.2 [Logging In and Managing Your Account](#132-logging-in-and-managing-your-account)
-    - 13.3 [What Each Role Can Do](#133-what-each-role-can-do)
-    - 13.4 [Admin Tools](#134-admin-tools)
+10. [People — Review, Quality, and Maintenance](#10-people--review-quality-and-maintenance)
+    - 10.1 [People Review Queue](#101-people-review-queue)
+    - 10.2 [Scoped People Work](#102-scoped-people-work)
+    - 10.3 [Recognition Run Summary](#103-recognition-run-summary)
+    - 10.4 [Enrollment and Recognition Quality](#104-enrollment-and-recognition-quality)
+    - 10.5 [People Maintenance](#105-people-maintenance)
+    - 10.6 [Getting Started with a Large Library](#106-getting-started-with-a-large-library)
+11. [Editing Photos](#11-editing-photos)
+    - 11.1 [Edit Queue](#111-edit-queue)
+    - 11.2 [Edit History](#112-edit-history)
+12. [Duplicate Management *(not yet available)*](#12-duplicate-management)
+13. [Maintenance](#13-maintenance)
+    - 13.1 [Maintenance Dialog](#131-maintenance-dialog)
+    - 13.2 [Per-Asset Inspector Actions](#132-per-asset-inspector-actions)
+14. [Users and Permissions](#14-users-and-permissions)
+    - 14.1 [Roles](#141-roles)
+    - 14.2 [Logging In and Managing Your Account](#142-logging-in-and-managing-your-account)
+    - 14.3 [What Each Role Can Do](#143-what-each-role-can-do)
+    - 14.4 [Admin Tools](#144-admin-tools)
 
 ---
 
@@ -568,7 +569,7 @@ The Print feature is subject to role-based permissions. Limited users can print 
 
 ---
 
-## 9. People
+## 9. People — Concepts and Browsing
 
 ### 9.1 Core Concepts
 
@@ -652,11 +653,15 @@ Each person has a detail page at `/people/:personId`. Reach it by clicking any p
 - Add a confirmed face as an example
 - Remove a confirmed face from this person
 - Reassign a confirmed face to another person
-- **Split Selected Faces** — move a subset of confirmed faces to a different person (see [Section 9.10](#910-people-maintenance))
-- **Merge Person** — merge this person record into another (see [Section 9.10](#910-people-maintenance))
+- **Split Selected Faces** — move a subset of confirmed faces to a different person (see [Section 10.5](#105-people-maintenance))
+- **Merge Person** — merge this person record into another (see [Section 10.5](#105-people-maintenance))
 - **Reprocess Related Assets** — re-run recognition on a bounded set of recent confirmed assets for this person
 
-### 9.6 People Review Queue
+---
+
+## 10. People — Review, Quality, and Maintenance
+
+### 10.1 People Review Queue
 
 The standalone People Review page at `/people/review` is a queue-based workbench for reviewing many face detections at once.
 
@@ -695,7 +700,7 @@ The standalone People Review page at `/people/review` is a queue-based workbench
 - Person filter within the current queue
 - Auto-advance after action (optional)
 
-### 9.7 Scoped People Work
+### 10.2 Scoped People Work
 
 Rather than processing your entire library at once, use **People Scope** to work on a manageable subset.
 
@@ -716,7 +721,7 @@ Rather than processing your entire library at once, use **People Scope** to work
 
 For large scopes, the dialog asks for confirmation before processing.
 
-### 9.8 Recognition Run Summary
+### 10.3 Recognition Run Summary
 
 After **Run People Recognition** or **Reprocess People Recognition** completes, Tedography shows a **People Recognition Run Summary** dialog.
 
@@ -744,7 +749,7 @@ After **Run People Recognition** or **Reprocess People Recognition** completes, 
 
 The summary persists across navigation. If you click **Review Suggested Matches** and return to Library, the summary reappears. It is cleared only when explicitly dismissed.
 
-### 9.9 Enrollment and Recognition Quality
+### 10.4 Enrollment and Recognition Quality
 
 Every confirmed face *can* be promoted to an **example face** that the recognition engine uses to improve future matching.
 
@@ -764,7 +769,7 @@ From Person Detail, click the remove control on an example face. This removes it
 **Reprocessing after example changes:**
 Use **Reprocess Related Assets** on Person Detail to re-run recognition on a bounded set of recent confirmed assets. This is intentionally scoped — it is not a full-library reprocess.
 
-### 9.10 People Maintenance
+### 10.5 People Maintenance
 
 #### Merge Duplicate People
 
@@ -791,7 +796,7 @@ Individual confirmed faces on Person Detail support:
 - **Remove from Person** — remove the confirmation (updates the asset's derived people list)
 - **Add as Example** — promote to an example face
 
-### 9.11 Getting Started with a Large Library
+### 10.6 Getting Started with a Large Library
 
 Work in small, inspectable chunks — do not run People recognition across thousands of photos in one pass.
 
@@ -819,9 +824,9 @@ Neither deletes the person or removes them from confirmed photos.
 
 ---
 
-## 10. Editing Photos
+## 11. Editing Photos
 
-### 10.1 Edit Queue
+### 11.1 Edit Queue
 
 The Edit Queue exports original photos to an external folder so you can edit them in any tool, then imports the results back into Tedography. Imported files inherit key metadata from their source.
 
@@ -862,7 +867,7 @@ The original file is never modified.
 | `skipped` | No matching manifest entry, or unsupported format |
 | `error` | Import failed (duplicate, missing storage root, etc.) |
 
-### 10.2 Edit History
+### 11.2 Edit History
 
 Every file processed by Import (succeeded or failed) is recorded in **Edit History**. Open it from **Edit Queue → View Edit History**.
 
@@ -877,15 +882,15 @@ Archives are useful for keeping the active Edit History list focused on recent w
 
 ---
 
-## 11. Duplicate Management
+## 12. Duplicate Management
 
 > **Not yet available.** Duplicate detection tooling exists in the codebase (`apps/duplicate-cli`, `apps/duplicate-worker`, `apps/duplicate-review-web`) but is not integrated into the main Tedography app. The CLI can scan assets and generate candidate pairs; the review web app is currently a placeholder. This feature is planned for a future release.
 
 ---
 
-## 12. Maintenance
+## 13. Maintenance
 
-### 12.1 Maintenance Dialog
+### 13.1 Maintenance Dialog
 
 Open the **Maintenance** dialog from **⋯ → Maintenance** (Admin only). It provides folder-level operations for keeping already-imported assets healthy.
 
@@ -903,7 +908,7 @@ Navigate your storage roots to select a target folder. Maintenance only operates
 
 **Keyword Hierarchy** — accessible from the Maintenance dialog: create, rename, reparent, and organize your keyword tree.
 
-### 12.2 Per-Asset Inspector Actions
+### 13.2 Per-Asset Inspector Actions
 
 When one photo is selected, the Inspector includes two asset-level maintenance actions (Admin only):
 
@@ -915,9 +920,9 @@ Both actions are available directly in the Inspector without opening the full Ma
 
 ---
 
-## 13. Users and Permissions
+## 14. Users and Permissions
 
-### 13.1 Roles
+### 14.1 Roles
 
 Tedography supports multiple users with role-based access control. Every action is tied to a **feature**, and each role has one of three permission values for each feature:
 
@@ -944,7 +949,7 @@ Tedography supports multiple users with role-based access control. Every action 
 
 Custom roles can be created with any combination of permissions.
 
-### 13.2 Logging In and Managing Your Account
+### 14.2 Logging In and Managing Your Account
 
 A login screen appears before the application loads. Select your name from the list and enter your PIN.
 
@@ -953,7 +958,7 @@ Once logged in:
 - **Log out** ends your session and returns to the login screen.
 - **Change PIN** opens a dialog to update your PIN. You must supply your current PIN; the new PIN must be at least 4 characters.
 
-### 13.3 What Each Role Can Do
+### 14.3 What Each Role Can Do
 
 **All users** (regardless of role):
 - See the login screen and log in
@@ -965,7 +970,7 @@ Once logged in:
 
 **Admin users** have access to all features, including Maintenance, all import operations, and user/role management.
 
-### 13.4 Admin Tools
+### 14.4 Admin Tools
 
 **Managing album writers:**
 Right-click any album in the album tree and choose **Manage Writers…**. This dialog shows Admin and Full users (always have access) and lets you grant or revoke write access for Limited users on that album.
