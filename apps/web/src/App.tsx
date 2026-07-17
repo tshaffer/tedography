@@ -137,6 +137,7 @@ import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
 import { EditHistoryArchivesDialog } from './components/editQueue/EditHistoryArchivesDialog';
 import { EditHistoryArchiveViewDialog } from './components/editQueue/EditHistoryArchiveViewDialog';
 import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
+import { ExportQueueResultDialog } from './components/editQueue/ExportQueueResultDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
 import {
@@ -4163,6 +4164,8 @@ export default function App() {
   const [editQueueDialogOpen, setEditQueueDialogOpen] = useState(false);
   const [editQueueExportNotice, setEditQueueExportNotice] = useState<string | null>(null);
   const [editQueueExportError, setEditQueueExportError] = useState<string | null>(null);
+  const [editQueueExporting, setEditQueueExporting] = useState(false);
+  const [editQueueExportDialogOpen, setEditQueueExportDialogOpen] = useState(false);
   const [editQueueImportResults, setEditQueueImportResults] = useState<ImportEditedResult[] | null>(null);
   const [editQueueImportError, setEditQueueImportError] = useState<string | null>(null);
   const [editQueueImporting, setEditQueueImporting] = useState(false);
@@ -7742,11 +7745,15 @@ export default function App() {
   async function handleExportEditQueue(assetIds: string[]): Promise<void> {
     setEditQueueExportNotice(null);
     setEditQueueExportError(null);
+    setEditQueueExporting(true);
+    setEditQueueExportDialogOpen(true);
     try {
       const result = await exportEditQueue(assetIds);
       setEditQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.editPath}`);
     } catch (err) {
       setEditQueueExportError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setEditQueueExporting(false);
     }
   }
 
@@ -12193,10 +12200,10 @@ export default function App() {
             type="button"
             style={compareButtonStyle}
             onClick={() => void handleExportEditQueue(editQueueEntries.map((e) => e.assetId))}
-            disabled={editQueueEntries.length === 0}
+            disabled={editQueueEntries.length === 0 || editQueueExporting}
             title="Copy files to export folder and write manifest.json"
           >
-            Export Queue
+            {editQueueExporting ? 'Exporting…' : 'Export Queue'}
           </button>
           <button
             type="button"
@@ -12207,12 +12214,6 @@ export default function App() {
             Clear
           </button>
         </div>
-        {editQueueExportNotice ? (
-          <p style={{ margin: '6px 0 0', color: '#2f6f3e', fontSize: '12px' }}>{editQueueExportNotice}</p>
-        ) : null}
-        {editQueueExportError ? (
-          <p style={{ margin: '6px 0 0', color: '#b00020', fontSize: '12px' }}>{editQueueExportError}</p>
-        ) : null}
       </section>
     );
   }
@@ -14034,8 +14035,7 @@ export default function App() {
         entries={editQueueEntries}
         loading={editQueueLoading}
         error={editQueueError}
-        exportNotice={editQueueExportNotice}
-        exportError={editQueueExportError}
+        exporting={editQueueExporting}
         importResults={editQueueImportResults}
         importError={editQueueImportError}
         importing={editQueueImporting}
@@ -14049,6 +14049,17 @@ export default function App() {
         onClearFolder={() => void handleClearEditFolder()}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
+      />
+      <ExportQueueResultDialog
+        open={editQueueExportDialogOpen}
+        exporting={editQueueExporting}
+        notice={editQueueExportNotice}
+        error={editQueueExportError}
+        onClose={() => {
+          setEditQueueExportDialogOpen(false);
+          setEditQueueExportNotice(null);
+          setEditQueueExportError(null);
+        }}
       />
       <EditHistoryDialog
         open={editHistoryDialogOpen}

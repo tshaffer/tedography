@@ -6,8 +6,7 @@ interface EditQueueDialogProps {
   entries: EditQueueEntryWithFilename[];
   loading: boolean;
   error: string | null;
-  exportNotice: string | null;
-  exportError: string | null;
+  exporting: boolean;
   importResults: ImportEditedResult[] | null;
   importError: string | null;
   importing: boolean;
@@ -194,8 +193,7 @@ export function EditQueueDialog({
   entries,
   loading,
   error,
-  exportNotice,
-  exportError,
+  exporting,
   importResults,
   importError,
   importing,
@@ -388,12 +386,12 @@ export function EditQueueDialog({
           <div style={footerButtonRowStyle}>
             <button
               type="button"
-              style={selectedCount === 0 ? disabledButtonStyle : primaryButtonStyle}
+              style={selectedCount === 0 || exporting ? disabledButtonStyle : primaryButtonStyle}
               onClick={() => onExport(selectedAssetIds)}
-              disabled={selectedCount === 0}
+              disabled={selectedCount === 0 || exporting}
               title="Copy selected files and write manifest.json to edit folder"
             >
-              {selectedCount > 0 ? `Export (${selectedCount})` : 'Export'}
+              {exporting ? 'Exporting…' : selectedCount > 0 ? `Export (${selectedCount})` : 'Export'}
             </button>
             <button
               type="button"
@@ -438,8 +436,6 @@ export function EditQueueDialog({
           </div>
 
           {/* Status messages */}
-          {exportNotice ? <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{exportNotice}</span> : null}
-          {exportError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{exportError}</span> : null}
           {importResults && !importError ? (
             <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {importedCount === 0 && importErrorCount === 0 ? (
