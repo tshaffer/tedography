@@ -347,6 +347,7 @@ const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoSt
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
 const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
 const showThumbnailEditedImportBadgesStorageKey = 'tedography.showThumbnailEditedImportBadges';
+const showThumbnailHasEditedVersionBadgesStorageKey = 'tedography.showThumbnailHasEditedVersionBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
@@ -1135,6 +1136,42 @@ const toggleOptionLabelStyle: CSSProperties = {
   fontSize: '12px'
 };
 
+const menuBadgeIconWrapperStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '16px',
+  height: '16px',
+  flexShrink: 0
+};
+
+const menuBadgeDotStyle: CSSProperties = {
+  width: '10px',
+  height: '10px',
+  borderRadius: '50%'
+};
+
+const menuBadgePillStyle: CSSProperties = {
+  minWidth: '16px',
+  height: '12px',
+  borderRadius: '999px',
+  backgroundColor: '#0d9488'
+};
+
+const menuBadgeGlyphStyle: CSSProperties = {
+  width: '14px',
+  height: '14px',
+  borderRadius: '50%',
+  backgroundColor: '#1f6feb',
+  color: '#fff',
+  fontSize: '9px',
+  fontWeight: 700,
+  lineHeight: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
 const compactSelectStyle: CSSProperties = {
   height: '30px',
   borderRadius: '8px',
@@ -1371,6 +1408,19 @@ const cardEditedImportBadgeStyle: CSSProperties = {
   lineHeight: 1,
   letterSpacing: '0.03em',
   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.22)',
+  pointerEvents: 'none'
+};
+
+const cardHasEditedVersionBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  top: '40px',
+  left: '11px',
+  zIndex: 2,
+  width: '14px',
+  height: '14px',
+  borderRadius: '50%',
+  backgroundColor: '#6366f1',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
   pointerEvents: 'none'
 };
 
@@ -3069,6 +3119,7 @@ type AssetCardProps = {
   showKeywordAssignmentBadge: boolean;
   showAiQueueBadge: boolean;
   showEditedImportBadge: boolean;
+  showHasEditedVersionBadge: boolean;
   showPeopleBadge: boolean;
   isInAiQueue: boolean;
   touchSelectionMode: boolean;
@@ -3094,6 +3145,7 @@ function AssetCard({
   showKeywordAssignmentBadge,
   showAiQueueBadge,
   showEditedImportBadge,
+  showHasEditedVersionBadge,
   showPeopleBadge,
   isInAiQueue,
   touchSelectionMode,
@@ -3276,6 +3328,8 @@ function AssetCard({
           <span style={cardEditedImportBadgeStyle} title="Imported from Edit Queue">
             Edited
           </span>
+        ) : showHasEditedVersionBadge && asset.sourceAssetId == null && asset.editedAssetId != null ? (
+          <span style={cardHasEditedVersionBadgeStyle} title="An edited version of this photo exists" />
         ) : null}
         {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
           <span
@@ -4580,6 +4634,12 @@ export default function App() {
     }
     return window.localStorage.getItem(showThumbnailEditedImportBadgesStorageKey) === 'true';
   });
+  const [showThumbnailHasEditedVersionBadges, setShowThumbnailHasEditedVersionBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.localStorage.getItem(showThumbnailHasEditedVersionBadgesStorageKey) === 'true';
+  });
   const [showThumbnailPeopleBadges, setShowThumbnailPeopleBadges] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -5057,6 +5117,13 @@ export default function App() {
       showThumbnailEditedImportBadges ? 'true' : 'false'
     );
   }, [showThumbnailEditedImportBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailHasEditedVersionBadgesStorageKey,
+      showThumbnailHasEditedVersionBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailHasEditedVersionBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -12914,6 +12981,9 @@ export default function App() {
                     checked={showThumbnailPhotoStateBadges}
                     onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
                   />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <span style={{ ...menuBadgeDotStyle, borderRadius: '999px', width: '14px', backgroundColor: '#1f8f4d' }} />
+                  </span>
                   Review State
                 </label>
                 <label style={toggleOptionLabelStyle}>
@@ -12922,6 +12992,9 @@ export default function App() {
                     checked={showThumbnailKeywordBadges}
                     onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
                   />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <span style={{ ...menuBadgeDotStyle, backgroundColor: '#16a34a' }} />
+                  </span>
                   Keyword Status
                 </label>
                 <label style={toggleOptionLabelStyle}>
@@ -12930,7 +13003,10 @@ export default function App() {
                     checked={showThumbnailEditQueueBadges}
                     onChange={(event) => setShowThumbnailEditQueueBadges(event.target.checked)}
                   />
-                  AI Queue Indicator
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <PsychologyIcon style={{ fontSize: '14px', color: '#9333ea' }} />
+                  </span>
+                  Edit Queue Indicator
                 </label>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -12938,7 +13014,21 @@ export default function App() {
                     checked={showThumbnailEditedImportBadges}
                     onChange={(event) => setShowThumbnailEditedImportBadges(event.target.checked)}
                   />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <span style={menuBadgePillStyle} />
+                  </span>
                   Edited Import
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailHasEditedVersionBadges}
+                    onChange={(event) => setShowThumbnailHasEditedVersionBadges(event.target.checked)}
+                  />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <span style={{ ...menuBadgePillStyle, backgroundColor: '#6366f1' }} />
+                  </span>
+                  Has Edited Version
                 </label>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -12946,6 +13036,9 @@ export default function App() {
                     checked={showThumbnailPeopleBadges}
                     onChange={(event) => setShowThumbnailPeopleBadges(event.target.checked)}
                   />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <FaceIcon style={{ fontSize: '15px', color: '#00b8d9' }} />
+                  </span>
                   People
                 </label>
                 <label style={toggleOptionLabelStyle} title="Flag suspect capture dates and manually placed photos">
@@ -12954,6 +13047,9 @@ export default function App() {
                     checked={showThumbnailOrderingBadges}
                     onChange={(event) => setShowThumbnailOrderingBadges(event.target.checked)}
                   />
+                  <span style={menuBadgeIconWrapperStyle}>
+                    <span style={menuBadgeGlyphStyle}>⤓</span>
+                  </span>
                   Ordering
                 </label>
                 <span style={filterSubsectionTitleStyle}>Panel Visibility</span>
@@ -13751,6 +13847,7 @@ export default function App() {
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
+                          showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -13786,6 +13883,7 @@ export default function App() {
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
+                          showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -13829,6 +13927,7 @@ export default function App() {
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
                     showAiQueueBadge={showThumbnailEditQueueBadges}
                     showEditedImportBadge={showThumbnailEditedImportBadges}
+                    showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                     isInAiQueue={editQueueAssetIdSet.has(asset.id)}
