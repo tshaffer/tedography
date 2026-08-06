@@ -243,6 +243,7 @@ const searchHasKeywordsStorageKey = 'tedography.search.hasKeywords';
 const searchIsEditedImportStorageKey = 'tedography.search.isEditedImport';
 const searchHasEditedVersionStorageKey = 'tedography.search.hasEditedVersion';
 const searchInEditQueueStorageKey = 'tedography.search.inEditQueue';
+const searchEditQueueMatchModeStorageKey = 'tedography.search.editQueueMatchMode';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
 const searchKeywordIncludeModeStorageKey = 'tedography.search.keyword.includeMode';
 const searchKeywordExcludeStorageKey = 'tedography.search.keyword.exclude';
@@ -366,6 +367,8 @@ type AlbumResultsPresentation = 'Merged' | 'GroupedByAlbum';
 type ViewerMode = 'Grid' | 'Loupe';
 type SurveyLayoutMode = 'landscape' | 'portrait';
 type SearchPeopleMatchMode = 'Any' | 'All';
+type TriState = 'any' | 'yes' | 'no';
+type EditQueueMatchMode = 'and' | 'or';
 
 type KeywordQueryClause = {
   keywordId: string;
@@ -394,9 +397,10 @@ type SearchFilters = {
   hasReviewableFaces: boolean;
   hasKeywords: boolean;
   keywordQuery: KeywordQueryState;
-  isEditedImport: boolean;
-  hasEditedVersion: boolean;
-  inEditQueue: boolean;
+  isEditedImport: TriState;
+  hasEditedVersion: TriState;
+  inEditQueue: TriState;
+  editQueueMatchMode: EditQueueMatchMode;
 };
 
 type AssetsBootstrapScope =
@@ -2597,6 +2601,16 @@ function parseBooleanFromStorage(value: string | null): boolean {
   return value === 'true';
 }
 
+function parseTriStateFromStorage(value: string | null): TriState {
+  if (value === 'yes' || value === 'no') return value;
+  if (value === 'true') return 'yes'; // legacy boolean value from before the tri-state redesign
+  return 'any';
+}
+
+function parseEditQueueMatchModeFromStorage(value: string | null): EditQueueMatchMode {
+  return value === 'or' ? 'or' : 'and';
+}
+
 function parseKeywordClausesFromStorage(value: string | null): KeywordQueryClause[] {
   if (!value) {
     return [];
@@ -2891,9 +2905,10 @@ function getDefaultSearchFilters(): SearchFilters {
     hasReviewableFaces: false,
     hasKeywords: false,
     keywordQuery: { include: [], includeMode: 'all', exclude: [] },
-    isEditedImport: false,
-    hasEditedVersion: false,
-    inEditQueue: false,
+    isEditedImport: 'any',
+    hasEditedVersion: 'any',
+    inEditQueue: 'any',
+    editQueueMatchMode: 'and',
   };
 }
 
@@ -2932,7 +2947,8 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     ) &&
     left.isEditedImport === right.isEditedImport &&
     left.hasEditedVersion === right.hasEditedVersion &&
-    left.inEditQueue === right.inEditQueue
+    left.inEditQueue === right.inEditQueue &&
+    left.editQueueMatchMode === right.editQueueMatchMode
   );
 }
 
@@ -2953,9 +2969,9 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.hasKeywords ||
     filters.keywordQuery.include.length > 0 ||
     filters.keywordQuery.exclude.length > 0 ||
-    filters.isEditedImport ||
-    filters.hasEditedVersion ||
-    filters.inEditQueue
+    filters.isEditedImport !== 'any' ||
+    filters.hasEditedVersion !== 'any' ||
+    filters.inEditQueue !== 'any'
   );
 }
 
@@ -4395,17 +4411,21 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasKeywordsStorageKey));
   });
-  const [searchIsEditedImport, setSearchIsEditedImport] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return parseBooleanFromStorage(window.localStorage.getItem(searchIsEditedImportStorageKey));
+  const [searchIsEditedImport, setSearchIsEditedImport] = useState<TriState>(() => {
+    if (typeof window === 'undefined') return 'any';
+    return parseTriStateFromStorage(window.localStorage.getItem(searchIsEditedImportStorageKey));
   });
-  const [searchHasEditedVersion, setSearchHasEditedVersion] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return parseBooleanFromStorage(window.localStorage.getItem(searchHasEditedVersionStorageKey));
+  const [searchHasEditedVersion, setSearchHasEditedVersion] = useState<TriState>(() => {
+    if (typeof window === 'undefined') return 'any';
+    return parseTriStateFromStorage(window.localStorage.getItem(searchHasEditedVersionStorageKey));
   });
-  const [searchInEditQueue, setSearchInEditQueue] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return parseBooleanFromStorage(window.localStorage.getItem(searchInEditQueueStorageKey));
+  const [searchInEditQueue, setSearchInEditQueue] = useState<TriState>(() => {
+    if (typeof window === 'undefined') return 'any';
+    return parseTriStateFromStorage(window.localStorage.getItem(searchInEditQueueStorageKey));
+  });
+  const [searchEditQueueMatchMode, setSearchEditQueueMatchMode] = useState<EditQueueMatchMode>(() => {
+    if (typeof window === 'undefined') return 'and';
+    return parseEditQueueMatchModeFromStorage(window.localStorage.getItem(searchEditQueueMatchModeStorageKey));
   });
   const [reviewableDetectionAssetIds, setReviewableDetectionAssetIds] = useState<Set<string> | null>(null);
   const [searchKeywordInclude, setSearchKeywordInclude] = useState<KeywordQueryClause[]>(() =>
@@ -5312,6 +5332,10 @@ export default function App() {
   }, [searchInEditQueue]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchEditQueueMatchModeStorageKey, searchEditQueueMatchMode);
+  }, [searchEditQueueMatchMode]);
+
+  useEffect(() => {
     if (!searchHasReviewableFaces) {
       setReviewableDetectionAssetIds(null);
       return;
@@ -5940,6 +5964,7 @@ export default function App() {
       isEditedImport: searchIsEditedImport,
       hasEditedVersion: searchHasEditedVersion,
       inEditQueue: searchInEditQueue,
+      editQueueMatchMode: searchEditQueueMatchMode,
     }),
     [
       searchAlbumIds,
@@ -5962,6 +5987,7 @@ export default function App() {
       searchIsEditedImport,
       searchHasEditedVersion,
       searchInEditQueue,
+      searchEditQueueMatchMode,
     ]
   );
   const searchResults = useMemo(() => {
@@ -6027,12 +6053,28 @@ export default function App() {
         includePass &&
         !excludeMatchSets.some((matchSet) => assetKeywordIds.some((id) => matchSet.has(id)));
 
-      const matchesIsEditedImport =
-        !appliedSearchFilters.isEditedImport || (asset.sourceAssetId != null);
-      const matchesHasEditedVersion =
-        !appliedSearchFilters.hasEditedVersion || (asset.editedAssetId != null);
-      const matchesInEditQueue =
-        !appliedSearchFilters.inEditQueue || editQueueAssetIdSet.has(asset.id);
+      const editQueueConstraints: boolean[] = [];
+      if (appliedSearchFilters.isEditedImport !== 'any') {
+        editQueueConstraints.push(
+          (appliedSearchFilters.isEditedImport === 'yes') === (asset.sourceAssetId != null)
+        );
+      }
+      if (appliedSearchFilters.hasEditedVersion !== 'any') {
+        editQueueConstraints.push(
+          (appliedSearchFilters.hasEditedVersion === 'yes') === (asset.editedAssetId != null)
+        );
+      }
+      if (appliedSearchFilters.inEditQueue !== 'any') {
+        editQueueConstraints.push(
+          (appliedSearchFilters.inEditQueue === 'yes') === editQueueAssetIdSet.has(asset.id)
+        );
+      }
+      const matchesEditQueueFilters =
+        editQueueConstraints.length === 0
+          ? true
+          : appliedSearchFilters.editQueueMatchMode === 'or'
+            ? editQueueConstraints.some(Boolean)
+            : editQueueConstraints.every(Boolean);
 
       return (
         matchesPhotoState &&
@@ -6042,9 +6084,7 @@ export default function App() {
         matchesCaptureDateRange &&
         matchesPeople &&
         matchesKeyword &&
-        matchesIsEditedImport &&
-        matchesHasEditedVersion &&
-        matchesInEditQueue
+        matchesEditQueueFilters
       );
     });
 
@@ -6456,9 +6496,9 @@ export default function App() {
       filters.hasReviewableFaces ||
       filters.photoStates.length > 1 ||
       filters.groupIds.length > 1 ||
-      filters.isEditedImport ||
-      filters.hasEditedVersion ||
-      filters.inEditQueue;
+      filters.isEditedImport !== 'any' ||
+      filters.hasEditedVersion !== 'any' ||
+      filters.inEditQueue !== 'any';
 
     if (activeUnsupportedFilters) {
       return null;
@@ -9292,6 +9332,7 @@ export default function App() {
     setSearchIsEditedImport(filters.isEditedImport);
     setSearchHasEditedVersion(filters.hasEditedVersion);
     setSearchInEditQueue(filters.inEditQueue);
+    setSearchEditQueueMatchMode(filters.editQueueMatchMode);
   }
 
   function applyPendingSearchFilters(): void {
@@ -9327,9 +9368,9 @@ export default function App() {
         ...(result.hasNoPeople !== undefined && { hasNoPeople: result.hasNoPeople }),
         ...(result.hasKeywords !== undefined && { hasKeywords: result.hasKeywords }),
         ...(result.keywordQuery !== undefined && { keywordQuery: result.keywordQuery }),
-        ...(result.isEditedImport !== undefined && { isEditedImport: result.isEditedImport }),
-        ...(result.hasEditedVersion !== undefined && { hasEditedVersion: result.hasEditedVersion }),
-        ...(result.inEditQueue !== undefined && { inEditQueue: result.inEditQueue }),
+        ...(result.isEditedImport !== undefined && { isEditedImport: result.isEditedImport ? 'yes' as const : 'no' as const }),
+        ...(result.hasEditedVersion !== undefined && { hasEditedVersion: result.hasEditedVersion ? 'yes' as const : 'no' as const }),
+        ...(result.inEditQueue !== undefined && { inEditQueue: result.inEditQueue ? 'yes' as const : 'no' as const }),
       };
       setPendingSearchFilters(merged);
       setAppliedSearchFilters(merged);
@@ -12127,33 +12168,65 @@ export default function App() {
             </button>
           </div>
           {!searchEditQueueSectionCollapsed ? (
-            <div style={filterRowStyle}>
-              <div style={filterGroupStyle}>
-                <label style={filterOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={searchIsEditedImport}
-                    onChange={() => setSearchIsEditedImport((v) => !v)}
-                  />
-                  Is edited import
-                </label>
-                <label style={filterOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={searchHasEditedVersion}
-                    onChange={() => setSearchHasEditedVersion((v) => !v)}
-                  />
-                  Has edited version
-                </label>
-                <label style={filterOptionLabelStyle}>
-                  <input
-                    type="checkbox"
-                    checked={searchInEditQueue}
-                    onChange={() => setSearchInEditQueue((v) => !v)}
-                  />
-                  In edit queue
-                </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748' }}>Match</span>
+                <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                  {(['and', 'or'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setSearchEditQueueMatchMode(mode)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '12px',
+                        fontWeight: searchEditQueueMatchMode === mode ? 700 : 400,
+                        backgroundColor: searchEditQueueMatchMode === mode ? '#dbeafe' : '#f9f9f9',
+                        color: searchEditQueueMatchMode === mode ? '#1d4ed8' : '#555',
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderRight: mode === 'and' ? '1px solid #c8c8c8' : 'none'
+                      }}
+                    >
+                      {mode === 'and' ? 'AND' : 'OR'}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {(
+                [
+                  { key: 'isEditedImport', label: 'Is edited import', value: searchIsEditedImport, setValue: setSearchIsEditedImport },
+                  { key: 'hasEditedVersion', label: 'Has edited version', value: searchHasEditedVersion, setValue: setSearchHasEditedVersion },
+                  { key: 'inEditQueue', label: 'In edit queue', value: searchInEditQueue, setValue: setSearchInEditQueue },
+                ] as const
+              ).map((row) => (
+                <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#1f2937' }}>{row.label}</span>
+                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                    {(['any', 'yes', 'no'] as const).map((state, idx) => (
+                      <button
+                        key={state}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => row.setValue(state)}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '12px',
+                          fontWeight: row.value === state ? 700 : 400,
+                          backgroundColor: row.value === state ? '#dbeafe' : '#f9f9f9',
+                          color: row.value === state ? '#1d4ed8' : '#555',
+                          border: 'none',
+                          cursor: 'pointer',
+                          borderRight: idx < 2 ? '1px solid #c8c8c8' : 'none'
+                        }}
+                      >
+                        {state === 'any' ? 'Any' : state === 'yes' ? 'Yes' : 'No'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : null}
         </div>
