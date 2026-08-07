@@ -1322,8 +1322,7 @@ const cardTopBadgeRowStyle: CSSProperties = {
   zIndex: 2,
   display: 'flex',
   alignItems: 'center',
-  gap: '4px',
-  pointerEvents: 'none'
+  gap: '4px'
 };
 
 const cardBottomBadgeRowStyle: CSSProperties = {
@@ -1333,8 +1332,7 @@ const cardBottomBadgeRowStyle: CSSProperties = {
   zIndex: 2,
   display: 'flex',
   alignItems: 'center',
-  gap: '4px',
-  pointerEvents: 'none'
+  gap: '4px'
 };
 
 const cardDropIndicatorStyle: CSSProperties = {
@@ -1376,8 +1374,7 @@ const cardPeopleBadgeChipStyle: CSSProperties = {
   position: 'absolute',
   bottom: '5px',
   left: '6px',
-  zIndex: 2,
-  pointerEvents: 'none'
+  zIndex: 2
 };
 
 const cardSelectedBadgeStyle: CSSProperties = {
