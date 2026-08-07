@@ -51,6 +51,8 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
 import LockIcon from '@mui/icons-material/Lock';
 import FaceIcon from '@mui/icons-material/Face';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -1140,40 +1142,26 @@ const toggleOptionLabelStyle: CSSProperties = {
   fontSize: '12px'
 };
 
-const menuBadgeIconWrapperStyle: CSSProperties = {
+const menuBadgeChipStyle: CSSProperties = {
+  width: '16px',
+  height: '16px',
+  borderRadius: '50%',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: '16px',
-  height: '16px',
   flexShrink: 0
 };
 
-const menuBadgeDotStyle: CSSProperties = {
-  width: '10px',
-  height: '10px',
-  borderRadius: '50%'
+const menuBadgeChipIconStyle: CSSProperties = {
+  fontSize: '11px',
+  color: '#fff'
 };
 
-const menuBadgePillStyle: CSSProperties = {
-  minWidth: '16px',
-  height: '12px',
-  borderRadius: '999px',
-  backgroundColor: '#0d9488'
-};
-
-const menuBadgeGlyphStyle: CSSProperties = {
-  width: '14px',
-  height: '14px',
-  borderRadius: '50%',
-  backgroundColor: '#1f6feb',
-  color: '#fff',
-  fontSize: '9px',
-  fontWeight: 700,
-  lineHeight: 1,
+const menuBadgeChipGroupStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center'
+  gap: '3px',
+  flexShrink: 0
 };
 
 const compactSelectStyle: CSSProperties = {
@@ -1311,22 +1299,41 @@ const activeCardStyle: CSSProperties = {
   boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.18)'
 };
 
-const cardOrderingBadgeStyle: CSSProperties = {
+const cardBadgeChipStyle: CSSProperties = {
+  width: '18px',
+  height: '18px',
+  borderRadius: '50%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.35)',
+  flexShrink: 0
+};
+
+const cardBadgeIconStyle: CSSProperties = {
+  fontSize: '12px',
+  color: '#fff'
+};
+
+const cardTopBadgeRowStyle: CSSProperties = {
+  position: 'absolute',
+  top: '8px',
+  left: '8px',
+  zIndex: 2,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  pointerEvents: 'none'
+};
+
+const cardBottomBadgeRowStyle: CSSProperties = {
   position: 'absolute',
   bottom: '5px',
   right: '8px',
   zIndex: 2,
-  display: 'inline-flex',
+  display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  minWidth: '16px',
-  height: '16px',
-  padding: '0 4px',
-  borderRadius: '999px',
-  color: '#fff',
-  fontSize: '10px',
-  fontWeight: 700,
-  lineHeight: 1,
+  gap: '4px',
   pointerEvents: 'none'
 };
 
@@ -1365,96 +1372,12 @@ const thumbnailFallbackStyle: CSSProperties = {
   fontSize: '12px'
 };
 
-const cardPhotoStateBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  top: '8px',
-  left: '8px',
-  zIndex: 2,
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  padding: '3px 7px',
-  borderRadius: '999px',
-  color: '#fff',
-  fontSize: '10px',
-  fontWeight: 700,
-  lineHeight: 1,
-  letterSpacing: '0.02em',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.22)',
-  pointerEvents: 'none'
-};
-
-const cardKeywordBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  bottom: '8px',
-  right: '8px',
-  zIndex: 2,
-  width: '10px',
-  height: '10px',
-  borderRadius: '50%',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-  pointerEvents: 'none'
-};
-
-const cardEditedImportBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  top: '36px',
-  left: '8px',
-  zIndex: 2,
-  display: 'inline-flex',
-  alignItems: 'center',
-  padding: '2px 6px',
-  borderRadius: '999px',
-  backgroundColor: '#0d9488',
-  color: '#fff',
-  fontSize: '9px',
-  fontWeight: 700,
-  lineHeight: 1,
-  letterSpacing: '0.03em',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.22)',
-  pointerEvents: 'none'
-};
-
-const cardHasEditedVersionBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  top: '40px',
-  left: '11px',
-  zIndex: 2,
-  width: '14px',
-  height: '14px',
-  borderRadius: '50%',
-  backgroundColor: '#6366f1',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-  pointerEvents: 'none'
-};
-
-const cardEditQueueBadgeStyle: CSSProperties = {
-  position: 'absolute',
-  bottom: '5px',
-  zIndex: 2,
-  width: '16px',
-  height: '16px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#9333ea',
-  pointerEvents: 'none',
-  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
-};
-
-const cardPeopleBadgeStyle: CSSProperties = {
+const cardPeopleBadgeChipStyle: CSSProperties = {
   position: 'absolute',
   bottom: '5px',
   left: '6px',
   zIndex: 2,
-  width: '28px',
-  height: '28px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#00d4ff',
-  pointerEvents: 'none',
-  filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.6))'
+  pointerEvents: 'none'
 };
 
 const cardSelectedBadgeStyle: CSSProperties = {
@@ -2560,6 +2483,15 @@ function getPhotoStateIcon(state: PhotoState): ReactElement {
   }
 }
 
+function getPhotoStateChipIcon(state: PhotoState): ReactElement {
+  switch (state) {
+    case PhotoState.Keep:    return <CheckIcon style={cardBadgeIconStyle} />;
+    case PhotoState.Discard: return <CloseIcon style={cardBadgeIconStyle} />;
+    case PhotoState.Pending: return <PauseCircleOutlineIcon style={cardBadgeIconStyle} />;
+    case PhotoState.New:     return <RadioButtonUncheckedIcon style={cardBadgeIconStyle} />;
+  }
+}
+
 const reviewActions: PhotoState[] = [
   PhotoState.Keep,
   PhotoState.Discard,
@@ -3335,59 +3267,70 @@ function AssetCard({
         />
       ) : null}
       <div style={thumbnailFrameStyle}>
-        {showPhotoStateBadge ? (
-          <span style={{ ...cardPhotoStateBadgeStyle, backgroundColor: photoStateBadgeColor }}>
-            {photoStateLabel}
-          </span>
-        ) : null}
-        {showEditedImportBadge && asset.sourceAssetId != null ? (
-          <span style={cardEditedImportBadgeStyle} title="Imported from Edit Queue">
-            Edited
-          </span>
-        ) : showHasEditedVersionBadge && asset.sourceAssetId == null && asset.editedAssetId != null ? (
-          <span style={cardHasEditedVersionBadgeStyle} title="An edited version of this photo exists" />
-        ) : null}
-        {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
-          <span
-            style={{
-              ...cardKeywordBadgeStyle,
-              backgroundColor: getAssetKeywordStatusDotColor(asset.keywordAssignmentStatus)
-            }}
-            title={`Keywords: ${asset.keywordAssignmentStatus}`}
-          />
-        ) : null}
-        {showAiQueueBadge && isInAiQueue ? (
-          <span
-            style={{
-              ...cardEditQueueBadgeStyle,
-              right: showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? '22px' : '8px'
-            }}
-            title="In AI queue"
-          >
-            <PsychologyIcon style={{ fontSize: '14px' }} />
-          </span>
-        ) : null}
+        <span style={cardTopBadgeRowStyle}>
+          {showPhotoStateBadge ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: photoStateBadgeColor }}
+              title={`Review state: ${photoStateLabel}`}
+            >
+              {getPhotoStateChipIcon(asset.photoState)}
+            </span>
+          ) : null}
+          {showEditedImportBadge && asset.sourceAssetId != null ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#0d9488' }}
+              title="Imported from Edit Queue"
+            >
+              <AutoFixHighIcon style={cardBadgeIconStyle} />
+            </span>
+          ) : showHasEditedVersionBadge && asset.sourceAssetId == null && asset.editedAssetId != null ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#6366f1' }}
+              title="An edited version of this photo exists"
+            >
+              <AutoFixHighIcon style={cardBadgeIconStyle} />
+            </span>
+          ) : null}
+        </span>
+        <span style={cardBottomBadgeRowStyle}>
+          {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
+            <span
+              style={{
+                ...cardBadgeChipStyle,
+                backgroundColor: getAssetKeywordStatusDotColor(asset.keywordAssignmentStatus)
+              }}
+              title={`Keywords: ${asset.keywordAssignmentStatus}`}
+            >
+              <LabelIcon style={cardBadgeIconStyle} />
+            </span>
+          ) : null}
+          {orderingBadge ? (
+            <span
+              style={{
+                ...cardBadgeChipStyle,
+                backgroundColor: orderingBadge === 'suspect' ? '#b45309' : '#1f6feb'
+              }}
+              title={
+                orderingBadge === 'suspect'
+                  ? 'Capture date is suspect (weak EXIF, changed after import, or marked wrong)'
+                  : 'Manually placed in this album'
+              }
+            >
+              {orderingBadge === 'suspect' ? <WarningAmberIcon style={cardBadgeIconStyle} /> : <SwapVertIcon style={cardBadgeIconStyle} />}
+            </span>
+          ) : null}
+          {showAiQueueBadge && isInAiQueue ? (
+            <span style={{ ...cardBadgeChipStyle, backgroundColor: '#9333ea' }} title="In AI queue">
+              <PsychologyIcon style={cardBadgeIconStyle} />
+            </span>
+          ) : null}
+        </span>
         {showPeopleBadge && asset.people && asset.people.length > 0 ? (
           <span
-            style={cardPeopleBadgeStyle}
+            style={{ ...cardPeopleBadgeChipStyle, ...cardBadgeChipStyle, backgroundColor: '#0891b2' }}
             title={`People: ${asset.people.map((p) => p.displayName).join(', ')}`}
           >
-            <FaceIcon style={{ fontSize: '28px' }} />
-          </span>
-        ) : null}
-        {orderingBadge ? (
-          <span
-            style={{
-              ...cardOrderingBadgeStyle,
-              backgroundColor: orderingBadge === 'suspect' ? '#b45309' : '#1f6feb'
-            }}
-            title={
-              orderingBadge === 'suspect'
-                ? 'Capture date is suspect (weak EXIF, changed after import, or marked wrong)'
-                : 'Manually placed in this album'
-            }
-          >
-            {orderingBadge === 'suspect' ? '!' : '⤓'}
+            <FaceIcon style={cardBadgeIconStyle} />
           </span>
         ) : null}
         {isSelected
@@ -13054,8 +12997,19 @@ export default function App() {
                     checked={showThumbnailPhotoStateBadges}
                     onChange={(event) => setShowThumbnailPhotoStateBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <span style={{ ...menuBadgeDotStyle, borderRadius: '999px', width: '14px', backgroundColor: '#1f8f4d' }} />
+                  <span style={menuBadgeChipGroupStyle}>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#5b6573' }} title="New">
+                      <RadioButtonUncheckedIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#b58813' }} title="Pending">
+                      <PauseCircleOutlineIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#1f8f4d' }} title="Keep">
+                      <CheckIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#b4232f' }} title="Discard">
+                      <CloseIcon style={menuBadgeChipIconStyle} />
+                    </span>
                   </span>
                   Review State
                 </label>
@@ -13065,8 +13019,8 @@ export default function App() {
                     checked={showThumbnailKeywordBadges}
                     onChange={(event) => setShowThumbnailKeywordBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <span style={{ ...menuBadgeDotStyle, backgroundColor: '#16a34a' }} />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#16a34a' }}>
+                    <LabelIcon style={menuBadgeChipIconStyle} />
                   </span>
                   Keyword Status
                 </label>
@@ -13076,8 +13030,8 @@ export default function App() {
                     checked={showThumbnailEditQueueBadges}
                     onChange={(event) => setShowThumbnailEditQueueBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <PsychologyIcon style={{ fontSize: '14px', color: '#9333ea' }} />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#9333ea' }}>
+                    <PsychologyIcon style={menuBadgeChipIconStyle} />
                   </span>
                   Edit Queue Indicator
                 </label>
@@ -13087,8 +13041,8 @@ export default function App() {
                     checked={showThumbnailEditedImportBadges}
                     onChange={(event) => setShowThumbnailEditedImportBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <span style={menuBadgePillStyle} />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#0d9488' }}>
+                    <AutoFixHighIcon style={menuBadgeChipIconStyle} />
                   </span>
                   Edited Import
                 </label>
@@ -13098,8 +13052,8 @@ export default function App() {
                     checked={showThumbnailHasEditedVersionBadges}
                     onChange={(event) => setShowThumbnailHasEditedVersionBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <span style={{ ...menuBadgePillStyle, backgroundColor: '#6366f1' }} />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#6366f1' }}>
+                    <AutoFixHighIcon style={menuBadgeChipIconStyle} />
                   </span>
                   Has Edited Version
                 </label>
@@ -13109,8 +13063,8 @@ export default function App() {
                     checked={showThumbnailPeopleBadges}
                     onChange={(event) => setShowThumbnailPeopleBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <FaceIcon style={{ fontSize: '15px', color: '#00b8d9' }} />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#0891b2' }}>
+                    <FaceIcon style={menuBadgeChipIconStyle} />
                   </span>
                   People
                 </label>
@@ -13120,8 +13074,13 @@ export default function App() {
                     checked={showThumbnailOrderingBadges}
                     onChange={(event) => setShowThumbnailOrderingBadges(event.target.checked)}
                   />
-                  <span style={menuBadgeIconWrapperStyle}>
-                    <span style={menuBadgeGlyphStyle}>⤓</span>
+                  <span style={menuBadgeChipGroupStyle}>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#b45309' }} title="Suspect capture date">
+                      <WarningAmberIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#1f6feb' }} title="Manually placed">
+                      <SwapVertIcon style={menuBadgeChipIconStyle} />
+                    </span>
                   </span>
                   Ordering
                 </label>
