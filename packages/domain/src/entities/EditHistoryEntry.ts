@@ -5,6 +5,8 @@ export interface EditHistoryEntry {
   note: string;
   editedFilename: string;
   editedAssetId: string | null;
+  // How this edit was produced. Optional since entries created before this field existed won't have it.
+  editMethod?: 'ai' | 'manual';
   status: 'succeeded' | 'failed';
   errorMessage: string | null;
   processedAt: string;

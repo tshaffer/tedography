@@ -149,22 +149,14 @@ async function run(): Promise<void> {
         continue;
       }
 
-      if (source.editedAssetId) {
-        if (source.editedAssetId === edited.id) {
-          assetAlreadySet++;
-          continue;
-        }
-        console.warn(
-          `  ⚠ "${source.filename}" already has editedAssetId="${source.editedAssetId}" ` +
-          `(conflicts with "${edited.filename}" id=${edited.id}) — skipping`
-        );
-        assetConflict++;
+      if ((source.editedAssetIds ?? []).includes(edited.id)) {
+        assetAlreadySet++;
         continue;
       }
 
-      console.log(`  ${source.filename}  →  editedAssetId = ${edited.id}  (${edited.filename})`);
+      console.log(`  ${source.filename}  →  editedAssetIds += ${edited.id}  (${edited.filename})`);
       if (apply) {
-        await MediaAssetModel.updateOne({ id: sourceId }, { $set: { editedAssetId: edited.id } });
+        await MediaAssetModel.updateOne({ id: sourceId }, { $addToSet: { editedAssetIds: edited.id } });
       }
       assetUpdated++;
     }
@@ -189,16 +181,8 @@ async function run(): Promise<void> {
         continue;
       }
 
-      if (source.editedAssetId) {
-        if (source.editedAssetId === histEntry.editedAssetId) {
-          assetAlreadySet++;
-          continue;
-        }
-        console.warn(
-          `  ⚠ "${source.filename}" already has editedAssetId="${source.editedAssetId}" ` +
-          `(history has editedAssetId="${histEntry.editedAssetId}") — skipping`
-        );
-        assetConflict++;
+      if ((source.editedAssetIds ?? []).includes(histEntry.editedAssetId ?? '')) {
+        assetAlreadySet++;
         continue;
       }
 
@@ -210,9 +194,9 @@ async function run(): Promise<void> {
         continue;
       }
 
-      console.log(`  ${source.filename}  →  editedAssetId = ${editedAsset.id}  (${editedAsset.filename})  [via editHistory]`);
+      console.log(`  ${source.filename}  →  editedAssetIds += ${editedAsset.id}  (${editedAsset.filename})  [via editHistory]`);
       if (apply) {
-        await MediaAssetModel.updateOne({ id: source.id }, { $set: { editedAssetId: editedAsset.id } });
+        await MediaAssetModel.updateOne({ id: source.id }, { $addToSet: { editedAssetIds: editedAsset.id } });
       }
       assetUpdated++;
     }

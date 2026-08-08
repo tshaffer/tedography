@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { type MediaAsset, type MediaAssetPerson, type Person } from '@tedography/domain';
-import type { EditQueueEntryWithFilename } from '../../api/editQueueApi';
+import type { EditQueueEntryWithFilename, EditMethod } from '../../api/editQueueApi';
 import Chip from '@mui/material/Chip';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -40,6 +40,7 @@ interface AssetDetailsPanelProps {
   keywordsSlot?: ReactNode;
   editQueueEntry?: EditQueueEntryWithFilename | null;
   onSaveEditNote?: ((note: string) => Promise<void>) | undefined;
+  onChangeEditMethod?: ((method: EditMethod) => Promise<void>) | undefined;
 }
 
 const panelStyle: CSSProperties = {
@@ -298,6 +299,7 @@ export function AssetDetailsPanel({
   keywordsSlot,
   editQueueEntry = null,
   onSaveEditNote,
+  onChangeEditMethod,
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
@@ -307,6 +309,7 @@ export function AssetDetailsPanel({
   const [noteEditing, setNoteEditing] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
+  const [editMethodSaving, setEditMethodSaving] = useState(false);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   if (!asset) {
@@ -582,6 +585,48 @@ export function AssetDetailsPanel({
           ) : (
             <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.note}</p>
           )}
+        </section>
+      ) : null}
+
+      {/* Edit Method */}
+      {asset.sourceAssetId != null && onChangeEditMethod ? (
+        <section style={subSectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>Edit Method</h4>
+            <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8' }}>
+              {(['manual', 'ai'] as const).map((method, idx) => {
+                const active = asset.editMethod === method;
+                return (
+                  <button
+                    key={method}
+                    type="button"
+                    disabled={editMethodSaving || active}
+                    onClick={async () => {
+                      setEditMethodSaving(true);
+                      try {
+                        await onChangeEditMethod(method);
+                      } finally {
+                        setEditMethodSaving(false);
+                      }
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '12px',
+                      fontWeight: active ? 700 : 400,
+                      backgroundColor: active ? '#dbeafe' : '#f9f9f9',
+                      color: active ? '#1d4ed8' : '#555',
+                      border: 'none',
+                      cursor: active ? 'default' : 'pointer',
+                      borderRight: idx === 0 ? '1px solid #c8c8c8' : 'none',
+                      opacity: editMethodSaving ? 0.6 : 1,
+                    }}
+                  >
+                    {method === 'ai' ? 'AI' : 'Manual'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </section>
       ) : null}
 

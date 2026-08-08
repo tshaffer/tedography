@@ -17,6 +17,7 @@
     "thumbnails:rebuild": "tsx src/tools/thumbnailMaintenance.ts --mode rebuild",
     "edited:migrate": "tsx src/tools/migrateEditedFilesToSourceFolder.ts",
     "edited:backfill": "tsx src/tools/backfillEditedAssetIds.ts",
+    "edit-method:backfill": "tsx src/tools/backfillEditMethod.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "tsx --test src/**/*.test.ts",

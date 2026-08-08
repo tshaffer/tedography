@@ -103,8 +103,11 @@ export interface MediaAsset {
   // When this asset was generated from another asset (e.g. AI editing), the source asset's id.
   sourceAssetId?: string | null;
 
-  // When an edited version of this asset has been imported, the edited asset's id.
-  editedAssetId?: string | null;
+  // How this asset was produced, when it's an edited copy of a sourceAssetId. Absent on originals.
+  editMethod?: 'ai' | 'manual';
+
+  // Ids of edited versions imported for this asset, if any (an original can have more than one).
+  editedAssetIds?: string[];
 
   // Optional capture location metadata when available.
   locationLabel?: string | null;

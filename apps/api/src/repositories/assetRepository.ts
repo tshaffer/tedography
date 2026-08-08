@@ -96,7 +96,8 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           albumMemberships: 1,
           people: 1,
           sourceAssetId: 1,
-          editedAssetId: 1,
+          editMethod: 1,
+          editedAssetIds: 1,
         }
       }
     )
@@ -153,7 +154,8 @@ export async function getAssetPageForLibrary(input?: {
           albumMemberships: 1,
           people: 1,
           sourceAssetId: 1,
-          editedAssetId: 1,
+          editMethod: 1,
+          editedAssetIds: 1,
         }
       }
     )
@@ -348,6 +350,7 @@ export interface CreateMediaAssetInput {
   keywordIds?: string[];
   albumMemberships?: MediaAssetAlbumMembership[];
   sourceAssetId?: string | null;
+  editMethod?: 'ai' | 'manual';
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
@@ -387,6 +390,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     albumMemberships: input.albumMemberships ?? [],
     people: [],
     ...(input.sourceAssetId != null && { sourceAssetId: input.sourceAssetId }),
+    ...(input.editMethod != null && { editMethod: input.editMethod }),
   };
 
   if (input.thumbnailStorageType) {
@@ -718,8 +722,12 @@ export async function updateMediaAssetPeople(
   return asset ? normalizeMediaAsset(asset) : null;
 }
 
-export async function setMediaAssetEditedAssetId(id: string, editedAssetId: string): Promise<void> {
-  await MediaAssetModel.updateOne({ id }, { $set: { editedAssetId } });
+export async function addEditedAssetId(id: string, editedAssetId: string): Promise<void> {
+  await MediaAssetModel.updateOne({ id }, { $addToSet: { editedAssetIds: editedAssetId } });
+}
+
+export async function setMediaAssetEditMethod(id: string, editMethod: 'ai' | 'manual'): Promise<void> {
+  await MediaAssetModel.updateOne({ id }, { $set: { editMethod } });
 }
 
 export async function removePersonFromAllAssets(personId: string): Promise<number> {

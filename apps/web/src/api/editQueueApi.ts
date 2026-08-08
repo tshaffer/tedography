@@ -15,6 +15,14 @@ export interface ImportEditedResult {
   message?: string;
 }
 
+export interface EditedFileCandidate {
+  filename: string;
+  sourceAssetId: string;
+  sourceFilename: string;
+}
+
+export type EditMethod = 'ai' | 'manual';
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: 'no-store', ...options });
   if (!response.ok) {
@@ -52,12 +60,30 @@ export function exportEditQueue(assetIds: string[]): Promise<{ editPath: string;
   });
 }
 
-export function importEditedFiles(): Promise<{
+export function scanEditedFiles(): Promise<{ files: EditedFileCandidate[] }> {
+  return fetchJson<{ files: EditedFileCandidate[] }>('/api/edit-queue/import/scan');
+}
+
+export function importEditedFiles(
+  files: { filename: string; editMethod: EditMethod }[]
+): Promise<{
   results: ImportEditedResult[];
   importedCount: number;
   errorCount: number;
 }> {
-  return fetchJson('/api/edit-queue/import', { method: 'POST' });
+  return fetchJson('/api/edit-queue/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files }),
+  });
+}
+
+export function updateAssetEditMethod(assetId: string, editMethod: EditMethod): Promise<{ ok: boolean; editMethod: EditMethod }> {
+  return fetchJson(`/api/edit-queue/assets/${encodeURIComponent(assetId)}/edit-method`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ editMethod }),
+  });
 }
 
 export function clearEditFolder(): Promise<{ ok: boolean; deletedCount: number }> {

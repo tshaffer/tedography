@@ -11,7 +11,8 @@ import {
   createMediaAsset,
   updateMediaAssetAlbumIds,
   updateMediaAssetPeople,
-  setMediaAssetEditedAssetId,
+  addEditedAssetId,
+  setMediaAssetEditMethod,
 } from '../repositories/assetRepository.js';
 import { listAlbumTreeNodes } from '../repositories/albumTreeRepository.js';
 import {
@@ -111,6 +112,61 @@ function buildAlbumPath(albumId: string, nodesById: AlbumNodeMap): string | null
     depth++;
   }
   return parts.length > 0 ? parts.join(' → ') : null;
+}
+
+/**
+ * Matches an edited filename's basename against manifest entries whose original
+ * basename is followed immediately by "_edited" (optionally with more characters
+ * after, e.g. "_edited_ai", "_edited-2") — this lets more than one edited output
+ * exist for the same original, as long as each has a distinct filename. When more
+ * than one entry's basename qualifies, the longest one wins to avoid ambiguity.
+ */
+function findManifestMatchForFilename(filename: string, manifestEntries: ManifestEntry[]): ManifestEntry | null {
+  const base = basenameWithoutExt(filename).toLowerCase();
+  const matches = manifestEntries.filter((entry) =>
+    base.startsWith(`${entry.originalBasename.toLowerCase()}_edited`)
+  );
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => b.originalBasename.length - a.originalBasename.length)[0]!;
+}
+
+async function readManifest(editPath: string): Promise<Manifest | null> {
+  try {
+    const raw = await fs.readFile(path.join(editPath, 'manifest.json'), 'utf-8');
+    return JSON.parse(raw) as Manifest;
+  } catch {
+    return null;
+  }
+}
+
+type EditedFileCandidate = { filename: string; manifestEntry: ManifestEntry };
+
+async function findEditedFileCandidates(
+  editPath: string
+): Promise<{ ok: true; candidates: EditedFileCandidate[] } | { ok: false; error: string }> {
+  const manifest = await readManifest(editPath);
+  if (!manifest) {
+    return { ok: false, error: 'manifest.json not found in edit path. Run Export first.' };
+  }
+
+  let allFiles: string[];
+  try {
+    allFiles = await fs.readdir(editPath);
+  } catch {
+    return { ok: false, error: 'Failed to read edit path directory' };
+  }
+
+  const candidates: EditedFileCandidate[] = [];
+  for (const filename of allFiles) {
+    const base = basenameWithoutExt(filename).toLowerCase();
+    if (!base.includes('_edited')) continue;
+    const manifestEntry = findManifestMatchForFilename(filename, manifest.entries);
+    if (manifestEntry) {
+      candidates.push({ filename, manifestEntry });
+    }
+  }
+
+  return { ok: true, candidates };
 }
 
 // ─── GET / — list queue entries with filenames and album path ────────────────
@@ -258,46 +314,52 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
   }
 });
 
-// ─── POST /import — import _edited files back into the library ───────────────
+// ─── GET /import/scan — find candidate _edited files, no side effects ───────
 
-editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res) => {
+editQueueRoutes.get('/import/scan', requireFeature('maintenance'), async (_req, res) => {
   const editPath = requireEditPath(res);
   if (!editPath) return;
 
-  // 1. Read manifest
-  let manifest: Manifest;
-  try {
-    const raw = await fs.readFile(path.join(editPath, 'manifest.json'), 'utf-8');
-    manifest = JSON.parse(raw) as Manifest;
-  } catch {
-    res.status(400).json({ error: 'manifest.json not found in edit path. Run Export first.' });
+  const result = await findEditedFileCandidates(editPath);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
     return;
   }
 
-  // Build a basename → manifest entry map for fast lookup
-  const byBasename = new Map<string, ManifestEntry>();
-  for (const entry of manifest.entries) {
-    byBasename.set(entry.originalBasename.toLowerCase(), entry);
-  }
-
-  // 3. Scan edit path for *_edited.* files
-  let allFiles: string[];
-  try {
-    allFiles = await fs.readdir(editPath);
-  } catch {
-    res.status(500).json({ error: 'Failed to read edit path directory' });
-    return;
-  }
-
-  const editedFiles = allFiles.filter((f) => {
-    const base = basenameWithoutExt(f).toLowerCase();
-    return base.endsWith('_edited');
+  res.json({
+    files: result.candidates.map((c) => ({
+      filename: c.filename,
+      sourceAssetId: c.manifestEntry.sourceAssetId,
+      sourceFilename: c.manifestEntry.originalFilename,
+    })),
   });
+});
 
-  if (editedFiles.length === 0) {
-    res.json({ results: [], message: 'No _edited files found in edit path.' });
+// ─── POST /import — import the given classified _edited files ───────────────
+
+editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) => {
+  const editPath = requireEditPath(res);
+  if (!editPath) return;
+
+  const { files } = req.body as { files?: { filename?: string; editMethod?: string }[] };
+  if (!Array.isArray(files) || files.length === 0) {
+    res.status(400).json({ error: 'files must be a non-empty array' });
     return;
   }
+  for (const f of files) {
+    if (!f || typeof f.filename !== 'string' || (f.editMethod !== 'ai' && f.editMethod !== 'manual')) {
+      res.status(400).json({ error: 'Each file entry requires a filename and editMethod of "ai" or "manual"' });
+      return;
+    }
+  }
+  const requestedFiles = files as { filename: string; editMethod: 'ai' | 'manual' }[];
+
+  const scanResult = await findEditedFileCandidates(editPath);
+  if (!scanResult.ok) {
+    res.status(400).json({ error: scanResult.error });
+    return;
+  }
+  const candidateByFilename = new Map(scanResult.candidates.map((c) => [c.filename, c.manifestEntry]));
 
   const results: Array<{
     filename: string;
@@ -307,12 +369,10 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
     message?: string;
   }> = [];
 
-  for (const editedFilename of editedFiles) {
+  for (const { filename: editedFilename, editMethod } of requestedFiles) {
     const absolutePath = path.join(editPath, editedFilename);
-    const base = basenameWithoutExt(editedFilename).toLowerCase(); // e.g. "img_1234_edited"
-    const sourceBasename = base.slice(0, -'_edited'.length);        // e.g. "img_1234"
 
-    const manifestEntry = byBasename.get(sourceBasename);
+    const manifestEntry = candidateByFilename.get(editedFilename);
     if (!manifestEntry) {
       results.push({ filename: editedFilename, status: 'skipped', message: 'No matching manifest entry for source basename' });
       continue;
@@ -468,6 +528,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         albumMemberships,
         keywordIds,
         sourceAssetId: sourceAsset.id,
+        editMethod,
       });
 
       // Inherit people from source
@@ -483,7 +544,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
 
       // Link the edited asset back to the source (bidirectional) and mark the queue entry.
       await Promise.all([
-        setMediaAssetEditedAssetId(sourceAsset.id, newAsset.id),
+        addEditedAssetId(sourceAsset.id, newAsset.id),
         setQueueEntryEditedAssetId(sourceAsset.id, newAsset.id),
       ]);
 
@@ -496,6 +557,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         status: 'succeeded',
         errorMessage: null,
         editedAssetId: newAsset.id,
+        editMethod,
       });
 
       log.info(`Imported edited file ${editedFilename} as asset ${newAsset.id}`);
@@ -510,6 +572,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
         editedFilename,
         status: 'failed',
         errorMessage: message,
+        editMethod,
       });
       results.push({ filename: editedFilename, status: 'error', message });
     }
@@ -518,4 +581,32 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (_req, res)
   const importedCount = results.filter((r) => r.status === 'imported').length;
   const errorCount = results.filter((r) => r.status === 'error').length;
   res.json({ results, importedCount, errorCount });
+});
+
+// ─── PATCH /assets/:assetId/edit-method — reclassify an edited copy's method ──
+
+editQueueRoutes.patch('/assets/:assetId/edit-method', requireFeature('maintenance'), async (req, res) => {
+  const { assetId } = req.params;
+  const { editMethod } = req.body as { editMethod?: string };
+  if (editMethod !== 'ai' && editMethod !== 'manual') {
+    res.status(400).json({ error: 'editMethod must be "ai" or "manual"' });
+    return;
+  }
+
+  try {
+    const asset = await findById(assetId as string);
+    if (!asset) {
+      res.status(404).json({ error: 'Asset not found' });
+      return;
+    }
+    if (asset.sourceAssetId == null) {
+      res.status(400).json({ error: 'Only edited-copy assets (with a sourceAssetId) have an edit method' });
+      return;
+    }
+    await setMediaAssetEditMethod(assetId as string, editMethod);
+    res.json({ ok: true, editMethod });
+  } catch (error) {
+    log.error(`Failed to update edit method for asset ${assetId}`, error);
+    res.status(500).json({ error: 'Failed to update edit method' });
+  }
 });

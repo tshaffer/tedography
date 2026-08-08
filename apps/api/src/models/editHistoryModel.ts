@@ -9,6 +9,7 @@ const editHistorySchema = new Schema<EditHistoryEntry>(
     note: { type: String, required: false, trim: true, default: '' },
     editedFilename: { type: String, required: true, trim: true },
     editedAssetId: { type: String, default: null },
+    editMethod: { type: String, required: false, enum: ['ai', 'manual'] },
     status: { type: String, required: true, enum: ['succeeded', 'failed'] },
     errorMessage: { type: String, default: null },
     processedAt: { type: String, required: true, trim: true },

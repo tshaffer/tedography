@@ -218,13 +218,21 @@ ${albumsContext}`;
                 },
                 description: 'Keyword include/exclude filters.',
               },
-              isEditedImport: {
+              isManuallyEditedImport: {
                 type: 'boolean',
-                description: 'Only show photos that were imported as edited versions.',
+                description: 'Only show photos that were imported as a manually edited version (e.g. Photoshop, Lightroom), as opposed to AI-edited.',
               },
-              hasEditedVersion: {
+              isAiEditedImport: {
                 type: 'boolean',
-                description: 'Only show photos that have an edited version.',
+                description: 'Only show photos that were imported as an AI-edited version, as opposed to manually edited.',
+              },
+              hasManuallyEditedVersion: {
+                type: 'boolean',
+                description: 'Only show photos that have a manually edited version.',
+              },
+              hasAiEditedVersion: {
+                type: 'boolean',
+                description: 'Only show photos that have an AI-edited version.',
               },
               inEditQueue: {
                 type: 'boolean',

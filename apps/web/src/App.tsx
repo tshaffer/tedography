@@ -53,6 +53,8 @@ import LockIcon from '@mui/icons-material/Lock';
 import FaceIcon from '@mui/icons-material/Face';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import BrushIcon from '@mui/icons-material/Brush';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -126,15 +128,20 @@ import {
 import {
   type EditQueueEntryWithFilename,
   type ImportEditedResult,
+  type EditedFileCandidate,
+  type EditMethod,
   addToEditQueue,
   clearEditQueue,
   exportEditQueue,
   getEditQueue,
+  scanEditedFiles,
   importEditedFiles,
+  updateAssetEditMethod,
   removeFromEditQueue,
   clearEditFolder,
 } from './api/editQueueApi';
 import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
+import { ClassifyEditedFilesDialog } from './components/editQueue/ClassifyEditedFilesDialog';
 import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
 import { EditHistoryArchivesDialog } from './components/editQueue/EditHistoryArchivesDialog';
 import { EditHistoryArchiveViewDialog } from './components/editQueue/EditHistoryArchiveViewDialog';
@@ -242,8 +249,10 @@ const searchHasNoPeopleStorageKey = 'tedography.search.hasNoPeople';
 const searchHasConfirmedPeopleStorageKey = 'tedography.search.hasConfirmedPeople';
 const searchHasReviewableFacesStorageKey = 'tedography.search.hasReviewableFaces';
 const searchHasKeywordsStorageKey = 'tedography.search.hasKeywords';
-const searchIsEditedImportStorageKey = 'tedography.search.isEditedImport';
-const searchHasEditedVersionStorageKey = 'tedography.search.hasEditedVersion';
+const searchIsManuallyEditedImportStorageKey = 'tedography.search.isManuallyEditedImport';
+const searchIsAiEditedImportStorageKey = 'tedography.search.isAiEditedImport';
+const searchHasManuallyEditedVersionStorageKey = 'tedography.search.hasManuallyEditedVersion';
+const searchHasAiEditedVersionStorageKey = 'tedography.search.hasAiEditedVersion';
 const searchInEditQueueStorageKey = 'tedography.search.inEditQueue';
 const searchEditQueueMatchModeStorageKey = 'tedography.search.editQueueMatchMode';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
@@ -351,6 +360,7 @@ const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBad
 const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
 const showThumbnailEditedImportBadgesStorageKey = 'tedography.showThumbnailEditedImportBadges';
 const showThumbnailHasEditedVersionBadgesStorageKey = 'tedography.showThumbnailHasEditedVersionBadges';
+const showThumbnailEditMethodBadgesStorageKey = 'tedography.showThumbnailEditMethodBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
@@ -399,8 +409,10 @@ type SearchFilters = {
   hasReviewableFaces: boolean;
   hasKeywords: boolean;
   keywordQuery: KeywordQueryState;
-  isEditedImport: TriState;
-  hasEditedVersion: TriState;
+  isManuallyEditedImport: TriState;
+  isAiEditedImport: TriState;
+  hasManuallyEditedVersion: TriState;
+  hasAiEditedVersion: TriState;
   inEditQueue: TriState;
   editQueueMatchMode: EditQueueMatchMode;
 };
@@ -2834,8 +2846,10 @@ function getDefaultSearchFilters(): SearchFilters {
     hasReviewableFaces: false,
     hasKeywords: false,
     keywordQuery: { include: [], includeMode: 'all', exclude: [] },
-    isEditedImport: 'any',
-    hasEditedVersion: 'any',
+    isManuallyEditedImport: 'any',
+    isAiEditedImport: 'any',
+    hasManuallyEditedVersion: 'any',
+    hasAiEditedVersion: 'any',
     inEditQueue: 'any',
     editQueueMatchMode: 'and',
   };
@@ -2874,8 +2888,10 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
         c.keywordId === right.keywordQuery.exclude[i]?.keywordId &&
         c.includeDescendants === right.keywordQuery.exclude[i]?.includeDescendants
     ) &&
-    left.isEditedImport === right.isEditedImport &&
-    left.hasEditedVersion === right.hasEditedVersion &&
+    left.isManuallyEditedImport === right.isManuallyEditedImport &&
+    left.isAiEditedImport === right.isAiEditedImport &&
+    left.hasManuallyEditedVersion === right.hasManuallyEditedVersion &&
+    left.hasAiEditedVersion === right.hasAiEditedVersion &&
     left.inEditQueue === right.inEditQueue &&
     left.editQueueMatchMode === right.editQueueMatchMode
   );
@@ -2898,8 +2914,10 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.hasKeywords ||
     filters.keywordQuery.include.length > 0 ||
     filters.keywordQuery.exclude.length > 0 ||
-    filters.isEditedImport !== 'any' ||
-    filters.hasEditedVersion !== 'any' ||
+    filters.isManuallyEditedImport !== 'any' ||
+    filters.isAiEditedImport !== 'any' ||
+    filters.hasManuallyEditedVersion !== 'any' ||
+    filters.hasAiEditedVersion !== 'any' ||
     filters.inEditQueue !== 'any'
   );
 }
@@ -3065,6 +3083,7 @@ type AssetCardProps = {
   showAiQueueBadge: boolean;
   showEditedImportBadge: boolean;
   showHasEditedVersionBadge: boolean;
+  editMethodBadges: EditMethod[];
   showPeopleBadge: boolean;
   isInAiQueue: boolean;
   touchSelectionMode: boolean;
@@ -3091,6 +3110,7 @@ function AssetCard({
   showAiQueueBadge,
   showEditedImportBadge,
   showHasEditedVersionBadge,
+  editMethodBadges,
   showPeopleBadge,
   isInAiQueue,
   touchSelectionMode,
@@ -3280,7 +3300,7 @@ function AssetCard({
             >
               <AutoFixHighIcon style={cardBadgeIconStyle} />
             </span>
-          ) : showHasEditedVersionBadge && asset.sourceAssetId == null && asset.editedAssetId != null ? (
+          ) : showHasEditedVersionBadge && asset.sourceAssetId == null && (asset.editedAssetIds?.length ?? 0) > 0 ? (
             <span
               style={{ ...cardBadgeChipStyle, backgroundColor: '#6366f1' }}
               title="An edited version of this photo exists"
@@ -3288,6 +3308,15 @@ function AssetCard({
               <AutoFixHighIcon style={cardBadgeIconStyle} />
             </span>
           ) : null}
+          {editMethodBadges.map((method) => (
+            <span
+              key={method}
+              style={{ ...cardBadgeChipStyle, backgroundColor: method === 'ai' ? '#c026d3' : '#57534e' }}
+              title={method === 'ai' ? 'Edited with AI' : 'Edited manually'}
+            >
+              {method === 'ai' ? <AutoAwesomeIcon style={cardBadgeIconStyle} /> : <BrushIcon style={cardBadgeIconStyle} />}
+            </span>
+          ))}
         </span>
         <span style={cardBottomBadgeRowStyle}>
           {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
@@ -4179,6 +4208,9 @@ export default function App() {
   const [editQueueImportResults, setEditQueueImportResults] = useState<ImportEditedResult[] | null>(null);
   const [editQueueImportError, setEditQueueImportError] = useState<string | null>(null);
   const [editQueueImporting, setEditQueueImporting] = useState(false);
+  const [editQueueClassifyDialogOpen, setEditQueueClassifyDialogOpen] = useState(false);
+  const [editQueueClassifyCandidates, setEditQueueClassifyCandidates] = useState<EditedFileCandidate[]>([]);
+  const [editQueueClassifyCommitting, setEditQueueClassifyCommitting] = useState(false);
   const [editQueueClearFolderNotice, setEditQueueClearFolderNotice] = useState<string | null>(null);
   const [editQueueClearFolderError, setEditQueueClearFolderError] = useState<string | null>(null);
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
@@ -4351,13 +4383,21 @@ export default function App() {
 
     return parseBooleanFromStorage(window.localStorage.getItem(searchHasKeywordsStorageKey));
   });
-  const [searchIsEditedImport, setSearchIsEditedImport] = useState<TriState>(() => {
+  const [searchIsManuallyEditedImport, setSearchIsManuallyEditedImport] = useState<TriState>(() => {
     if (typeof window === 'undefined') return 'any';
-    return parseTriStateFromStorage(window.localStorage.getItem(searchIsEditedImportStorageKey));
+    return parseTriStateFromStorage(window.localStorage.getItem(searchIsManuallyEditedImportStorageKey));
   });
-  const [searchHasEditedVersion, setSearchHasEditedVersion] = useState<TriState>(() => {
+  const [searchIsAiEditedImport, setSearchIsAiEditedImport] = useState<TriState>(() => {
     if (typeof window === 'undefined') return 'any';
-    return parseTriStateFromStorage(window.localStorage.getItem(searchHasEditedVersionStorageKey));
+    return parseTriStateFromStorage(window.localStorage.getItem(searchIsAiEditedImportStorageKey));
+  });
+  const [searchHasManuallyEditedVersion, setSearchHasManuallyEditedVersion] = useState<TriState>(() => {
+    if (typeof window === 'undefined') return 'any';
+    return parseTriStateFromStorage(window.localStorage.getItem(searchHasManuallyEditedVersionStorageKey));
+  });
+  const [searchHasAiEditedVersion, setSearchHasAiEditedVersion] = useState<TriState>(() => {
+    if (typeof window === 'undefined') return 'any';
+    return parseTriStateFromStorage(window.localStorage.getItem(searchHasAiEditedVersionStorageKey));
   });
   const [searchInEditQueue, setSearchInEditQueue] = useState<TriState>(() => {
     if (typeof window === 'undefined') return 'any';
@@ -4599,6 +4639,12 @@ export default function App() {
       return false;
     }
     return window.localStorage.getItem(showThumbnailHasEditedVersionBadgesStorageKey) === 'true';
+  });
+  const [showThumbnailEditMethodBadges, setShowThumbnailEditMethodBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.localStorage.getItem(showThumbnailEditMethodBadgesStorageKey) === 'true';
   });
   const [showThumbnailPeopleBadges, setShowThumbnailPeopleBadges] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
@@ -5087,6 +5133,13 @@ export default function App() {
 
   useEffect(() => {
     window.localStorage.setItem(
+      showThumbnailEditMethodBadgesStorageKey,
+      showThumbnailEditMethodBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailEditMethodBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
       showThumbnailPeopleBadgesStorageKey,
       showThumbnailPeopleBadges ? 'true' : 'false'
     );
@@ -5260,12 +5313,20 @@ export default function App() {
   }, [searchHasKeywords]);
 
   useEffect(() => {
-    window.localStorage.setItem(searchIsEditedImportStorageKey, String(searchIsEditedImport));
-  }, [searchIsEditedImport]);
+    window.localStorage.setItem(searchIsManuallyEditedImportStorageKey, String(searchIsManuallyEditedImport));
+  }, [searchIsManuallyEditedImport]);
 
   useEffect(() => {
-    window.localStorage.setItem(searchHasEditedVersionStorageKey, String(searchHasEditedVersion));
-  }, [searchHasEditedVersion]);
+    window.localStorage.setItem(searchIsAiEditedImportStorageKey, String(searchIsAiEditedImport));
+  }, [searchIsAiEditedImport]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasManuallyEditedVersionStorageKey, String(searchHasManuallyEditedVersion));
+  }, [searchHasManuallyEditedVersion]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchHasAiEditedVersionStorageKey, String(searchHasAiEditedVersion));
+  }, [searchHasAiEditedVersion]);
 
   useEffect(() => {
     window.localStorage.setItem(searchInEditQueueStorageKey, String(searchInEditQueue));
@@ -5901,8 +5962,10 @@ export default function App() {
         includeMode: searchKeywordIncludeMode,
         exclude: searchKeywordExclude
       },
-      isEditedImport: searchIsEditedImport,
-      hasEditedVersion: searchHasEditedVersion,
+      isManuallyEditedImport: searchIsManuallyEditedImport,
+      isAiEditedImport: searchIsAiEditedImport,
+      hasManuallyEditedVersion: searchHasManuallyEditedVersion,
+      hasAiEditedVersion: searchHasAiEditedVersion,
       inEditQueue: searchInEditQueue,
       editQueueMatchMode: searchEditQueueMatchMode,
     }),
@@ -5924,8 +5987,10 @@ export default function App() {
       searchPeopleIds,
       searchPeopleMatchMode,
       searchPhotoStates,
-      searchIsEditedImport,
-      searchHasEditedVersion,
+      searchIsManuallyEditedImport,
+      searchIsAiEditedImport,
+      searchHasManuallyEditedVersion,
+      searchHasAiEditedVersion,
       searchInEditQueue,
       searchEditQueueMatchMode,
     ]
@@ -5994,14 +6059,32 @@ export default function App() {
         !excludeMatchSets.some((matchSet) => assetKeywordIds.some((id) => matchSet.has(id)));
 
       const editQueueConstraints: boolean[] = [];
-      if (appliedSearchFilters.isEditedImport !== 'any') {
+      if (appliedSearchFilters.isManuallyEditedImport !== 'any') {
         editQueueConstraints.push(
-          (appliedSearchFilters.isEditedImport === 'yes') === (asset.sourceAssetId != null)
+          (appliedSearchFilters.isManuallyEditedImport === 'yes') ===
+            (asset.sourceAssetId != null && asset.editMethod === 'manual')
         );
       }
-      if (appliedSearchFilters.hasEditedVersion !== 'any') {
+      if (appliedSearchFilters.isAiEditedImport !== 'any') {
         editQueueConstraints.push(
-          (appliedSearchFilters.hasEditedVersion === 'yes') === (asset.editedAssetId != null)
+          (appliedSearchFilters.isAiEditedImport === 'yes') ===
+            (asset.sourceAssetId != null && asset.editMethod === 'ai')
+        );
+      }
+      if (appliedSearchFilters.hasManuallyEditedVersion !== 'any') {
+        const hasManualEditedVersion = (asset.editedAssetIds ?? []).some(
+          (id) => assetsById.get(id)?.editMethod === 'manual'
+        );
+        editQueueConstraints.push(
+          (appliedSearchFilters.hasManuallyEditedVersion === 'yes') === hasManualEditedVersion
+        );
+      }
+      if (appliedSearchFilters.hasAiEditedVersion !== 'any') {
+        const hasAiEditedVersion = (asset.editedAssetIds ?? []).some(
+          (id) => assetsById.get(id)?.editMethod === 'ai'
+        );
+        editQueueConstraints.push(
+          (appliedSearchFilters.hasAiEditedVersion === 'yes') === hasAiEditedVersion
         );
       }
       if (appliedSearchFilters.inEditQueue !== 'any') {
@@ -6033,6 +6116,7 @@ export default function App() {
     appliedSearchFilters,
     albumTreeNodes,
     areaPhotoStateVisibleAssets,
+    assetsById,
     editQueueAssetIdSet,
     keywords,
     primaryArea,
@@ -6436,8 +6520,10 @@ export default function App() {
       filters.hasReviewableFaces ||
       filters.photoStates.length > 1 ||
       filters.groupIds.length > 1 ||
-      filters.isEditedImport !== 'any' ||
-      filters.hasEditedVersion !== 'any' ||
+      filters.isManuallyEditedImport !== 'any' ||
+      filters.isAiEditedImport !== 'any' ||
+      filters.hasManuallyEditedVersion !== 'any' ||
+      filters.hasAiEditedVersion !== 'any' ||
       filters.inEditQueue !== 'any';
 
     if (activeUnsupportedFilters) {
@@ -7809,8 +7895,27 @@ export default function App() {
     setEditQueueImportError(null);
     setEditQueueImporting(true);
     try {
-      const { results } = await importEditedFiles();
+      const { files } = await scanEditedFiles();
+      if (files.length === 0) {
+        setEditQueueImportResults([]);
+        return;
+      }
+      setEditQueueClassifyCandidates(files);
+      setEditQueueClassifyDialogOpen(true);
+    } catch (err) {
+      setEditQueueImportError(err instanceof Error ? err.message : 'Scan failed');
+    } finally {
+      setEditQueueImporting(false);
+    }
+  }
+
+  async function handleConfirmClassifyImport(files: { filename: string; editMethod: EditMethod }[]): Promise<void> {
+    setEditQueueClassifyCommitting(true);
+    setEditQueueImportError(null);
+    try {
+      const { results } = await importEditedFiles(files);
       setEditQueueImportResults(results);
+      setEditQueueClassifyDialogOpen(false);
       await loadEditQueue();
       if (results.some((r) => r.status === 'imported')) {
         await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
@@ -7818,7 +7923,7 @@ export default function App() {
     } catch (err) {
       setEditQueueImportError(err instanceof Error ? err.message : 'Import failed');
     } finally {
-      setEditQueueImporting(false);
+      setEditQueueClassifyCommitting(false);
     }
   }
 
@@ -7873,6 +7978,13 @@ export default function App() {
   async function handleSaveEditQueueNote(assetId: string, note: string): Promise<void> {
     await addToEditQueue(assetId, note);
     await loadEditQueue();
+  }
+
+  async function handleChangeAssetEditMethod(assetId: string, editMethod: EditMethod): Promise<void> {
+    await updateAssetEditMethod(assetId, editMethod);
+    setAssets((previous) =>
+      previous.map((asset) => (asset.id === assetId ? { ...asset, editMethod } : asset))
+    );
   }
 
   async function handleSaveEditHistoryNote(entryId: string, note: string): Promise<void> {
@@ -8055,6 +8167,27 @@ export default function App() {
     }
 
     return null;
+  }
+
+  // Returns the distinct edit methods to badge for this asset: its own method when
+  // it's an edited copy, or the methods of its edited children when it's an original.
+  function getEditMethodBadgesForAsset(asset: MediaAsset): EditMethod[] {
+    if (!showThumbnailEditMethodBadges) {
+      return [];
+    }
+
+    if (asset.sourceAssetId != null) {
+      return asset.editMethod ? [asset.editMethod] : [];
+    }
+
+    const methods = new Set<EditMethod>();
+    for (const editedAssetId of asset.editedAssetIds ?? []) {
+      const sibling = assetsById.get(editedAssetId);
+      if (sibling?.editMethod) {
+        methods.add(sibling.editMethod);
+      }
+    }
+    return (['manual', 'ai'] as const).filter((method) => methods.has(method));
   }
 
   // When the dragged photo is part of a multi-selection, the whole selection
@@ -9269,8 +9402,10 @@ export default function App() {
     setSearchKeywordInclude(filters.keywordQuery.include);
     setSearchKeywordIncludeMode(filters.keywordQuery.includeMode);
     setSearchKeywordExclude(filters.keywordQuery.exclude);
-    setSearchIsEditedImport(filters.isEditedImport);
-    setSearchHasEditedVersion(filters.hasEditedVersion);
+    setSearchIsManuallyEditedImport(filters.isManuallyEditedImport);
+    setSearchIsAiEditedImport(filters.isAiEditedImport);
+    setSearchHasManuallyEditedVersion(filters.hasManuallyEditedVersion);
+    setSearchHasAiEditedVersion(filters.hasAiEditedVersion);
     setSearchInEditQueue(filters.inEditQueue);
     setSearchEditQueueMatchMode(filters.editQueueMatchMode);
   }
@@ -9308,8 +9443,10 @@ export default function App() {
         ...(result.hasNoPeople !== undefined && { hasNoPeople: result.hasNoPeople }),
         ...(result.hasKeywords !== undefined && { hasKeywords: result.hasKeywords }),
         ...(result.keywordQuery !== undefined && { keywordQuery: result.keywordQuery }),
-        ...(result.isEditedImport !== undefined && { isEditedImport: result.isEditedImport ? 'yes' as const : 'no' as const }),
-        ...(result.hasEditedVersion !== undefined && { hasEditedVersion: result.hasEditedVersion ? 'yes' as const : 'no' as const }),
+        ...(result.isManuallyEditedImport !== undefined && { isManuallyEditedImport: result.isManuallyEditedImport ? 'yes' as const : 'no' as const }),
+        ...(result.isAiEditedImport !== undefined && { isAiEditedImport: result.isAiEditedImport ? 'yes' as const : 'no' as const }),
+        ...(result.hasManuallyEditedVersion !== undefined && { hasManuallyEditedVersion: result.hasManuallyEditedVersion ? 'yes' as const : 'no' as const }),
+        ...(result.hasAiEditedVersion !== undefined && { hasAiEditedVersion: result.hasAiEditedVersion ? 'yes' as const : 'no' as const }),
         ...(result.inEditQueue !== undefined && { inEditQueue: result.inEditQueue ? 'yes' as const : 'no' as const }),
       };
       setPendingSearchFilters(merged);
@@ -12136,8 +12273,10 @@ export default function App() {
               </div>
               {(
                 [
-                  { key: 'isEditedImport', label: 'Is edited import', value: searchIsEditedImport, setValue: setSearchIsEditedImport },
-                  { key: 'hasEditedVersion', label: 'Has edited version', value: searchHasEditedVersion, setValue: setSearchHasEditedVersion },
+                  { key: 'isManuallyEditedImport', label: 'Is manually edited import', value: searchIsManuallyEditedImport, setValue: setSearchIsManuallyEditedImport },
+                  { key: 'isAiEditedImport', label: 'Is AI edited import', value: searchIsAiEditedImport, setValue: setSearchIsAiEditedImport },
+                  { key: 'hasManuallyEditedVersion', label: 'Has manually edited version', value: searchHasManuallyEditedVersion, setValue: setSearchHasManuallyEditedVersion },
+                  { key: 'hasAiEditedVersion', label: 'Has AI edited version', value: searchHasAiEditedVersion, setValue: setSearchHasAiEditedVersion },
                   { key: 'inEditQueue', label: 'In edit queue', value: searchInEditQueue, setValue: setSearchInEditQueue },
                 ] as const
               ).map((row) => (
@@ -12434,6 +12573,11 @@ export default function App() {
             onSaveEditNote={
               selectedAsset
                 ? async (note) => handleSaveEditQueueNote(selectedAsset.id, note)
+                : undefined
+            }
+            onChangeEditMethod={
+              selectedAsset
+                ? async (method) => handleChangeAssetEditMethod(selectedAsset.id, method)
                 : undefined
             }
           />
@@ -13053,6 +13197,22 @@ export default function App() {
                     <AutoFixHighIcon style={menuBadgeChipIconStyle} />
                   </span>
                   Has Edited Version
+                </label>
+                <label style={toggleOptionLabelStyle} title="Whether an edit was AI-generated or done with a traditional tool">
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailEditMethodBadges}
+                    onChange={(event) => setShowThumbnailEditMethodBadges(event.target.checked)}
+                  />
+                  <span style={menuBadgeChipGroupStyle}>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#57534e' }} title="Manual">
+                      <BrushIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                    <span style={{ ...menuBadgeChipStyle, backgroundColor: '#c026d3' }} title="AI">
+                      <AutoAwesomeIcon style={menuBadgeChipIconStyle} />
+                    </span>
+                  </span>
+                  Edit Method
                 </label>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -13877,6 +14037,7 @@ export default function App() {
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
+                          editMethodBadges={getEditMethodBadgesForAsset(asset)}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -13913,6 +14074,7 @@ export default function App() {
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
+                          editMethodBadges={getEditMethodBadgesForAsset(asset)}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -13957,6 +14119,7 @@ export default function App() {
                     showAiQueueBadge={showThumbnailEditQueueBadges}
                     showEditedImportBadge={showThumbnailEditedImportBadges}
                     showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
+                    editMethodBadges={getEditMethodBadgesForAsset(asset)}
                     showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                     isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -14177,6 +14340,13 @@ export default function App() {
         onClearFolder={() => void handleClearEditFolder()}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
+      />
+      <ClassifyEditedFilesDialog
+        open={editQueueClassifyDialogOpen}
+        candidates={editQueueClassifyCandidates}
+        committing={editQueueClassifyCommitting}
+        onCancel={() => setEditQueueClassifyDialogOpen(false)}
+        onConfirm={(files) => void handleConfirmClassifyImport(files)}
       />
       <ExportQueueResultDialog
         open={editQueueExportDialogOpen}

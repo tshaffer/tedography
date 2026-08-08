@@ -243,6 +243,8 @@ Photo thumbnails in the grid can show small status badges. The visible badges ar
 | Keyword badge | Indicates the photo has keywords assigned |
 | Edit Queue badge | Photo is currently in the (human) Edit Queue — awaiting export/editing |
 | Edited import badge | This photo was imported via the Edit Queue as an `_edited` file |
+| Has edited version badge | Shown on an original that has one or more edited versions imported from the Edit Queue |
+| Edit method badge | Shown alongside the Edited import / Has edited version badges — a sparkle icon for AI-edited, a brush icon for manually edited (Lightroom, Photoshop, etc.); see [11.1 Edit Queue](#111-edit-queue) |
 | People badge | Photo has confirmed people data |
 
 Badges can be toggled on or off individually from the toolbar overflow menu under **Badges**.
@@ -450,8 +452,14 @@ Open **Search** from the top navigation. Available filters:
 - **People** — one or more confirmed people, with Any or All matching
 - **Date range** — From and/or To (capture date)
 - **Capture date availability** — filter to photos with a capture date, photos without, or either
-- **Has edited version** — show only photos that have an `_edited` file imported from the Edit Queue
-- **In edit queue** — show only photos currently queued in the Edit Queue
+- **Edit Queue filters** — five independent filters, each set to Any / Yes / No, combined with a **Match: AND / OR** toggle:
+  - **Is manually edited import** — this photo was imported as a manually edited version (Lightroom, Photoshop, etc.)
+  - **Is AI edited import** — this photo was imported as an AI-edited version
+  - **Has manually edited version** — this original has at least one manually edited version imported from the Edit Queue
+  - **Has AI edited version** — this original has at least one AI-edited version imported from the Edit Queue
+  - **In edit queue** — photo is currently queued in the Edit Queue
+
+  Set Match to **OR** to combine filters (e.g. "Is manually edited import" + "Is AI edited import" with OR finds any edited import regardless of method); leave it on **AND** (the default) to require all the filters you've set.
 - **Filename pattern**
 - **Publication status**
 
@@ -828,7 +836,7 @@ Neither deletes the person or removes them from confirmed photos.
 
 ### 11.1 Edit Queue
 
-The Edit Queue exports original photos to an external folder so you can edit them in any tool, then imports the results back into Tedography. Imported files inherit key metadata from their source.
+The Edit Queue exports original photos to an external folder so you can edit them in any tool — a traditional editor (Lightroom, Photoshop, etc.) or an AI tool — then imports the results back into Tedography. Imported files inherit key metadata from their source. There's no limit on how many edited versions an original can have — for example, several manual edits and several AI edits can all coexist. Note that the thumbnail badge only shows one indicator per method (Manual / AI) regardless of how many versions of that method exist; to see the actual count, use Search or browse the album.
 
 **Setup:** add to `apps/api/.env`:
 ```
@@ -842,9 +850,13 @@ The folder is created automatically. The path must be within one of your registe
 
 **2. Export** — Open the **Edit Queue** dialog (View Queue). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `prompts.txt` and `manifest.json` (do not delete or rename the manifest).
 
-**3. Edit externally** — Open the exported files in any tool. Save results with the naming convention `<originalBasename>_edited.<ext>` (e.g. `IMG_1234_edited.jpg`). Save to the same edit folder.
+**3. Edit externally** — Open the exported files in any tool. Save results with the naming convention `<originalBasename>_edited.<ext>` (e.g. `IMG_1234_edited.jpg`), and save to the same edit folder. To produce more than one edited version of the same original (e.g. a manual edit and an AI edit), give each a distinct filename that still starts with `<originalBasename>_edited` — for example `IMG_1234_edited_ai.png` and `IMG_1234_edited_manual.jpg`.
 
-**4. Import** — Back in the Edit Queue dialog, click **Import Edited Files**. Each `_edited` file is matched to its source and imported as a new asset inheriting:
+**4. Import** — Back in the Edit Queue dialog, click **Import Edited Files**. Tedography scans the edit folder and matches files to their source. If it finds any, a **Classify Edited Files** dialog opens before anything is imported:
+
+- **Set all to** — a batch toggle that marks every listed file **Manual** or **AI** at once.
+- Each file also has its own **Manual / AI** toggle, so you can override individual files in a mixed batch.
+- Click **Confirm Import** to commit. Each file is imported as a new asset inheriting:
 
 | Property | Source |
 |---|---|
@@ -854,8 +866,9 @@ The folder is created automatically. The path must be within one of your registe
 | Capture date/time | From edited file EXIF if present; otherwise from original |
 | People tags | Copied from original |
 | Photo state | Always starts as **New** |
+| Edit method | As classified in the dialog — shown as a badge (sparkle = AI, brush = Manual) on both the new asset and the original |
 
-The original file is never modified.
+The original file is never modified. If you classify a file incorrectly, open the edited asset and change **Edit Method** in the Inspector — no need to re-import.
 
 **5. Clean up** — Use **Clear Queue** to remove queue entries (does not affect files). Use **Clear Edit Folder** (two-step confirmation) to delete files from the edit folder after a successful import.
 

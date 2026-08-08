@@ -10,6 +10,7 @@ export interface CreateEditHistoryEntryInput {
   status: 'succeeded' | 'failed';
   errorMessage: string | null;
   editedAssetId?: string | null;
+  editMethod?: 'ai' | 'manual';
 }
 
 export async function createEditHistoryEntry(input: CreateEditHistoryEntryInput): Promise<EditHistoryEntry> {
@@ -23,6 +24,7 @@ export async function createEditHistoryEntry(input: CreateEditHistoryEntryInput)
     status: input.status,
     errorMessage: input.errorMessage,
     processedAt: new Date().toISOString(),
+    ...(input.editMethod != null && { editMethod: input.editMethod }),
   };
   await EditHistoryModel.create(entry);
   return entry;

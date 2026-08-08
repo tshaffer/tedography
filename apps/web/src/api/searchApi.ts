@@ -20,8 +20,10 @@ export interface NaturalLanguageSearchResult {
     includeMode: 'all' | 'any';
     exclude: { keywordId: string; includeDescendants: boolean }[];
   };
-  isEditedImport?: boolean;
-  hasEditedVersion?: boolean;
+  isManuallyEditedImport?: boolean;
+  isAiEditedImport?: boolean;
+  hasManuallyEditedVersion?: boolean;
+  hasAiEditedVersion?: boolean;
   inEditQueue?: boolean;
 }
 
