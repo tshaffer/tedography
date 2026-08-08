@@ -141,7 +141,6 @@ import {
   clearEditFolder,
 } from './api/editQueueApi';
 import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
-import { ClassifyEditedFilesDialog } from './components/editQueue/ClassifyEditedFilesDialog';
 import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
 import { EditHistoryArchivesDialog } from './components/editQueue/EditHistoryArchivesDialog';
 import { EditHistoryArchiveViewDialog } from './components/editQueue/EditHistoryArchiveViewDialog';
@@ -4208,7 +4207,6 @@ export default function App() {
   const [editQueueImportResults, setEditQueueImportResults] = useState<ImportEditedResult[] | null>(null);
   const [editQueueImportError, setEditQueueImportError] = useState<string | null>(null);
   const [editQueueImporting, setEditQueueImporting] = useState(false);
-  const [editQueueClassifyDialogOpen, setEditQueueClassifyDialogOpen] = useState(false);
   const [editQueueClassifyCandidates, setEditQueueClassifyCandidates] = useState<EditedFileCandidate[]>([]);
   const [editQueueClassifyCommitting, setEditQueueClassifyCommitting] = useState(false);
   const [editQueueClearFolderNotice, setEditQueueClearFolderNotice] = useState<string | null>(null);
@@ -7901,12 +7899,15 @@ export default function App() {
         return;
       }
       setEditQueueClassifyCandidates(files);
-      setEditQueueClassifyDialogOpen(true);
     } catch (err) {
       setEditQueueImportError(err instanceof Error ? err.message : 'Scan failed');
     } finally {
       setEditQueueImporting(false);
     }
+  }
+
+  function handleCancelClassifyImport(): void {
+    setEditQueueClassifyCandidates([]);
   }
 
   async function handleConfirmClassifyImport(files: { filename: string; editMethod: EditMethod }[]): Promise<void> {
@@ -7915,7 +7916,7 @@ export default function App() {
     try {
       const { results } = await importEditedFiles(files);
       setEditQueueImportResults(results);
-      setEditQueueClassifyDialogOpen(false);
+      setEditQueueClassifyCandidates([]);
       await loadEditQueue();
       if (results.some((r) => r.status === 'imported')) {
         await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
@@ -14332,7 +14333,12 @@ export default function App() {
         importing={editQueueImporting}
         clearFolderNotice={editQueueClearFolderNotice}
         clearFolderError={editQueueClearFolderError}
-        onClose={() => setEditQueueDialogOpen(false)}
+        classifyCandidates={editQueueClassifyCandidates}
+        classifyCommitting={editQueueClassifyCommitting}
+        onClose={() => {
+          setEditQueueDialogOpen(false);
+          handleCancelClassifyImport();
+        }}
         onRemove={(assetId) => void handleRemoveFromEditQueue(assetId)}
         onExport={(assetIds) => void handleExportEditQueue(assetIds)}
         onImport={() => void handleImportEditedFiles()}
@@ -14340,13 +14346,8 @@ export default function App() {
         onClearFolder={() => void handleClearEditFolder()}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
-      />
-      <ClassifyEditedFilesDialog
-        open={editQueueClassifyDialogOpen}
-        candidates={editQueueClassifyCandidates}
-        committing={editQueueClassifyCommitting}
-        onCancel={() => setEditQueueClassifyDialogOpen(false)}
-        onConfirm={(files) => void handleConfirmClassifyImport(files)}
+        onCancelClassify={handleCancelClassifyImport}
+        onConfirmClassify={(files) => void handleConfirmClassifyImport(files)}
       />
       <ExportQueueResultDialog
         open={editQueueExportDialogOpen}

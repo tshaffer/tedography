@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, type CSSProperties, type ReactElement } from 'react';
-import type { EditQueueEntryWithFilename, ImportEditedResult } from '../../api/editQueueApi.js';
+import type {
+  EditQueueEntryWithFilename,
+  ImportEditedResult,
+  EditedFileCandidate,
+  EditMethod,
+} from '../../api/editQueueApi.js';
 
 interface EditQueueDialogProps {
   open: boolean;
@@ -12,6 +17,8 @@ interface EditQueueDialogProps {
   importing: boolean;
   clearFolderNotice: string | null;
   clearFolderError: string | null;
+  classifyCandidates: EditedFileCandidate[];
+  classifyCommitting: boolean;
   onClose: () => void;
   onRemove: (assetId: string) => void;
   onExport: (assetIds: string[]) => void;
@@ -20,6 +27,8 @@ interface EditQueueDialogProps {
   onClearFolder: () => void;
   onSaveNote: (assetId: string, note: string) => Promise<void>;
   onNavigate: (assetId: string, albumId: string | null) => void;
+  onCancelClassify: () => void;
+  onConfirmClassify: (files: { filename: string; editMethod: EditMethod }[]) => void;
 }
 
 const overlayStyle: CSSProperties = {
@@ -188,6 +197,61 @@ const dangerButtonStyle: CSSProperties = {
   color: '#dc2626',
 };
 
+const classifySubtitleStyle: CSSProperties = {
+  margin: '0 0 6px',
+  fontSize: '12px',
+  color: '#6b7280',
+};
+
+const classifyBatchRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  padding: '8px 10px',
+  borderRadius: '8px',
+  backgroundColor: '#f9fafb',
+  border: '1px solid #e5e7eb',
+  marginBottom: '4px',
+};
+
+const classifyRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  padding: '6px 2px',
+};
+
+const classifyFilenameColStyle: CSSProperties = {
+  minWidth: 0,
+  flex: '1 1 auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1px',
+};
+
+const classifySegStyle: CSSProperties = {
+  display: 'flex',
+  borderRadius: '4px',
+  overflow: 'hidden',
+  border: '1px solid #c8c8c8',
+  flexShrink: 0,
+};
+
+function classifySegButtonStyle(active: boolean, isFirst: boolean): CSSProperties {
+  return {
+    padding: '3px 10px',
+    fontSize: '12px',
+    fontWeight: active ? 700 : 400,
+    backgroundColor: active ? '#dbeafe' : '#f9f9f9',
+    color: active ? '#1d4ed8' : '#555',
+    border: 'none',
+    cursor: 'pointer',
+    borderRight: isFirst ? '1px solid #c8c8c8' : 'none',
+  };
+}
+
 export function EditQueueDialog({
   open,
   entries,
@@ -199,6 +263,8 @@ export function EditQueueDialog({
   importing,
   clearFolderNotice,
   clearFolderError,
+  classifyCandidates,
+  classifyCommitting,
   onClose,
   onRemove,
   onExport,
@@ -207,12 +273,23 @@ export function EditQueueDialog({
   onClearFolder,
   onSaveNote,
   onNavigate,
+  onCancelClassify,
+  onConfirmClassify,
 }: EditQueueDialogProps): ReactElement | null {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [confirmClearFolder, setConfirmClearFolder] = useState(false);
+  const [classifyMethodByFilename, setClassifyMethodByFilename] = useState<Record<string, EditMethod>>({});
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const isClassifying = classifyCandidates.length > 0;
+
+  useEffect(() => {
+    if (classifyCandidates.length === 0) return;
+    setClassifyMethodByFilename(
+      Object.fromEntries(classifyCandidates.map((c) => [c.filename, 'manual' as EditMethod]))
+    );
+  }, [classifyCandidates]);
 
   useEffect(() => {
     const validIds = new Set(entries.map((e) => e.assetId));
@@ -266,6 +343,20 @@ export function EditQueueDialog({
     setEditingAssetId(null);
   }
 
+  function setAllClassifyMethods(method: EditMethod): void {
+    setClassifyMethodByFilename(Object.fromEntries(classifyCandidates.map((c) => [c.filename, method])));
+  }
+
+  function setOneClassifyMethod(filename: string, method: EditMethod): void {
+    setClassifyMethodByFilename((prev) => ({ ...prev, [filename]: method }));
+  }
+
+  function handleConfirmClassify(): void {
+    onConfirmClassify(
+      classifyCandidates.map((c) => ({ filename: c.filename, editMethod: classifyMethodByFilename[c.filename] ?? 'manual' }))
+    );
+  }
+
   const importedResults = importResults?.filter((r) => r.status === 'imported') ?? [];
   const skippedResults = importResults?.filter((r) => r.status === 'skipped') ?? [];
   const errorResults = importResults?.filter((r) => r.status === 'error') ?? [];
@@ -278,13 +369,53 @@ export function EditQueueDialog({
 
         <div style={headerStyle}>
           <h2 style={titleStyle}>
-            Edit Queue{entries.length > 0 ? ` (${entries.length})` : ''}
+            {isClassifying
+              ? `Classify Edited Files (${classifyCandidates.length})`
+              : `Edit Queue${entries.length > 0 ? ` (${entries.length})` : ''}`}
           </h2>
           <button type="button" style={closeButtonStyle} onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div style={bodyStyle}>
-          {loading ? (
+          {isClassifying ? (
+            <>
+              <p style={classifySubtitleStyle}>How was each edit produced? This is recorded per photo and can be changed later.</p>
+              <div style={classifyBatchRowStyle}>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748' }}>Set all to</span>
+                <div style={classifySegStyle}>
+                  <button type="button" style={classifySegButtonStyle(false, true)} onClick={() => setAllClassifyMethods('manual')}>Manual</button>
+                  <button type="button" style={classifySegButtonStyle(false, false)} onClick={() => setAllClassifyMethods('ai')}>AI</button>
+                </div>
+              </div>
+              {classifyCandidates.map((c) => {
+                const method = classifyMethodByFilename[c.filename] ?? 'manual';
+                return (
+                  <div key={c.filename} style={classifyRowStyle}>
+                    <div style={classifyFilenameColStyle}>
+                      <span style={{ fontSize: '13px', color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.filename}</span>
+                      <span style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>from {c.sourceFilename}</span>
+                    </div>
+                    <div style={classifySegStyle}>
+                      <button
+                        type="button"
+                        style={classifySegButtonStyle(method === 'manual', true)}
+                        onClick={() => setOneClassifyMethod(c.filename, 'manual')}
+                      >
+                        Manual
+                      </button>
+                      <button
+                        type="button"
+                        style={classifySegButtonStyle(method === 'ai', false)}
+                        onClick={() => setOneClassifyMethod(c.filename, 'ai')}
+                      >
+                        AI
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : loading ? (
             <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading...</p>
           ) : error ? (
             <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{error}</p>
@@ -382,6 +513,22 @@ export function EditQueueDialog({
         </div>
 
         <div style={footerStyle}>
+          {isClassifying ? (
+          <div style={footerButtonRowStyle}>
+            <button type="button" style={actionButtonStyle} onClick={onCancelClassify} disabled={classifyCommitting}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              style={classifyCommitting ? disabledButtonStyle : primaryButtonStyle}
+              onClick={handleConfirmClassify}
+              disabled={classifyCommitting}
+            >
+              {classifyCommitting ? 'Importing…' : `Confirm Import (${classifyCandidates.length})`}
+            </button>
+          </div>
+          ) : (
+          <>
           {/* Primary action row */}
           <div style={footerButtonRowStyle}>
             <button
@@ -487,6 +634,8 @@ export function EditQueueDialog({
           {importError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{importError}</span> : null}
           {clearFolderNotice ? <span style={{ fontSize: '12px', color: '#2f6f3e' }}>{clearFolderNotice}</span> : null}
           {clearFolderError ? <span style={{ fontSize: '12px', color: '#b00020' }}>{clearFolderError}</span> : null}
+          </>
+          )}
         </div>
 
       </div>
