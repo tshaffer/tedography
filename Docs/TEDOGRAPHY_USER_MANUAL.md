@@ -868,9 +868,13 @@ The folder is created automatically. The path must be within one of your registe
 | Photo state | Always starts as **New** |
 | Edit method | As classified in the dialog — shown as a badge (sparkle = AI, brush = Manual) on both the new asset and the original |
 
-The original file is never modified. If you classify a file incorrectly, open the edited asset and change **Edit Method** in the Inspector — no need to re-import.
+As part of import, the edited file is **moved** (not copied) out of the edit folder into the same folder on disk as its source original, keeping its `_edited` filename. It no longer exists in the edit folder afterward. The source original itself is never modified or moved — but the *exported copy* of it that Export placed in the edit folder in step 2 is untouched by import and is left behind there. If you classify a file incorrectly, open the edited asset and change **Edit Method** in the Inspector — no need to re-import.
 
-**5. Clean up** — Use **Clear Queue** to remove queue entries (does not affect files). Use **Clear Edit Folder** (two-step confirmation) to delete files from the edit folder after a successful import.
+Each queue entry is automatically removed once its file is successfully imported — there's no manual cleanup step for completed items.
+
+**5. Clean up** — To remove a single queue entry without touching the rest of the queue, click the **×** next to that entry in the Edit Queue dialog (this only removes the queue entry — it never touches any file). To remove every queue entry at once, use **Clear Queue** (requires confirmation, either a **Clear entire queue?** inline prompt in the dialog or a confirmation dialog from the toolbar menu).
+
+**Clear Edit Folder** (two-step confirmation) is separate and file-based: it deletes **every file** left in the edit folder — the exported copies of your originals from step 2 (since successfully-imported edited files are already gone, moved out in step 4), `manifest.json`, `notes.txt`, and also any edited file you haven't imported yet. It's all-or-nothing — there's currently no way to delete a single file from the edit folder, only clear it entirely.
 
 **Import result statuses:**
 
