@@ -320,7 +320,7 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
     const entryMap = new Map(entries.map((e) => [e.assetId, e]));
 
     const noteLines: string[] = [];
-    const manifestEntries: ManifestEntry[] = [];
+    const newManifestEntries: ManifestEntry[] = [];
 
     for (const assetId of assetIds) {
       const entry = entryMap.get(assetId);
@@ -333,7 +333,7 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
         const destPath = path.join(editPath, asset.filename);
         await fs.copyFile(srcPath, destPath);
         noteLines.push(`${asset.filename}: ${entry.note || '(no note)'}`);
-        manifestEntries.push({
+        newManifestEntries.push({
           sourceAssetId: asset.id,
           originalFilename: asset.filename,
           originalBasename: basenameWithoutExt(asset.filename),
@@ -351,14 +351,30 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
       'utf-8'
     );
 
-    const manifest: Manifest = { exportedAt: new Date().toISOString(), entries: manifestEntries };
+    // Merge into any existing manifest instead of overwriting it — otherwise a
+    // later export of a different subset silently orphans _edited files already
+    // produced for assets left out of this call. Re-exporting an asset updates
+    // its entry in place; entries are never pruned here (only Clear Edit Folder,
+    // which deletes manifest.json itself, removes entries).
+    const existingManifest = await readManifest(editPath);
+    const mergedEntriesByAssetId = new Map(
+      (existingManifest?.entries ?? []).map((e) => [e.sourceAssetId, e])
+    );
+    for (const entry of newManifestEntries) {
+      mergedEntriesByAssetId.set(entry.sourceAssetId, entry);
+    }
+
+    const manifest: Manifest = {
+      exportedAt: new Date().toISOString(),
+      entries: Array.from(mergedEntriesByAssetId.values()),
+    };
     await fs.writeFile(
       path.join(editPath, 'manifest.json'),
       JSON.stringify(manifest, null, 2),
       'utf-8'
     );
 
-    res.json({ editPath, count: manifestEntries.length });
+    res.json({ editPath, count: newManifestEntries.length });
   } catch (error) {
     log.error('Failed to export edit queue', error);
     res.status(500).json({ error: 'Failed to export edit queue' });

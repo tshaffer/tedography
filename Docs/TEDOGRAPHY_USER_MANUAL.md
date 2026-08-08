@@ -846,17 +846,16 @@ The folder is created automatically. The path must be within one of your registe
 
 **Workflow:**
 
-**1. Add to queue** — Select a photo and click the **Add to Edit Queue** toolbar button. Optionally add an editing note, then confirm. To update an existing note later, select the photo again and choose **Edit Note** from the **Edit Queue** toolbar menu (brain icon).
+**1. Add to queue** — Select a photo and click the **Add to Edit Queue** toolbar button. Optionally add an editing note, then confirm. This button is grayed out whenever the selected photo is already in the queue — that's not an error, it just means there's nothing to add. To update an existing note, or to re-export/re-import for a photo already queued, select it and use **Open Queue** or **Edit Note** from the **Edit Queue** toolbar menu (brain icon) instead.
 
-**2. Export** — Open the **Edit Queue** dialog (**Open Queue** from the same toolbar menu). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `notes.txt` and `manifest.json` (do not delete or rename the manifest).
+**2. Export** — Open the **Edit Queue** dialog (**Open Queue** from the same toolbar menu). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `notes.txt`, and merges into `manifest.json` (do not delete or rename it). Exporting a different subset later adds/updates entries rather than replacing the file, so an original you exported previously — and haven't imported its edit for yet — stays matchable even if it's no longer checked (or no longer in the queue at all) in a later export. Entries are only ever cleared out by **Clear Edit Folder**, which deletes `manifest.json` along with everything else in the folder.
 
 **3. Edit externally** — Open the exported files in any tool. Save results with the naming convention `<originalBasename>_edited.<ext>` (e.g. `IMG_1234_edited.jpg`), and save to the same edit folder. To produce more than one edited version of the same original (e.g. a manual edit and an AI edit), give each a distinct filename that still starts with `<originalBasename>_edited` — for example `IMG_1234_edited_ai.png` and `IMG_1234_edited_manual.jpg`.
 
-**4. Import** — Back in the Edit Queue dialog, click **Import Edited Files**. Tedography scans the edit folder and matches files to their source. If it finds any, a **Classify Edited Files** dialog opens before anything is imported:
+**4. Import** — Back in the Edit Queue dialog, click **Import Edited Files**. This button shows a live count of matched files and is disabled (with "No `_edited` files found in edit folder") whenever the folder has none — it scans the whole edit folder, independent of which queue entries are checked; the queue's checkboxes only scope Export and Clear Queue. If matches are found, a **Classify Edited Files** dialog opens before anything is imported:
 
-- **Set all to** — a batch toggle that marks every listed file **Manual** or **AI** at once.
-- Each file also has its own **Manual / AI** toggle, so you can override individual files in a mixed batch.
-- Click **Confirm Import** to commit. Each file is imported as a new asset inheriting:
+- Every listed file is checked by default. Uncheck any you don't want to import in this pass — for example if one edit needs more work — and its **Manual / AI** toggle grays out while unchecked. A **Select all** checkbox and a **Set all to** batch toggle (Manual/AI) apply to the whole list. Since this list is built only from files the scan actually matched to a source, you can never select something with no corresponding `_edited` file — deselecting only removes files from *this* import batch, it never deletes them.
+- Click **Confirm Import (N)** to commit the checked files (disabled when nothing is checked). Each imported file becomes a new asset inheriting:
 
 | Property | Source |
 |---|---|

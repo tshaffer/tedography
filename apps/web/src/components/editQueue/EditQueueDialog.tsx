@@ -21,6 +21,7 @@ interface EditQueueDialogProps {
   editFolderFiles: EditFolderFile[];
   editFolderFilesLoading: boolean;
   editFolderFilesError: string | null;
+  importCandidateCount: number;
   classifyCandidates: EditedFileCandidate[];
   classifyCommitting: boolean;
   onClose: () => void;
@@ -291,6 +292,7 @@ export function EditQueueDialog({
   editFolderFiles,
   editFolderFilesLoading,
   editFolderFilesError,
+  importCandidateCount,
   classifyCandidates,
   classifyCommitting,
   onClose,
@@ -311,6 +313,7 @@ export function EditQueueDialog({
   const [confirmClearFolder, setConfirmClearFolder] = useState(false);
   const [confirmClearQueue, setConfirmClearQueue] = useState(false);
   const [classifyMethodByFilename, setClassifyMethodByFilename] = useState<Record<string, EditMethod>>({});
+  const [classifySelected, setClassifySelected] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
   const isClassifying = classifyCandidates.length > 0;
 
@@ -319,6 +322,7 @@ export function EditQueueDialog({
     setClassifyMethodByFilename(
       Object.fromEntries(classifyCandidates.map((c) => [c.filename, 'manual' as EditMethod]))
     );
+    setClassifySelected(new Set(classifyCandidates.map((c) => c.filename)));
   }, [classifyCandidates]);
 
   useEffect(() => {
@@ -381,9 +385,26 @@ export function EditQueueDialog({
     setClassifyMethodByFilename((prev) => ({ ...prev, [filename]: method }));
   }
 
+  function toggleClassifySelected(filename: string): void {
+    setClassifySelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(filename)) next.delete(filename);
+      else next.add(filename);
+      return next;
+    });
+  }
+
+  function toggleClassifySelectAll(): void {
+    setClassifySelected((prev) =>
+      prev.size === classifyCandidates.length ? new Set() : new Set(classifyCandidates.map((c) => c.filename))
+    );
+  }
+
   function handleConfirmClassify(): void {
     onConfirmClassify(
-      classifyCandidates.map((c) => ({ filename: c.filename, editMethod: classifyMethodByFilename[c.filename] ?? 'manual' }))
+      classifyCandidates
+        .filter((c) => classifySelected.has(c.filename))
+        .map((c) => ({ filename: c.filename, editMethod: classifyMethodByFilename[c.filename] ?? 'manual' }))
     );
   }
 
@@ -409,8 +430,17 @@ export function EditQueueDialog({
         <div style={bodyStyle}>
           {isClassifying ? (
             <>
-              <p style={classifySubtitleStyle}>How was each edit produced? This is recorded per photo and can be changed later.</p>
+              <p style={classifySubtitleStyle}>Choose which files to import and how each edit was produced. This is recorded per photo and can be changed later.</p>
               <div style={classifyBatchRowStyle}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={classifySelected.size === classifyCandidates.length}
+                    onChange={toggleClassifySelectAll}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  Select all
+                </label>
                 <span style={{ fontSize: '12px', fontWeight: 500, color: '#2d3748' }}>Set all to</span>
                 <div style={classifySegStyle}>
                   <button type="button" style={classifySegButtonStyle(false, true)} onClick={() => setAllClassifyMethods('manual')}>Manual</button>
@@ -419,8 +449,15 @@ export function EditQueueDialog({
               </div>
               {classifyCandidates.map((c) => {
                 const method = classifyMethodByFilename[c.filename] ?? 'manual';
+                const isSelected = classifySelected.has(c.filename);
                 return (
-                  <div key={c.filename} style={classifyRowStyle}>
+                  <div key={c.filename} style={{ ...classifyRowStyle, opacity: isSelected ? 1 : 0.45 }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleClassifySelected(c.filename)}
+                      style={{ cursor: 'pointer', flexShrink: 0 }}
+                    />
                     <div style={classifyFilenameColStyle}>
                       <span style={{ fontSize: '13px', color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.filename}</span>
                       <span style={{ fontSize: '11px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>from {c.sourceFilename}</span>
@@ -430,6 +467,7 @@ export function EditQueueDialog({
                         type="button"
                         style={classifySegButtonStyle(method === 'manual', true)}
                         onClick={() => setOneClassifyMethod(c.filename, 'manual')}
+                        disabled={!isSelected}
                       >
                         Manual
                       </button>
@@ -437,6 +475,7 @@ export function EditQueueDialog({
                         type="button"
                         style={classifySegButtonStyle(method === 'ai', false)}
                         onClick={() => setOneClassifyMethod(c.filename, 'ai')}
+                        disabled={!isSelected}
                       >
                         AI
                       </button>
@@ -550,11 +589,11 @@ export function EditQueueDialog({
             </button>
             <button
               type="button"
-              style={classifyCommitting ? disabledButtonStyle : primaryButtonStyle}
+              style={classifyCommitting || classifySelected.size === 0 ? disabledButtonStyle : primaryButtonStyle}
               onClick={handleConfirmClassify}
-              disabled={classifyCommitting}
+              disabled={classifyCommitting || classifySelected.size === 0}
             >
-              {classifyCommitting ? 'Importing…' : `Confirm Import (${classifyCandidates.length})`}
+              {classifyCommitting ? 'Importing…' : `Confirm Import (${classifySelected.size})`}
             </button>
           </div>
           ) : (
@@ -572,12 +611,16 @@ export function EditQueueDialog({
             </button>
             <button
               type="button"
-              style={importing ? disabledButtonStyle : actionButtonStyle}
+              style={importing || importCandidateCount === 0 ? disabledButtonStyle : actionButtonStyle}
               onClick={onImport}
-              disabled={importing}
-              title="Scan edit folder for _edited files and import them"
+              disabled={importing || importCandidateCount === 0}
+              title={importCandidateCount === 0 ? 'No _edited files found in edit folder' : 'Scan edit folder for _edited files and import them'}
             >
-              {importing ? 'Importing…' : 'Import Edited Files'}
+              {importing
+                ? 'Importing…'
+                : importCandidateCount > 0
+                  ? `Import Edited Files (${importCandidateCount})`
+                  : 'Import Edited Files'}
             </button>
             {confirmClearQueue ? (
               <>
