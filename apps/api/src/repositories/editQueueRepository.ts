@@ -37,10 +37,6 @@ export async function upsertQueueEntry(assetId: string, note: string): Promise<E
   return entry;
 }
 
-export async function setQueueEntryEditedAssetId(assetId: string, editedAssetId: string): Promise<void> {
-  await EditQueueEntryModel.updateOne({ assetId }, { $set: { editedAssetId } });
-}
-
 export async function removeQueueEntry(assetId: string): Promise<void> {
   await EditQueueEntryModel.deleteOne({ assetId });
 }

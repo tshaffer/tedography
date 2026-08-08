@@ -280,6 +280,7 @@ export function EditQueueDialog({
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [confirmClearFolder, setConfirmClearFolder] = useState(false);
+  const [confirmClearQueue, setConfirmClearQueue] = useState(false);
   const [classifyMethodByFilename, setClassifyMethodByFilename] = useState<Record<string, EditMethod>>({});
   const selectAllRef = useRef<HTMLInputElement>(null);
   const isClassifying = classifyCandidates.length > 0;
@@ -549,14 +550,30 @@ export function EditQueueDialog({
             >
               {importing ? 'Importing…' : 'Import Edited Files'}
             </button>
-            <button
-              type="button"
-              style={entries.length === 0 ? disabledButtonStyle : actionButtonStyle}
-              onClick={onClearQueue}
-              disabled={entries.length === 0}
-            >
-              Clear Queue
-            </button>
+            {confirmClearQueue ? (
+              <>
+                <span style={{ fontSize: '12px', color: '#374151' }}>Clear entire queue?</span>
+                <button
+                  type="button"
+                  style={{ ...dangerButtonStyle, backgroundColor: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                  onClick={() => { setConfirmClearQueue(false); onClearQueue(); }}
+                >
+                  Yes, clear
+                </button>
+                <button type="button" style={smallButtonStyle} onClick={() => setConfirmClearQueue(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                style={entries.length === 0 ? disabledButtonStyle : actionButtonStyle}
+                onClick={() => setConfirmClearQueue(true)}
+                disabled={entries.length === 0}
+              >
+                Clear Queue
+              </button>
+            )}
           </div>
 
           {/* Clear folder — two-step confirm */}

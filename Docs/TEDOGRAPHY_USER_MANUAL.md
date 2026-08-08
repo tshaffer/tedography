@@ -846,9 +846,9 @@ The folder is created automatically. The path must be within one of your registe
 
 **Workflow:**
 
-**1. Add to queue** — Select a photo, click the **Edit Queue** toolbar button (brain icon), choose **Add to Edit Queue**. Optionally add an editing note. To update an existing note, choose **Edit Prompt**.
+**1. Add to queue** — Select a photo and click the **Add to Edit Queue** toolbar button. Optionally add an editing note, then confirm. To update an existing note later, select the photo again and choose **Edit Note** from the **Edit Queue** toolbar menu (brain icon).
 
-**2. Export** — Open the **Edit Queue** dialog (View Queue). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `prompts.txt` and `manifest.json` (do not delete or rename the manifest).
+**2. Export** — Open the **Edit Queue** dialog (**Open Queue** from the same toolbar menu). Check the photos to export and click **Export (N)**. Tedography copies the originals to your edit folder and writes `notes.txt` and `manifest.json` (do not delete or rename the manifest).
 
 **3. Edit externally** — Open the exported files in any tool. Save results with the naming convention `<originalBasename>_edited.<ext>` (e.g. `IMG_1234_edited.jpg`), and save to the same edit folder. To produce more than one edited version of the same original (e.g. a manual edit and an AI edit), give each a distinct filename that still starts with `<originalBasename>_edited` — for example `IMG_1234_edited_ai.png` and `IMG_1234_edited_manual.jpg`.
 

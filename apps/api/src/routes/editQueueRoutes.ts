@@ -19,7 +19,6 @@ import {
   clearQueue,
   getQueueEntries,
   removeQueueEntry,
-  setQueueEntryEditedAssetId,
   upsertQueueEntry,
 } from '../repositories/editQueueRepository.js';
 import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js';
@@ -542,10 +541,10 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
         await updateMediaAssetPeople(newAsset.id, sourcePeople);
       }
 
-      // Link the edited asset back to the source (bidirectional) and mark the queue entry.
+      // Link the edited asset back to the source, and remove the now-completed queue entry.
       await Promise.all([
         addEditedAssetId(sourceAsset.id, newAsset.id),
-        setQueueEntryEditedAssetId(sourceAsset.id, newAsset.id),
+        removeQueueEntry(sourceAsset.id),
       ]);
 
       // Record in history

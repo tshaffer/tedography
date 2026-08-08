@@ -12365,79 +12365,6 @@ export default function App() {
 
   const toolbarBrowseMode = isLibraryArea ? libraryBrowseMode : null;
 
-  function renderEditQueuePanel(): ReactElement | null {
-    if (editQueueEntries.length === 0 && !editQueueLoading && !editQueueError) return null;
-
-    return (
-      <section style={sidePanelSectionStyle}>
-        <div style={sidePanelHeaderStyle}>
-          <h2 style={sidePanelTitleStyle}>Edit Queue {editQueueEntries.length > 0 ? `(${editQueueEntries.length})` : ''}</h2>
-        </div>
-        {editQueueLoading ? (
-          <p style={{ margin: 0, color: '#666', fontSize: '12px' }}>Loading...</p>
-        ) : editQueueError ? (
-          <p style={{ margin: 0, color: '#b00020', fontSize: '12px' }}>{editQueueError}</p>
-        ) : (
-          <div style={{ display: 'grid', gap: '6px', marginTop: '6px' }}>
-            {editQueueEntries.map((entry) => (
-              <div
-                key={entry.assetId}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid #e5e7eb',
-                  backgroundColor: '#fafafa',
-                  fontSize: '12px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1f2937' }}>
-                    {entry.filename}
-                  </span>
-                  <button
-                    type="button"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', padding: '0 2px', flexShrink: 0 }}
-                    onClick={() => void handleRemoveFromEditQueue(entry.assetId)}
-                    title="Remove from queue"
-                  >
-                    ×
-                  </button>
-                </div>
-                {entry.note ? (
-                  <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '11px' }}>{entry.note}</span>
-                ) : (
-                  <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            onClick={() => void handleExportEditQueue(editQueueEntries.map((e) => e.assetId))}
-            disabled={editQueueEntries.length === 0 || editQueueExporting}
-            title="Copy files to export folder and write manifest.json"
-          >
-            {editQueueExporting ? 'Exporting…' : 'Export Queue'}
-          </button>
-          <button
-            type="button"
-            style={compareButtonStyle}
-            onClick={() => void handleClearEditQueue()}
-            disabled={editQueueEntries.length === 0}
-          >
-            Clear
-          </button>
-        </div>
-      </section>
-    );
-  }
-
   function renderLeftPanel(): ReactElement | null {
     if (!leftPanelVisible) {
       return null;
@@ -13020,15 +12947,12 @@ export default function App() {
                   overflowY: 'auto'
                 }}
               >
-                <div className="tdg-overflow-section">
-                  Edit Queue{editQueueEntries.length > 0 ? ` (${editQueueEntries.length})` : ''}
-                </div>
                 <button
                   type="button"
                   className="tdg-overflow-item"
                   onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                 >
-                  View Queue
+                  Open Queue
                 </button>
                 <button
                   type="button"
@@ -13071,7 +12995,12 @@ export default function App() {
                     <button
                       type="button"
                       className="tdg-overflow-item"
-                      onClick={() => { void handleClearEditQueue(); setAiMenuOpen(false); }}
+                      onClick={() => {
+                        setAiMenuOpen(false);
+                        if (window.confirm(`Clear the entire edit queue (${editQueueEntries.length} item${editQueueEntries.length !== 1 ? 's' : ''})? This cannot be undone.`)) {
+                          void handleClearEditQueue();
+                        }
+                      }}
                     >
                       Clear Queue
                     </button>
