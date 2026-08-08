@@ -513,6 +513,7 @@ export function EditQueueDialog({
               {entries.map((entry) => {
                 const isSelected = selectedIds.has(entry.assetId);
                 const isEditing = editingAssetId === entry.assetId;
+                const hasOrphanedEdit = entry.orphanedEditFilenames.length > 0;
                 return (
                   <div
                     key={entry.assetId}
@@ -527,8 +528,12 @@ export function EditQueueDialog({
                       />
                       <button
                         type="button"
-                        style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit' }}
-                        title="Navigate to this photo"
+                        style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: hasOrphanedEdit ? '#b45309' : '#1a56db', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit' }}
+                        title={
+                          hasOrphanedEdit
+                            ? `Navigate to this photo — edited file waiting but not linked (${entry.orphanedEditFilenames.join(', ')}). Re-export to import it.`
+                            : 'Navigate to this photo'
+                        }
                         onClick={() => { onNavigate(entry.assetId, entry.albumId); }}
                       >
                         {entry.filename}

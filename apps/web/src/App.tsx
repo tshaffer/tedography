@@ -7912,6 +7912,7 @@ export default function App() {
       setEditQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.editPath}`);
       await loadEditFolderFiles();
       await refreshImportCandidateCount();
+      await loadEditQueue();
     } catch (err) {
       setEditQueueExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -7970,6 +7971,7 @@ export default function App() {
       setEditQueueClearFolderNotice(`Deleted ${result.deletedCount} file${result.deletedCount !== 1 ? 's' : ''} from edit folder`);
       await loadEditFolderFiles();
       await refreshImportCandidateCount();
+      await loadEditQueue();
     } catch (err) {
       setEditQueueClearFolderError(err instanceof Error ? err.message : 'Failed to clear edit folder');
     }
@@ -7980,6 +7982,7 @@ export default function App() {
       await deleteEditFolderFile(filename);
       await loadEditFolderFiles();
       await refreshImportCandidateCount();
+      await loadEditQueue();
     } catch (err) {
       setEditFolderFilesError(err instanceof Error ? err.message : 'Failed to delete file');
     }
@@ -12996,7 +12999,7 @@ export default function App() {
                 <button
                   type="button"
                   className="tdg-overflow-item"
-                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); void loadEditFolderFiles(); void refreshImportCandidateCount(); }}
+                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); void loadEditFolderFiles(); void refreshImportCandidateCount(); void loadEditQueue(); }}
                 >
                   Open Queue
                 </button>

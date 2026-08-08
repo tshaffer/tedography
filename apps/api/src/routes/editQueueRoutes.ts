@@ -138,6 +138,36 @@ async function readManifest(editPath: string): Promise<Manifest | null> {
   }
 }
 
+/**
+ * Finds "_edited" files in the folder that don't resolve to any current manifest
+ * entry — i.e. real edit output that Import can't see because its source asset's
+ * manifest link is missing or was overwritten by a later export. Returns each
+ * orphan's filename plus its inferred original basename (everything before
+ * "_edited"), so callers can match it back to a specific queue entry.
+ */
+async function findOrphanedEditedFiles(
+  editPath: string,
+  manifestEntries: ManifestEntry[]
+): Promise<{ filename: string; inferredBasename: string }[]> {
+  let allFiles: string[];
+  try {
+    allFiles = await fs.readdir(editPath);
+  } catch {
+    return [];
+  }
+
+  const orphans: { filename: string; inferredBasename: string }[] = [];
+  for (const filename of allFiles) {
+    if (filename === 'manifest.json' || filename === 'notes.txt') continue;
+    const base = basenameWithoutExt(filename);
+    const editedIdx = base.toLowerCase().indexOf('_edited');
+    if (editedIdx <= 0) continue;
+    if (findManifestMatchForFilename(filename, manifestEntries)) continue;
+    orphans.push({ filename, inferredBasename: base.slice(0, editedIdx) });
+  }
+  return orphans;
+}
+
 type EditedFileCandidate = { filename: string; manifestEntry: ManifestEntry };
 
 async function findEditedFileCandidates(
@@ -175,6 +205,19 @@ editQueueRoutes.get('/', async (_req, res) => {
     const [entries, allNodes] = await Promise.all([getQueueEntries(), listAlbumTreeNodes()]);
     const nodesById = new Map(allNodes.map((n) => [n.id, n]));
 
+    const editPath = getEditPath();
+    const orphansByBasenameLower = new Map<string, string[]>();
+    if (editPath) {
+      const manifest = await readManifest(editPath);
+      const orphans = await findOrphanedEditedFiles(editPath, manifest?.entries ?? []);
+      for (const orphan of orphans) {
+        const key = orphan.inferredBasename.toLowerCase();
+        const list = orphansByBasenameLower.get(key) ?? [];
+        list.push(orphan.filename);
+        orphansByBasenameLower.set(key, list);
+      }
+    }
+
     const withDetails = await Promise.all(
       entries.map(async (entry) => {
         const asset = await findById(entry.assetId);
@@ -182,7 +225,8 @@ editQueueRoutes.get('/', async (_req, res) => {
         const albumIds = asset?.albumIds ?? [];
         const albumId = albumIds[0] ?? null;
         const albumPath = albumId ? buildAlbumPath(albumId, nodesById) : null;
-        return { ...entry, filename, albumId, albumPath };
+        const orphanedEditFilenames = orphansByBasenameLower.get(basenameWithoutExt(filename).toLowerCase()) ?? [];
+        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames };
       })
     );
     res.json(withDetails);
