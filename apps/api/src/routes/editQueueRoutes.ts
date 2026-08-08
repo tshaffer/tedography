@@ -238,6 +238,58 @@ editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_re
   }
 });
 
+// ─── GET /edit-folder — list files currently sitting in the edit folder ──────
+
+editQueueRoutes.get('/edit-folder', requireFeature('maintenance'), async (_req, res) => {
+  const editPath = requireEditPath(res);
+  if (!editPath) return;
+
+  try {
+    const entries = await fs.readdir(editPath, { withFileTypes: true });
+    const fileEntries = entries.filter((e) => e.isFile());
+    const files = await Promise.all(
+      fileEntries.map(async (e) => {
+        const stat = await fs.stat(path.join(editPath, e.name));
+        return { filename: e.name, size: stat.size, modifiedAt: stat.mtime.toISOString() };
+      })
+    );
+    files.sort((a, b) => a.filename.localeCompare(b.filename));
+    res.json({ files });
+  } catch (error) {
+    log.error('Failed to list edit folder', error);
+    res.status(500).json({ error: 'Failed to list edit folder' });
+  }
+});
+
+// ─── DELETE /edit-folder/:filename — delete a single file from the edit folder ─
+
+editQueueRoutes.delete('/edit-folder/:filename', requireFeature('maintenance'), async (req, res) => {
+  const editPath = requireEditPath(res);
+  if (!editPath) return;
+
+  const filename = req.params.filename as string;
+  const targetAbsolutePath = path.resolve(path.join(editPath, filename));
+  const editPathResolved = path.resolve(editPath);
+  const isDirectChild =
+    path.dirname(targetAbsolutePath) === editPathResolved && !filename.includes('/') && !filename.includes('\\');
+  if (!isDirectChild) {
+    res.status(400).json({ error: 'Invalid filename' });
+    return;
+  }
+
+  try {
+    await fs.unlink(targetAbsolutePath);
+    res.json({ ok: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    log.error(`Failed to delete edit folder file "${filename}"`, error);
+    res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
 // ─── DELETE /:assetId — remove one entry ─────────────────────────────────────
 
 editQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, res) => {

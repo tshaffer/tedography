@@ -130,6 +130,7 @@ import {
   type ImportEditedResult,
   type EditedFileCandidate,
   type EditMethod,
+  type EditFolderFile,
   addToEditQueue,
   clearEditQueue,
   exportEditQueue,
@@ -139,6 +140,8 @@ import {
   updateAssetEditMethod,
   removeFromEditQueue,
   clearEditFolder,
+  listEditFolderFiles,
+  deleteEditFolderFile,
 } from './api/editQueueApi';
 import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
 import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
@@ -4211,6 +4214,9 @@ export default function App() {
   const [editQueueClassifyCommitting, setEditQueueClassifyCommitting] = useState(false);
   const [editQueueClearFolderNotice, setEditQueueClearFolderNotice] = useState<string | null>(null);
   const [editQueueClearFolderError, setEditQueueClearFolderError] = useState<string | null>(null);
+  const [editFolderFiles, setEditFolderFiles] = useState<EditFolderFile[]>([]);
+  const [editFolderFilesLoading, setEditFolderFilesLoading] = useState(false);
+  const [editFolderFilesError, setEditFolderFilesError] = useState<string | null>(null);
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
@@ -5623,6 +5629,19 @@ export default function App() {
       setEditQueueError(err instanceof Error ? err.message : 'Failed to load edit queue');
     } finally {
       setEditQueueLoading(false);
+    }
+  }
+
+  async function loadEditFolderFiles(): Promise<void> {
+    setEditFolderFilesLoading(true);
+    setEditFolderFilesError(null);
+    try {
+      const { files } = await listEditFolderFiles();
+      setEditFolderFiles(files);
+    } catch (err) {
+      setEditFolderFilesError(err instanceof Error ? err.message : 'Failed to load edit folder files');
+    } finally {
+      setEditFolderFilesLoading(false);
     }
   }
 
@@ -7881,6 +7900,7 @@ export default function App() {
     try {
       const result = await exportEditQueue(assetIds);
       setEditQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.editPath}`);
+      await loadEditFolderFiles();
     } catch (err) {
       setEditQueueExportError(err instanceof Error ? err.message : 'Export failed');
     } finally {
@@ -7918,6 +7938,7 @@ export default function App() {
       setEditQueueImportResults(results);
       setEditQueueClassifyCandidates([]);
       await loadEditQueue();
+      await loadEditFolderFiles();
       if (results.some((r) => r.status === 'imported')) {
         await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
       }
@@ -7934,8 +7955,18 @@ export default function App() {
     try {
       const result = await clearEditFolder();
       setEditQueueClearFolderNotice(`Deleted ${result.deletedCount} file${result.deletedCount !== 1 ? 's' : ''} from edit folder`);
+      await loadEditFolderFiles();
     } catch (err) {
       setEditQueueClearFolderError(err instanceof Error ? err.message : 'Failed to clear edit folder');
+    }
+  }
+
+  async function handleDeleteEditFolderFile(filename: string): Promise<void> {
+    try {
+      await deleteEditFolderFile(filename);
+      await loadEditFolderFiles();
+    } catch (err) {
+      setEditFolderFilesError(err instanceof Error ? err.message : 'Failed to delete file');
     }
   }
 
@@ -12950,7 +12981,7 @@ export default function App() {
                 <button
                   type="button"
                   className="tdg-overflow-item"
-                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); }}
+                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); void loadEditFolderFiles(); }}
                 >
                   Open Queue
                 </button>
@@ -14262,6 +14293,9 @@ export default function App() {
         importing={editQueueImporting}
         clearFolderNotice={editQueueClearFolderNotice}
         clearFolderError={editQueueClearFolderError}
+        editFolderFiles={editFolderFiles}
+        editFolderFilesLoading={editFolderFilesLoading}
+        editFolderFilesError={editFolderFilesError}
         classifyCandidates={editQueueClassifyCandidates}
         classifyCommitting={editQueueClassifyCommitting}
         onClose={() => {
@@ -14273,6 +14307,7 @@ export default function App() {
         onImport={() => void handleImportEditedFiles()}
         onClearQueue={() => void handleClearEditQueue()}
         onClearFolder={() => void handleClearEditFolder()}
+        onDeleteEditFolderFile={(filename) => void handleDeleteEditFolderFile(filename)}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
         onCancelClassify={handleCancelClassifyImport}

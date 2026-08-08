@@ -91,3 +91,19 @@ export function clearEditFolder(): Promise<{ ok: boolean; deletedCount: number }
     method: 'DELETE',
   });
 }
+
+export interface EditFolderFile {
+  filename: string;
+  size: number;
+  modifiedAt: string;
+}
+
+export function listEditFolderFiles(): Promise<{ files: EditFolderFile[] }> {
+  return fetchJson<{ files: EditFolderFile[] }>('/api/edit-queue/edit-folder');
+}
+
+export function deleteEditFolderFile(filename: string): Promise<{ ok: boolean }> {
+  return fetchJson<{ ok: boolean }>(`/api/edit-queue/edit-folder/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  });
+}

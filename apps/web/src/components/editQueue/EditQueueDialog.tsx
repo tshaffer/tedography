@@ -4,6 +4,7 @@ import type {
   ImportEditedResult,
   EditedFileCandidate,
   EditMethod,
+  EditFolderFile,
 } from '../../api/editQueueApi.js';
 
 interface EditQueueDialogProps {
@@ -17,6 +18,9 @@ interface EditQueueDialogProps {
   importing: boolean;
   clearFolderNotice: string | null;
   clearFolderError: string | null;
+  editFolderFiles: EditFolderFile[];
+  editFolderFilesLoading: boolean;
+  editFolderFilesError: string | null;
   classifyCandidates: EditedFileCandidate[];
   classifyCommitting: boolean;
   onClose: () => void;
@@ -25,6 +29,7 @@ interface EditQueueDialogProps {
   onImport: () => void;
   onClearQueue: () => void;
   onClearFolder: () => void;
+  onDeleteEditFolderFile: (filename: string) => void;
   onSaveNote: (assetId: string, note: string) => Promise<void>;
   onNavigate: (assetId: string, albumId: string | null) => void;
   onCancelClassify: () => void;
@@ -197,6 +202,26 @@ const dangerButtonStyle: CSSProperties = {
   color: '#dc2626',
 };
 
+const editFolderFileListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  maxHeight: '120px',
+  overflowY: 'auto',
+  border: '1px solid #e5e7eb',
+  borderRadius: '6px',
+  padding: '4px 6px',
+};
+
+const editFolderFileRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '3px 2px',
+  fontSize: '11px',
+  color: '#374151',
+};
+
 const classifySubtitleStyle: CSSProperties = {
   margin: '0 0 6px',
   fontSize: '12px',
@@ -263,6 +288,9 @@ export function EditQueueDialog({
   importing,
   clearFolderNotice,
   clearFolderError,
+  editFolderFiles,
+  editFolderFilesLoading,
+  editFolderFilesError,
   classifyCandidates,
   classifyCommitting,
   onClose,
@@ -271,6 +299,7 @@ export function EditQueueDialog({
   onImport,
   onClearQueue,
   onClearFolder,
+  onDeleteEditFolderFile,
   onSaveNote,
   onNavigate,
   onCancelClassify,
@@ -573,6 +602,42 @@ export function EditQueueDialog({
               >
                 Clear Queue
               </button>
+            )}
+          </div>
+
+          {/* Edit folder file list — per-file delete */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>
+              Edit Folder Files{editFolderFilesLoading ? '' : ` (${editFolderFiles.length})`}
+            </span>
+            {editFolderFilesLoading ? (
+              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Loading…</span>
+            ) : editFolderFilesError ? (
+              <span style={{ fontSize: '11px', color: '#b00020' }}>{editFolderFilesError}</span>
+            ) : editFolderFiles.length === 0 ? (
+              <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No files in edit folder.</span>
+            ) : (
+              <div style={editFolderFileListStyle}>
+                {editFolderFiles.map((file) => (
+                  <div key={file.filename} style={editFolderFileRowStyle}>
+                    <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {file.filename}
+                    </span>
+                    <button
+                      type="button"
+                      style={iconButtonStyle}
+                      onClick={() => {
+                        if (window.confirm(`Delete "${file.filename}" from the edit folder? This cannot be undone.`)) {
+                          onDeleteEditFolderFile(file.filename);
+                        }
+                      }}
+                      title="Delete this file from the edit folder"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

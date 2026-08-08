@@ -874,7 +874,9 @@ Each queue entry is automatically removed once its file is successfully imported
 
 **5. Clean up** — To remove a single queue entry without touching the rest of the queue, click the **×** next to that entry in the Edit Queue dialog (this only removes the queue entry — it never touches any file). To remove every queue entry at once, use **Clear Queue** (requires confirmation, either a **Clear entire queue?** inline prompt in the dialog or a confirmation dialog from the toolbar menu).
 
-**Clear Edit Folder** (two-step confirmation) is separate and file-based: it deletes **every file** left in the edit folder — the exported copies of your originals from step 2 (since successfully-imported edited files are already gone, moved out in step 4), `manifest.json`, `notes.txt`, and also any edited file you haven't imported yet. It's all-or-nothing — there's currently no way to delete a single file from the edit folder, only clear it entirely.
+The dialog also shows an **Edit Folder Files** list — every file currently sitting in the edit folder (exported originals, `manifest.json`, `notes.txt`, and any not-yet-imported edited files), refreshed automatically after Export, Import, and Clear Edit Folder. Click the **×** next to any single file to delete just that one (confirmation required) — useful for discarding one bad export or edit without wiping the whole folder. This list is also where stray OS artifacts show up (e.g. macOS `._filename` AppleDouble files created when copying to certain volumes) — safe to delete individually here.
+
+**Clear Edit Folder** (two-step confirmation) is separate and file-based: it deletes **every file** left in the edit folder in one shot — the exported copies of your originals from step 2 (since successfully-imported edited files are already gone, moved out in step 4), `manifest.json`, `notes.txt`, and also any edited file you haven't imported yet. Use the per-file **×** above instead when you only want to remove one file.
 
 **Import result statuses:**
 
