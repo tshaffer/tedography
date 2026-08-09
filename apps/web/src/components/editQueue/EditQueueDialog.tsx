@@ -538,6 +538,14 @@ export function EditQueueDialog({
                       >
                         {entry.filename}
                       </button>
+                      {entry.isExported ? (
+                        <span
+                          style={{ color: '#16a34a', fontSize: '13px', flexShrink: 0, lineHeight: 1 }}
+                          title="Exported — currently linked in manifest.json"
+                        >
+                          ✓
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         style={{ ...iconButtonStyle, color: isEditing ? '#1a56db' : '#9ca3af' }}

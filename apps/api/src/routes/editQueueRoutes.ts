@@ -207,9 +207,12 @@ editQueueRoutes.get('/', async (_req, res) => {
 
     const editPath = getEditPath();
     const orphansByBasenameLower = new Map<string, string[]>();
+    let manifestAssetIds = new Set<string>();
     if (editPath) {
       const manifest = await readManifest(editPath);
-      const orphans = await findOrphanedEditedFiles(editPath, manifest?.entries ?? []);
+      const manifestEntries = manifest?.entries ?? [];
+      manifestAssetIds = new Set(manifestEntries.map((e) => e.sourceAssetId));
+      const orphans = await findOrphanedEditedFiles(editPath, manifestEntries);
       for (const orphan of orphans) {
         const key = orphan.inferredBasename.toLowerCase();
         const list = orphansByBasenameLower.get(key) ?? [];
@@ -226,7 +229,8 @@ editQueueRoutes.get('/', async (_req, res) => {
         const albumId = albumIds[0] ?? null;
         const albumPath = albumId ? buildAlbumPath(albumId, nodesById) : null;
         const orphanedEditFilenames = orphansByBasenameLower.get(basenameWithoutExt(filename).toLowerCase()) ?? [];
-        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames };
+        const isExported = manifestAssetIds.has(entry.assetId);
+        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames, isExported };
       })
     );
     res.json(withDetails);

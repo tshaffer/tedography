@@ -6,6 +6,7 @@ export interface EditQueueEntryWithFilename extends EditQueueEntry {
   albumPath: string | null;
   editedAssetId: string | null;
   orphanedEditFilenames: string[];
+  isExported: boolean;
 }
 
 export interface ImportEditedResult {
