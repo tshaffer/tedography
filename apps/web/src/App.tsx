@@ -12325,14 +12325,14 @@ export default function App() {
                 [
                   { key: 'isManuallyEditedImport', label: 'Is manually edited import', value: searchIsManuallyEditedImport, setValue: setSearchIsManuallyEditedImport },
                   { key: 'isAiEditedImport', label: 'Is AI edited import', value: searchIsAiEditedImport, setValue: setSearchIsAiEditedImport },
-                  { key: 'hasManuallyEditedVersion', label: 'Has manually edited version', value: searchHasManuallyEditedVersion, setValue: setSearchHasManuallyEditedVersion },
+                  { key: 'hasManuallyEditedVersion', label: 'Has manually edited version', value: searchHasManuallyEditedVersion, setValue: setSearchHasManuallyEditedVersion },
                   { key: 'hasAiEditedVersion', label: 'Has AI edited version', value: searchHasAiEditedVersion, setValue: setSearchHasAiEditedVersion },
                   { key: 'inEditQueue', label: 'In edit queue', value: searchInEditQueue, setValue: setSearchInEditQueue },
                 ] as const
               ).map((row) => (
                 <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#1f2937' }}>{row.label}</span>
-                  <div style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: '12px', color: '#1f2937', flex: '1 1 auto', minWidth: 0 }}>{row.label}</span>
+                  <div style={{ display: 'flex', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #c8c8c8', marginLeft: 'auto' }}>
                     {(['any', 'yes', 'no'] as const).map((state, idx) => (
                       <button
                         key={state}
