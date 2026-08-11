@@ -1,0 +1,12 @@
+-- Opens the Tedography presentation view (/present) as a chrome-less Chrome
+-- app-mode window, suitable for dragging to an external monitor/TV and
+-- full-screening. Syncs live with whatever photo is selected in the main
+-- Tedography window via a BroadcastChannel — see
+-- apps/web/src/components/presentation/PresentationPage.tsx.
+--
+-- The dev server (pnpm dev) must already be running.
+--
+-- -n forces `open` to launch a new instance even when Chrome is already
+-- running — without it, `open -a` just activates the existing Chrome
+-- window and silently drops --args, so nothing appears to happen.
+do shell script "open -n -a 'Google Chrome' --args --app=http://localhost:3000/present"

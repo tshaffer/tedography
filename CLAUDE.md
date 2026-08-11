@@ -27,6 +27,10 @@ pnpm thumbnails:rebuild   # rebuild all thumbnails
 pnpm locations:backfill   # backfill location metadata on existing assets
 ```
 
+macOS-only: `scripts/mac/` has launcher `.app` sources (e.g. the Presentation
+Mode external-monitor launcher) that get compiled locally into
+`/Applications` — see `scripts/mac/README.md`.
+
 ---
 
 ## Repo Structure
