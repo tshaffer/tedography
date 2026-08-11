@@ -49,6 +49,14 @@ export async function rotateAsset180(assetId: string): Promise<MediaAsset> {
   });
 }
 
+export async function updateAssetRating(assetId: string, rating: number | null): Promise<MediaAsset> {
+  return fetchJson<MediaAsset>(`/api/assets/${encodeURIComponent(assetId)}/rating`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating })
+  });
+}
+
 export async function openAssetInPreview(assetId: string): Promise<void> {
   await fetchJson<{ ok: boolean }>(`/api/assets/${encodeURIComponent(assetId)}/open-in-preview`, {
     method: 'POST'

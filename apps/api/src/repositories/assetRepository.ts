@@ -98,6 +98,7 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           sourceAssetId: 1,
           editMethod: 1,
           editedAssetIds: 1,
+          rating: 1,
         }
       }
     )
@@ -156,6 +157,7 @@ export async function getAssetPageForLibrary(input?: {
           sourceAssetId: 1,
           editMethod: 1,
           editedAssetIds: 1,
+          rating: 1,
         }
       }
     )
@@ -423,6 +425,15 @@ export async function updatePhotoState(id: string, photoState: PhotoState): Prom
   const asset = await MediaAssetModel.findOneAndUpdate(
     { id },
     { $set: { photoState } },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<MediaAsset | null>();
+  return asset ? normalizeMediaAsset(asset) : null;
+}
+
+export async function updateRating(id: string, rating: number | null): Promise<MediaAsset | null> {
+  const asset = await MediaAssetModel.findOneAndUpdate(
+    { id },
+    { $set: { rating } },
     { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<MediaAsset | null>();
   return asset ? normalizeMediaAsset(asset) : null;

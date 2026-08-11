@@ -86,6 +86,7 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     sourceAssetId: { type: String, required: false, trim: true, default: null },
     editMethod: { type: String, required: false, enum: ['ai', 'manual'] },
     editedAssetIds: { type: [String], required: false, default: [] },
+    rating: { type: Number, required: false, min: 0, max: 5, default: null },
     peopleRecognitionRanAt: { type: String, required: false, trim: true },
     people: {
       type: [

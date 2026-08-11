@@ -13,6 +13,7 @@ Tedography is a personal photo archive and curation system. The primary workflow
    - 2.1 [Photo States](#21-photo-states)
    - 2.2 [Setting Photo State](#22-setting-photo-state)
    - 2.3 [Keyboard Shortcuts](#23-keyboard-shortcuts)
+   - 2.4 [Ratings](#24-ratings)
 3. [Viewing and Browsing](#3-viewing-and-browsing)
    - 3.1 [Library Browse Modes](#31-library-browse-modes)
    - 3.2 [Viewing Modes](#32-viewing-modes)
@@ -169,6 +170,14 @@ These shortcuts work throughout Library and in Survey and Loupe modes when focus
 | `←` `→` | Previous / next photo |
 | `s` `p` `r` `u` `Delete` | Same state shortcuts as above |
 
+### 2.4 Ratings
+
+Independent of Photo State, every photo can carry a **0–5 star rating** — a way to rank quality among the photos you've already decided to keep, rather than a triage state.
+
+Set a rating from the Inspector panel: click a star to rate the photo 1–5. Click the currently-set star again to clear the rating back to unrated. There are no keyboard shortcuts for ratings yet — they're set from the Inspector only.
+
+Rated photos can show a small amber badge with the star count on their thumbnail — off by default; enable it from **View Options → Photo Badges → Ratings**. Ratings can be filtered on in Search (**6.1 Search Filters**) and saved as a Smart Album criterion (**5.2 Smart Albums**).
+
 ---
 
 ## 3. Viewing and Browsing
@@ -245,6 +254,7 @@ Photo thumbnails in the grid can show small status badges. The visible badges ar
 | Edited import badge | This photo was imported via the Edit Queue as an `_edited` file |
 | Has edited version badge | Shown on an original that has one or more edited versions imported from the Edit Queue |
 | Edit method badge | Shown alongside the Edited import / Has edited version badges — a sparkle icon for AI-edited, a brush icon for manually edited (Lightroom, Photoshop, etc.); see [11.1 Edit Queue](#111-edit-queue) |
+| Rating badge | Amber badge showing the star count (1-5) for any rated photo; see 2.4 Ratings |
 | People badge | Photo has confirmed people data |
 
 Badges can be toggled on or off individually from the toolbar overflow menu under **Badges**.
@@ -426,6 +436,7 @@ Smart Albums are saved searches that reopen a filtered result set with one click
 - Keyword
 - Photo state
 - Year group
+- Rating (at least N stars)
 
 **Creating a Smart Album:**
 1. Open **Search** and set the filters you want to save.
@@ -460,6 +471,7 @@ Open **Search** from the top navigation. Available filters:
   - **In edit queue** — photo is currently queued in the Edit Queue
 
   Set Match to **OR** to combine filters (e.g. "Is manually edited import" + "Is AI edited import" with OR finds any edited import regardless of method); leave it on **AND** (the default) to require all the filters you've set.
+- **Rating** — at least N stars (0 = off, no minimum)
 - **Filename pattern**
 - **Publication status**
 

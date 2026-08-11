@@ -55,6 +55,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BrushIcon from '@mui/icons-material/Brush';
+import StarIcon from '@mui/icons-material/Star';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -100,7 +101,8 @@ import {
   rotateAssetCounterclockwise,
   rotateAsset180,
   updateAssetsCaptureDateTime,
-  updateAssetsCaptureDateMarkedWrong
+  updateAssetsCaptureDateMarkedWrong,
+  updateAssetRating
 } from './api/assetApi';
 import {
   addKeywordsToAssets as addKeywordsToAssetsRequest,
@@ -171,6 +173,7 @@ import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDi
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
 import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
+import { StarRatingControl } from './components/assets/StarRatingControl';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
@@ -257,6 +260,7 @@ const searchHasManuallyEditedVersionStorageKey = 'tedography.search.hasManuallyE
 const searchHasAiEditedVersionStorageKey = 'tedography.search.hasAiEditedVersion';
 const searchInEditQueueStorageKey = 'tedography.search.inEditQueue';
 const searchEditQueueMatchModeStorageKey = 'tedography.search.editQueueMatchMode';
+const searchRatingMinStorageKey = 'tedography.search.ratingMin';
 const searchKeywordIncludeStorageKey = 'tedography.search.keyword.include';
 const searchKeywordIncludeModeStorageKey = 'tedography.search.keyword.includeMode';
 const searchKeywordExcludeStorageKey = 'tedography.search.keyword.exclude';
@@ -322,7 +326,8 @@ function normalizeSmartAlbumFilterSpecForComparison(
       typeof filterSpec.captureDateTo === 'string' && filterSpec.captureDateTo.trim().length > 0
         ? filterSpec.captureDateTo.trim()
         : null,
-    captureDateAvailability: filterSpec.captureDateAvailability ?? null
+    captureDateAvailability: filterSpec.captureDateAvailability ?? null,
+    ratingMin: filterSpec.ratingMin ?? null
   };
 }
 
@@ -342,6 +347,7 @@ function smartAlbumFilterSpecsEqual(
     l.captureDateFrom === r.captureDateFrom &&
     l.captureDateTo === r.captureDateTo &&
     l.captureDateAvailability === r.captureDateAvailability &&
+    l.ratingMin === r.ratingMin &&
     (l.peopleIds ?? []).length === (r.peopleIds ?? []).length &&
     (l.peopleIds ?? []).every((id, i) => id === r.peopleIds?.[i]) &&
     (l.excludedPeopleIds ?? []).length === (r.excludedPeopleIds ?? []).length &&
@@ -365,6 +371,7 @@ const showThumbnailHasEditedVersionBadgesStorageKey = 'tedography.showThumbnailH
 const showThumbnailEditMethodBadgesStorageKey = 'tedography.showThumbnailEditMethodBadges';
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
+const showThumbnailRatingBadgesStorageKey = 'tedography.showThumbnailRatingBadges';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
@@ -417,6 +424,7 @@ type SearchFilters = {
   hasAiEditedVersion: TriState;
   inEditQueue: TriState;
   editQueueMatchMode: EditQueueMatchMode;
+  ratingMin: number;
 };
 
 type AssetsBootstrapScope =
@@ -2854,6 +2862,7 @@ function getDefaultSearchFilters(): SearchFilters {
     hasAiEditedVersion: 'any',
     inEditQueue: 'any',
     editQueueMatchMode: 'and',
+    ratingMin: 0,
   };
 }
 
@@ -2895,7 +2904,8 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.hasManuallyEditedVersion === right.hasManuallyEditedVersion &&
     left.hasAiEditedVersion === right.hasAiEditedVersion &&
     left.inEditQueue === right.inEditQueue &&
-    left.editQueueMatchMode === right.editQueueMatchMode
+    left.editQueueMatchMode === right.editQueueMatchMode &&
+    left.ratingMin === right.ratingMin
   );
 }
 
@@ -2920,7 +2930,8 @@ function hasSearchFilters(filters: SearchFilters): boolean {
     filters.isAiEditedImport !== 'any' ||
     filters.hasManuallyEditedVersion !== 'any' ||
     filters.hasAiEditedVersion !== 'any' ||
-    filters.inEditQueue !== 'any'
+    filters.inEditQueue !== 'any' ||
+    filters.ratingMin > 0
   );
 }
 
@@ -3086,6 +3097,7 @@ type AssetCardProps = {
   showEditedImportBadge: boolean;
   showHasEditedVersionBadge: boolean;
   editMethodBadges: EditMethod[];
+  showRatingBadge: boolean;
   showPeopleBadge: boolean;
   isInAiQueue: boolean;
   touchSelectionMode: boolean;
@@ -3113,6 +3125,7 @@ function AssetCard({
   showEditedImportBadge,
   showHasEditedVersionBadge,
   editMethodBadges,
+  showRatingBadge,
   showPeopleBadge,
   isInAiQueue,
   touchSelectionMode,
@@ -3319,6 +3332,14 @@ function AssetCard({
               {method === 'ai' ? <AutoAwesomeIcon style={cardBadgeIconStyle} /> : <BrushIcon style={cardBadgeIconStyle} />}
             </span>
           ))}
+          {showRatingBadge && asset.rating ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#f59e0b' }}
+              title={`Rating: ${asset.rating} star${asset.rating !== 1 ? 's' : ''}`}
+            >
+              <span style={{ ...cardBadgeIconStyle, fontWeight: 700 }}>{asset.rating}</span>
+            </span>
+          ) : null}
         </span>
         <span style={cardBottomBadgeRowStyle}>
           {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
@@ -4412,6 +4433,11 @@ export default function App() {
     if (typeof window === 'undefined') return 'and';
     return parseEditQueueMatchModeFromStorage(window.localStorage.getItem(searchEditQueueMatchModeStorageKey));
   });
+  const [searchRatingMin, setSearchRatingMin] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = Number(window.localStorage.getItem(searchRatingMinStorageKey));
+    return Number.isInteger(stored) && stored >= 0 && stored <= 5 ? stored : 0;
+  });
   const [reviewableDetectionAssetIds, setReviewableDetectionAssetIds] = useState<Set<string> | null>(null);
   const [searchKeywordInclude, setSearchKeywordInclude] = useState<KeywordQueryClause[]>(() =>
     typeof window !== 'undefined'
@@ -4466,6 +4492,9 @@ export default function App() {
     const stored = localStorage.getItem('tdg-search-section-edit-queue-collapsed');
     return stored === null ? true : stored === 'true';
   });
+  const [searchRatingSectionCollapsed, setSearchRatingSectionCollapsed] = useState(() =>
+    localStorage.getItem('tdg-search-section-rating-collapsed') === 'true'
+  );
   const searchPeopleAttemptedRef = useRef(false);
   useEffect(() => {
     if (!location.search) {
@@ -4664,6 +4693,13 @@ export default function App() {
     }
 
     return window.localStorage.getItem(showThumbnailOrderingBadgesStorageKey) === 'true';
+  });
+  const [showThumbnailRatingBadges, setShowThumbnailRatingBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showThumbnailRatingBadgesStorageKey) === 'true';
   });
   const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -5158,6 +5194,13 @@ export default function App() {
   }, [showThumbnailOrderingBadges]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailRatingBadgesStorageKey,
+      showThumbnailRatingBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailRatingBadges]);
+
+  useEffect(() => {
     window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
   }, [showAlbumKeywordStatusBadge]);
 
@@ -5340,6 +5383,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(searchEditQueueMatchModeStorageKey, searchEditQueueMatchMode);
   }, [searchEditQueueMatchMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(searchRatingMinStorageKey, String(searchRatingMin));
+  }, [searchRatingMin]);
 
   useEffect(() => {
     if (!searchHasReviewableFaces) {
@@ -5995,6 +6042,7 @@ export default function App() {
       hasAiEditedVersion: searchHasAiEditedVersion,
       inEditQueue: searchInEditQueue,
       editQueueMatchMode: searchEditQueueMatchMode,
+      ratingMin: searchRatingMin,
     }),
     [
       searchAlbumIds,
@@ -6020,6 +6068,7 @@ export default function App() {
       searchHasAiEditedVersion,
       searchInEditQueue,
       searchEditQueueMatchMode,
+      searchRatingMin,
     ]
   );
   const searchResults = useMemo(() => {
@@ -6126,6 +6175,9 @@ export default function App() {
             ? editQueueConstraints.some(Boolean)
             : editQueueConstraints.every(Boolean);
 
+      const matchesRating =
+        appliedSearchFilters.ratingMin === 0 || (asset.rating ?? 0) >= appliedSearchFilters.ratingMin;
+
       return (
         matchesPhotoState &&
         matchesAlbum &&
@@ -6134,7 +6186,8 @@ export default function App() {
         matchesCaptureDateRange &&
         matchesPeople &&
         matchesKeyword &&
-        matchesEditQueueFilters
+        matchesEditQueueFilters &&
+        matchesRating
       );
     });
 
@@ -6586,7 +6639,8 @@ export default function App() {
       hasNoPeople: filters.hasNoPeople || null,
       captureDateFrom: filters.captureDateFrom || null,
       captureDateTo: filters.captureDateTo || null,
-      captureDateAvailability: filters.captureDateAvailability !== 'datedOnly' ? filters.captureDateAvailability : null
+      captureDateAvailability: filters.captureDateAvailability !== 'datedOnly' ? filters.captureDateAvailability : null,
+      ratingMin: filters.ratingMin > 0 ? filters.ratingMin : null
     });
 
     const hasAnyFilter =
@@ -6598,7 +6652,8 @@ export default function App() {
       filterSpec.hasNoPeople ||
       filterSpec.captureDateFrom ||
       filterSpec.captureDateTo ||
-      filterSpec.captureDateAvailability;
+      filterSpec.captureDateAvailability ||
+      filterSpec.ratingMin;
 
     if (!hasAnyFilter) {
       return null;
@@ -8037,6 +8092,14 @@ export default function App() {
     );
   }
 
+  async function handleChangeAssetRating(assetId: string, rating: number): Promise<void> {
+    const updated = await updateAssetRating(assetId, rating === 0 ? null : rating);
+    const normalizedRating = updated.rating ?? null;
+    setAssets((previous) =>
+      previous.map((asset) => (asset.id === assetId ? { ...asset, rating: normalizedRating } : asset))
+    );
+  }
+
   async function handleSaveEditHistoryNote(entryId: string, note: string): Promise<void> {
     await updateEditHistoryNote(entryId, note);
     setEditHistoryEntries((prev) =>
@@ -9458,6 +9521,7 @@ export default function App() {
     setSearchHasAiEditedVersion(filters.hasAiEditedVersion);
     setSearchInEditQueue(filters.inEditQueue);
     setSearchEditQueueMatchMode(filters.editQueueMatchMode);
+    setSearchRatingMin(filters.ratingMin);
   }
 
   function applyPendingSearchFilters(): void {
@@ -9546,7 +9610,8 @@ export default function App() {
       hasNoPeople: filterSpec.hasNoPeople ?? false,
       captureDateFrom: filterSpec.captureDateFrom ?? '',
       captureDateTo: filterSpec.captureDateTo ?? '',
-      captureDateAvailability: filterSpec.captureDateAvailability ?? 'datedOnly'
+      captureDateAvailability: filterSpec.captureDateAvailability ?? 'datedOnly',
+      ratingMin: filterSpec.ratingMin ?? 0
     };
 
     setPrimaryArea('Search');
@@ -12359,6 +12424,37 @@ export default function App() {
             </div>
           ) : null}
         </div>
+        <div style={filterSubsectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Rating</h3>
+            <button
+              type="button"
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+              onClick={() => setSearchRatingSectionCollapsed((v) => {
+                const next = !v;
+                localStorage.setItem('tdg-search-section-rating-collapsed', String(next));
+                return next;
+              })}
+            >
+              {searchRatingSectionCollapsed ? '▸ Show' : '▾ Hide'}
+            </button>
+          </div>
+          {!searchRatingSectionCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#1f2937' }}>At least</span>
+              <StarRatingControl value={searchRatingMin} onChange={setSearchRatingMin} size="small" />
+              {searchRatingMin > 0 ? (
+                <button
+                  type="button"
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+                  onClick={() => setSearchRatingMin(0)}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </section>
     );
   }
@@ -12555,6 +12651,11 @@ export default function App() {
             onChangeEditMethod={
               selectedAsset
                 ? async (method) => handleChangeAssetEditMethod(selectedAsset.id, method)
+                : undefined
+            }
+            onChangeRating={
+              selectedAsset
+                ? async (rating) => handleChangeAssetRating(selectedAsset.id, rating)
                 : undefined
             }
           />
@@ -13219,6 +13320,17 @@ export default function App() {
                     </span>
                   </span>
                   Ordering
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showThumbnailRatingBadges}
+                    onChange={(event) => setShowThumbnailRatingBadges(event.target.checked)}
+                  />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#f59e0b' }}>
+                    <StarIcon style={menuBadgeChipIconStyle} />
+                  </span>
+                  Ratings
                 </label>
                 <span style={filterSubsectionTitleStyle}>Panel Visibility</span>
                 <label style={toggleOptionLabelStyle}>
@@ -14017,6 +14129,7 @@ export default function App() {
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                           editMethodBadges={getEditMethodBadgesForAsset(asset)}
+                          showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -14054,6 +14167,7 @@ export default function App() {
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                           editMethodBadges={getEditMethodBadgesForAsset(asset)}
+                          showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           isInAiQueue={editQueueAssetIdSet.has(asset.id)}
@@ -14099,6 +14213,7 @@ export default function App() {
                     showEditedImportBadge={showThumbnailEditedImportBadges}
                     showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
                     editMethodBadges={getEditMethodBadgesForAsset(asset)}
+                    showRatingBadge={showThumbnailRatingBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                     isInAiQueue={editQueueAssetIdSet.has(asset.id)}

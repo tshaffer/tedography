@@ -54,7 +54,11 @@ function normalizeSmartAlbumRecord(item: SmartAlbum): SmartAlbum {
         typeof item.filterSpec.captureDateTo === 'string' && item.filterSpec.captureDateTo.trim().length > 0
           ? item.filterSpec.captureDateTo.trim()
           : null,
-      captureDateAvailability: item.filterSpec.captureDateAvailability ?? null
+      captureDateAvailability: item.filterSpec.captureDateAvailability ?? null,
+      ratingMin:
+        typeof item.filterSpec.ratingMin === 'number' && item.filterSpec.ratingMin > 0
+          ? item.filterSpec.ratingMin
+          : null
     }
   };
 }
@@ -115,6 +119,19 @@ async function normalizeAndValidateFilterSpec(
       ? filterSpec.captureDateAvailability
       : null;
 
+  if (
+    filterSpec.ratingMin !== undefined &&
+    filterSpec.ratingMin !== null &&
+    (typeof filterSpec.ratingMin !== 'number' ||
+      !Number.isInteger(filterSpec.ratingMin) ||
+      filterSpec.ratingMin < 0 ||
+      filterSpec.ratingMin > 5)
+  ) {
+    throw new SmartAlbumValidationError('filterSpec.ratingMin must be an integer 0-5.');
+  }
+  const ratingMin =
+    typeof filterSpec.ratingMin === 'number' && filterSpec.ratingMin > 0 ? filterSpec.ratingMin : null;
+
   const hasAnyFilter =
     keywordId ||
     photoState ||
@@ -124,7 +141,8 @@ async function normalizeAndValidateFilterSpec(
     hasNoPeople ||
     captureDateFrom ||
     captureDateTo ||
-    (captureDateAvailability && captureDateAvailability !== 'datedOnly');
+    (captureDateAvailability && captureDateAvailability !== 'datedOnly') ||
+    ratingMin;
 
   if (!hasAnyFilter) {
     throw new SmartAlbumValidationError(
@@ -142,7 +160,8 @@ async function normalizeAndValidateFilterSpec(
     hasNoPeople,
     captureDateFrom,
     captureDateTo,
-    captureDateAvailability
+    captureDateAvailability,
+    ratingMin
   };
 }
 

@@ -109,6 +109,9 @@ export interface MediaAsset {
   // Ids of edited versions imported for this asset, if any (an original can have more than one).
   editedAssetIds?: string[];
 
+  // Star rating, 0-5. Null/undefined means unrated. Independent of PhotoState.
+  rating?: number | null;
+
   // Optional capture location metadata when available.
   locationLabel?: string | null;
   locationLatitude?: number | null;

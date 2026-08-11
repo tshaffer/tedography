@@ -26,7 +26,8 @@ import {
   bulkUpdatePhotoState,
   updateCaptureDateTimeMarkedWrong,
   updateCaptureDateTimes,
-  updatePhotoState
+  updatePhotoState,
+  updateRating
 } from './repositories/assetRepository.js';
 import { listAssetIdsWithReviewableDetections } from './repositories/faceDetectionRepository.js';
 import { editHistoryRoutes } from './routes/editHistoryRoutes.js';
@@ -250,6 +251,28 @@ export function createServer(): Express {
       res.json(updatedAsset);
     } catch (error) {
       log.error('Failed to update asset photoState', error);
+      res.status(500).json({ error: 'Failed to update asset' });
+    }
+  });
+
+  app.patch('/api/assets/:id/rating', requireFeature('set-photo-state', (req) => [req.params.id as string]), async (req, res) => {
+    const { rating } = req.body as { rating?: unknown };
+    if (rating !== null && (typeof rating !== 'number' || rating < 0 || rating > 5 || !Number.isInteger(rating))) {
+      res.status(400).json({ error: 'rating must be an integer 0-5, or null' });
+      return;
+    }
+
+    try {
+      const updatedAsset = await updateRating(req.params.id as string, rating);
+
+      if (!updatedAsset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      res.json(updatedAsset);
+    } catch (error) {
+      log.error('Failed to update asset rating', error);
       res.status(500).json({ error: 'Failed to update asset' });
     }
   });

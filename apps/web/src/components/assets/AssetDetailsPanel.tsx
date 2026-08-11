@@ -9,6 +9,7 @@ import TextField from '@mui/material/TextField';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import FaceIcon from '@mui/icons-material/Face';
 import { listPeople } from '../../api/peoplePipelineApi';
+import { StarRatingControl } from './StarRatingControl';
 
 interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
@@ -41,6 +42,7 @@ interface AssetDetailsPanelProps {
   editQueueEntry?: EditQueueEntryWithFilename | null;
   onSaveEditNote?: ((note: string) => Promise<void>) | undefined;
   onChangeEditMethod?: ((method: EditMethod) => Promise<void>) | undefined;
+  onChangeRating?: ((rating: number) => Promise<void>) | undefined;
 }
 
 const panelStyle: CSSProperties = {
@@ -300,6 +302,7 @@ export function AssetDetailsPanel({
   editQueueEntry = null,
   onSaveEditNote,
   onChangeEditMethod,
+  onChangeRating,
 }: AssetDetailsPanelProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
@@ -310,6 +313,7 @@ export function AssetDetailsPanel({
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [editMethodSaving, setEditMethodSaving] = useState(false);
+  const [ratingSaving, setRatingSaving] = useState(false);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   if (!asset) {
@@ -585,6 +589,27 @@ export function AssetDetailsPanel({
           ) : (
             <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.note}</p>
           )}
+        </section>
+      ) : null}
+
+      {/* Rating */}
+      {onChangeRating ? (
+        <section style={subSectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h4 style={{ ...subSectionTitleStyle, margin: 0 }}>Rating</h4>
+            <StarRatingControl
+              value={asset.rating ?? 0}
+              disabled={ratingSaving}
+              onChange={async (value) => {
+                setRatingSaving(true);
+                try {
+                  await onChangeRating(value);
+                } finally {
+                  setRatingSaving(false);
+                }
+              }}
+            />
+          </div>
         </section>
       ) : null}
 

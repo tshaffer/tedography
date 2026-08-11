@@ -12,7 +12,8 @@ const smartAlbumFilterSpecSchema = new Schema<SmartAlbumFilterSpec>(
     hasNoPeople: { type: Boolean, default: null },
     captureDateFrom: { type: String, default: null, trim: true },
     captureDateTo: { type: String, default: null, trim: true },
-    captureDateAvailability: { type: String, enum: ['datedOnly', 'datedOrUndated', 'undatedOnly'], default: null }
+    captureDateAvailability: { type: String, enum: ['datedOnly', 'datedOrUndated', 'undatedOnly'], default: null },
+    ratingMin: { type: Number, default: null, min: 0, max: 5 }
   },
   {
     _id: false,

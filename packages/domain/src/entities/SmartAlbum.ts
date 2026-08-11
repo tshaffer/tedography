@@ -12,6 +12,7 @@ export interface SmartAlbumFilterSpec {
   captureDateFrom?: string | null;
   captureDateTo?: string | null;
   captureDateAvailability?: SearchCaptureDateAvailabilityMode | null;
+  ratingMin?: number | null;
 }
 
 export interface SmartAlbum {
