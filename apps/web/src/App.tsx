@@ -46,6 +46,7 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TagIcon from '@mui/icons-material/Tag';
 import DownloadIcon from '@mui/icons-material/Download';
+import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
@@ -153,6 +154,7 @@ import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
 import { ExportQueueResultDialog } from './components/editQueue/ExportQueueResultDialog';
 import { PublishToGooglePhotosDialog } from './components/publish/PublishToGooglePhotosDialog';
 import { PrintDialog } from './components/print/PrintDialog';
+import { ExportPhotosDialog } from './components/export/ExportPhotosDialog';
 import {
   getEditHistory,
   getEditHistoryArchives,
@@ -4241,6 +4243,7 @@ export default function App() {
   const [editQueueImportCandidateCount, setEditQueueImportCandidateCount] = useState(0);
   const [publishToGooglePhotosOpen, setPublishToGooglePhotosOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [exportPhotosDialogOpen, setExportPhotosDialogOpen] = useState(false);
   const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
   const [editHistoryEntries, setEditHistoryEntries] = useState<EditHistoryEntryWithNavigation[]>([]);
   const [editHistoryLoading, setEditHistoryLoading] = useState(false);
@@ -12891,6 +12894,23 @@ export default function App() {
             </Tooltip>
           </div>
 
+          {/* Export Photos — hidden on touch devices */}
+          <div style={toolbarGroupStyle} className="tdg-desktop-only">
+            <Tooltip title={hasSelectedAssets ? 'Export Photos' : 'Select one or more photos to export'}>
+              <span>
+                <button
+                  type="button"
+                  style={hasSelectedAssets ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
+                  onClick={() => setExportPhotosDialogOpen(true)}
+                  disabled={!hasSelectedAssets}
+                  aria-label="Export Photos"
+                >
+                  <SaveAltIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: hasSelectedAssets ? '#555' : '#bbb' }} />
+                </button>
+              </span>
+            </Tooltip>
+          </div>
+
           {/* Rotation + Crop */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
@@ -14506,6 +14526,12 @@ export default function App() {
         open={printDialogOpen}
         assets={visibleAssets.filter((a) => selectedAssetIds.includes(a.id))}
         onClose={() => setPrintDialogOpen(false)}
+      />
+      <ExportPhotosDialog
+        open={exportPhotosDialogOpen}
+        assetIds={selectedAssetIds}
+        assetsById={assetsById}
+        onClose={() => setExportPhotosDialogOpen(false)}
       />
 
       <ImportAssetsDialog

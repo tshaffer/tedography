@@ -93,3 +93,14 @@ export async function updateAssetsCaptureDateMarkedWrong(request: {
     body: JSON.stringify(request)
   });
 }
+
+export async function fetchExportedAssetBlob(assetId: string, format: 'jpeg' | 'png' | 'original'): Promise<Blob> {
+  const response = await fetch(`/api/media/export/${encodeURIComponent(assetId)}?format=${format}`, {
+    cache: 'no-store'
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    throw new Error(payload.error ?? `Request failed with status ${response.status}`);
+  }
+  return response.blob();
+}

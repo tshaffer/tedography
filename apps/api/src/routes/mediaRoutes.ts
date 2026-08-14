@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router, type Response } from 'express';
-import type { ImportApiErrorResponse } from '@tedography/domain';
+import sharp from 'sharp';
+import { MediaType, type ImportApiErrorResponse } from '@tedography/domain';
 import {
   resolveDisplayAbsolutePathForAsset,
   resolveOriginalAbsolutePathForAsset,
@@ -134,5 +135,50 @@ mediaRoutes.get('/original/:assetId', async (req, res) => {
     log.error('Failed to resolve original media path', error);
     const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
     res.status(404).json(errorResponse);
+  }
+});
+
+mediaRoutes.get('/export/:assetId', async (req, res) => {
+  const assetId = req.params.assetId?.trim();
+  if (!assetId) {
+    const errorResponse: ImportApiErrorResponse = { error: 'assetId is required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const asset = await findById(assetId);
+  if (!asset) {
+    const errorResponse: ImportApiErrorResponse = { error: 'Asset not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  if (asset.mediaType !== MediaType.Photo) {
+    const errorResponse: ImportApiErrorResponse = { error: 'Only photos can be exported' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const format = req.query.format === 'png' ? 'png' : req.query.format === 'original' ? 'original' : 'jpeg';
+
+  try {
+    if (format === 'original') {
+      const originalPath = resolveOriginalAbsolutePathForAsset(asset);
+      const originalBytes = await fs.readFile(originalPath);
+      res.setHeader('Content-Type', getContentTypeForFile(originalPath));
+      res.send(originalBytes);
+      return;
+    }
+
+    const displayPath = resolveDisplayAbsolutePathForAsset(asset);
+    const converted = format === 'png'
+      ? await sharp(displayPath).png().toBuffer()
+      : await sharp(displayPath).jpeg({ quality: 92 }).toBuffer();
+    res.setHeader('Content-Type', format === 'png' ? 'image/png' : 'image/jpeg');
+    res.send(converted);
+  } catch (error) {
+    log.error('Failed to export asset', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'Failed to export asset' };
+    res.status(500).json(errorResponse);
   }
 });
