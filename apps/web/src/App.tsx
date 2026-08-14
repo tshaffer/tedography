@@ -8090,6 +8090,9 @@ export default function App() {
     setAssets((previous) =>
       previous.map((asset) => (asset.id === assetId ? { ...asset, editMethod } : asset))
     );
+    setSelectedAssetDetails((previous) =>
+      previous && previous.id === assetId ? { ...previous, editMethod } : previous
+    );
   }
 
   async function handleChangeAssetRating(assetId: string, rating: number): Promise<void> {
@@ -8097,6 +8100,9 @@ export default function App() {
     const normalizedRating = updated.rating ?? null;
     setAssets((previous) =>
       previous.map((asset) => (asset.id === assetId ? { ...asset, rating: normalizedRating } : asset))
+    );
+    setSelectedAssetDetails((previous) =>
+      previous && previous.id === assetId ? { ...previous, rating: normalizedRating } : previous
     );
   }
 
