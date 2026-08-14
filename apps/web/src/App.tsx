@@ -374,6 +374,7 @@ const showThumbnailEditMethodBadgesStorageKey = 'tedography.showThumbnailEditMet
 const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadges';
 const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
 const showThumbnailRatingBadgesStorageKey = 'tedography.showThumbnailRatingBadges';
+const showImmersiveFilenameStorageKey = 'tedography.showImmersiveFilename';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
@@ -2039,6 +2040,7 @@ const immersiveControlButtonStyle: CSSProperties = {
 };
 
 const immersiveImageWrapStyle: CSSProperties = {
+  position: 'relative',
   flex: 1,
   width: '100%',
   height: '100%',
@@ -2064,6 +2066,18 @@ const immersiveBottomHintStyle: CSSProperties = {
   color: '#a9a9a9',
   fontSize: '12px',
   marginTop: '8px'
+};
+
+const immersiveFilenameLabelStyle: CSSProperties = {
+  position: 'absolute',
+  bottom: '14px',
+  left: '14px',
+  padding: '4px 10px',
+  borderRadius: '5px',
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  color: '#f0f0f0',
+  fontSize: '13px',
+  pointerEvents: 'none'
 };
 
 const slideshowOverlayStyle: CSSProperties = {
@@ -3474,6 +3488,7 @@ type ImmersiveViewerProps = {
   total: number;
   hasPrevious: boolean;
   hasNext: boolean;
+  showFilename: boolean;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -3482,6 +3497,7 @@ type ImmersiveViewerProps = {
 
 function ImmersiveViewer({
   asset,
+  showFilename,
   onClose,
   onActiveImageLoad
 }: ImmersiveViewerProps) {
@@ -3505,6 +3521,7 @@ function ImmersiveViewer({
           ) : (
             <div style={immersiveImageStyle} />
           )}
+          {showFilename ? <span style={immersiveFilenameLabelStyle}>{asset.filename}</span> : null}
         </div>
       </section>
     </div>
@@ -4704,6 +4721,13 @@ export default function App() {
 
     return window.localStorage.getItem(showThumbnailRatingBadgesStorageKey) === 'true';
   });
+  const [showImmersiveFilename, setShowImmersiveFilename] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showImmersiveFilenameStorageKey) === 'true';
+  });
   const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const own = window.localStorage.getItem(showAlbumKeywordStatusBadgeStorageKey);
@@ -5202,6 +5226,13 @@ export default function App() {
       showThumbnailRatingBadges ? 'true' : 'false'
     );
   }, [showThumbnailRatingBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showImmersiveFilenameStorageKey,
+      showImmersiveFilename ? 'true' : 'false'
+    );
+  }, [showImmersiveFilename]);
 
   useEffect(() => {
     window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
@@ -13402,6 +13433,14 @@ export default function App() {
                   />
                   Show filmstrip
                 </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showImmersiveFilename}
+                    onChange={(event) => setShowImmersiveFilename(event.target.checked)}
+                  />
+                  Show filename in Full Screen
+                </label>
                 <span style={filterSubsectionTitleStyle}>Album Layout</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -14372,6 +14411,7 @@ export default function App() {
             immersiveSelectedAssetIndex >= 0 &&
             immersiveSelectedAssetIndex < immersiveAssets.length - 1
           }
+          showFilename={showImmersiveFilename}
           onClose={closeImmersive}
           onPrevious={() => handleSelectRelativeInList(immersiveAssets, -1)}
           onNext={() => handleSelectRelativeInList(immersiveAssets, 1)}
