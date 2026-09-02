@@ -4,7 +4,7 @@ import { Router, type Router as RouterType, type Response } from 'express';
 import { requireFeature } from '../middleware/requireFeature.js';
 import { config } from '../config.js';
 import { log } from '../logger.js';
-import { PhotoState, MediaType, type MediaAssetAlbumMembership, type MediaAssetPerson } from '@tedography/domain';
+import { PhotoState, MediaType, EditType, EDIT_TYPE_VALUES, type MediaAssetAlbumMembership, type MediaAssetPerson } from '@tedography/domain';
 import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
 import {
   findById,
@@ -19,6 +19,7 @@ import {
   clearQueue,
   getQueueEntries,
   removeQueueEntry,
+  updateQueueEntryEditType,
   upsertQueueEntry,
 } from '../repositories/editQueueRepository.js';
 import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js';
@@ -723,5 +724,24 @@ editQueueRoutes.patch('/assets/:assetId/edit-method', requireFeature('maintenanc
   } catch (error) {
     log.error(`Failed to update edit method for asset ${assetId}`, error);
     res.status(500).json({ error: 'Failed to update edit method' });
+  }
+});
+
+// ─── PATCH /:assetId/edit-type — set an edit queue entry's edit type ─────────
+
+editQueueRoutes.patch('/:assetId/edit-type', requireFeature('maintenance'), async (req, res) => {
+  const { assetId } = req.params;
+  const { editType } = req.body as { editType?: string };
+  if (!EDIT_TYPE_VALUES.includes(editType as EditType)) {
+    res.status(400).json({ error: `editType must be one of: ${EDIT_TYPE_VALUES.join(', ')}` });
+    return;
+  }
+
+  try {
+    await updateQueueEntryEditType(assetId as string, editType as EditType);
+    res.json({ ok: true, editType });
+  } catch (error) {
+    log.error(`Failed to update edit type for asset ${assetId}`, error);
+    res.status(500).json({ error: 'Failed to update edit type' });
   }
 });

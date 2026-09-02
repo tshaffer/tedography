@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties, type ReactElement } from 'react';
+import { EditType, EDIT_TYPE_LABELS, EDIT_TYPE_VALUES } from '@tedography/domain';
 import type {
   EditQueueEntryWithFilename,
   ImportEditedResult,
@@ -32,6 +33,7 @@ interface EditQueueDialogProps {
   onClearFolder: () => void;
   onDeleteEditFolderFile: (filename: string) => void;
   onSaveNote: (assetId: string, note: string) => Promise<void>;
+  onSaveEditType: (assetId: string, editType: EditType) => void;
   onNavigate: (assetId: string, albumId: string | null) => void;
   onCancelClassify: () => void;
   onConfirmClassify: (files: { filename: string; editMethod: EditMethod }[]) => void;
@@ -180,6 +182,28 @@ const textareaStyle: CSSProperties = {
   boxSizing: 'border-box',
 };
 
+const filterSelectStyle: CSSProperties = {
+  fontSize: '12px',
+  border: '1px solid #d1d5db',
+  borderRadius: '4px',
+  padding: '3px 6px',
+  fontFamily: 'inherit',
+  color: '#374151',
+  backgroundColor: '#fff',
+};
+
+const rowEditTypeSelectStyle: CSSProperties = {
+  fontSize: '11px',
+  border: '1px solid #d1d5db',
+  borderRadius: '4px',
+  padding: '2px 4px',
+  fontFamily: 'inherit',
+  color: '#374151',
+  backgroundColor: '#fff',
+  flexShrink: 0,
+  maxWidth: '140px',
+};
+
 const smallButtonStyle: CSSProperties = {
   padding: '3px 10px',
   fontSize: '12px',
@@ -303,6 +327,7 @@ export function EditQueueDialog({
   onClearFolder,
   onDeleteEditFolderFile,
   onSaveNote,
+  onSaveEditType,
   onNavigate,
   onCancelClassify,
   onConfirmClassify,
@@ -314,8 +339,11 @@ export function EditQueueDialog({
   const [confirmClearQueue, setConfirmClearQueue] = useState(false);
   const [classifyMethodByFilename, setClassifyMethodByFilename] = useState<Record<string, EditMethod>>({});
   const [classifySelected, setClassifySelected] = useState<Set<string>>(new Set());
+  const [editTypeFilter, setEditTypeFilter] = useState<EditType | 'All'>('All');
   const selectAllRef = useRef<HTMLInputElement>(null);
   const isClassifying = classifyCandidates.length > 0;
+  const visibleEntries =
+    editTypeFilter === 'All' ? entries : entries.filter((e) => e.editType === editTypeFilter);
 
   useEffect(() => {
     if (classifyCandidates.length === 0) return;
@@ -338,19 +366,27 @@ export function EditQueueDialog({
 
   useEffect(() => {
     if (selectAllRef.current) {
+      const visibleSelectedCount = visibleEntries.filter((e) => selectedIds.has(e.assetId)).length;
       selectAllRef.current.indeterminate =
-        selectedIds.size > 0 && selectedIds.size < entries.length;
+        visibleSelectedCount > 0 && visibleSelectedCount < visibleEntries.length;
     }
-  }, [selectedIds.size, entries.length]);
+  }, [selectedIds, visibleEntries]);
 
   if (!open) return null;
 
-  const allSelected = entries.length > 0 && selectedIds.size === entries.length;
+  const allSelected = visibleEntries.length > 0 && visibleEntries.every((e) => selectedIds.has(e.assetId));
   const selectedCount = selectedIds.size;
   const selectedAssetIds = Array.from(selectedIds);
 
   function toggleSelectAll(): void {
-    setSelectedIds(allSelected ? new Set() : new Set(entries.map((e) => e.assetId)));
+    setSelectedIds((prev) => {
+      if (allSelected) {
+        const next = new Set(prev);
+        for (const e of visibleEntries) next.delete(e.assetId);
+        return next;
+      }
+      return new Set([...prev, ...visibleEntries.map((e) => e.assetId)]);
+    });
   }
 
   function toggleEntry(assetId: string): void {
@@ -494,6 +530,20 @@ export function EditQueueDialog({
             </p>
           ) : (
             <>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#374151' }}>
+                Filter by edit type
+                <select
+                  style={{ ...filterSelectStyle, flex: 1 }}
+                  value={editTypeFilter}
+                  onChange={(e) => setEditTypeFilter(e.target.value as EditType | 'All')}
+                >
+                  <option value="All">All</option>
+                  {EDIT_TYPE_VALUES.map((value) => (
+                    <option key={value} value={value}>{EDIT_TYPE_LABELS[value]}</option>
+                  ))}
+                </select>
+              </label>
+
               <div style={selectAllRowStyle}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#374151', cursor: 'pointer' }}>
                   <input
@@ -506,11 +556,18 @@ export function EditQueueDialog({
                   Select all
                 </label>
                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                  {entries.length} item{entries.length !== 1 ? 's' : ''}
+                  {visibleEntries.length} item{visibleEntries.length !== 1 ? 's' : ''}
+                  {visibleEntries.length !== entries.length ? ` of ${entries.length}` : ''}
                 </span>
               </div>
 
-              {entries.map((entry) => {
+              {visibleEntries.length === 0 ? (
+                <p style={{ margin: 0, color: '#9ca3af', fontSize: '12px', fontStyle: 'italic' }}>
+                  No items match this filter.
+                </p>
+              ) : null}
+
+              {visibleEntries.map((entry) => {
                 const isSelected = selectedIds.has(entry.assetId);
                 const isEditing = editingAssetId === entry.assetId;
                 const hasOrphanedEdit = entry.orphanedEditFilenames.length > 0;
@@ -546,6 +603,16 @@ export function EditQueueDialog({
                           ✓
                         </span>
                       ) : null}
+                      <select
+                        style={rowEditTypeSelectStyle}
+                        value={entry.editType}
+                        onChange={(e) => onSaveEditType(entry.assetId, e.target.value as EditType)}
+                        title="Edit type"
+                      >
+                        {EDIT_TYPE_VALUES.map((value) => (
+                          <option key={value} value={value}>{EDIT_TYPE_LABELS[value]}</option>
+                        ))}
+                      </select>
                       <button
                         type="button"
                         style={{ ...iconButtonStyle, color: isEditing ? '#1a56db' : '#9ca3af' }}

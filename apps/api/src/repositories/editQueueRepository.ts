@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { EditQueueEntry } from '@tedography/domain';
+import { EditType, type EditQueueEntry } from '@tedography/domain';
 import { EditQueueEntryModel } from '../models/editQueueEntryModel.js';
 
 export interface EditQueueEntryWithFilename extends EditQueueEntry {
@@ -11,6 +11,7 @@ function normalize(doc: EditQueueEntry): EditQueueEntry {
     id: doc.id,
     assetId: doc.assetId,
     note: doc.note,
+    editType: doc.editType ?? EditType.Unspecified,
     createdAt: doc.createdAt,
     editedAssetId: doc.editedAssetId ?? null,
   };
@@ -31,10 +32,15 @@ export async function upsertQueueEntry(assetId: string, note: string): Promise<E
     id: randomUUID(),
     assetId,
     note,
+    editType: EditType.Unspecified,
     createdAt: new Date().toISOString(),
   };
   await EditQueueEntryModel.create(entry);
   return entry;
+}
+
+export async function updateQueueEntryEditType(assetId: string, editType: EditType): Promise<void> {
+  await EditQueueEntryModel.updateOne({ assetId }, { editType });
 }
 
 export async function removeQueueEntry(assetId: string): Promise<void> {

@@ -1,4 +1,4 @@
-import type { EditQueueEntry } from '@tedography/domain';
+import type { EditQueueEntry, EditType } from '@tedography/domain';
 
 export interface EditQueueEntryWithFilename extends EditQueueEntry {
   filename: string;
@@ -85,6 +85,14 @@ export function updateAssetEditMethod(assetId: string, editMethod: EditMethod): 
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ editMethod }),
+  });
+}
+
+export function updateEditQueueEntryEditType(assetId: string, editType: EditType): Promise<{ ok: boolean; editType: EditType }> {
+  return fetchJson(`/api/edit-queue/${encodeURIComponent(assetId)}/edit-type`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ editType }),
   });
 }
 

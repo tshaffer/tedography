@@ -1,11 +1,13 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
+import { EditType, EDIT_TYPE_LABELS, EDIT_TYPE_VALUES } from '@tedography/domain';
 
 interface AddToEditQueueDialogProps {
   open: boolean;
   assetFilename: string;
   existingNote?: string;
+  existingEditType?: EditType;
   onClose: () => void;
-  onConfirm: (note: string) => void;
+  onConfirm: (note: string, editType: EditType) => void;
 }
 
 const overlayStyle: CSSProperties = {
@@ -72,6 +74,18 @@ const textareaStyle: CSSProperties = {
   boxSizing: 'border-box',
 };
 
+const selectStyle: CSSProperties = {
+  width: '100%',
+  padding: '8px',
+  fontSize: '13px',
+  borderRadius: '6px',
+  border: '1px solid #d1d5db',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+  backgroundColor: '#fff',
+  color: '#1f2937',
+};
+
 const footerStyle: CSSProperties = {
   padding: '12px 18px',
   borderTop: '1px solid #ececec',
@@ -105,15 +119,17 @@ export function AddToEditQueueDialog({
   open,
   assetFilename,
   existingNote,
+  existingEditType,
   onClose,
   onConfirm,
 }: AddToEditQueueDialogProps): ReactElement | null {
   const [note, setNote] = useState(existingNote ?? '');
+  const [editType, setEditType] = useState<EditType>(existingEditType ?? EditType.Unspecified);
 
   if (!open) return null;
 
   function handleConfirm(): void {
-    onConfirm(note.trim());
+    onConfirm(note.trim(), editType);
     onClose();
   }
 
@@ -125,6 +141,18 @@ export function AddToEditQueueDialog({
           <p style={filenameStyle}>{assetFilename}</p>
         </div>
         <div style={bodyStyle}>
+          <label style={labelStyle}>
+            Edit Type
+          </label>
+          <select
+            style={selectStyle}
+            value={editType}
+            onChange={(e) => setEditType(e.target.value as EditType)}
+          >
+            {EDIT_TYPE_VALUES.map((value) => (
+              <option key={value} value={value}>{EDIT_TYPE_LABELS[value]}</option>
+            ))}
+          </select>
           <label style={labelStyle}>
             Note (optional)
           </label>

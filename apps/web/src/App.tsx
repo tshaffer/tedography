@@ -141,6 +141,7 @@ import {
   scanEditedFiles,
   importEditedFiles,
   updateAssetEditMethod,
+  updateEditQueueEntryEditType,
   removeFromEditQueue,
   clearEditFolder,
   listEditFolderFiles,
@@ -168,6 +169,7 @@ import {
 } from './api/editHistoryApi';
 import { translateNaturalLanguageSearch } from './api/searchApi';
 import type { EditHistoryArchive } from '@tedography/domain';
+import { EditType } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
@@ -7963,10 +7965,11 @@ export default function App() {
     await applyAlbumPlacement(arrangedAssetIds, placeAfterAssetId);
   }
 
-  async function handleAddToEditQueue(note: string): Promise<void> {
+  async function handleAddToEditQueue(note: string, editType: EditType): Promise<void> {
     if (!selectedAsset) return;
     try {
       await addToEditQueue(selectedAsset.id, note);
+      await updateEditQueueEntryEditType(selectedAsset.id, editType);
       await loadEditQueue();
     } catch (err) {
       console.error('Failed to add to edit queue', err);
@@ -8116,6 +8119,11 @@ export default function App() {
 
   async function handleSaveEditQueueNote(assetId: string, note: string): Promise<void> {
     await addToEditQueue(assetId, note);
+    await loadEditQueue();
+  }
+
+  async function handleSaveEditQueueEditType(assetId: string, editType: EditType): Promise<void> {
+    await updateEditQueueEntryEditType(assetId, editType);
     await loadEditQueue();
   }
 
@@ -14478,8 +14486,9 @@ export default function App() {
         open={addToEditQueueDialogOpen}
         assetFilename={selectedAsset?.filename ?? ''}
         existingNote={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.note ?? '') : ''}
+        existingEditType={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.editType ?? EditType.Unspecified) : EditType.Unspecified}
         onClose={() => setAddToEditQueueDialogOpen(false)}
-        onConfirm={(note) => void handleAddToEditQueue(note)}
+        onConfirm={(note, editType) => void handleAddToEditQueue(note, editType)}
       />
       <EditQueueDialog
         open={editQueueDialogOpen}
@@ -14509,6 +14518,7 @@ export default function App() {
         onClearFolder={() => void handleClearEditFolder()}
         onDeleteEditFolderFile={(filename) => void handleDeleteEditFolderFile(filename)}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
+        onSaveEditType={(assetId, editType) => void handleSaveEditQueueEditType(assetId, editType)}
         onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
         onCancelClassify={handleCancelClassifyImport}
         onConfirmClassify={(files) => void handleConfirmClassifyImport(files)}

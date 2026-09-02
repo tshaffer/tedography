@@ -16,6 +16,7 @@ export * from './entities/PublicationRecord.js';
 export * from './entities/StorageInstance.js';
 export * from './entities/SmartAlbum.js';
 export * from './enums/AssetEventType.js';
+export * from './enums/EditType.js';
 export * from './enums/KeywordAssignmentStatus.js';
 export * from './enums/MediaType.js';
 export * from './enums/PhotoState.js';
