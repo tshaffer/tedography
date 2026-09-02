@@ -13185,7 +13185,7 @@ export default function App() {
                         className="tdg-overflow-item"
                         onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                       >
-                        Edit Note
+                        Edit Note & Type
                       </button>
                       <button
                         type="button"
