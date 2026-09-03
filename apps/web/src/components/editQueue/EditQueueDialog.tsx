@@ -7,6 +7,7 @@ import type {
   EditMethod,
   EditFolderFile,
 } from '../../api/editQueueApi.js';
+import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
 interface EditQueueDialogProps {
   open: boolean;
@@ -104,15 +105,33 @@ const selectAllRowStyle: CSSProperties = {
   marginBottom: '2px',
 };
 
-const entryStyle: CSSProperties = {
+const entryRowStyle: CSSProperties = {
   display: 'flex',
-  flexDirection: 'column',
-  gap: '3px',
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  gap: '8px',
   padding: '8px 10px',
   borderRadius: '6px',
   border: '1px solid #e5e7eb',
   backgroundColor: '#fafafa',
   fontSize: '12px',
+};
+
+const entryThumbnailStyle: CSSProperties = {
+  width: '44px',
+  height: '44px',
+  borderRadius: '4px',
+  objectFit: 'cover',
+  flexShrink: 0,
+  backgroundColor: '#e5e7eb',
+};
+
+const entryContentStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '3px',
+  flex: '1 1 auto',
+  minWidth: 0,
 };
 
 const entryHeaderStyle: CSSProperties = {
@@ -574,8 +593,15 @@ export function EditQueueDialog({
                 return (
                   <div
                     key={entry.assetId}
-                    style={{ ...entryStyle, borderColor: isSelected ? '#1a56db' : '#e5e7eb', backgroundColor: isSelected ? '#f0f5ff' : '#fafafa' }}
+                    style={{ ...entryRowStyle, borderColor: isSelected ? '#1a56db' : '#e5e7eb', backgroundColor: isSelected ? '#f0f5ff' : '#fafafa' }}
                   >
+                    <img
+                      src={getThumbnailMediaUrl(entry.assetId)}
+                      alt=""
+                      style={entryThumbnailStyle}
+                      loading="lazy"
+                    />
+                    <div style={entryContentStyle}>
                     <div style={entryHeaderStyle}>
                       <input
                         type="checkbox"
@@ -654,6 +680,7 @@ export function EditQueueDialog({
                     ) : (
                       <span style={{ color: '#d1d5db', fontStyle: 'italic', fontSize: '11px' }}>no note</span>
                     )}
+                    </div>
                   </div>
                 );
               })}
