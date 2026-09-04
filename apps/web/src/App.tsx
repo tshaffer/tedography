@@ -189,6 +189,7 @@ import {
 } from './components/import/ImportAssetsDialog';
 import { KeywordManagementDialog } from './components/maintenance/KeywordManagementDialog';
 import { MaintenanceDialog } from './components/maintenance/MaintenanceDialog';
+import { HelpDialog } from './components/help/HelpDialog';
 import { AssetPeopleReviewDialog } from './components/people/AssetPeopleReviewDialog';
 import { ScopedPeopleMaintenanceDialog } from './components/people/ScopedPeopleMaintenanceDialog';
 import { PeopleRecognitionRunSummaryDialog } from './components/people/PeopleRecognitionRunSummaryDialog';
@@ -4277,6 +4278,7 @@ export default function App() {
   const [editHistoryArchiveViewLoading, setEditHistoryArchiveViewLoading] = useState(false);
   const [editHistoryArchiveViewError, setEditHistoryArchiveViewError] = useState<string | null>(null);
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
@@ -13907,6 +13909,17 @@ export default function App() {
                 {/* Tools */}
                 <div className="tdg-overflow-divider" />
                 <div className="tdg-overflow-section">Tools</div>
+                <button
+                  type="button"
+                  className="tdg-overflow-item"
+                  onClick={() => {
+                    setToolbarOverflowOpen(false);
+                    setHelpDialogOpen(true);
+                  }}
+                  title="Open help"
+                >
+                  Help
+                </button>
                 {user?.roleId === 'admin' ? (
                   <Link
                     to="/admin/users"
@@ -14615,6 +14628,7 @@ export default function App() {
           void loadKeywords({ showLoading: false });
         }}
       />
+      <HelpDialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} />
       <MaintenanceDialog
         open={maintenanceDialogOpen}
         onClose={() => setMaintenanceDialogOpen(false)}

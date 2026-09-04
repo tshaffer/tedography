@@ -33,6 +33,7 @@ import { listAssetIdsWithReviewableDetections } from './repositories/faceDetecti
 import { editHistoryRoutes } from './routes/editHistoryRoutes.js';
 import { editQueueRoutes } from './routes/editQueueRoutes.js';
 import { nlSearchRoutes } from './routes/nlSearchRoutes.js';
+import { helpRoutes } from './routes/helpRoutes.js';
 import { googlePhotosRoutes } from './routes/googlePhotosRoutes.js';
 import { printRoutes } from './routes/printRoutes.js';
 import { albumMembershipRoutes, albumTreeRoutes } from './routes/albumTreeRoutes.js';
@@ -148,6 +149,7 @@ export function createServer(): Express {
   app.use('/api/edit-queue', editQueueRoutes);
   app.use('/api/edit-history', editHistoryRoutes);
   app.use('/api/search', nlSearchRoutes);
+  app.use('/api/help', helpRoutes);
   app.use('/api/google-photos', googlePhotosRoutes);
   app.use('/api/print', printRoutes);
 
