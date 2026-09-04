@@ -18,7 +18,9 @@ export function buildDisplayFilePlan(input: {
 }): DisplayFilePlan {
   const normalizedOriginalFileFormat = input.originalFileFormat.toLowerCase();
 
-  if (normalizedOriginalFileFormat === 'heic') {
+  const formatsRequiringDerivedDisplay = new Set(['heic', 'tif', 'tiff', 'nef', 'dng']);
+
+  if (formatsRequiringDerivedDisplay.has(normalizedOriginalFileFormat)) {
     return {
       requiresDerivedDisplayFile: true,
       displayStorageType: 'derived-root',

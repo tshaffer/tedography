@@ -2,6 +2,7 @@ import type { HelpTopic } from '../types.js';
 import { gettingStarted } from './gettingStarted.js';
 import { importingPhotos } from './importingPhotos.js';
 import { reviewingPhotos } from './reviewingPhotos.js';
+import { supportedFileFormats } from './supportedFileFormats.js';
 import { viewingAndBrowsing } from './viewingAndBrowsing.js';
 import { albumManagement } from './albumManagement.js';
 import { keywords } from './keywords.js';
@@ -18,6 +19,7 @@ import { usersAndPermissions } from './usersAndPermissions.js';
 export const helpTopics: HelpTopic[] = [
   gettingStarted,
   importingPhotos,
+  supportedFileFormats,
   reviewingPhotos,
   viewingAndBrowsing,
   albumManagement,

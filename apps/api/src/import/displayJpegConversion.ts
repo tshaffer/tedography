@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 
-export interface ConvertHeicToJpegInput {
+export interface ConvertToDisplayJpegInput {
   sourceAbsolutePath: string;
   targetAbsolutePath: string;
   forceRegenerate?: boolean;
@@ -19,8 +19,8 @@ function runSipsConvert(sourceAbsolutePath: string, targetAbsolutePath: string):
           reject(
             new Error(
               stderrMessage.length > 0
-                ? `HEIC conversion failed: ${stderrMessage}`
-                : `HEIC conversion failed: ${error.message}`
+                ? `Display JPEG conversion failed: ${stderrMessage}`
+                : `Display JPEG conversion failed: ${error.message}`
             )
           );
           return;
@@ -41,7 +41,13 @@ async function hasReusableTarget(targetAbsolutePath: string): Promise<boolean> {
   }
 }
 
-export async function convertHeicToJpeg(input: ConvertHeicToJpegInput): Promise<void> {
+/**
+ * Converts a source image (HEIC, TIFF, NEF, DNG, ...) to a JPEG for use as an
+ * asset's full-size display file, via macOS `sips`. Format-agnostic — driven
+ * entirely by `buildDisplayFilePlan`'s decision that a format needs a derived
+ * display file.
+ */
+export async function convertToDisplayJpeg(input: ConvertToDisplayJpegInput): Promise<void> {
   if (!input.forceRegenerate && (await hasReusableTarget(input.targetAbsolutePath))) {
     return;
   }
@@ -52,6 +58,6 @@ export async function convertHeicToJpeg(input: ConvertHeicToJpegInput): Promise<
   await runSipsConvert(input.sourceAbsolutePath, input.targetAbsolutePath);
 
   if (!(await hasReusableTarget(input.targetAbsolutePath))) {
-    throw new Error('HEIC conversion did not produce a usable JPG output file');
+    throw new Error('Display JPEG conversion did not produce a usable JPG output file');
   }
 }

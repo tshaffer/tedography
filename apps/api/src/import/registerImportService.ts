@@ -13,7 +13,7 @@ import {
 } from '../repositories/assetRepository.js';
 import { linkEditedAsset } from '../repositories/editHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
-import { convertHeicToJpeg } from './heicConversion.js';
+import { convertToDisplayJpeg } from './displayJpegConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { classifyExtractedCaptureDate } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
@@ -225,7 +225,7 @@ export async function registerImportedFiles(input: {
 
       if (displayPlan.requiresDerivedDisplayFile && displayPlan.displayDerivedPath) {
         const targetAbsolutePath = resolveDerivedAbsolutePath(displayPlan.displayDerivedPath);
-        await convertHeicToJpeg({
+        await convertToDisplayJpeg({
           sourceAbsolutePath: absolutePath,
           targetAbsolutePath
         });

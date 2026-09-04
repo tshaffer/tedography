@@ -3,16 +3,28 @@ export interface HelpAskCitation {
   title: string;
 }
 
+export interface HelpConversationTurn {
+  question: string;
+  answer: string;
+  citedSlugs: string[];
+  toolUseId: string;
+}
+
 export interface HelpAskResult {
   answer: string;
   citations: HelpAskCitation[];
+  citedSlugs: string[];
+  toolUseId: string;
 }
 
-export async function askHelpQuestion(question: string): Promise<HelpAskResult> {
+export async function askHelpQuestion(
+  question: string,
+  history: HelpConversationTurn[] = []
+): Promise<HelpAskResult> {
   const response = await fetch('/api/help/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, history }),
   });
   if (!response.ok) {
     const text = await response.text();

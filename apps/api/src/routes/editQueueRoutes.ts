@@ -24,7 +24,7 @@ import {
 } from '../repositories/editQueueRepository.js';
 import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js';
 import { buildDisplayFilePlan } from '../import/displayFilePlanning.js';
-import { convertHeicToJpeg } from '../import/heicConversion.js';
+import { convertToDisplayJpeg } from '../import/displayJpegConversion.js';
 import { extractImportMetadata } from '../import/exifMetadata.js';
 import { classifyExtractedCaptureDate } from '../import/captureProvenance.js';
 import { computeSha256ForFile } from '../import/fileHash.js';
@@ -535,10 +535,10 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
         originalFileFormat,
       });
 
-      // Convert HEIC → JPEG display if needed
+      // Convert to a display JPEG if this format needs one
       if (displayPlan.requiresDerivedDisplayFile && displayPlan.displayDerivedPath) {
         const targetAbsPath = resolveDerivedAbsolutePath(displayPlan.displayDerivedPath);
-        await convertHeicToJpeg({ sourceAbsolutePath: absolutePath, targetAbsolutePath: targetAbsPath });
+        await convertToDisplayJpeg({ sourceAbsolutePath: absolutePath, targetAbsolutePath: targetAbsPath });
       }
 
       // Thumbnail

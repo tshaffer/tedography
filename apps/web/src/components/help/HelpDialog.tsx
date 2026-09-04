@@ -11,7 +11,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { helpTopics, helpCategoryOrder, type HelpTopic } from '@tedography/shared';
-import { askHelpQuestion, type HelpAskResult } from '../../api/helpApi';
+import { askHelpQuestion, type HelpAskCitation } from '../../api/helpApi';
 
 const overlayStyle: CSSProperties = {
   position: 'fixed',
@@ -153,9 +153,31 @@ const answerBoxStyle: CSSProperties = {
   border: '1px solid #dbe7fa',
   borderRadius: '8px',
   padding: '12px',
-  marginBottom: '16px',
+  marginBottom: '10px',
   fontSize: '13px',
   lineHeight: 1.5,
+};
+
+const questionLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: '#555',
+  marginBottom: '6px',
+};
+
+const conversationStyle: CSSProperties = {
+  marginBottom: '16px',
+};
+
+const clearConversationButtonStyle: CSSProperties = {
+  backgroundColor: 'transparent',
+  border: 'none',
+  color: '#888',
+  fontSize: '11px',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+  padding: 0,
+  marginBottom: '10px',
 };
 
 const citationChipStyle: CSSProperties = {
@@ -219,13 +241,21 @@ function topicMatchesQuery(topic: HelpTopic, query: string): boolean {
   );
 }
 
+interface HelpConversationTurn {
+  question: string;
+  answer: string;
+  citedSlugs: string[];
+  toolUseId: string;
+  citations: HelpAskCitation[];
+}
+
 export function HelpDialog({ open, onClose, initialSlug }: HelpDialogProps) {
   const [selectedSlug, setSelectedSlug] = useState<string>(initialSlug ?? helpTopics[0]?.slug ?? '');
   const [searchQuery, setSearchQuery] = useState('');
   const [askQuery, setAskQuery] = useState('');
   const [askLoading, setAskLoading] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
-  const [askResult, setAskResult] = useState<HelpAskResult | null>(null);
+  const [conversation, setConversation] = useState<HelpConversationTurn[]>([]);
 
   const filteredTopics = useMemo(
     () => helpTopics.filter((topic) => topicMatchesQuery(topic, searchQuery)),
@@ -255,8 +285,21 @@ export function HelpDialog({ open, onClose, initialSlug }: HelpDialogProps) {
     setAskLoading(true);
     setAskError(null);
     try {
-      const result = await askHelpQuestion(question);
-      setAskResult(result);
+      const result = await askHelpQuestion(
+        question,
+        conversation.map(({ question: q, answer, citedSlugs, toolUseId }) => ({ question: q, answer, citedSlugs, toolUseId }))
+      );
+      setConversation((prev) => [
+        ...prev,
+        {
+          question,
+          answer: result.answer,
+          citedSlugs: result.citedSlugs,
+          toolUseId: result.toolUseId,
+          citations: result.citations,
+        },
+      ]);
+      setAskQuery('');
     } catch (error) {
       setAskError(error instanceof Error ? error.message : 'Failed to get an answer');
     } finally {
@@ -329,25 +372,37 @@ export function HelpDialog({ open, onClose, initialSlug }: HelpDialogProps) {
               </button>
             </div>
             {askError ? <p style={errorTextStyle}>{askError}</p> : null}
-            {askResult ? (
-              <div style={answerBoxStyle}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                  {askResult.answer}
-                </ReactMarkdown>
-                {askResult.citations.length > 0 ? (
-                  <div>
-                    {askResult.citations.map((citation) => (
-                      <button
-                        key={citation.slug}
-                        type="button"
-                        style={citationChipStyle}
-                        onClick={() => setSelectedSlug(citation.slug)}
-                      >
-                        {citation.title}
-                      </button>
-                    ))}
+            {conversation.length > 0 ? (
+              <div style={conversationStyle}>
+                <button
+                  type="button"
+                  style={clearConversationButtonStyle}
+                  onClick={() => setConversation([])}
+                >
+                  Clear conversation
+                </button>
+                {conversation.map((turn, index) => (
+                  <div key={turn.toolUseId ?? index} style={answerBoxStyle}>
+                    <div style={questionLabelStyle}>You asked: {turn.question}</div>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {turn.answer}
+                    </ReactMarkdown>
+                    {turn.citations.length > 0 ? (
+                      <div>
+                        {turn.citations.map((citation) => (
+                          <button
+                            key={citation.slug}
+                            type="button"
+                            style={citationChipStyle}
+                            onClick={() => setSelectedSlug(citation.slug)}
+                          >
+                            {citation.title}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                ))}
               </div>
             ) : null}
             {selectedTopic ? (

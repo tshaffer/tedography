@@ -16,7 +16,7 @@ import {
 } from '../repositories/assetRepository.js';
 import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
-import { convertHeicToJpeg } from './heicConversion.js';
+import { convertToDisplayJpeg } from './displayJpegConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
 import { classifyExtractedCaptureDate } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
@@ -206,7 +206,7 @@ async function processAssetRefresh(
 
     if (displayPlan.requiresDerivedDisplayFile && displayPlan.displayDerivedPath) {
       const targetAbsolutePath = resolveDerivedAbsolutePath(displayPlan.displayDerivedPath);
-      await convertHeicToJpeg({
+      await convertToDisplayJpeg({
         sourceAbsolutePath: originalAbsolutePath,
         targetAbsolutePath,
         forceRegenerate: mode === 'rebuild-derived'

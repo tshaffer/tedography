@@ -1,4 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
+import type Anthropic from '@anthropic-ai/sdk';
 import { log } from '../logger.js';
 import { getClaudeClient } from '../ai/claudeClient.js';
 import { helpTopics } from '@tedography/shared';
@@ -6,6 +7,15 @@ import { helpTopics } from '@tedography/shared';
 export const helpRoutes: RouterType = Router();
 
 // ─── POST /ask — answer a natural-language question from the help docs ────────
+
+const MAX_HISTORY_TURNS = 6;
+
+interface HelpConversationTurn {
+  question: string;
+  answer: string;
+  citedSlugs: string[];
+  toolUseId: string;
+}
 
 const systemInstructions = `You are the in-app Help assistant for Tedography, a personal photo archive and curation application.
 
@@ -15,6 +25,7 @@ Your job is to answer the user's question using ONLY the help documentation prov
 - Base your answer strictly on the provided documentation. Do not invent features, menu items, or behavior that isn't described.
 - If the documentation doesn't cover the question, say so plainly in the answer (e.g. "The help docs don't cover that") rather than guessing.
 - Keep answers concise and task-oriented — a few sentences or a short list, not a full article.
+- The conversation may include earlier questions and answers. Use them for context (e.g. resolving "it"/"that" or follow-ups), but always ground the actual answer in the documentation.
 - In citedSlugs, list the slugs of the topics you actually drew on to answer, in relevance order. If none of the docs were relevant, return an empty array.`;
 
 function buildContextBlock(): string {
@@ -23,8 +34,29 @@ function buildContextBlock(): string {
     .join('\n\n---\n\n');
 }
 
+function buildHistoryMessages(history: HelpConversationTurn[]): Anthropic.MessageParam[] {
+  return history.slice(-MAX_HISTORY_TURNS).flatMap((turn): Anthropic.MessageParam[] => [
+    { role: 'user', content: turn.question },
+    {
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool_use',
+          id: turn.toolUseId,
+          name: 'provide_answer',
+          input: { answer: turn.answer, citedSlugs: turn.citedSlugs },
+        },
+      ],
+    },
+    {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: turn.toolUseId, content: 'Acknowledged.' }],
+    },
+  ]);
+}
+
 helpRoutes.post('/ask', async (req, res) => {
-  const { question } = req.body as { question?: string };
+  const { question, history } = req.body as { question?: string; history?: HelpConversationTurn[] };
   if (!question?.trim()) {
     res.status(400).json({ error: 'question is required' });
     return;
@@ -70,7 +102,7 @@ helpRoutes.post('/ask', async (req, res) => {
         },
       ],
       tool_choice: { type: 'tool', name: 'provide_answer' },
-      messages: [{ role: 'user', content: question.trim() }],
+      messages: [...buildHistoryMessages(history ?? []), { role: 'user', content: question.trim() }],
     });
 
     const toolUse = response.content.find((block) => block.type === 'tool_use');
@@ -88,12 +120,18 @@ helpRoutes.post('/ask', async (req, res) => {
 
     log.info('Help question answered', {
       question: question.trim(),
+      historyTurns: history?.length ?? 0,
       citedSlugs: input.citedSlugs,
       cacheCreation: response.usage.cache_creation_input_tokens,
       cacheRead: response.usage.cache_read_input_tokens,
     });
 
-    res.json({ answer: input.answer, citations });
+    res.json({
+      answer: input.answer,
+      citations,
+      citedSlugs: input.citedSlugs ?? [],
+      toolUseId: toolUse.id,
+    });
   } catch (error) {
     if (error instanceof Error && error.message.includes('ANTHROPIC_API_KEY')) {
       res.status(503).json({ error: 'Claude API is not configured (missing ANTHROPIC_API_KEY)' });
