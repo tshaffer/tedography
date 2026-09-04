@@ -3,6 +3,7 @@ export enum EditType {
   RemovePeople = 'RemovePeople',
   RemoveObjects = 'RemoveObjects',
   RemovePhotographerShadow = 'RemovePhotographerShadow',
+  RemovePowerLines = 'RemovePowerLines',
   Sharpen = 'Sharpen',
   BrightnessContrast = 'BrightnessContrast'
 }
@@ -12,6 +13,7 @@ export const EDIT_TYPE_LABELS: Record<EditType, string> = {
   [EditType.RemovePeople]: 'Remove people',
   [EditType.RemoveObjects]: 'Remove non-people objects',
   [EditType.RemovePhotographerShadow]: "Remove photographer's shadow",
+  [EditType.RemovePowerLines]: 'Remove power lines',
   [EditType.Sharpen]: 'Sharpen',
   [EditType.BrightnessContrast]: 'Fix brightness / contrast'
 };
