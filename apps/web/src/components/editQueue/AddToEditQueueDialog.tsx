@@ -1,9 +1,16 @@
-import { useState, type CSSProperties, type ReactElement } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { EditType, EDIT_TYPE_LABELS, EDIT_TYPE_VALUES } from '@tedography/domain';
 
 interface AddToEditQueueDialogProps {
   open: boolean;
+  /** 'add' queues the current selection; 'edit' changes one existing entry. */
+  mode: 'add' | 'edit';
+  /** How many assets the confirm will affect (in 'add' mode, excludes already-queued). */
+  assetCount: number;
+  /** Filename to show when exactly one asset is targeted. */
   assetFilename: string;
+  /** In 'add' mode, how many selected assets are already queued and will be skipped. */
+  alreadyQueuedCount?: number;
   existingNote?: string;
   existingEditType?: EditType;
   onClose: () => void;
@@ -117,7 +124,10 @@ const confirmButtonStyle: CSSProperties = {
 
 export function AddToEditQueueDialog({
   open,
+  mode,
+  assetCount,
   assetFilename,
+  alreadyQueuedCount = 0,
   existingNote,
   existingEditType,
   onClose,
@@ -126,7 +136,27 @@ export function AddToEditQueueDialog({
   const [note, setNote] = useState(existingNote ?? '');
   const [editType, setEditType] = useState<EditType>(existingEditType ?? EditType.Unspecified);
 
+  // The dialog stays mounted between opens (it just returns null while closed),
+  // so re-seed the fields from props each time it opens.
+  useEffect(() => {
+    if (open) {
+      setNote(existingNote ?? '');
+      setEditType(existingEditType ?? EditType.Unspecified);
+    }
+  }, [open, existingNote, existingEditType]);
+
   if (!open) return null;
+
+  const isEdit = mode === 'edit';
+  const title = isEdit
+    ? 'Edit Queue Note & Type'
+    : assetCount === 1
+      ? 'Add to Edit Queue'
+      : `Add ${assetCount} Photos to Edit Queue`;
+  const subtitle =
+    assetCount === 1
+      ? assetFilename
+      : `${assetCount} photos — each gets the same edit type and note`;
 
   function handleConfirm(): void {
     onConfirm(note.trim(), editType);
@@ -137,8 +167,13 @@ export function AddToEditQueueDialog({
     <div style={overlayStyle} onClick={onClose}>
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Add to Edit Queue</h2>
-          <p style={filenameStyle}>{assetFilename}</p>
+          <h2 style={titleStyle}>{title}</h2>
+          <p style={filenameStyle}>{subtitle}</p>
+          {!isEdit && alreadyQueuedCount > 0 ? (
+            <p style={{ ...filenameStyle, color: '#9ca3af' }}>
+              {alreadyQueuedCount} already in the queue{assetCount > 0 ? ' — left unchanged' : ''}.
+            </p>
+          ) : null}
         </div>
         <div style={bodyStyle}>
           <label style={labelStyle}>
@@ -169,7 +204,14 @@ export function AddToEditQueueDialog({
         </div>
         <div style={footerStyle}>
           <button type="button" style={cancelButtonStyle} onClick={onClose}>Cancel</button>
-          <button type="button" style={confirmButtonStyle} onClick={handleConfirm}>Add to Queue</button>
+          <button
+            type="button"
+            style={{ ...confirmButtonStyle, ...(assetCount === 0 ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
+            disabled={assetCount === 0}
+            onClick={handleConfirm}
+          >
+            {isEdit ? 'Save' : assetCount > 1 ? `Add ${assetCount} to Queue` : 'Add to Queue'}
+          </button>
         </div>
       </div>
     </div>

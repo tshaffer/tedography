@@ -5,7 +5,8 @@ export enum EditType {
   RemovePhotographerShadow = 'RemovePhotographerShadow',
   RemovePowerLines = 'RemovePowerLines',
   Sharpen = 'Sharpen',
-  BrightnessContrast = 'BrightnessContrast'
+  BrightnessContrast = 'BrightnessContrast',
+  Crop = 'Crop'
 }
 
 export const EDIT_TYPE_LABELS: Record<EditType, string> = {
@@ -15,7 +16,8 @@ export const EDIT_TYPE_LABELS: Record<EditType, string> = {
   [EditType.RemovePhotographerShadow]: "Remove photographer's shadow",
   [EditType.RemovePowerLines]: 'Remove power lines',
   [EditType.Sharpen]: 'Sharpen',
-  [EditType.BrightnessContrast]: 'Fix brightness / contrast'
+  [EditType.BrightnessContrast]: 'Fix brightness / contrast',
+  [EditType.Crop]: 'Crop'
 };
 
 export const EDIT_TYPE_VALUES: EditType[] = Object.values(EditType);

@@ -16,6 +16,7 @@ import {
 } from '../repositories/assetRepository.js';
 import { listAlbumTreeNodes } from '../repositories/albumTreeRepository.js';
 import {
+  bulkUpsertQueueEntries,
   clearQueue,
   getQueueEntries,
   removeQueueEntry,
@@ -255,6 +256,40 @@ editQueueRoutes.post('/', requireFeature('maintenance'), async (req, res) => {
   } catch (error) {
     log.error('Failed to add to edit queue', error);
     res.status(500).json({ error: 'Failed to add to edit queue' });
+  }
+});
+
+// ─── POST /bulk — add many assets with one shared note + edit type ───────────
+
+editQueueRoutes.post('/bulk', requireFeature('maintenance'), async (req, res) => {
+  const { assetIds, note, editType } = req.body as {
+    assetIds?: unknown;
+    note?: unknown;
+    editType?: unknown;
+  };
+  if (!Array.isArray(assetIds) || assetIds.length === 0 || !assetIds.every((id) => typeof id === 'string')) {
+    res.status(400).json({ error: 'assetIds must be a non-empty array of strings' });
+    return;
+  }
+  if (note != null && typeof note !== 'string') {
+    res.status(400).json({ error: 'note must be a string' });
+    return;
+  }
+  const resolvedEditType = editType == null ? EditType.Unspecified : editType;
+  if (!EDIT_TYPE_VALUES.includes(resolvedEditType as EditType)) {
+    res.status(400).json({ error: `editType must be one of: ${EDIT_TYPE_VALUES.join(', ')}` });
+    return;
+  }
+  try {
+    const result = await bulkUpsertQueueEntries(
+      assetIds as string[],
+      (note as string | undefined) ?? '',
+      resolvedEditType as EditType
+    );
+    res.json({ addedCount: result.added.length, skippedCount: result.skipped.length, ...result });
+  } catch (error) {
+    log.error('Failed to bulk add to edit queue', error);
+    res.status(500).json({ error: 'Failed to bulk add to edit queue' });
   }
 });
 

@@ -46,6 +46,25 @@ export function addToEditQueue(assetId: string, note: string): Promise<EditQueue
   });
 }
 
+export interface BulkAddToEditQueueResult {
+  addedCount: number;
+  skippedCount: number;
+  added: string[];
+  skipped: string[];
+}
+
+export function bulkAddToEditQueue(
+  assetIds: string[],
+  note: string,
+  editType: EditType
+): Promise<BulkAddToEditQueueResult> {
+  return fetchJson<BulkAddToEditQueueResult>('/api/edit-queue/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assetIds, note, editType }),
+  });
+}
+
 export function removeFromEditQueue(assetId: string): Promise<void> {
   return fetchJson<void>(`/api/edit-queue/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
 }

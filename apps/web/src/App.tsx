@@ -135,6 +135,7 @@ import {
   type EditMethod,
   type EditFolderFile,
   addToEditQueue,
+  bulkAddToEditQueue,
   clearEditQueue,
   exportEditQueue,
   getEditQueue,
@@ -4245,6 +4246,9 @@ export default function App() {
   const [editQueueLoading, setEditQueueLoading] = useState(false);
   const [editQueueError, setEditQueueError] = useState<string | null>(null);
   const [addToEditQueueDialogOpen, setAddToEditQueueDialogOpen] = useState(false);
+  // 'add' = bulk-add the current selection (toolbar); 'edit' = change the note &
+  // type of the single already-queued selected asset (AI menu).
+  const [addToEditQueueDialogMode, setAddToEditQueueDialogMode] = useState<'add' | 'edit'>('add');
   const [editQueueDialogOpen, setEditQueueDialogOpen] = useState(false);
   const [editQueueExportNotice, setEditQueueExportNotice] = useState<string | null>(null);
   const [editQueueExportError, setEditQueueExportError] = useState<string | null>(null);
@@ -7968,13 +7972,30 @@ export default function App() {
   }
 
   async function handleAddToEditQueue(note: string, editType: EditType): Promise<void> {
-    if (!selectedAsset) return;
     try {
-      await addToEditQueue(selectedAsset.id, note);
-      await updateEditQueueEntryEditType(selectedAsset.id, editType);
+      if (addToEditQueueDialogMode === 'edit') {
+        if (!selectedAsset) return;
+        await addToEditQueue(selectedAsset.id, note);
+        await updateEditQueueEntryEditType(selectedAsset.id, editType);
+        await loadEditQueue();
+        return;
+      }
+
+      // 'add' mode: queue every selected asset that isn't already queued, all
+      // sharing the same note + edit type. Recompute here so an asset queued
+      // between opening the dialog and confirming is still skipped cleanly.
+      const targetIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+      if (targetIds.length === 0) return;
+      const result = await bulkAddToEditQueue(targetIds, note, editType);
       await loadEditQueue();
+      if (result.skippedCount > 0) {
+        setUpdateError(
+          `Added ${result.addedCount} to the edit queue; skipped ${result.skippedCount} already queued.`
+        );
+      }
     } catch (err) {
       console.error('Failed to add to edit queue', err);
+      setUpdateError(err instanceof Error ? err.message : 'Failed to add to edit queue');
     }
   }
 
@@ -13022,18 +13043,24 @@ export default function App() {
                       </span>
                     </Tooltip>
                     {can('maintenance') ? (() => {
-                      const canAddToQueue =
-                        selectedAssetIds.length === 1 &&
-                        !!selectedAsset &&
-                        !editQueueAssetIdSet.has(selectedAsset.id);
+                      const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+                      const canAddToQueue = addableIds.length > 0;
+                      const tooltipTitle =
+                        selectedAssetIds.length === 0
+                          ? 'Add to Edit Queue'
+                          : addableIds.length === 0
+                            ? 'All selected photos are already in the Edit Queue'
+                            : addableIds.length === 1
+                              ? 'Add to Edit Queue'
+                              : `Add ${addableIds.length} photos to Edit Queue`;
                       return (
-                        <Tooltip title="Add to Edit Queue">
+                        <Tooltip title={tooltipTitle}>
                           <span>
                             <button
                               type="button"
                               style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
                               disabled={!canAddToQueue}
-                              onClick={() => setAddToEditQueueDialogOpen(true)}
+                              onClick={() => { setAddToEditQueueDialogMode('add'); setAddToEditQueueDialogOpen(true); }}
                               aria-label="Add to Edit Queue"
                             >
                               <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
@@ -13185,7 +13212,7 @@ export default function App() {
                       <button
                         type="button"
                         className="tdg-overflow-item"
-                        onClick={() => { setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
+                        onClick={() => { setAddToEditQueueDialogMode('edit'); setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
                       >
                         Edit Note & Type
                       </button>
@@ -14495,14 +14522,36 @@ export default function App() {
         onClose={() => setSetCaptureDateDialogOpen(false)}
         onSave={handleUpdateSelectedAssetsCaptureDateTime}
       />
-      <AddToEditQueueDialog
-        open={addToEditQueueDialogOpen}
-        assetFilename={selectedAsset?.filename ?? ''}
-        existingNote={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.note ?? '') : ''}
-        existingEditType={selectedAsset ? (editQueueEntries.find((e) => e.assetId === selectedAsset.id)?.editType ?? EditType.Unspecified) : EditType.Unspecified}
-        onClose={() => setAddToEditQueueDialogOpen(false)}
-        onConfirm={(note, editType) => void handleAddToEditQueue(note, editType)}
-      />
+      {(() => {
+        const isEdit = addToEditQueueDialogMode === 'edit';
+        const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+        const targetCount = isEdit ? 1 : addableIds.length;
+        const singleId = isEdit
+          ? selectedAsset?.id ?? null
+          : addableIds.length === 1
+            ? addableIds[0] ?? null
+            : null;
+        const singleFilename = singleId
+          ? visibleAssets.find((a) => a.id === singleId)?.filename ?? ''
+          : '';
+        const existingEntry =
+          isEdit && selectedAsset
+            ? editQueueEntries.find((e) => e.assetId === selectedAsset.id) ?? null
+            : null;
+        return (
+          <AddToEditQueueDialog
+            open={addToEditQueueDialogOpen}
+            mode={addToEditQueueDialogMode}
+            assetCount={targetCount}
+            assetFilename={singleFilename}
+            alreadyQueuedCount={isEdit ? 0 : selectedAssetIds.length - addableIds.length}
+            existingNote={existingEntry?.note ?? ''}
+            existingEditType={existingEntry?.editType ?? EditType.Unspecified}
+            onClose={() => setAddToEditQueueDialogOpen(false)}
+            onConfirm={(note, editType) => void handleAddToEditQueue(note, editType)}
+          />
+        );
+      })()}
       <EditQueueDialog
         open={editQueueDialogOpen}
         entries={editQueueEntries}
