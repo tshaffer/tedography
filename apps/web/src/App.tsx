@@ -170,7 +170,7 @@ import {
 } from './api/editHistoryApi';
 import { translateNaturalLanguageSearch } from './api/searchApi';
 import type { EditHistoryArchive } from '@tedography/domain';
-import { EditType } from '@tedography/domain';
+import { EditType, EDIT_TYPE_LABELS } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
@@ -3119,7 +3119,7 @@ type AssetCardProps = {
   editMethodBadges: EditMethod[];
   showRatingBadge: boolean;
   showPeopleBadge: boolean;
-  isInAiQueue: boolean;
+  aiQueueEntry: EditQueueEntryWithFilename | null;
   touchSelectionMode: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
@@ -3147,7 +3147,7 @@ function AssetCard({
   editMethodBadges,
   showRatingBadge,
   showPeopleBadge,
-  isInAiQueue,
+  aiQueueEntry,
   touchSelectionMode,
   onCardClick,
   onCardDoubleClick,
@@ -3388,8 +3388,11 @@ function AssetCard({
               {orderingBadge === 'suspect' ? <WarningAmberIcon style={cardBadgeIconStyle} /> : <SwapVertIcon style={cardBadgeIconStyle} />}
             </span>
           ) : null}
-          {showAiQueueBadge && isInAiQueue ? (
-            <span style={{ ...cardBadgeChipStyle, backgroundColor: '#9333ea' }} title="In AI queue">
+          {showAiQueueBadge && aiQueueEntry ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#9333ea' }}
+              title={`In AI queue: ${EDIT_TYPE_LABELS[aiQueueEntry.editType]}${aiQueueEntry.note ? ` — ${aiQueueEntry.note}` : ''}`}
+            >
               <PsychologyIcon style={cardBadgeIconStyle} />
             </span>
           ) : null}
@@ -5956,6 +5959,10 @@ export default function App() {
   );
   const editQueueAssetIdSet = useMemo(
     () => new Set<string>(editQueueEntries.map((e) => e.assetId)),
+    [editQueueEntries]
+  );
+  const editQueueEntriesByAssetId = useMemo(
+    () => new Map<string, EditQueueEntryWithFilename>(editQueueEntries.map((e) => [e.assetId, e])),
     [editQueueEntries]
   );
   const selectedTreeNode = useMemo(
@@ -14245,7 +14252,7 @@ export default function App() {
                           showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
-                          isInAiQueue={editQueueAssetIdSet.has(asset.id)}
+                          aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -14283,7 +14290,7 @@ export default function App() {
                           showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
-                          isInAiQueue={editQueueAssetIdSet.has(asset.id)}
+                          aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                           touchSelectionMode={touchSelectionMode}
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
@@ -14329,7 +14336,7 @@ export default function App() {
                     showRatingBadge={showThumbnailRatingBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
-                    isInAiQueue={editQueueAssetIdSet.has(asset.id)}
+                    aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                     touchSelectionMode={touchSelectionMode}
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
