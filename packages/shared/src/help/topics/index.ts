@@ -7,6 +7,7 @@ import { viewingAndBrowsing } from './viewingAndBrowsing.js';
 import { albumManagement } from './albumManagement.js';
 import { keywords } from './keywords.js';
 import { smartAlbums } from './smartAlbums.js';
+import { location } from './location.js';
 import { searching } from './searching.js';
 import { photoAdjustments } from './photoAdjustments.js';
 import { editQueue } from './editQueue.js';
@@ -26,6 +27,7 @@ export const helpTopics: HelpTopic[] = [
   albumManagement,
   keywords,
   smartAlbums,
+  location,
   searching,
   photoAdjustments,
   editQueue,

@@ -24,7 +24,8 @@ pnpm --filter @tedography/api test   # run API tests (tsx --test)
 pnpm thumbnails:verify    # check thumbnail integrity
 pnpm thumbnails:repair    # repair missing thumbnails
 pnpm thumbnails:rebuild   # rebuild all thumbnails
-pnpm locations:backfill   # backfill location metadata on existing assets
+pnpm locations:backfill   # backfill reverse-geocoded city/state/country on existing assets
+pnpm location-source:backfill  # backfill locationSource: 'exif' on assets that predate the field
 ```
 
 macOS-only: `scripts/mac/` has launcher `.app` sources (e.g. the Presentation
@@ -114,6 +115,7 @@ API calls and components are organized by the same domain areas (albums, assets,
 | `TEDOGRAPHY_UNROTATED_ROOT` | Optional path for pre-rotation originals |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED` | `true` / `false` |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE` | `rekognition` / `mock` / `none` |
+| `GOOGLE_PLACES_API_KEY` | Places API (New) key, restricted to `places.googleapis.com` — forward geocoding for Set Location |
 
 ---
 

@@ -114,7 +114,7 @@ New → Pending → Keep → Discard
 For each file during registration:
 1. Hash the file (SHA-256)
 2. Check for duplicates by path and hash
-3. Extract EXIF metadata (capture date/time, dimensions, camera info, GPS/location with reverse geocoding)
+3. Extract EXIF metadata (capture date/time, dimensions, camera info, GPS/location with reverse geocoding); `locationSource` is stamped `'exif'` when the file supplied a location, `'none'` otherwise
 4. Convert HEIC → JPEG if needed (stored in derived root)
 5. Generate a JPEG thumbnail (stored in derived root)
 6. Create a `MediaAsset` record in MongoDB
@@ -132,7 +132,7 @@ The main `App.tsx` is a large single-component UI managing:
 - Photo state transitions (Keep / Discard / Pending)
 - Album management (create, rename, move, reorder)
 - Keyword tagging
-- Search and filter (by state, album, people, date range, filename pattern, publication status)
+- Search and filter (by state, album, people, date range, filename pattern, publication status, place)
 - People review dialogs
 - Smart albums
 
@@ -147,7 +147,16 @@ Hierarchical Groups + Albums. Assets belong **only to leaf albums** — parent n
 
 ### Smart Albums
 
-Saved filter presets that combine: keyword, photo state, and/or year group. Listed in the sidebar for quick access.
+Saved filter presets that combine: keyword, photo state, year group, and/or a location substring match (`filterSpec.locationQuery`, matched against city/state/country/locationLabel). Listed in the sidebar for quick access.
+
+### Location
+
+`MediaAsset` carries `locationLabel`/`city`/`state`/`country`/`locationLatitude`/`locationLongitude` plus a `locationSource` provenance field (`'exif' | 'manual' | 'inherited' | 'none'`, mirrors `captureDateTimeSource`). Coordinates are stored but never rendered as raw numbers in the UI — only place names. Four ways a photo gets a location beyond EXIF:
+
+- **Set Location dialog** (Inspector / toolbar **⋯ → Set Location…**) — manual entry via Google Places (New) forward geocoding. `apps/api/src/import/placesGeocoding.ts` proxies Autocomplete + Place Details server-side (key never reaches the browser, `GOOGLE_PLACES_API_KEY`); `PATCH /api/assets/location` persists it with `locationSource: 'manual'`.
+- **Album default location** — `AlbumTreeNode.defaultLocationLabel`/`defaultCity`/etc. (right-click an album → **Set Default Location…**). Never written onto assets; resolved live as a fallback when an asset has no location of its own, shown with a "From album" badge.
+- **Sibling suggestion** — `apps/api/src/import/locationSuggestion.ts` finds the nearest-in-time album-mate with a usable location. Surfaces as an inline Inspector banner (single asset) or the **Fill Missing Locations…** bulk dialog (whole album, album context menu). Applying sets `locationSource: 'inherited'`.
+- **Reverse geocoding at import** — unchanged, still Nominatim (`exifMetadata.ts`), kept separate from the above (Google Places is forward-search only; Nominatim remains the free, already-integrated path for the high-volume automatic import-time lookup).
 
 ### Maintenance Tools
 
@@ -155,7 +164,7 @@ Available from the Maintenance dialog and via CLI scripts:
 
 - Thumbnail verify / repair / rebuild
 - Asset integrity verification
-- Location metadata backfill
+- Location metadata backfill (`locations:backfill` — reverse-geocode city/state/country from existing coordinates; `location-source:backfill` — stamp `locationSource: 'exif'` on assets that predate the field)
 - Reimport known assets in a folder
 - Rebuild derived files (display + thumbnail) for a folder
 
@@ -181,6 +190,10 @@ pnpm -r typecheck
 pnpm thumbnails:verify
 pnpm thumbnails:repair
 pnpm thumbnails:rebuild
+
+# Location maintenance
+pnpm locations:backfill
+pnpm location-source:backfill
 ```
 
 ### Environment Configuration
@@ -195,6 +208,7 @@ The API reads from `apps/api/.env`. Key variables:
 | `TEDOGRAPHY_UNROTATED_ROOT` | Optional path for pre-rotation originals |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED` | `true` / `false` |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE` | `rekognition` / `mock` / `none` |
+| `GOOGLE_PLACES_API_KEY` | Places API (New) key, restricted to `places.googleapis.com` — powers Set Location's forward-geocode search |
 
 ---
 
