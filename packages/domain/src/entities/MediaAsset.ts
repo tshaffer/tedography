@@ -24,6 +24,15 @@ export type CaptureDateTimeSource =
   | 'manual'
   | 'none';
 
+/**
+ * Where an asset's location metadata came from.
+ * - 'exif': GPS coordinates (optionally reverse-geocoded to city/state/country) read from the file at import
+ * - 'manual': set through Tedography's Set Location dialog
+ * - 'inherited': applied from a nearby sibling asset's location via the "Fill Missing Locations" suggestion
+ * - 'none': no location
+ */
+export type LocationSource = 'exif' | 'manual' | 'inherited' | 'none';
+
 export interface MediaAssetAlbumMembership {
   albumId: string;
   // Legacy two-bucket ordering (pre-interleaving); still used as a fallback
@@ -119,6 +128,7 @@ export interface MediaAsset {
   city?: string | null;
   state?: string | null;
   country?: string | null;
+  locationSource?: LocationSource | null;
 
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.

@@ -29,6 +29,12 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     city: { type: String, required: false, trim: true },
     state: { type: String, required: false, trim: true },
     country: { type: String, required: false, trim: true },
+    locationSource: {
+      type: String,
+      required: false,
+      enum: ['exif', 'manual', 'inherited', 'none'],
+      default: null
+    },
     importedAt: { type: String, required: true, trim: true },
     originalStorageRootId: { type: String, required: true, trim: true },
     originalArchivePath: { type: String, required: true, trim: true },

@@ -18,7 +18,7 @@ import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaP
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertToDisplayJpeg } from './displayJpegConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
-import { classifyExtractedCaptureDate } from './captureProvenance.js';
+import { classifyExtractedCaptureDate, classifyExtractedLocation } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
 import {
   buildThumbnailDerivedRelativePath,
@@ -280,7 +280,10 @@ async function processAssetRefresh(
             captureDateTimeSource: classifyExtractedCaptureDate(reimportMetadata),
             exifCaptureDateTime: reimportMetadata.captureDateTime,
             cameraMake: reimportMetadata.cameraMake,
-            cameraModel: reimportMetadata.cameraModel
+            cameraModel: reimportMetadata.cameraModel,
+            // Reimport re-reads the file, so refresh location provenance too —
+            // same "trust the file" convention as captureDateTimeSource above.
+            locationSource: classifyExtractedLocation(reimportMetadata)
           }
         : {}),
       width: metadata.width,

@@ -94,6 +94,38 @@ export async function updateAssetsCaptureDateMarkedWrong(request: {
   });
 }
 
+export interface SetAssetsLocationRequest {
+  assetIds: string[];
+  locationLabel?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
+  /** 'inherited' only for the sibling-suggestion Apply flow; omit for manual entry. */
+  source?: 'manual' | 'inherited';
+}
+
+export async function updateAssetsLocation(request: SetAssetsLocationRequest): Promise<MediaAsset[]> {
+  return fetchJson<MediaAsset[]>('/api/assets/location', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+}
+
+export async function clearAssetsLocation(assetIds: string[]): Promise<MediaAsset[]> {
+  return fetchJson<MediaAsset[]>('/api/assets/location', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ assetIds, clear: true })
+  });
+}
+
 export async function fetchExportedAssetBlob(assetId: string, format: 'jpeg' | 'png' | 'original'): Promise<Blob> {
   const response = await fetch(`/api/media/export/${encodeURIComponent(assetId)}?format=${format}`, {
     cache: 'no-store'

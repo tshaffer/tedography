@@ -33,6 +33,12 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
       default: null
     },
     writerUserIds: { type: [String], required: false, default: [] },
+    defaultLocationLabel: { type: String, required: false, trim: true, default: null },
+    defaultCity: { type: String, required: false, trim: true, default: null },
+    defaultState: { type: String, required: false, trim: true, default: null },
+    defaultCountry: { type: String, required: false, trim: true, default: null },
+    defaultLocationLatitude: { type: Number, required: false, default: null },
+    defaultLocationLongitude: { type: Number, required: false, default: null },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },

@@ -249,6 +249,36 @@ export async function renameAlbumTreeNode(
   ).lean<AlbumTreeNode | null>();
 }
 
+export interface AlbumDefaultLocationFields {
+  defaultLocationLabel: string | null;
+  defaultCity: string | null;
+  defaultState: string | null;
+  defaultCountry: string | null;
+  defaultLocationLatitude: number | null;
+  defaultLocationLongitude: number | null;
+}
+
+export async function updateAlbumDefaultLocation(
+  albumId: string,
+  location: AlbumDefaultLocationFields | null
+): Promise<AlbumTreeNode | null> {
+  return AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId, nodeType: 'Album' },
+    {
+      $set: {
+        defaultLocationLabel: location?.defaultLocationLabel ?? null,
+        defaultCity: location?.defaultCity ?? null,
+        defaultState: location?.defaultState ?? null,
+        defaultCountry: location?.defaultCountry ?? null,
+        defaultLocationLatitude: location?.defaultLocationLatitude ?? null,
+        defaultLocationLongitude: location?.defaultLocationLongitude ?? null,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<AlbumTreeNode | null>();
+}
+
 export async function updateAlbumTreeNodeChildOrderMode(
   nodeId: string,
   childOrderMode: AlbumTreeChildOrderMode

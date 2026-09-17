@@ -160,6 +160,34 @@ export async function updateAlbumTreeChildOrderMode(
   return (await response.json()) as AlbumTreeNode;
 }
 
+export interface SetAlbumDefaultLocationRequest {
+  clear?: true;
+  locationLabel?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
+}
+
+export async function updateAlbumDefaultLocation(
+  nodeId: string,
+  request: SetAlbumDefaultLocationRequest
+): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/default-location`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
 export async function addAssetsToAlbum(
   albumId: string,
   request: AlbumMembershipRequest

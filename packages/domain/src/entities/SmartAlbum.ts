@@ -13,6 +13,8 @@ export interface SmartAlbumFilterSpec {
   captureDateTo?: string | null;
   captureDateAvailability?: SearchCaptureDateAvailabilityMode | null;
   ratingMin?: number | null;
+  /** Substring match against city, state, country, or locationLabel. */
+  locationQuery?: string | null;
 }
 
 export interface SmartAlbum {

@@ -15,6 +15,16 @@ interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
   albumOrderingModeLabel?: string | null;
+  /** Set when the asset has no location of its own but a containing album does. */
+  inheritedAlbumLocation?: { label: string; albumLabel: string } | null;
+  /** Set when the asset has no location (own or inherited) and a nearby sibling suggests one. */
+  locationSuggestion?: {
+    label: string;
+    sourceFilename: string;
+    minutesApart: number | null;
+  } | null;
+  onApplyLocationSuggestion?: (() => void) | undefined;
+  onDismissLocationSuggestion?: (() => void) | undefined;
   onEditCaptureDate?: (() => void) | undefined;
   onReimportAsset?: (() => void) | undefined;
   onRebuildDerivedFiles?: (() => void) | undefined;
@@ -76,6 +86,57 @@ const labelStyle: CSSProperties = {
 const valueStyle: CSSProperties = {
   color: '#111',
   wordBreak: 'break-word'
+};
+
+const locationBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontSize: '10px',
+  fontWeight: 600,
+  color: '#059669',
+  backgroundColor: '#ecfdf5',
+  border: '1px solid #059669',
+  borderRadius: '999px',
+  padding: '1px 7px',
+  whiteSpace: 'nowrap'
+};
+
+const inheritedLocationBadgeStyle: CSSProperties = {
+  ...locationBadgeStyle,
+  color: '#7c3aed',
+  backgroundColor: '#f5f3ff',
+  borderColor: '#7c3aed'
+};
+
+const suggestionBannerStyle: CSSProperties = {
+  marginTop: '8px',
+  padding: '10px 12px',
+  borderRadius: '8px',
+  backgroundColor: '#eff6ff',
+  border: '1px solid #bfdbfe',
+  display: 'grid',
+  gap: '4px'
+};
+
+const suggestionApplyButtonStyle: CSSProperties = {
+  backgroundColor: '#1f6feb',
+  border: '1px solid #1f6feb',
+  color: '#fff',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 500,
+  padding: '4px 10px'
+};
+
+const suggestionDismissButtonStyle: CSSProperties = {
+  backgroundColor: '#fff',
+  border: '1px solid #bfdbfe',
+  color: '#1d4ed8',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  padding: '4px 10px'
 };
 
 const actionsStyle: CSSProperties = {
@@ -189,7 +250,7 @@ function formatAlbumLabels(albumLabels: string[]): string {
 // coordinates still get stored and used internally (map view, reverse
 // geocoding, sibling-proximity matching) — they're just never rendered as
 // digits in this field.
-function formatLocation(
+export function formatLocation(
   city?: string | null,
   state?: string | null,
   country?: string | null,
@@ -274,6 +335,10 @@ export function AssetDetailsPanel({
   asset,
   albumLabels = [],
   albumOrderingModeLabel = null,
+  inheritedAlbumLocation = null,
+  locationSuggestion = null,
+  onApplyLocationSuggestion,
+  onDismissLocationSuggestion,
   onEditCaptureDate,
   onReimportAsset,
   onRebuildDerivedFiles,
@@ -644,12 +709,75 @@ export function AssetDetailsPanel({
 
       {/* Location */}
       <div style={subSectionStyle}>
-        {renderRow('Location', formatLocation(
-          asset.city,
-          asset.state,
-          asset.country,
-          asset.locationLabel
-        ), '13px')}
+        {(() => {
+          const ownLocation = formatLocation(asset.city, asset.state, asset.country, asset.locationLabel);
+          const hasOwnLocation = ownLocation !== '—';
+          const showSuggestion = !hasOwnLocation && !inheritedAlbumLocation && locationSuggestion;
+
+          return (
+            <>
+              <div style={rowStyle}>
+                <span style={{ ...labelStyle, fontSize: '13px' }}>Location</span>
+                <span style={{ ...valueStyle, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {hasOwnLocation ? (
+                    <>
+                      {ownLocation}
+                      {asset.locationSource === 'manual' ? (
+                        <span style={locationBadgeStyle} title="Set manually — won't be overwritten by re-import or backfill">
+                          ● Manual
+                        </span>
+                      ) : null}
+                    </>
+                  ) : inheritedAlbumLocation ? (
+                    <>
+                      {inheritedAlbumLocation.label}
+                      <span
+                        style={inheritedLocationBadgeStyle}
+                        title={`Inherited from the ${inheritedAlbumLocation.albumLabel} album default — set a location on this photo to override it`}
+                      >
+                        ● From album
+                      </span>
+                    </>
+                  ) : (
+                    ownLocation
+                  )}
+                </span>
+              </div>
+              {showSuggestion ? (
+                <div style={suggestionBannerStyle}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8' }}>
+                    ● Suggested from a nearby photo
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{locationSuggestion.label}</span>
+                  <span style={{ fontSize: '11px', color: '#6b7280' }}>
+                    From {locationSuggestion.sourceFilename}
+                    {locationSuggestion.minutesApart != null
+                      ? ` — ${locationSuggestion.minutesApart} min ${locationSuggestion.minutesApart === 1 ? 'apart' : 'apart'}, same album`
+                      : ', same album'}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      style={suggestionApplyButtonStyle}
+                      onClick={onApplyLocationSuggestion}
+                      disabled={!onApplyLocationSuggestion}
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      style={suggestionDismissButtonStyle}
+                      onClick={onDismissLocationSuggestion}
+                      disabled={!onDismissLocationSuggestion}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          );
+        })()}
       </div>
 
       {/* Action Buttons */}

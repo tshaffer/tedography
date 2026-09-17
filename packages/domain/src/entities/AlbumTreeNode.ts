@@ -15,6 +15,15 @@ export interface AlbumTreeNode {
   peopleAssignmentStatus?: AlbumPeopleAssignmentStatus | null;
   /** User IDs granted write access to this album (used for 'per-album' permission checks) */
   writerUserIds?: string[];
+  // Fallback location for member assets that have none of their own. Never
+  // written onto assets — resolved live at display time. Album-only (not
+  // meaningful on a Group node).
+  defaultLocationLabel?: string | null;
+  defaultCity?: string | null;
+  defaultState?: string | null;
+  defaultCountry?: string | null;
+  defaultLocationLatitude?: number | null;
+  defaultLocationLongitude?: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -256,6 +256,10 @@ function formatSmartAlbumFilterSummary(input: {
     parts.push(label);
   }
 
+  if (input.filterSpec.locationQuery) {
+    parts.push(`Location: ${input.filterSpec.locationQuery}`);
+  }
+
   return parts.join(' · ');
 }
 
@@ -286,6 +290,7 @@ export function SmartAlbumsSection({
   const [captureDateFrom, setCaptureDateFrom] = useState('');
   const [captureDateTo, setCaptureDateTo] = useState('');
   const [captureDateAvailability, setCaptureDateAvailability] = useState<'' | SearchCaptureDateAvailabilityMode>('');
+  const [locationQuery, setLocationQuery] = useState('');
   const [actionBusy, setActionBusy] = useState<null | 'save' | 'delete'>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -352,6 +357,7 @@ export function SmartAlbumsSection({
       setCaptureDateFrom('');
       setCaptureDateTo('');
       setCaptureDateAvailability('');
+      setLocationQuery('');
       return;
     }
 
@@ -369,6 +375,7 @@ export function SmartAlbumsSection({
     setCaptureDateAvailability(
       (spec.captureDateAvailability as SearchCaptureDateAvailabilityMode | null | undefined) ?? ''
     );
+    setLocationQuery(spec.locationQuery ?? '');
   }, [selectedSmartAlbum]);
 
   function buildFilterSpecFromForm(): SmartAlbumFilterSpec {
@@ -382,7 +389,8 @@ export function SmartAlbumsSection({
       hasNoPeople: hasNoPeople || null,
       captureDateFrom: captureDateFrom.trim() || null,
       captureDateTo: captureDateTo.trim() || null,
-      captureDateAvailability: captureDateAvailability || null
+      captureDateAvailability: captureDateAvailability || null,
+      locationQuery: locationQuery.trim() || null
     };
   }
 
@@ -553,6 +561,16 @@ export function SmartAlbumsSection({
                         </option>
                       ))}
                     </select>
+                  </label>
+                  <label style={{ display: 'grid', gap: '4px' }}>
+                    Location
+                    <input
+                      type="text"
+                      value={locationQuery}
+                      onChange={(event) => setLocationQuery(event.target.value)}
+                      style={inputStyle}
+                      placeholder="e.g. Downieville, CA"
+                    />
                   </label>
                 </div>
 

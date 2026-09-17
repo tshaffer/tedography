@@ -1,5 +1,5 @@
-import type { CaptureDateTimeSource } from '@tedography/domain';
-import type { CaptureDateTag, ExtractedCaptureDateFields } from './exifMetadata.js';
+import type { CaptureDateTimeSource, LocationSource } from '@tedography/domain';
+import type { CaptureDateTag, ExtractedCaptureDateFields, ExtractedImportMetadata } from './exifMetadata.js';
 
 export type ExtractedCaptureDateTimeSource = Extract<
   CaptureDateTimeSource,
@@ -31,6 +31,20 @@ export function classifyExtractedCaptureDate(
   const hasCameraTags =
     (fields.cameraMake ?? '').trim().length > 0 || (fields.cameraModel ?? '').trim().length > 0;
   return hasCameraTags ? 'exif-original' : 'exif-weak';
+}
+
+/**
+ * Classify the source of a location extracted from a file: 'exif' when the file
+ * itself supplied GPS coordinates or a location label (reverse-geocoding just
+ * enriches those coordinates into city/state/country, it isn't its own source),
+ * 'none' otherwise.
+ */
+export function classifyExtractedLocation(
+  metadata: Pick<ExtractedImportMetadata, 'locationLatitude' | 'locationLongitude' | 'locationLabel'>
+): LocationSource {
+  const hasCoordinates = metadata.locationLatitude != null && metadata.locationLongitude != null;
+  const hasLabel = typeof metadata.locationLabel === 'string' && metadata.locationLabel.trim().length > 0;
+  return hasCoordinates || hasLabel ? 'exif' : 'none';
 }
 
 /**

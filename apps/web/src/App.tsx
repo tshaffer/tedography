@@ -91,7 +91,8 @@ import {
   setAlbumReviewAssignmentStatus as setAlbumReviewAssignmentStatusRequest,
   updateAlbumTreeChildOrderMode,
   placeAssetsInAlbum,
-  updateAlbumOrderingMode
+  updateAlbumOrderingMode,
+  updateAlbumDefaultLocation as updateAlbumDefaultLocationRequest
 } from './api/albumTreeApi';
 import {
   getAssetFileStat,
@@ -103,8 +104,11 @@ import {
   rotateAsset180,
   updateAssetsCaptureDateTime,
   updateAssetsCaptureDateMarkedWrong,
-  updateAssetRating
+  updateAssetRating,
+  updateAssetsLocation,
+  clearAssetsLocation
 } from './api/assetApi';
+import { getAssetLocationSuggestion, type LocationSuggestion } from './api/locationSuggestionApi';
 import {
   addKeywordsToAssets as addKeywordsToAssetsRequest,
   createKeyword as createKeywordRequest,
@@ -172,18 +176,21 @@ import { translateNaturalLanguageSearch } from './api/searchApi';
 import type { EditHistoryArchive } from '@tedography/domain';
 import { EditType, EDIT_TYPE_LABELS } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
+import { AlbumDefaultLocationDialog } from './components/albums/AlbumDefaultLocationDialog';
+import { FillMissingLocationsDialog } from './components/albums/FillMissingLocationsDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
-import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
+import { AssetDetailsPanel, formatLocation } from './components/assets/AssetDetailsPanel';
 import { StarRatingControl } from './components/assets/StarRatingControl';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { CropWatcher } from './components/assets/CropWatcher';
 import { SetCaptureDateDialog } from './components/assets/SetCaptureDateDialog';
+import { SetLocationDialog, type ResolvedLocationSelection } from './components/assets/SetLocationDialog';
 import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
@@ -249,6 +256,7 @@ const searchPhotoStatesStorageKey = 'tedography.search.photoStates';
 const searchAlbumIdsStorageKey = 'tedography.search.albumIds';
 const searchGroupIdsStorageKey = 'tedography.search.groupIds';
 const searchFilenamePatternStorageKey = 'tedography.search.filenamePattern';
+const searchLocationQueryStorageKey = 'tedography.search.locationQuery';
 const searchCaptureDateFromStorageKey = 'tedography.search.captureDateFrom';
 const searchCaptureDateToStorageKey = 'tedography.search.captureDateTo';
 const searchCaptureDateAvailabilityStorageKey = 'tedography.search.captureDateAvailability';
@@ -333,7 +341,11 @@ function normalizeSmartAlbumFilterSpecForComparison(
         ? filterSpec.captureDateTo.trim()
         : null,
     captureDateAvailability: filterSpec.captureDateAvailability ?? null,
-    ratingMin: filterSpec.ratingMin ?? null
+    ratingMin: filterSpec.ratingMin ?? null,
+    locationQuery:
+      typeof filterSpec.locationQuery === 'string' && filterSpec.locationQuery.trim().length > 0
+        ? filterSpec.locationQuery.trim()
+        : null
   };
 }
 
@@ -354,6 +366,7 @@ function smartAlbumFilterSpecsEqual(
     l.captureDateTo === r.captureDateTo &&
     l.captureDateAvailability === r.captureDateAvailability &&
     l.ratingMin === r.ratingMin &&
+    l.locationQuery === r.locationQuery &&
     (l.peopleIds ?? []).length === (r.peopleIds ?? []).length &&
     (l.peopleIds ?? []).every((id, i) => id === r.peopleIds?.[i]) &&
     (l.excludedPeopleIds ?? []).length === (r.excludedPeopleIds ?? []).length &&
@@ -432,6 +445,7 @@ type SearchFilters = {
   inEditQueue: TriState;
   editQueueMatchMode: EditQueueMatchMode;
   ratingMin: number;
+  locationQuery: string;
 };
 
 type AssetsBootstrapScope =
@@ -2887,6 +2901,7 @@ function getDefaultSearchFilters(): SearchFilters {
     inEditQueue: 'any',
     editQueueMatchMode: 'and',
     ratingMin: 0,
+    locationQuery: '',
   };
 }
 
@@ -2929,7 +2944,8 @@ function searchFiltersEqual(left: SearchFilters | null, right: SearchFilters | n
     left.hasAiEditedVersion === right.hasAiEditedVersion &&
     left.inEditQueue === right.inEditQueue &&
     left.editQueueMatchMode === right.editQueueMatchMode &&
-    left.ratingMin === right.ratingMin
+    left.ratingMin === right.ratingMin &&
+    left.locationQuery === right.locationQuery
   );
 }
 
@@ -4248,6 +4264,7 @@ export default function App() {
   const [createTopLevelGroupDialogOpen, setCreateTopLevelGroupDialogOpen] = useState(false);
   const [moveAssetsDialogOpen, setMoveAssetsDialogOpen] = useState(false);
   const [setCaptureDateDialogOpen, setSetCaptureDateDialogOpen] = useState(false);
+  const [setLocationDialogOpen, setSetLocationDialogOpen] = useState(false);
   const [editQueueEntries, setEditQueueEntries] = useState<EditQueueEntryWithFilename[]>([]);
   const [editQueueLoading, setEditQueueLoading] = useState(false);
   const [editQueueError, setEditQueueError] = useState<string | null>(null);
@@ -4290,6 +4307,8 @@ export default function App() {
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
+  const [defaultLocationAlbum, setDefaultLocationAlbum] = useState<AlbumTreeNode | null>(null);
+  const [fillMissingLocationsAlbum, setFillMissingLocationsAlbum] = useState<AlbumTreeNode | null>(null);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
   const [assetPeopleReviewDialogOpen, setAssetPeopleReviewDialogOpen] = useState(false);
@@ -4370,6 +4389,13 @@ export default function App() {
     }
 
     return window.localStorage.getItem(searchFilenamePatternStorageKey) ?? '';
+  });
+  const [searchLocationQuery, setSearchLocationQuery] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return window.localStorage.getItem(searchLocationQueryStorageKey) ?? '';
   });
   const [searchCaptureDateFrom, setSearchCaptureDateFrom] = useState<string>(() => {
     if (typeof window === 'undefined') {
@@ -4608,6 +4634,8 @@ export default function App() {
   const [pendingNavigateAssetId, setPendingNavigateAssetId] = useState<string | null>(null);
   const [selectedAssetDetails, setSelectedAssetDetails] = useState<MediaAsset | null>(null);
   const [selectedAssetPeopleStatus, setSelectedAssetPeopleStatus] = useState<ListAssetFaceDetectionsResponse | null>(null);
+  const [selectedAssetLocationSuggestion, setSelectedAssetLocationSuggestion] = useState<LocationSuggestion | null>(null);
+  const [dismissedLocationSuggestionAssetId, setDismissedLocationSuggestionAssetId] = useState<string | null>(null);
   const [selectedAssetPeopleStatusLoading, setSelectedAssetPeopleStatusLoading] = useState(false);
   const [selectedAssetPeopleStatusError, setSelectedAssetPeopleStatusError] = useState<string | null>(null);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
@@ -5366,6 +5394,10 @@ export default function App() {
   }, [searchFilenamePattern]);
 
   useEffect(() => {
+    window.localStorage.setItem(searchLocationQueryStorageKey, searchLocationQuery);
+  }, [searchLocationQuery]);
+
+  useEffect(() => {
     window.localStorage.setItem(searchCaptureDateFromStorageKey, searchCaptureDateFrom);
   }, [searchCaptureDateFrom]);
 
@@ -6095,6 +6127,7 @@ export default function App() {
       inEditQueue: searchInEditQueue,
       editQueueMatchMode: searchEditQueueMatchMode,
       ratingMin: searchRatingMin,
+      locationQuery: searchLocationQuery,
     }),
     [
       searchAlbumIds,
@@ -6121,6 +6154,7 @@ export default function App() {
       searchInEditQueue,
       searchEditQueueMatchMode,
       searchRatingMin,
+      searchLocationQuery,
     ]
   );
   const searchResults = useMemo(() => {
@@ -6230,6 +6264,13 @@ export default function App() {
       const matchesRating =
         appliedSearchFilters.ratingMin === 0 || (asset.rating ?? 0) >= appliedSearchFilters.ratingMin;
 
+      const locationQuery = appliedSearchFilters.locationQuery.trim().toLowerCase();
+      const matchesLocation =
+        locationQuery.length === 0 ||
+        [asset.city, asset.state, asset.country, asset.locationLabel].some(
+          (value) => typeof value === 'string' && value.toLowerCase().includes(locationQuery)
+        );
+
       return (
         matchesPhotoState &&
         matchesAlbum &&
@@ -6239,7 +6280,8 @@ export default function App() {
         matchesPeople &&
         matchesKeyword &&
         matchesEditQueueFilters &&
-        matchesRating
+        matchesRating &&
+        matchesLocation
       );
     });
 
@@ -6508,6 +6550,72 @@ export default function App() {
       .filter((node): node is AlbumTreeNode => node?.nodeType === 'Album')
       .map((node) => node.label);
   }, [albumNodesById, selectedAsset]);
+  const selectedAssetInheritedAlbumLocation = useMemo(() => {
+    if (!selectedAssetForDetails) {
+      return null;
+    }
+
+    const ownLocation = formatLocation(
+      selectedAssetForDetails.city,
+      selectedAssetForDetails.state,
+      selectedAssetForDetails.country,
+      selectedAssetForDetails.locationLabel
+    );
+    if (ownLocation !== '—') {
+      return null;
+    }
+
+    for (const albumId of selectedAssetForDetails.albumIds ?? []) {
+      const album = albumNodesById.get(albumId);
+      if (!album || album.nodeType !== 'Album') {
+        continue;
+      }
+
+      const albumDefaultLocation = formatLocation(
+        album.defaultCity,
+        album.defaultState,
+        album.defaultCountry,
+        album.defaultLocationLabel
+      );
+      if (albumDefaultLocation !== '—') {
+        return { label: albumDefaultLocation, albumLabel: album.label };
+      }
+    }
+
+    return null;
+  }, [albumNodesById, selectedAssetForDetails]);
+  useEffect(() => {
+    const asset = selectedAssetForDetails;
+    if (!asset || selectedAssetIds.length !== 1) {
+      setSelectedAssetLocationSuggestion(null);
+      return;
+    }
+
+    const hasOwnLocation =
+      formatLocation(asset.city, asset.state, asset.country, asset.locationLabel) !== '—';
+
+    if (hasOwnLocation || selectedAssetInheritedAlbumLocation || dismissedLocationSuggestionAssetId === asset.id) {
+      setSelectedAssetLocationSuggestion(null);
+      return;
+    }
+
+    let cancelled = false;
+    void getAssetLocationSuggestion(asset.id)
+      .then((suggestion) => {
+        if (!cancelled) {
+          setSelectedAssetLocationSuggestion(suggestion);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedAssetLocationSuggestion(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dismissedLocationSuggestionAssetId, selectedAssetForDetails, selectedAssetIds.length, selectedAssetInheritedAlbumLocation]);
   const selectedAssetAlbumOrderingModeLabel = useMemo(() => {
     if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
       return null;
@@ -6692,7 +6800,8 @@ export default function App() {
       captureDateFrom: filters.captureDateFrom || null,
       captureDateTo: filters.captureDateTo || null,
       captureDateAvailability: filters.captureDateAvailability !== 'datedOnly' ? filters.captureDateAvailability : null,
-      ratingMin: filters.ratingMin > 0 ? filters.ratingMin : null
+      ratingMin: filters.ratingMin > 0 ? filters.ratingMin : null,
+      locationQuery: filters.locationQuery.trim() || null
     });
 
     const hasAnyFilter =
@@ -6705,7 +6814,8 @@ export default function App() {
       filterSpec.captureDateFrom ||
       filterSpec.captureDateTo ||
       filterSpec.captureDateAvailability ||
-      filterSpec.ratingMin;
+      filterSpec.ratingMin ||
+      filterSpec.locationQuery;
 
     if (!hasAnyFilter) {
       return null;
@@ -7957,6 +8067,124 @@ export default function App() {
         error instanceof Error ? error.message : 'Failed to update the capture-date wrong flag'
       );
     }
+  }
+
+  async function handleApplyLocationSuggestion(): Promise<void> {
+    const suggestion = selectedAssetLocationSuggestion;
+    const assetId = selectedAssetForDetails?.id;
+    if (!suggestion || !assetId) {
+      return;
+    }
+
+    setUpdateError(null);
+    try {
+      const updatedAssets = await updateAssetsLocation({
+        assetIds: [assetId],
+        locationLabel: suggestion.locationLabel,
+        city: suggestion.city,
+        state: suggestion.state,
+        country: suggestion.country,
+        locationLatitude: suggestion.locationLatitude,
+        locationLongitude: suggestion.locationLongitude,
+        source: 'inherited'
+      });
+
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+      if (updatesById.has(assetId)) {
+        setSelectedAssetDetails((previous) =>
+          previous && previous.id === assetId ? { ...previous, ...(updatesById.get(assetId) ?? previous) } : previous
+        );
+      }
+      setSelectedAssetLocationSuggestion(null);
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to apply suggested location.');
+    }
+  }
+
+  function handleDismissLocationSuggestion(): void {
+    if (selectedAssetForDetails) {
+      setDismissedLocationSuggestionAssetId(selectedAssetForDetails.id);
+    }
+    setSelectedAssetLocationSuggestion(null);
+  }
+
+  function handleOpenSetLocationDialog(): void {
+    if (selectedAssetIds.length === 0) {
+      return;
+    }
+
+    setSetLocationDialogOpen(true);
+  }
+
+  async function handleSaveLocation(input: { clear: true } | ResolvedLocationSelection): Promise<void> {
+    const assetIds = selectedAssetIds;
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    setUpdateError(null);
+
+    try {
+      const updatedAssets =
+        'clear' in input
+          ? await clearAssetsLocation(assetIds)
+          : await updateAssetsLocation({
+              assetIds,
+              locationLabel: input.locationLabel,
+              city: input.city,
+              state: input.state,
+              country: input.country,
+              locationLatitude: input.locationLatitude,
+              locationLongitude: input.locationLongitude
+            });
+
+      const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
+
+      if (selectedAssetId && updatesById.has(selectedAssetId)) {
+        setSelectedAssetDetails((previous) => {
+          const updatedAsset = updatesById.get(selectedAssetId);
+          if (!updatedAsset) {
+            return previous;
+          }
+
+          return previous && previous.id === selectedAssetId
+            ? { ...previous, ...updatedAsset }
+            : updatedAsset;
+        });
+      }
+
+      setSetLocationDialogOpen(false);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update location.';
+      setUpdateError(message);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function handleSaveAlbumDefaultLocation(
+    input: { clear: true } | ResolvedLocationSelection
+  ): Promise<void> {
+    if (!defaultLocationAlbum) {
+      return;
+    }
+
+    const request =
+      'clear' in input
+        ? { clear: true as const }
+        : {
+            locationLabel: input.locationLabel,
+            city: input.city,
+            state: input.state,
+            country: input.country,
+            locationLatitude: input.locationLatitude,
+            locationLongitude: input.locationLongitude
+          };
+
+    const updated = await updateAlbumDefaultLocationRequest(defaultLocationAlbum.id, request);
+    setAlbumTreeNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+    setDefaultLocationAlbum(null);
   }
 
   async function handleArrangeSelectionByFilename(): Promise<void> {
@@ -9603,6 +9831,7 @@ export default function App() {
     setSearchInEditQueue(filters.inEditQueue);
     setSearchEditQueueMatchMode(filters.editQueueMatchMode);
     setSearchRatingMin(filters.ratingMin);
+    setSearchLocationQuery(filters.locationQuery);
   }
 
   function applyPendingSearchFilters(): void {
@@ -9692,7 +9921,8 @@ export default function App() {
       captureDateFrom: filterSpec.captureDateFrom ?? '',
       captureDateTo: filterSpec.captureDateTo ?? '',
       captureDateAvailability: filterSpec.captureDateAvailability ?? 'datedOnly',
-      ratingMin: filterSpec.ratingMin ?? 0
+      ratingMin: filterSpec.ratingMin ?? 0,
+      locationQuery: filterSpec.locationQuery ?? ''
     };
 
     setPrimaryArea('Search');
@@ -11587,6 +11817,36 @@ export default function App() {
               const noAccessTitle = 'No write access to this album';
               return (
                 <>
+                  {selectedAlbumTreeAlbumNode ? (
+                    <button
+                      type="button"
+                      style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                      disabled={!hasAlbumAccess}
+                      title={hasAlbumAccess ? undefined : noAccessTitle}
+                      onClick={
+                        hasAlbumAccess
+                          ? () => { closeAlbumTreeContextMenu(); setDefaultLocationAlbum(selectedAlbumTreeAlbumNode); }
+                          : undefined
+                      }
+                    >
+                      Set Default Location…
+                    </button>
+                  ) : null}
+                  {selectedAlbumTreeAlbumNode ? (
+                    <button
+                      type="button"
+                      style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                      disabled={!hasAlbumAccess}
+                      title={hasAlbumAccess ? undefined : noAccessTitle}
+                      onClick={
+                        hasAlbumAccess
+                          ? () => { closeAlbumTreeContextMenu(); setFillMissingLocationsAlbum(selectedAlbumTreeAlbumNode); }
+                          : undefined
+                      }
+                    >
+                      Fill Missing Locations…
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
@@ -12536,6 +12796,36 @@ export default function App() {
             </div>
           ) : null}
         </div>
+        <div style={filterSubsectionStyle}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h3 style={{ ...filterSubsectionTitleStyle, margin: 0 }}>Location</h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+            <input
+              type="text"
+              value={searchLocationQuery}
+              onChange={(e) => setSearchLocationQuery(e.target.value)}
+              placeholder="e.g. Downieville, CA"
+              style={{
+                flex: '1 1 auto',
+                minWidth: 0,
+                padding: '4px 8px',
+                fontSize: '12px',
+                border: '1px solid #c8c8c8',
+                borderRadius: '4px'
+              }}
+            />
+            {searchLocationQuery ? (
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#666', padding: '2px 4px' }}
+                onClick={() => setSearchLocationQuery('')}
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
       </section>
     );
   }
@@ -12636,6 +12926,23 @@ export default function App() {
             asset={selectedAssetForDetails}
             albumLabels={selectedAssetAlbumLabels}
             albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
+            inheritedAlbumLocation={selectedAssetInheritedAlbumLocation}
+            locationSuggestion={
+              selectedAssetLocationSuggestion
+                ? {
+                    label: formatLocation(
+                      selectedAssetLocationSuggestion.city,
+                      selectedAssetLocationSuggestion.state,
+                      selectedAssetLocationSuggestion.country,
+                      selectedAssetLocationSuggestion.locationLabel
+                    ),
+                    sourceFilename: selectedAssetLocationSuggestion.sourceFilename,
+                    minutesApart: selectedAssetLocationSuggestion.minutesApart
+                  }
+                : null
+            }
+            onApplyLocationSuggestion={selectedAssetLocationSuggestion ? () => void handleApplyLocationSuggestion() : undefined}
+            onDismissLocationSuggestion={selectedAssetLocationSuggestion ? handleDismissLocationSuggestion : undefined}
             onEditCaptureDate={
               (isLibraryArea || isSearchArea) && selectedAssetIds.length === 1 && selectedAsset && canInAlbum('set-photo-state', focusedAlbumWriterIds)
                 ? handleOpenSetCaptureDateDialog
@@ -13800,6 +14107,19 @@ export default function App() {
                     <button
                       type="button"
                       className="tdg-overflow-item"
+                      onClick={() => { handleOpenSetLocationDialog(); setToolbarOverflowOpen(false); }}
+                      disabled={!hasSelectedAssets}
+                      title={
+                        hasSelectedAssets
+                          ? 'Set or clear location for the current selection'
+                          : 'Select one or more photos to set location'
+                      }
+                    >
+                      Set Location…
+                    </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
                       onClick={() => { void handleSetCaptureDateMarkedWrong(true); setToolbarOverflowOpen(false); }}
                       disabled={!hasSelectedAssets}
                       title="Flag the selection's capture dates as inaccurate (e.g. wrong camera clock) without changing them"
@@ -14532,6 +14852,25 @@ export default function App() {
         onClose={() => setSetCaptureDateDialogOpen(false)}
         onSave={handleUpdateSelectedAssetsCaptureDateTime}
       />
+      <SetLocationDialog
+        open={setLocationDialogOpen}
+        selectedAssetCount={selectedAssetIds.length}
+        existingLocationLabel={
+          selectedAssetIds.length === 1 && selectedAssetForDetails
+            ? (() => {
+                const label = formatLocation(
+                  selectedAssetForDetails.city,
+                  selectedAssetForDetails.state,
+                  selectedAssetForDetails.country,
+                  selectedAssetForDetails.locationLabel
+                );
+                return label === '—' ? null : label;
+              })()
+            : null
+        }
+        onClose={() => setSetLocationDialogOpen(false)}
+        onSave={handleSaveLocation}
+      />
       {(() => {
         const isEdit = addToEditQueueDialogMode === 'edit';
         const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
@@ -14677,6 +15016,34 @@ export default function App() {
           setManageWritersAlbum(updated);
         }}
       />
+      <AlbumDefaultLocationDialog
+        open={defaultLocationAlbum !== null}
+        albumLabel={defaultLocationAlbum?.label ?? ''}
+        existingLocationLabel={
+          defaultLocationAlbum
+            ? (() => {
+                const label = formatLocation(
+                  defaultLocationAlbum.defaultCity,
+                  defaultLocationAlbum.defaultState,
+                  defaultLocationAlbum.defaultCountry,
+                  defaultLocationAlbum.defaultLocationLabel
+                );
+                return label === '—' ? null : label;
+              })()
+            : null
+        }
+        onClose={() => setDefaultLocationAlbum(null)}
+        onSave={handleSaveAlbumDefaultLocation}
+      />
+      {fillMissingLocationsAlbum ? (
+        <FillMissingLocationsDialog
+          open={fillMissingLocationsAlbum !== null}
+          albumId={fillMissingLocationsAlbum.id}
+          albumLabel={fillMissingLocationsAlbum.label}
+          onClose={() => setFillMissingLocationsAlbum(null)}
+          onApplied={() => void loadAssets({ showLoading: false, preserveCachedFirstPage: false })}
+        />
+      ) : null}
       {changePinOpen ? (
         <ChangePinDialog onClose={() => setChangePinOpen(false)} />
       ) : null}

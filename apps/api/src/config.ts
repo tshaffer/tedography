@@ -258,6 +258,9 @@ export const config = {
   editPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_EDIT_PATH') ??
     parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,
+  googlePlaces: {
+    apiKey: process.env.GOOGLE_PLACES_API_KEY?.trim() || null,
+  },
   printOrdersRoot: parseOptionalAbsolutePathEnv('TEDOGRAPHY_PRINT_ORDERS_ROOT'),
   googlePhotos: {
     clientId: process.env.GOOGLE_PHOTOS_CLIENT_ID?.trim() || null,

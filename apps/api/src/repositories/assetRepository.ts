@@ -4,6 +4,7 @@ import {
   normalizePhotoState,
   type AssetKeywordAssignmentStatus,
   type CaptureDateTimeSource,
+  type LocationSource,
   type MediaAssetAlbumMembership,
   type MediaAssetPerson,
   type DisplayStorageType,
@@ -333,6 +334,7 @@ export interface CreateMediaAssetInput {
   city: string | null;
   state: string | null;
   country: string | null;
+  locationSource?: LocationSource | null;
   importedAt: Date;
   originalStorageRootId: string;
   originalArchivePath: string;
@@ -376,6 +378,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     city: input.city,
     state: input.state,
     country: input.country,
+    locationSource: input.locationSource ?? null,
     importedAt: input.importedAt.toISOString(),
     originalStorageRootId: input.originalStorageRootId,
     originalArchivePath: input.originalArchivePath,
@@ -470,6 +473,44 @@ export async function updateCaptureDateTimes(
       $set: {
         captureDateTime: captureDateTime?.toISOString() ?? null,
         captureDateTimeSource: 'manual'
+      }
+    },
+    { runValidators: true }
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
+export interface LocationUpdateFields {
+  locationLabel: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
+}
+
+export async function updateAssetsLocation(
+  assetIds: string[],
+  location: LocationUpdateFields | null,
+  source: LocationSource
+): Promise<MediaAsset[]> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    {
+      $set: {
+        locationLabel: location?.locationLabel ?? null,
+        city: location?.city ?? null,
+        state: location?.state ?? null,
+        country: location?.country ?? null,
+        locationLatitude: location?.locationLatitude ?? null,
+        locationLongitude: location?.locationLongitude ?? null,
+        locationSource: location ? source : null
       }
     },
     { runValidators: true }
@@ -583,6 +624,8 @@ export interface UpdateMediaAssetSourceDataInput {
   city: string | null;
   state: string | null;
   country: string | null;
+  // Refreshed only when provided, same rule as captureDateTimeSource above.
+  locationSource?: LocationSource | null;
   originalFileSizeBytes: number;
   originalContentHash: string;
   originalFileFormat: string;
@@ -637,6 +680,9 @@ export async function updateMediaAssetSourceData(
   }
   if (input.cameraModel !== undefined) {
     updatePayload.cameraModel = input.cameraModel;
+  }
+  if (input.locationSource !== undefined) {
+    updatePayload.locationSource = input.locationSource;
   }
 
   const asset = await MediaAssetModel.findOneAndUpdate(

@@ -15,7 +15,7 @@ import { linkEditedAsset } from '../repositories/editHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertToDisplayJpeg } from './displayJpegConversion.js';
 import { extractImportMetadata } from './exifMetadata.js';
-import { classifyExtractedCaptureDate } from './captureProvenance.js';
+import { classifyExtractedCaptureDate, classifyExtractedLocation } from './captureProvenance.js';
 import { computeSha256ForFile } from './fileHash.js';
 import {
   buildThumbnailDerivedRelativePath,
@@ -293,6 +293,11 @@ export async function registerImportedFiles(input: {
         city: sourceAsset?.city ?? metadata.city,
         state: sourceAsset?.state ?? metadata.state,
         country: sourceAsset?.country ?? metadata.country,
+        // When location is inherited from the AI-edit source asset, inherit its
+        // provenance too; otherwise classify what the file itself provided.
+        locationSource: sourceAsset?.locationLabel || sourceAsset?.locationLatitude != null
+          ? (sourceAsset?.locationSource ?? null)
+          : classifyExtractedLocation(metadata),
         importedAt,
         sourceAssetId: sourceAsset?.id ?? null,
         keywordIds: sourceAsset?.keywordIds ?? [],

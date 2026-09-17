@@ -20,15 +20,19 @@ import {
   reimportAssetById
 } from './import/refreshService.js';
 import {
+  findAssetsByAlbumId,
   findById,
   getAssetPageForLibrary,
   updateCaptureDatesPreservingTimes,
   bulkUpdatePhotoState,
+  updateAssetsLocation,
   updateCaptureDateTimeMarkedWrong,
   updateCaptureDateTimes,
   updatePhotoState,
   updateRating
 } from './repositories/assetRepository.js';
+import { autocompletePlace, getPlaceDetails } from './import/placesGeocoding.js';
+import { findLocationSuggestion, type LocationSuggestion } from './import/locationSuggestion.js';
 import { listAssetIdsWithReviewableDetections } from './repositories/faceDetectionRepository.js';
 import { editHistoryRoutes } from './routes/editHistoryRoutes.js';
 import { editQueueRoutes } from './routes/editQueueRoutes.js';
@@ -354,6 +358,170 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to update captureDateTimeMarkedWrong', error);
       res.status(500).json({ error: 'Failed to update capture date marked-wrong flag' });
+    }
+  });
+
+  app.patch('/api/assets/location', requireFeature('set-photo-state', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds)
+      ? body.assetIds.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      : [];
+  }), async (req, res) => {
+    const payload = req.body as {
+      assetIds?: unknown;
+      clear?: unknown;
+      locationLabel?: unknown;
+      city?: unknown;
+      state?: unknown;
+      country?: unknown;
+      locationLatitude?: unknown;
+      locationLongitude?: unknown;
+      source?: unknown;
+    };
+    const assetIds = Array.isArray(payload.assetIds)
+      ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must contain at least one asset id' });
+      return;
+    }
+
+    if (payload.clear === true) {
+      try {
+        const updatedAssets = await updateAssetsLocation(assetIds, null, 'none');
+        res.json(updatedAssets);
+      } catch (error) {
+        log.error('Failed to clear asset location', error);
+        res.status(500).json({ error: 'Failed to clear asset location' });
+      }
+      return;
+    }
+
+    const asStringOrNull = (value: unknown): string | null =>
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+    const asNumberOrNull = (value: unknown): number | null =>
+      typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+    const locationLabel = asStringOrNull(payload.locationLabel);
+    const city = asStringOrNull(payload.city);
+    const state = asStringOrNull(payload.state);
+    const country = asStringOrNull(payload.country);
+    const locationLatitude = asNumberOrNull(payload.locationLatitude);
+    const locationLongitude = asNumberOrNull(payload.locationLongitude);
+
+    if (!locationLabel && !city && !state && !country) {
+      res.status(400).json({ error: 'Provide at least one of locationLabel, city, state, or country, or pass clear: true' });
+      return;
+    }
+
+    // 'inherited' is set only by the Fill Missing Locations / sibling-suggestion
+    // flow (a user-approved Apply click); direct manual entry is always 'manual'.
+    const source = payload.source === 'inherited' ? 'inherited' : 'manual';
+
+    try {
+      const updatedAssets = await updateAssetsLocation(
+        assetIds,
+        { locationLabel, city, state, country, locationLatitude, locationLongitude },
+        source
+      );
+      res.json(updatedAssets);
+    } catch (error) {
+      log.error('Failed to update asset location', error);
+      res.status(500).json({ error: 'Failed to update asset location' });
+    }
+  });
+
+  app.get('/api/geocode/autocomplete', requireFeature('set-photo-state'), async (req, res) => {
+    const input = typeof req.query.input === 'string' ? req.query.input : '';
+    const sessionToken = typeof req.query.sessionToken === 'string' ? req.query.sessionToken : '';
+
+    if (!sessionToken) {
+      res.status(400).json({ error: 'sessionToken is required' });
+      return;
+    }
+
+    try {
+      const predictions = await autocompletePlace(input, sessionToken);
+      res.json({ predictions });
+    } catch (error) {
+      log.error('Places autocomplete failed', error);
+      res.status(502).json({ error: error instanceof Error ? error.message : 'Places autocomplete failed' });
+    }
+  });
+
+  app.get('/api/geocode/place-details', requireFeature('set-photo-state'), async (req, res) => {
+    const placeId = typeof req.query.placeId === 'string' ? req.query.placeId : '';
+    const sessionToken = typeof req.query.sessionToken === 'string' ? req.query.sessionToken : '';
+
+    if (!placeId) {
+      res.status(400).json({ error: 'placeId is required' });
+      return;
+    }
+    if (!sessionToken) {
+      res.status(400).json({ error: 'sessionToken is required' });
+      return;
+    }
+
+    try {
+      const place = await getPlaceDetails(placeId, sessionToken);
+      res.json(place);
+    } catch (error) {
+      log.error('Place details lookup failed', error);
+      res.status(502).json({ error: error instanceof Error ? error.message : 'Place details lookup failed' });
+    }
+  });
+
+  app.get('/api/assets/:id/location-suggestion', requireFeature('set-photo-state', (req) => [req.params.id as string]), async (req, res) => {
+    try {
+      const asset = await findById(req.params.id as string);
+      if (!asset) {
+        res.status(404).json({ error: 'Asset not found' });
+        return;
+      }
+
+      const albumIds = asset.albumIds ?? [];
+      if (albumIds.length === 0) {
+        res.json({ suggestion: null });
+        return;
+      }
+
+      const siblingLists = await Promise.all(albumIds.map((albumId) => findAssetsByAlbumId(albumId)));
+      const siblingsById = new Map(siblingLists.flat().map((sibling) => [sibling.id, sibling]));
+      siblingsById.delete(asset.id);
+
+      const suggestion = findLocationSuggestion(asset, [...siblingsById.values()]);
+      res.json({ suggestion });
+    } catch (error) {
+      log.error('Failed to compute location suggestion', error);
+      res.status(500).json({ error: 'Failed to compute location suggestion' });
+    }
+  });
+
+  app.get('/api/albums/:id/location-suggestions', requireFeature('set-photo-state'), async (req, res) => {
+    try {
+      const albumAssets = await findAssetsByAlbumId(req.params.id as string);
+      const assetsWithoutLocation = albumAssets.filter(
+        (asset) =>
+          asset.locationLatitude == null &&
+          asset.locationLongitude == null &&
+          !asset.city &&
+          !asset.state &&
+          !asset.country &&
+          !asset.locationLabel
+      );
+
+      const results: Array<{ assetId: string; filename: string; suggestion: LocationSuggestion | null }> =
+        assetsWithoutLocation.map((asset) => ({
+          assetId: asset.id,
+          filename: asset.filename,
+          suggestion: findLocationSuggestion(asset, albumAssets)
+        }));
+
+      res.json({ results });
+    } catch (error) {
+      log.error('Failed to compute album location suggestions', error);
+      res.status(500).json({ error: 'Failed to compute album location suggestions' });
     }
   });
 

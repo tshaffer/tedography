@@ -58,6 +58,10 @@ function normalizeSmartAlbumRecord(item: SmartAlbum): SmartAlbum {
       ratingMin:
         typeof item.filterSpec.ratingMin === 'number' && item.filterSpec.ratingMin > 0
           ? item.filterSpec.ratingMin
+          : null,
+      locationQuery:
+        typeof item.filterSpec.locationQuery === 'string' && item.filterSpec.locationQuery.trim().length > 0
+          ? item.filterSpec.locationQuery.trim()
           : null
     }
   };
@@ -131,6 +135,10 @@ async function normalizeAndValidateFilterSpec(
   }
   const ratingMin =
     typeof filterSpec.ratingMin === 'number' && filterSpec.ratingMin > 0 ? filterSpec.ratingMin : null;
+  const locationQuery =
+    typeof filterSpec.locationQuery === 'string' && filterSpec.locationQuery.trim().length > 0
+      ? filterSpec.locationQuery.trim()
+      : null;
 
   const hasAnyFilter =
     keywordId ||
@@ -142,7 +150,8 @@ async function normalizeAndValidateFilterSpec(
     captureDateFrom ||
     captureDateTo ||
     (captureDateAvailability && captureDateAvailability !== 'datedOnly') ||
-    ratingMin;
+    ratingMin ||
+    locationQuery;
 
   if (!hasAnyFilter) {
     throw new SmartAlbumValidationError(
@@ -161,7 +170,8 @@ async function normalizeAndValidateFilterSpec(
     captureDateFrom,
     captureDateTo,
     captureDateAvailability,
-    ratingMin
+    ratingMin,
+    locationQuery
   };
 }
 

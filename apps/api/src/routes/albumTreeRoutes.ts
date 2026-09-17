@@ -34,6 +34,7 @@ import {
   setAlbumKeywordAssignmentStatus,
   setAlbumPeopleAssignmentStatus,
   setAlbumReviewAssignmentStatus,
+  updateAlbumDefaultLocation,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 import { findRoleById } from '../repositories/roleRepository.js';
@@ -457,6 +458,55 @@ albumTreeRoutes.post('/:id/child-order-mode', requireFeature('create-albums'), a
     res.json(updated);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update group child order mode' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.patch('/:id/default-location', requireFeature('create-albums'), async (req, res) => {
+  const node = await findAlbumTreeNodeById(req.params.id as string);
+  if (!node || node.nodeType !== 'Album') {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const body = req.body as {
+    clear?: unknown;
+    locationLabel?: unknown;
+    city?: unknown;
+    state?: unknown;
+    country?: unknown;
+    locationLatitude?: unknown;
+    locationLongitude?: unknown;
+  };
+
+  const asStringOrNull = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  const asNumberOrNull = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  try {
+    const updated =
+      body.clear === true
+        ? await updateAlbumDefaultLocation(node.id, null)
+        : await updateAlbumDefaultLocation(node.id, {
+            defaultLocationLabel: asStringOrNull(body.locationLabel),
+            defaultCity: asStringOrNull(body.city),
+            defaultState: asStringOrNull(body.state),
+            defaultCountry: asStringOrNull(body.country),
+            defaultLocationLatitude: asNumberOrNull(body.locationLatitude),
+            defaultLocationLongitude: asNumberOrNull(body.locationLongitude)
+          });
+
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update album default location' };
     res.status(500).json(errorResponse);
   }
 });
