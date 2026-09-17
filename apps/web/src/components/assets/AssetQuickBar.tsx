@@ -50,7 +50,11 @@ function formatDateTime(value?: string | null): string {
     return value;
   }
 
-  return parsed.toLocaleString();
+  // A capture time of exactly local midnight almost always means no real time
+  // was known (e.g. Set Capture Date defaults untimed assets to 12:00 AM) —
+  // show just the date rather than a misleadingly precise "12:00:00 AM".
+  const isMidnight = parsed.getHours() === 0 && parsed.getMinutes() === 0 && parsed.getSeconds() === 0;
+  return isMidnight ? parsed.toLocaleDateString() : parsed.toLocaleString();
 }
 
 function formatDimensions(width?: number | null, height?: number | null): string {
