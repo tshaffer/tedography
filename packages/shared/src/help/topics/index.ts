@@ -15,6 +15,7 @@ import { people } from './people.js';
 import { peopleReviewAndMaintenance } from './peopleReviewAndMaintenance.js';
 import { maintenance } from './maintenance.js';
 import { usersAndPermissions } from './usersAndPermissions.js';
+import { runningOnTheNetwork } from './runningOnTheNetwork.js';
 
 export const helpTopics: HelpTopic[] = [
   gettingStarted,
@@ -33,6 +34,7 @@ export const helpTopics: HelpTopic[] = [
   peopleReviewAndMaintenance,
   maintenance,
   usersAndPermissions,
+  runningOnTheNetwork,
 ];
 
 /** Fixed display order for help categories in the browsable index. */
