@@ -183,41 +183,28 @@ function formatAlbumLabels(albumLabels: string[]): string {
   return albumLabels.join(', ');
 }
 
+// Users only ever want a place name here, never raw coordinates — if reverse
+// geocoding hasn't produced city/state/country (or an EXIF/IPTC locationLabel),
+// this reads as "no location," even when lat/lon exist on the record. GPS
+// coordinates still get stored and used internally (map view, reverse
+// geocoding, sibling-proximity matching) — they're just never rendered as
+// digits in this field.
 function formatLocation(
   city?: string | null,
   state?: string | null,
   country?: string | null,
-  locationLabel?: string | null,
-  locationLatitude?: number | null,
-  locationLongitude?: number | null
+  locationLabel?: string | null
 ): string {
   const humanLocation = [city, state, country]
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .filter((value, index, all) => all.indexOf(value) === index)
     .join(', ');
 
-  const fallbackLabel =
-    typeof locationLabel === 'string' && locationLabel.trim().length > 0 ? locationLabel : null;
-
-  const coordinateLabel =
-    typeof locationLatitude === 'number' && typeof locationLongitude === 'number'
-      ? `${locationLatitude.toFixed(5)}, ${locationLongitude.toFixed(5)}`
-      : null;
-
-  if (humanLocation.length > 0 && coordinateLabel) {
-    return `${humanLocation} (${coordinateLabel})`;
-  }
   if (humanLocation.length > 0) {
     return humanLocation;
   }
-  if (fallbackLabel && coordinateLabel) {
-    return `${fallbackLabel} (${coordinateLabel})`;
-  }
-  if (fallbackLabel) {
-    return fallbackLabel;
-  }
-  if (coordinateLabel) {
-    return coordinateLabel;
+  if (typeof locationLabel === 'string' && locationLabel.trim().length > 0) {
+    return locationLabel;
   }
   return '—';
 }
@@ -661,9 +648,7 @@ export function AssetDetailsPanel({
           asset.city,
           asset.state,
           asset.country,
-          asset.locationLabel,
-          asset.locationLatitude,
-          asset.locationLongitude
+          asset.locationLabel
         ), '13px')}
       </div>
 

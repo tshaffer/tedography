@@ -3627,12 +3627,11 @@ function SlideshowViewer({
   const imageUrl = getAssetDisplayImageUrl(asset);
   const progressPercent = total > 1 ? (index / (total - 1)) * 100 : 100;
 
+  // Coordinates are never shown to the user — only a place name, or nothing.
   const locationText =
     typeof asset.locationLabel === 'string' && asset.locationLabel.trim().length > 0
       ? asset.locationLabel
-      : typeof asset.locationLatitude === 'number' && typeof asset.locationLongitude === 'number'
-        ? `${asset.locationLatitude.toFixed(4)}, ${asset.locationLongitude.toFixed(4)}`
-        : null;
+      : null;
 
   const peopleNames = (asset.people ?? []).map((p) => p.displayName);
 
