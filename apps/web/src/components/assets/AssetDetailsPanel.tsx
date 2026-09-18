@@ -726,6 +726,13 @@ export function AssetDetailsPanel({
                         <span style={locationBadgeStyle} title="Set manually — won't be overwritten by re-import or backfill">
                           ● Manual
                         </span>
+                      ) : asset.locationSource === 'inherited' ? (
+                        <span
+                          style={inheritedLocationBadgeStyle}
+                          title="Applied from a nearby photo's location — won't be overwritten by re-import or backfill"
+                        >
+                          ● Inherited
+                        </span>
                       ) : null}
                     </>
                   ) : inheritedAlbumLocation ? (
