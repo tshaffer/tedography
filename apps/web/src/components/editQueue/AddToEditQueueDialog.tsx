@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { EditType, EDIT_TYPE_LABELS, EDIT_TYPE_VALUES } from '@tedography/domain';
+import { nextEditExportHint } from '../../utilities/editQueueNaming';
 
 interface AddToEditQueueDialogProps {
   open: boolean;
@@ -157,6 +158,7 @@ export function AddToEditQueueDialog({
     assetCount === 1
       ? assetFilename
       : `${assetCount} photos — each gets the same edit type and note`;
+  const exportHint = assetCount === 1 ? nextEditExportHint(assetFilename) : null;
 
   function handleConfirm(): void {
     onConfirm(note.trim(), editType);
@@ -172,6 +174,14 @@ export function AddToEditQueueDialog({
           {!isEdit && alreadyQueuedCount > 0 ? (
             <p style={{ ...filenameStyle, color: '#9ca3af' }}>
               {alreadyQueuedCount} already in the queue{assetCount > 0 ? ' — left unchanged' : ''}.
+            </p>
+          ) : null}
+          {exportHint ? (
+            <p
+              style={{ ...filenameStyle, color: '#9ca3af' }}
+              title="This photo is itself an edited copy. Your external-tool export must start with this exact filename to be matched back to it on import."
+            >
+              This is an edited copy — your next export should start with <strong>{exportHint}</strong>
             </p>
           ) : null}
         </div>

@@ -5,7 +5,7 @@ export const editQueue: HelpTopic = {
   title: 'Edit Queue',
   category: 'Editing',
   order: 2,
-  keywords: ['edit queue', 'export', 'manifest', 'edited', 'lightroom', 'photoshop', 'ai edit', 'edit history', 'archive'],
+  keywords: ['edit queue', 'export', 'manifest', 'edited', 'lightroom', 'photoshop', 'ai edit', 'edit history', 'archive', 're-edit', 'chain', 'round trip', 'orphaned'],
   body: `The Edit Queue exports original photos to an external folder so you can edit them in any tool (Lightroom, Photoshop, an AI tool, etc.) and imports the results back into Tedography. An original can have any number of edited versions — several manual and several AI edits can coexist (the thumbnail badge only shows one indicator per method; use Search to see the actual count).
 
 **Setup:** add \`TEDOGRAPHY_EDIT_PATH=/absolute/path/to/edit/folder\` to \`apps/api/.env\` (must be within a registered storage root; the folder is created automatically).
@@ -18,5 +18,7 @@ export const editQueue: HelpTopic = {
 4. **Import** — click **Import Edited Files** (scans the whole folder, independent of which queue rows are checked). A **Classify Edited Files** dialog opens listing every matched file (checked by default) with a Manual/AI toggle per file — uncheck any you're not ready to import. Click **Confirm Import (N)**. Each imported file becomes a new asset that inherits album memberships, keywords, people tags, and photo state **New**; location and capture date come from the edited file's EXIF if present, otherwise from the original. The edited file is moved (not copied) out of the edit folder to sit next to its source; the exported copy of the original is left behind in the edit folder. Misclassified? Change **Edit Method** in the Inspector afterward — no re-import needed.
 5. **Clean up** — remove a single queue entry with the **×** next to it (doesn't touch files); **Clear Queue** removes all entries. The dialog's **Edit Folder Files** list shows everything currently in the folder; delete individual files there, or use **Clear Edit Folder** to wipe the whole folder (exported originals, manifest, notes, and any not-yet-imported edits) — a two-step confirmation.
 
-**Edit History** (Edit Queue → View Edit History) records every processed file with source/edited filenames, import status, and an editable Note. **Archives** let you move completed entries out of the active list into named, read-only groups (Archive Selected / View Archives) to keep the active list focused.`,
+**Edit History** (Edit Queue → View Edit History) records every processed file with source/edited filenames, import status, and an editable Note. **Archives** let you move completed entries out of the active list into named, read-only groups (Archive Selected / View Archives) to keep the active list focused.
+
+**Not happy with an imported edit? Send it out again.** The already-imported edited file (e.g. \`IMG_1234_edited.tif\`) is just a normal asset now — select *it* (not the original), Add to Edit Queue, and Export as usual. Its manifest entry is keyed off its own filename, so your next round-trip export must produce a file starting with \`IMG_1234_edited_edited\` (anything after that is fine — \`_edited_v2\`, \`_edited_ai\`, etc.). Import Edited Files as normal; the new asset's source points at the edited TIFF, not the original, so the edit lineage stays correct through as many rounds as you need. Get the filename wrong and the file shows up as an orphaned/unmatched entry instead of silently vanishing — rename it and re-scan.`,
 };

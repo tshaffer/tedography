@@ -8,6 +8,7 @@ import type {
   EditFolderFile,
 } from '../../api/editQueueApi.js';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
+import { nextEditExportHint } from '../../utilities/editQueueNaming';
 
 interface EditQueueDialogProps {
   open: boolean;
@@ -659,6 +660,15 @@ export function EditQueueDialog({
 
                     {entry.albumPath ? (
                       <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
+                    ) : null}
+
+                    {entry.isExported && nextEditExportHint(entry.filename) ? (
+                      <span
+                        style={{ color: '#9ca3af', fontSize: '10px' }}
+                        title="This photo is itself an edited copy. Your next external-tool export must start with this exact filename to be matched back to it on import."
+                      >
+                        Next export should start with: {nextEditExportHint(entry.filename)}
+                      </span>
                     ) : null}
 
                     {isEditing ? (
