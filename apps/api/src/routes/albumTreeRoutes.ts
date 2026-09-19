@@ -14,6 +14,7 @@ import {
   applyAlbumPlacementUpdates,
   findAssetsByAlbumId,
   findByIds,
+  getAlbumAssetCounts,
   getAlbumCaptureDateRanges,
   moveAssetsToAlbum,
   removeAlbumIdFromAllAssets,
@@ -211,6 +212,20 @@ albumTreeRoutes.get('/capture-date-ranges', async (_req, res) => {
     res.json({ ranges });
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to load album capture date ranges' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Non-discarded asset count per album, across the whole archive — same
+// scoping problem as capture-date-ranges above: the browser's loaded
+// asset list only covers checked/viewed albums, so unchecked siblings
+// would otherwise show a permanent placeholder instead of a real count.
+albumTreeRoutes.get('/asset-counts', async (_req, res) => {
+  try {
+    const counts = await getAlbumAssetCounts();
+    res.json({ counts });
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to load album asset counts' };
     res.status(500).json(errorResponse);
   }
 });

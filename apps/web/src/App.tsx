@@ -94,7 +94,9 @@ import {
   updateAlbumOrderingMode,
   updateAlbumDefaultLocation as updateAlbumDefaultLocationRequest,
   getAlbumCaptureDateRanges as getAlbumCaptureDateRangesRequest,
-  type AlbumCaptureDateRange
+  type AlbumCaptureDateRange,
+  getAlbumAssetCounts as getAlbumAssetCountsRequest,
+  type AlbumAssetCount
 } from './api/albumTreeApi';
 import {
   getAssetFileStat,
@@ -1932,28 +1934,28 @@ const albumTreeCountStatusBadgeBaseStyle: CSSProperties = {
   border: '1px solid transparent'
 };
 
+// The real count (from the server aggregate) is shown as soon as it's known
+// — for 'not-in-current-scope' too, since that status is now only about
+// whether this album's actual photos are loaded, not about count accuracy.
+// Only the true "count itself hasn't loaded yet" case shows a placeholder.
 function getAlbumAssetCountStatusLabel(status: AlbumAssetCountStatus, count: number): string {
-  if (status === 'known-complete') {
-    return String(count);
+  if (status === 'loading-indeterminate') {
+    return '~';
   }
 
-  if (status === 'not-in-current-scope') {
-    return '◌';
-  }
-
-  return '~';
+  return String(count);
 }
 
 function getAlbumAssetCountStatusTitle(status: AlbumAssetCountStatus, albumLabel: string): string {
   if (status === 'known-complete') {
-    return `Count for "${albumLabel}" is complete for the current loaded asset scope.`;
+    return `Count for "${albumLabel}" is accurate, and its photos are loaded.`;
   }
 
   if (status === 'not-in-current-scope') {
-    return `Count for "${albumLabel}" is outside the current asset scope and should not be treated as complete right now.`;
+    return `Count for "${albumLabel}" is accurate, but its photos haven't been loaded yet — check this album to load them.`;
   }
 
-  return `Count for "${albumLabel}" is still indeterminate because assets for the current scope are still loading or have not been fully confirmed yet.`;
+  return `Count for "${albumLabel}" is still loading.`;
 }
 
 function getAlbumAssetCountStatusBadgeStyle(status: AlbumAssetCountStatus): CSSProperties {
@@ -1966,15 +1968,10 @@ function getAlbumAssetCountStatusBadgeStyle(status: AlbumAssetCountStatus): CSSP
     };
   }
 
-  if (status === 'not-in-current-scope') {
-    return {
-      ...albumTreeCountStatusBadgeBaseStyle,
-      backgroundColor: '#f3f4f6',
-      color: '#4b5563',
-      borderColor: '#d1d5db'
-    };
-  }
-
+  // 'not-in-current-scope' shares the amber "not yet loaded" treatment with
+  // 'loading-indeterminate' below — same color for both, since both mean
+  // "don't treat this as loaded/browsable yet"; the label (a real number vs.
+  // "~") is what tells them apart.
   return {
     ...albumTreeCountStatusBadgeBaseStyle,
     backgroundColor: '#fff4db',
@@ -4297,6 +4294,9 @@ export default function App() {
     return [];
   });
   const [albumCaptureDateRanges, setAlbumCaptureDateRanges] = useState<AlbumCaptureDateRange[]>([]);
+  // null = not yet loaded (every album's count badge shows loading); once
+  // loaded, every album gets a real count, regardless of checked/scope state.
+  const [albumAssetCountsFromServer, setAlbumAssetCountsFromServer] = useState<AlbumAssetCount[] | null>(null);
   const [assetsLoading, setAssetsLoading] = useState(() => !(appBootstrapCache.assets ?? readCachedBootstrapAssets()));
   const [assetsScopeLoadStatus, setAssetsScopeLoadStatus] = useState<AssetsScopeLoadStatus>(() =>
     appBootstrapCache.assets ?? readCachedBootstrapAssets() ? 'indeterminate' : 'loading'
@@ -5791,6 +5791,17 @@ export default function App() {
     }
   }
 
+  async function loadAlbumAssetCounts(): Promise<void> {
+    try {
+      const counts = await getAlbumAssetCountsRequest();
+      setAlbumAssetCountsFromServer(counts);
+    } catch (error: unknown) {
+      // Non-critical — the count badge just stays in its loading state;
+      // every other feature is unaffected.
+      console.error('Failed to load album asset counts', error);
+    }
+  }
+
   async function loadKeywords(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
       setKeywordsLoading(true);
@@ -5903,6 +5914,7 @@ export default function App() {
     void loadSmartAlbums({ showLoading: true });
     void loadEditQueue();
     void loadAlbumCaptureDateRanges();
+    void loadAlbumAssetCounts();
   }, []);
 
   useEffect(() => {
@@ -6118,41 +6130,48 @@ export default function App() {
     [albumTreeNodes]
   );
 
+  // Sourced from a dedicated server-side aggregate (getAlbumAssetCounts),
+  // not from the loaded `assets` array — that array is scoped to whatever's
+  // currently checked/viewed, not the full library, so deriving counts from
+  // it left every unchecked album with a permanent "unknown" placeholder.
+  // Excludes Discard-state assets, matching the aggregate's own semantics.
   const albumAssetCounts = useMemo(() => {
     const counts = new Map<string, number>();
-
-    for (const asset of assets) {
-      if (asset.photoState === PhotoState.Discard) {
-        continue;
-      }
-
-      for (const albumId of asset.albumIds ?? []) {
-        counts.set(albumId, (counts.get(albumId) ?? 0) + 1);
+    if (albumAssetCountsFromServer) {
+      for (const entry of albumAssetCountsFromServer) {
+        counts.set(entry.albumId, entry.count);
       }
     }
-
     return counts;
-  }, [assets]);
+  }, [albumAssetCountsFromServer]);
+  // Count accuracy (albumAssetCountsFromServer, above) and "are this album's
+  // actual photos loaded into the browser" (loadedAssetsScope/
+  // assetsScopeLoadStatus) are two independent things. The count is always
+  // shown once known; this only decides the badge's color — green once both
+  // the count is known AND this album's photos are actually loaded and
+  // browsable, amber otherwise (count still shown, just not yet backed by
+  // loaded photos for this specific album).
   const albumAssetCountStatuses = useMemo(() => {
     const statuses = new Map<string, AlbumAssetCountStatus>();
 
     for (const album of albumNodes) {
-      if (
-        loadedAssetsScope.kind === 'albums' &&
-        !loadedAssetsScope.albumIds.includes(album.id)
-      ) {
-        statuses.set(album.id, 'not-in-current-scope');
+      if (!albumAssetCountsFromServer) {
+        statuses.set(album.id, 'loading-indeterminate');
         continue;
       }
 
+      const assetsLoadedForAlbum =
+        loadedAssetsScope.kind === 'all' ||
+        (loadedAssetsScope.kind === 'albums' && loadedAssetsScope.albumIds.includes(album.id));
+
       statuses.set(
         album.id,
-        assetsScopeLoadStatus === 'complete' ? 'known-complete' : 'loading-indeterminate'
+        assetsLoadedForAlbum && assetsScopeLoadStatus === 'complete' ? 'known-complete' : 'not-in-current-scope'
       );
     }
 
     return statuses;
-  }, [albumNodes, assetsScopeLoadStatus, loadedAssetsScope]);
+  }, [albumNodes, albumAssetCountsFromServer, loadedAssetsScope, assetsScopeLoadStatus]);
 
   const areaDefaultPhotoStates = useMemo(
     () => getDefaultPhotoStatesForPrimaryArea(primaryArea),

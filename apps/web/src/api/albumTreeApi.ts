@@ -79,6 +79,21 @@ export async function getAlbumCaptureDateRanges(): Promise<AlbumCaptureDateRange
   return data.ranges;
 }
 
+export interface AlbumAssetCount {
+  albumId: string;
+  count: number;
+}
+
+export async function getAlbumAssetCounts(): Promise<AlbumAssetCount[]> {
+  const response = await fetch('/api/album-tree/asset-counts');
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as { counts: AlbumAssetCount[] };
+  return data.counts;
+}
+
 export async function createAlbumTreeNode(
   request: CreateAlbumTreeNodeRequest
 ): Promise<AlbumTreeNode> {

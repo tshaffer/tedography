@@ -1038,6 +1038,29 @@ export async function getAlbumCaptureDateRanges(): Promise<AlbumCaptureDateRange
   ]);
 }
 
+export interface AlbumAssetCount {
+  albumId: string;
+  count: number;
+}
+
+/**
+ * Non-discarded asset count per album, across the whole archive — not
+ * derivable client-side since the browser's loaded asset list is scoped to
+ * whatever's currently checked/viewed, not the full library (same root
+ * cause as getAlbumCaptureDateRanges above). Matches the existing
+ * client-side count's semantics: Discard-state assets are excluded. An
+ * album with no matching assets simply has no row here — callers should
+ * treat a missing albumId as a count of 0.
+ */
+export async function getAlbumAssetCounts(): Promise<AlbumAssetCount[]> {
+  return MediaAssetModel.aggregate<AlbumAssetCount>([
+    { $match: { photoState: { $ne: PhotoState.Discard }, albumIds: { $exists: true, $ne: [] } } },
+    { $unwind: '$albumIds' },
+    { $group: { _id: '$albumIds', count: { $sum: 1 } } },
+    { $project: { _id: 0, albumId: '$_id', count: 1 } }
+  ]);
+}
+
 /**
  * Persist virtual sort times computed by the placement service. Sets
  * forceManualOrder on each placed membership; other membership fields are
