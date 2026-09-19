@@ -92,7 +92,9 @@ import {
   updateAlbumTreeChildOrderMode,
   placeAssetsInAlbum,
   updateAlbumOrderingMode,
-  updateAlbumDefaultLocation as updateAlbumDefaultLocationRequest
+  updateAlbumDefaultLocation as updateAlbumDefaultLocationRequest,
+  getAlbumCaptureDateRanges as getAlbumCaptureDateRangesRequest,
+  type AlbumCaptureDateRange
 } from './api/albumTreeApi';
 import {
   getAssetFileStat,
@@ -396,6 +398,7 @@ const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
 const showAlbumPeopleStatusBadgeStorageKey = 'tedography.album.showPeopleBadge';
+const showAlbumDateRangeCaptionStorageKey = 'tedography.album.showDateRangeCaption';
 const albumStatusBadgeModeStorageKey = 'tedography.albumStatusBadgeMode';
 const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
@@ -1899,6 +1902,19 @@ const albumTreeLabelContentStyle: CSSProperties = {
   width: '100%'
 };
 
+const albumTreeDateRangeCaptionStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  fontSize: '10px',
+  color: '#9ca3af',
+  textAlign: 'left',
+  marginTop: '1px'
+};
+
 const albumTreeLabelTextStyle: CSSProperties = {
   minWidth: 0,
   overflow: 'hidden',
@@ -2567,6 +2583,47 @@ function formatCaptureDate(dateString?: string | null): string {
   // show just the date rather than a misleadingly precise "12:00:00 AM".
   const isMidnight = parsed.getHours() === 0 && parsed.getMinutes() === 0 && parsed.getSeconds() === 0;
   return isMidnight ? parsed.toLocaleDateString() : parsed.toLocaleString();
+}
+
+/**
+ * Compact date-range caption for an album's sidebar row, e.g. "Jul 12–19,
+ * 2026" (same month), "Mar 15 – Jul 2, 2026" (same year), or "Dec 28, 2025
+ * – Jan 3, 2026" (spans years). Null when the album has no dated photos —
+ * callers should render nothing in that case rather than a placeholder.
+ */
+function formatAlbumDateRangeCaption(range: { minTime: number; maxTime: number } | undefined): string | null {
+  if (!range) {
+    return null;
+  }
+
+  const start = new Date(range.minTime);
+  const end = new Date(range.maxTime);
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+
+  if (sameDay) {
+    return start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+
+  if (sameMonth) {
+    const monthLabel = start.toLocaleDateString(undefined, { month: 'short' });
+    return `${monthLabel} ${start.getDate()}–${end.getDate()}, ${start.getFullYear()}`;
+  }
+
+  if (sameYear) {
+    const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${startLabel} – ${endLabel}, ${start.getFullYear()}`;
+  }
+
+  const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${startLabel} – ${endLabel}`;
 }
 
 function parseStringArrayFromStorage(value: string | null): string[] {
@@ -4239,6 +4296,7 @@ export default function App() {
 
     return [];
   });
+  const [albumCaptureDateRanges, setAlbumCaptureDateRanges] = useState<AlbumCaptureDateRange[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(() => !(appBootstrapCache.assets ?? readCachedBootstrapAssets()));
   const [assetsScopeLoadStatus, setAssetsScopeLoadStatus] = useState<AssetsScopeLoadStatus>(() =>
     appBootstrapCache.assets ?? readCachedBootstrapAssets() ? 'indeterminate' : 'loading'
@@ -4792,6 +4850,11 @@ export default function App() {
     const stored = window.localStorage.getItem(showAlbumPeopleStatusBadgeStorageKey);
     return stored === null ? true : stored === 'true';
   });
+  const [showAlbumDateRangeCaption, setShowAlbumDateRangeCaption] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = window.localStorage.getItem(showAlbumDateRangeCaptionStorageKey);
+    return stored === null ? true : stored === 'true';
+  });
   const [showVisibilityPanel, setShowVisibilityPanel] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -5289,6 +5352,10 @@ export default function App() {
   }, [showAlbumPeopleStatusBadge]);
 
   useEffect(() => {
+    window.localStorage.setItem(showAlbumDateRangeCaptionStorageKey, showAlbumDateRangeCaption ? 'true' : 'false');
+  }, [showAlbumDateRangeCaption]);
+
+  useEffect(() => {
     window.localStorage.setItem(showVisibilityPanelStorageKey, showVisibilityPanel ? 'true' : 'false');
   }, [showVisibilityPanel]);
 
@@ -5713,6 +5780,17 @@ export default function App() {
     }
   }
 
+  async function loadAlbumCaptureDateRanges(): Promise<void> {
+    try {
+      const ranges = await getAlbumCaptureDateRangesRequest();
+      setAlbumCaptureDateRanges(ranges);
+    } catch (error: unknown) {
+      // Non-critical — the "Capture Date" order mode and date-range caption
+      // just fall back to no range data; every other feature is unaffected.
+      console.error('Failed to load album capture date ranges', error);
+    }
+  }
+
   async function loadKeywords(options?: { showLoading?: boolean }): Promise<void> {
     if (options?.showLoading ?? true) {
       setKeywordsLoading(true);
@@ -5824,6 +5902,7 @@ export default function App() {
     void loadKeywords({ showLoading: true });
     void loadSmartAlbums({ showLoading: true });
     void loadEditQueue();
+    void loadAlbumCaptureDateRanges();
   }, []);
 
   useEffect(() => {
@@ -7277,9 +7356,35 @@ export default function App() {
     isSearchFromSmartAlbum,
     singleCheckedAlbumSection
   ]);
+  // Earliest/latest capture time per album, across the whole archive — backs
+  // both the "Capture Date" album order mode and the sidebar's date-range
+  // caption. Computed server-side (albumCaptureDateRanges, loaded once at
+  // startup) rather than from the loaded `assets` array: that array is
+  // scoped/paginated to whatever's currently checked or viewed, not the
+  // full library, so most sibling albums would have no assets present in
+  // it at all — deriving ranges from it silently produced empty ranges for
+  // everything but the currently-scoped album(s), which is why a first cut
+  // of this at computing from `assets` looked like the sort had no effect.
+  const albumCaptureTimeRangeById = useMemo(() => {
+    const ranges = new Map<string, { minTime: number; maxTime: number }>();
+    for (const range of albumCaptureDateRanges) {
+      const minTime = new Date(range.minCaptureDateTime).getTime();
+      const maxTime = new Date(range.maxCaptureDateTime).getTime();
+      if (Number.isNaN(minTime) || Number.isNaN(maxTime)) continue;
+      ranges.set(range.albumId, { minTime, maxTime });
+    }
+    return ranges;
+  }, [albumCaptureDateRanges]);
+  const albumEarliestCaptureTimeById = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const [albumId, range] of albumCaptureTimeRangeById) {
+      map.set(albumId, range.minTime);
+    }
+    return map;
+  }, [albumCaptureTimeRangeById]);
   const treeDisplayNodes = useMemo(
-    () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode),
-    [albumTreeNodes, expandedGroupIds, albumTreeSortMode]
+    () => buildAlbumTreeDisplayList(albumTreeNodes, expandedGroupIds, albumTreeSortMode, albumEarliestCaptureTimeById),
+    [albumTreeNodes, expandedGroupIds, albumTreeSortMode, albumEarliestCaptureTimeById]
   );
   const checkedAlbumIdsInTreeOrder = useMemo(() => {
     const allGroupIds = albumTreeNodes
@@ -7287,10 +7392,10 @@ export default function App() {
       .map((node) => node.id);
     const checkedSet = new Set(checkedAlbumIds);
 
-    return buildAlbumTreeDisplayList(albumTreeNodes, allGroupIds, albumTreeSortMode)
+    return buildAlbumTreeDisplayList(albumTreeNodes, allGroupIds, albumTreeSortMode, albumEarliestCaptureTimeById)
       .filter((node) => node.nodeType === 'Album' && checkedSet.has(node.id))
       .map((node) => node.id);
-  }, [albumTreeNodes, albumTreeSortMode, checkedAlbumIds]);
+  }, [albumTreeNodes, albumTreeSortMode, albumEarliestCaptureTimeById, checkedAlbumIds]);
 
   /**
    * For each Group, compute a rollup status badge to show on the Group row.
@@ -11234,9 +11339,14 @@ export default function App() {
               : null;
             const albumCount = albumAssetCounts.get(node.id) ?? 0;
             const labelText = node.label;
+            const dateRangeCaption = !isGroup
+              ? formatAlbumDateRangeCaption(albumCaptureTimeRangeById.get(node.id))
+              : null;
             const titleText = !isGroup && countStatus
-              ? `${node.label} (${albumCount}) • ${getAlbumAssetCountStatusTitle(countStatus, node.label)}`
-              : node.label;
+              ? `${node.label} (${albumCount}) • ${getAlbumAssetCountStatusTitle(countStatus, node.label)}${dateRangeCaption ? ` • ${dateRangeCaption}` : ''}`
+              : dateRangeCaption
+                ? `${node.label} • ${dateRangeCaption}`
+                : node.label;
 
             return (
               <div
@@ -11369,6 +11479,9 @@ export default function App() {
                       />
                     ) : null}
                   </span>
+                  {!isGroup && showAlbumDateRangeCaption && dateRangeCaption ? (
+                    <span style={albumTreeDateRangeCaptionStyle}>{dateRangeCaption}</span>
+                  ) : null}
                 </button>
               </div>
             );
@@ -11509,6 +11622,16 @@ export default function App() {
                     title="Sort albums in this group numerically, then alphabetically"
                   >
                     {selectedGroupChildOrderMode === 'NumericThenName' ? '✓ ' : ''}Numeric Then Name
+                  </button>
+                  <button
+                    type="button"
+                    style={contextMenuItemStyle}
+                    onClick={() => {
+                      void handleSetSelectedGroupChildOrderMode('CaptureDate');
+                    }}
+                    title="Sort albums in this group by their earliest photo's capture date"
+                  >
+                    {selectedGroupChildOrderMode === 'CaptureDate' ? '✓ ' : ''}Capture Date
                   </button>
                 </div>
               ) : null}
@@ -13621,6 +13744,14 @@ export default function App() {
                     onChange={(event) => setShowAlbumPeopleStatusBadge(event.target.checked)}
                   />
                   People status
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showAlbumDateRangeCaption}
+                    onChange={(event) => setShowAlbumDateRangeCaption(event.target.checked)}
+                  />
+                  Date range
                 </label>
                 <span style={filterSubsectionTitleStyle}>Photo Badges</span>
                 <label style={toggleOptionLabelStyle}>

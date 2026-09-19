@@ -14,6 +14,7 @@ import {
   applyAlbumPlacementUpdates,
   findAssetsByAlbumId,
   findByIds,
+  getAlbumCaptureDateRanges,
   moveAssetsToAlbum,
   removeAlbumIdFromAllAssets,
   removeAssetsFromAlbum,
@@ -130,7 +131,7 @@ function parseReorderDirection(value: unknown): 'up' | 'down' | null {
 }
 
 function parseAlbumTreeChildOrderMode(value: unknown): AlbumTreeChildOrderMode | null {
-  if (value === 'Custom' || value === 'Name' || value === 'NumericThenName') {
+  if (value === 'Custom' || value === 'Name' || value === 'NumericThenName' || value === 'CaptureDate') {
     return value;
   }
 
@@ -196,6 +197,20 @@ albumTreeRoutes.get('/', async (_req, res) => {
     res.json(nodes);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to load album tree' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Earliest/latest capture date per album, across the whole archive — not
+// derivable client-side since the browser's loaded asset list is scoped
+// to whatever's currently checked/viewed, not the full library. Backs the
+// "Capture Date" child order mode and the sidebar's date-range caption.
+albumTreeRoutes.get('/capture-date-ranges', async (_req, res) => {
+  try {
+    const ranges = await getAlbumCaptureDateRanges();
+    res.json({ ranges });
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to load album capture date ranges' };
     res.status(500).json(errorResponse);
   }
 });
@@ -434,7 +449,7 @@ albumTreeRoutes.post('/:id/child-order-mode', requireFeature('create-albums'), a
   );
   if (!childOrderMode) {
     const errorResponse: AlbumTreeErrorResponse = {
-      error: 'childOrderMode must be "Custom", "Name", or "NumericThenName"'
+      error: 'childOrderMode must be "Custom", "Name", "NumericThenName", or "CaptureDate"'
     };
     res.status(400).json(errorResponse);
     return;

@@ -11,7 +11,7 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
     childOrderMode: {
       type: String,
       required: false,
-      enum: ['Custom', 'Name', 'NumericThenName'],
+      enum: ['Custom', 'Name', 'NumericThenName', 'CaptureDate'],
       default: null
     },
     keywordAssignmentStatus: {

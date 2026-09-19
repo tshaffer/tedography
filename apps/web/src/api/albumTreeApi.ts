@@ -63,6 +63,22 @@ export async function listAlbumTreeNodes(): Promise<AlbumTreeNode[]> {
   return (await response.json()) as AlbumTreeNode[];
 }
 
+export interface AlbumCaptureDateRange {
+  albumId: string;
+  minCaptureDateTime: string;
+  maxCaptureDateTime: string;
+}
+
+export async function getAlbumCaptureDateRanges(): Promise<AlbumCaptureDateRange[]> {
+  const response = await fetch('/api/album-tree/capture-date-ranges');
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as { ranges: AlbumCaptureDateRange[] };
+  return data.ranges;
+}
+
 export async function createAlbumTreeNode(
   request: CreateAlbumTreeNodeRequest
 ): Promise<AlbumTreeNode> {

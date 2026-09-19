@@ -75,6 +75,33 @@ function compareAlbumTreeNodeNumericThenName(left: AlbumTreeNode, right: AlbumTr
   return compareAlbumTreeNodeNames(left, right);
 }
 
+/**
+ * Sorts by earliest capture time among each album's own photos. Albums with
+ * no dated photos (null) sort after every dated album, then fall back to
+ * name — consistent with how undated photos sort last within an album
+ * (see packages/shared/src/util/albumOrder.ts).
+ */
+function compareAlbumTreeNodeCaptureDate(
+  left: AlbumTreeNode,
+  right: AlbumTreeNode,
+  earliestCaptureTimeById: Map<string, number | null>
+): number {
+  const leftTime = earliestCaptureTimeById.get(left.id) ?? null;
+  const rightTime = earliestCaptureTimeById.get(right.id) ?? null;
+
+  if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+  if (leftTime !== null && rightTime === null) {
+    return -1;
+  }
+  if (leftTime === null && rightTime !== null) {
+    return 1;
+  }
+
+  return compareAlbumTreeNodeNames(left, right);
+}
+
 function compareAlbumTreeNodeTypes(left: AlbumTreeNode, right: AlbumTreeNode): number {
   if (left.nodeType === right.nodeType) {
     return 0;
@@ -177,7 +204,8 @@ export function getEffectiveGroupChildOrderMode(
 function compareAlbumChildrenForGroupMode(
   left: AlbumTreeNode,
   right: AlbumTreeNode,
-  childOrderMode: AlbumTreeChildOrderMode
+  childOrderMode: AlbumTreeChildOrderMode,
+  earliestCaptureTimeById: Map<string, number | null>
 ): number {
   if (childOrderMode === 'Custom') {
     return compareAlbumTreeNodes(left, right, 'Custom');
@@ -187,6 +215,10 @@ function compareAlbumChildrenForGroupMode(
     return compareAlbumTreeNodeNumericThenName(left, right);
   }
 
+  if (childOrderMode === 'CaptureDate') {
+    return compareAlbumTreeNodeCaptureDate(left, right, earliestCaptureTimeById);
+  }
+
   return compareAlbumTreeNodeNames(left, right);
 }
 
@@ -194,7 +226,8 @@ function sortAlbumTreeChildrenForParent(
   nodesById: Map<string, AlbumTreeNode>,
   parentId: string | null,
   siblings: AlbumTreeNode[],
-  sortMode: AlbumTreeSortMode
+  sortMode: AlbumTreeSortMode,
+  earliestCaptureTimeById: Map<string, number | null>
 ): AlbumTreeNode[] {
   if (parentId === null) {
     return [...siblings].sort((left, right) => compareAlbumTreeNodes(left, right, sortMode));
@@ -211,7 +244,7 @@ function sortAlbumTreeChildrenForParent(
   const albumChildren = siblings
     .filter((node) => node.nodeType === 'Album')
     .sort((left, right) =>
-      compareAlbumChildrenForGroupMode(left, right, getEffectiveGroupChildOrderMode(parentNode))
+      compareAlbumChildrenForGroupMode(left, right, getEffectiveGroupChildOrderMode(parentNode), earliestCaptureTimeById)
     );
 
   return [...groupChildren, ...albumChildren];
@@ -220,7 +253,8 @@ function sortAlbumTreeChildrenForParent(
 export function buildAlbumTreeDisplayList(
   nodes: AlbumTreeNode[],
   expandedGroupIds: string[],
-  sortMode: AlbumTreeSortMode = 'Custom'
+  sortMode: AlbumTreeSortMode = 'Custom',
+  earliestCaptureTimeById: Map<string, number | null> = new Map()
 ): AlbumTreeNodeWithDepth[] {
   const expandedSet = new Set(expandedGroupIds);
   const childrenByParent = new Map<string | null, AlbumTreeNode[]>();
@@ -233,7 +267,10 @@ export function buildAlbumTreeDisplayList(
   }
 
   for (const [parentId, siblings] of childrenByParent.entries()) {
-    childrenByParent.set(parentId, sortAlbumTreeChildrenForParent(nodesById, parentId, siblings, sortMode));
+    childrenByParent.set(
+      parentId,
+      sortAlbumTreeChildrenForParent(nodesById, parentId, siblings, sortMode, earliestCaptureTimeById)
+    );
   }
 
   const ordered: AlbumTreeNodeWithDepth[] = [];

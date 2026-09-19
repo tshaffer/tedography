@@ -1009,6 +1009,35 @@ export async function findAssetsByAlbumId(albumId: string): Promise<MediaAsset[]
   return normalizeMediaAssets(assets);
 }
 
+export interface AlbumCaptureDateRange {
+  albumId: string;
+  minCaptureDateTime: string;
+  maxCaptureDateTime: string;
+}
+
+/**
+ * Earliest/latest captureDateTime per album, across every asset in the
+ * archive regardless of what's currently loaded client-side (the browser's
+ * asset list is scoped/paginated, not the full library — this must be
+ * computed server-side to be correct). captureDateTime is stored as an ISO
+ * 8601 UTC string, which sorts correctly lexicographically, so $min/$max
+ * work directly on the string field without a $toDate conversion.
+ */
+export async function getAlbumCaptureDateRanges(): Promise<AlbumCaptureDateRange[]> {
+  return MediaAssetModel.aggregate<AlbumCaptureDateRange>([
+    { $match: { captureDateTime: { $type: 'string', $ne: '' }, albumIds: { $exists: true, $ne: [] } } },
+    { $unwind: '$albumIds' },
+    {
+      $group: {
+        _id: '$albumIds',
+        minCaptureDateTime: { $min: '$captureDateTime' },
+        maxCaptureDateTime: { $max: '$captureDateTime' }
+      }
+    },
+    { $project: { _id: 0, albumId: '$_id', minCaptureDateTime: 1, maxCaptureDateTime: 1 } }
+  ]);
+}
+
 /**
  * Persist virtual sort times computed by the placement service. Sets
  * forceManualOrder on each placed membership; other membership fields are

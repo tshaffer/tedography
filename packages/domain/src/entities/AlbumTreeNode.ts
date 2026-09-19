@@ -1,7 +1,7 @@
 import type { AlbumKeywordAssignmentStatus, AlbumPeopleAssignmentStatus, AlbumReviewAssignmentStatus } from '../enums/KeywordAssignmentStatus.js';
 
 export type AlbumTreeNodeType = 'Group' | 'Album';
-export type AlbumTreeChildOrderMode = 'Custom' | 'Name' | 'NumericThenName';
+export type AlbumTreeChildOrderMode = 'Custom' | 'Name' | 'NumericThenName' | 'CaptureDate';
 
 export interface AlbumTreeNode {
   id: string;

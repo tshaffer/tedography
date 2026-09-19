@@ -141,7 +141,7 @@ The main `App.tsx` is a large single-component UI managing:
 Hierarchical Groups + Albums. Assets belong **only to leaf albums** — parent nodes are organizational only. Supports:
 
 - Interleaved photo ordering within albums: chronological by capture time, with any photo manually placeable anywhere via drag-and-drop (single photo or multi-select block), Arrange by Filename, or toolbar move commands; backed by per-membership `manualSortTime` virtual timestamps and capture-date provenance fields (see `SMART_ALBUM_ORDER.md` and `ORDERING_PLAN.md`)
-- Child order modes: `Custom`, `Name`, `NumericThenName`
+- Child order modes: `Custom`, `Name`, `NumericThenName`, `CaptureDate` (sorts a group's leaf albums by each album's earliest photo, computed client-side in `apps/web/src/utilities/albumTree.ts`; a per-row date-range caption in the sidebar, toggleable in Display Options, shows each album's actual span so wide-range "catch-all" albums that overlap several single-event albums are visibly explained rather than just looking out of order)
 - Move assets between albums
 - Move album nodes within the tree
 
