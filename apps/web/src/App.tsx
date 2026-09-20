@@ -10505,6 +10505,8 @@ export default function App() {
       }
       await loadAlbumTreeNodes({ showLoading: false });
       await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+      void loadAlbumAssetCounts();
+      void loadAlbumCaptureDateRanges();
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to delete node');
     }
@@ -10540,6 +10542,8 @@ export default function App() {
         assetIds: selectedAssetIdsForAlbumAction
       });
       await loadAssets({ showLoading: false, preserveCachedFirstPage: false });
+      void loadAlbumAssetCounts();
+      void loadAlbumCaptureDateRanges();
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to add assets to album');
     }
@@ -10606,6 +10610,8 @@ export default function App() {
             : '')
       });
       await loadAssets({ showLoading: false });
+      void loadAlbumAssetCounts();
+      void loadAlbumCaptureDateRanges();
     } catch (error: unknown) {
       setAlbumMembershipNotice({
         kind: 'error',
@@ -10650,6 +10656,8 @@ export default function App() {
       kind: 'success',
       message: `${input.keepInSourceAlbum ? 'Added' : 'Moved'} ${count} ${count === 1 ? 'asset' : 'assets'} to "${destinationAlbum?.label ?? 'the destination album'}".`
     });
+    void loadAlbumAssetCounts();
+    void loadAlbumCaptureDateRanges();
     setSelectedAssetIds([]);
     setSelectedAssetId(null);
     setSelectionAnchorAssetId(null);
@@ -15155,6 +15163,8 @@ export default function App() {
         onImportCompleted={() => {
           void loadAssets({ showLoading: false, preserveCachedFirstPage: false });
           void loadAlbumTreeNodes({ showLoading: false });
+          void loadAlbumAssetCounts();
+          void loadAlbumCaptureDateRanges();
         }}
       />
       <ManageAlbumWritersDialog
@@ -15211,6 +15221,8 @@ export default function App() {
         onMaintenanceCompleted={() => {
           void loadAssets({ showLoading: false });
           void loadAlbumTreeNodes({ showLoading: false });
+          void loadAlbumAssetCounts();
+          void loadAlbumCaptureDateRanges();
         }}
         albumTreeNodes={albumTreeNodes}
         onOpenSmartAlbum={(smartAlbum) => {
