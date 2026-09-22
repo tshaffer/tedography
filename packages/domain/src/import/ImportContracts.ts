@@ -104,6 +104,11 @@ export interface RegisterImportFileRequest {
 export interface RegisterImportRequest {
   rootId: string;
   files: RegisterImportFileRequest[];
+  // When provided, every registered (or already-imported-by-path) asset is
+  // added to this album as part of the same request — atomically, so a long
+  // import can't finish registering files but fail to land them in the
+  // destination album.
+  albumId?: string;
 }
 
 export type RegisterImportFileStatus =

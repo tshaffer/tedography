@@ -171,10 +171,13 @@ importRoutes.post('/register', requireFeature('import'), async (req, res) => {
     }
   }
 
+  const albumId = typeof body?.albumId === 'string' && body.albumId.trim().length > 0 ? body.albumId : undefined;
+
   try {
     const response: RegisterImportResponse = await registerImportedFiles({
       rootId,
-      relativePaths: files.map((file) => (file as { relativePath: string }).relativePath)
+      relativePaths: files.map((file) => (file as { relativePath: string }).relativePath),
+      ...(albumId ? { albumId } : {})
     });
     res.json(response);
   } catch (error) {

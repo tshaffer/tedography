@@ -13,7 +13,7 @@ import type {
   ScanImportResponse,
   StorageRootDto
 } from '@tedography/domain';
-import { addAssetsToAlbum, createAlbumTreeNode, listAlbumTreeNodes } from '../../api/albumTreeApi';
+import { createAlbumTreeNode, listAlbumTreeNodes } from '../../api/albumTreeApi';
 import {
   browseDirectory,
   getStorageRoots,
@@ -852,24 +852,23 @@ export function ImportAssetsDialog({
         await loadAlbumTree();
       }
 
+      // Album assignment happens server-side, inside the same register request, as
+      // each file is processed — so a long import can't finish registering files
+      // but fail to land them in the destination album (see moveToTrash branch history).
       const response = await registerImportedFiles({
         rootId: selectedSource.rootId,
-        files: selectedImportableScanPaths.map((relativePath) => ({ relativePath }))
+        files: selectedImportableScanPaths.map((relativePath) => ({ relativePath })),
+        ...(destinationAlbumId ? { albumId: destinationAlbumId } : {})
       });
 
       if (destinationAlbumId) {
-        const assetIds = Array.from(
-          new Set(
-            response.results
-              .map((result) => result.asset?.id)
-              .filter((assetId): assetId is string => typeof assetId === 'string' && assetId.length > 0)
-          )
-        );
+        const assignedCount = response.results.filter(
+          (result) => (result.status === 'Imported' || result.status === 'AlreadyImportedByPath') && result.asset
+        ).length;
 
-        if (assetIds.length > 0) {
-          await addAssetsToAlbum(destinationAlbumId, { assetIds });
+        if (assignedCount > 0) {
           setAlbumAssignmentMessage(
-            `Assigned ${assetIds.length} asset${assetIds.length === 1 ? '' : 's'} to "${destinationAlbumLabel}".`
+            `Assigned ${assignedCount} asset${assignedCount === 1 ? '' : 's'} to "${destinationAlbumLabel}".`
           );
         } else {
           setAlbumAssignmentMessage(`No import results were eligible to assign to "${destinationAlbumLabel}".`);

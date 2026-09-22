@@ -7,10 +7,12 @@ import {
   type RegisterImportResponse
 } from '@tedography/domain';
 import {
+  addAssetToAlbum,
   createMediaAsset,
   findById,
   findByOriginalStorageRootAndArchivePaths
 } from '../repositories/assetRepository.js';
+import { findAlbumTreeNodeById } from '../repositories/albumTreeRepository.js';
 import { linkEditedAsset } from '../repositories/editHistoryRepository.js';
 import { buildDisplayFilePlan } from './displayFilePlanning.js';
 import { convertToDisplayJpeg } from './displayJpegConversion.js';
@@ -86,6 +88,7 @@ function getOriginalFileFormat(extension: string | null): string {
 export async function registerImportedFiles(input: {
   rootId: string;
   relativePaths: string[];
+  albumId?: string;
 }): Promise<RegisterImportResponse> {
   const rootId = input.rootId.trim();
   if (rootId.length === 0) {
@@ -100,6 +103,14 @@ export async function registerImportedFiles(input: {
   const rootWithAvailability = getStorageRoots().find((storageRoot) => storageRoot.id === root.id);
   if (!rootWithAvailability?.isAvailable) {
     throw new RegisterImportServiceError('UNAVAILABLE', `Storage root is unavailable: ${root.id}`);
+  }
+
+  const albumId = input.albumId?.trim() || null;
+  if (albumId) {
+    const albumNode = await findAlbumTreeNodeById(albumId);
+    if (!albumNode || albumNode.nodeType !== 'Album') {
+      throw new RegisterImportServiceError('NOT_FOUND', `Album not found: ${albumId}`);
+    }
   }
 
   const results: RegisterImportFileResultDto[] = [];
@@ -194,6 +205,19 @@ export async function registerImportedFiles(input: {
 
     const existingByPathAsset = existingByPathMap.get(normalizedRelativePath);
     if (existingByPathAsset) {
+      if (albumId && !(existingByPathAsset.albumIds ?? []).includes(albumId)) {
+        try {
+          await addAssetToAlbum(existingByPathAsset.id, albumId);
+        } catch (error) {
+          results.push({
+            relativePath: normalizedRelativePath,
+            status: 'Error',
+            message: error instanceof Error ? error.message : 'Failed to add already-imported asset to album'
+          });
+          continue;
+        }
+      }
+
       results.push({
         relativePath: normalizedRelativePath,
         status: 'AlreadyImportedByPath',
@@ -301,7 +325,7 @@ export async function registerImportedFiles(input: {
         importedAt,
         sourceAssetId: sourceAsset?.id ?? null,
         keywordIds: sourceAsset?.keywordIds ?? [],
-        albumIds: sourceAsset?.albumIds ?? [],
+        albumIds: Array.from(new Set([...(sourceAsset?.albumIds ?? []), ...(albumId ? [albumId] : [])])),
         albumMemberships: (sourceAsset?.albumMemberships ?? []).map((m) => ({
           albumId: m.albumId,
           manualSortOrdinal: null,
