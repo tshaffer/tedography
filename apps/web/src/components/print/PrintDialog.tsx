@@ -240,6 +240,15 @@ function hasResolutionWarning(asset: MediaAsset, size: PrintSize): boolean {
   return short < min.short || long < min.long;
 }
 
+function truncateMiddle(text: string, maxLength = 32): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  const keepEnd = 13;
+  const keepStart = maxLength - keepEnd - 1;
+  return `${text.slice(0, keepStart)}…${text.slice(-keepEnd)}`;
+}
+
 interface AssetCropEntry {
   assetId: string;
   crop: PrintCrop;
@@ -591,7 +600,7 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
 
           {/* Column headers */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 4, borderBottom: '1px solid #e8e8e8', fontSize: 11, color: '#888', fontWeight: 500 }}>
-            <div style={{ width: 36, flexShrink: 0 }} />
+            <div style={{ width: 48, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>Photo</div>
             <div style={{ width: 68, textAlign: 'center' }}>Size</div>
             <div style={{ width: 80, textAlign: 'center' }}>Finish</div>
@@ -618,10 +627,15 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
                   <img
                     src={`/api/media/thumbnail/${encodeURIComponent(a.id)}`}
                     alt={a.filename}
-                    style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 3, flexShrink: 0 }}
+                    title="Click to view full size"
+                    onClick={() => window.open(getDisplayMediaUrl(a.id), '_blank', 'noopener')}
+                    style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 3, flexShrink: 0, cursor: 'zoom-in' }}
                   />
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
-                    {a.filename}
+                  <span
+                    title={a.filename}
+                    style={{ flex: 1, overflow: 'hidden', textOverflow: 'clip', whiteSpace: 'nowrap', fontSize: 13 }}
+                  >
+                    {truncateMiddle(a.filename)}
                   </span>
                   <select
                     style={{ ...compactSelectStyle, width: 68 }}
