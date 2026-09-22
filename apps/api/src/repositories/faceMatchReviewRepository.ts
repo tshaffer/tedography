@@ -22,6 +22,14 @@ export async function syncFaceMatchReviewIndexes(): Promise<void> {
   log.info('Synchronized faceMatchReviews indexes');
 }
 
+export async function deleteFaceMatchReviewsForAssetIds(mediaAssetIds: string[]): Promise<void> {
+  if (mediaAssetIds.length === 0) {
+    return;
+  }
+
+  await FaceMatchReviewModel.deleteMany({ mediaAssetId: { $in: mediaAssetIds } });
+}
+
 export async function replaceFaceMatchReviewsForAsset(input: {
   mediaAssetId: string;
   reviews: Array<Omit<FaceMatchReview, 'id' | 'createdAt' | 'updatedAt'>>;

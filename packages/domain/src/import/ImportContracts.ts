@@ -225,3 +225,16 @@ export interface RefreshOperationResponse {
   summary: RefreshSummaryDto;
   results: RefreshResultDto[];
 }
+
+export type TrashAssetResultStatus = 'Trashed' | 'NotFound' | 'Error';
+
+export interface TrashAssetResultDto {
+  assetId: string;
+  filename?: string;
+  status: TrashAssetResultStatus;
+  message?: string;
+}
+
+export interface TrashAssetsResponse {
+  results: TrashAssetResultDto[];
+}

@@ -19,6 +19,7 @@ import {
   RefreshServiceError,
   reimportAssetById
 } from './import/refreshService.js';
+import { trashAssetsByIds } from './import/trashService.js';
 import {
   findAssetsByAlbumId,
   findById,
@@ -236,6 +237,29 @@ export function createServer(): Express {
     } catch (error) {
       log.error('Failed to bulk update asset photoState', error);
       res.status(500).json({ error: 'Failed to update assets' });
+    }
+  });
+
+  app.post('/api/assets/trash', requireFeature('trash-assets', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds) ? (body.assetIds as string[]) : [];
+  }), async (req, res) => {
+    const body = req.body as { assetIds?: unknown };
+    const assetIds = Array.isArray(body.assetIds)
+      ? body.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must be a non-empty array' });
+      return;
+    }
+
+    try {
+      const response = await trashAssetsByIds(assetIds);
+      res.json(response);
+    } catch (error) {
+      log.error('Failed to trash assets', error);
+      res.status(500).json({ error: 'Failed to trash assets' });
     }
   });
 

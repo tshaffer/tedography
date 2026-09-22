@@ -458,6 +458,15 @@ export async function bulkUpdatePhotoState(assetIds: string[], photoState: Photo
   return assets.map(normalizeMediaAsset);
 }
 
+export async function deleteAssetsByIds(assetIds: string[]): Promise<void> {
+  const normalized = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))];
+  if (normalized.length === 0) {
+    return;
+  }
+
+  await MediaAssetModel.deleteMany({ id: { $in: normalized } });
+}
+
 export async function updateCaptureDateTimes(
   assetIds: string[],
   captureDateTime: Date | null

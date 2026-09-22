@@ -101,6 +101,8 @@ New → Pending → Keep → Discard
 - **Keep** — confirmed keeper
 - **Discard** — rejected (hidden by default but recoverable)
 
+**Trash** is a separate, destructive action outside this lifecycle: it deletes the `MediaAsset` document (plus its `FaceDetection`/`FaceMatchReview` records) and moves the original file into a `Trash/` subfolder inside its own storage root (mirroring its original relative path), via `POST /api/assets/trash` (`trashAssetsByIds` in `apps/api/src/import/trashService.ts`). Unlike Discard, there's no in-app undo. Gated by the `trash-assets` RBAC feature (default `deny` for `full`/`limited`, `allow` for `admin` — see `apps/api/src/tools/seedRoles.ts`; existing roles need `tsx src/tools/seedRoles.ts` re-run to pick up the new permission key). The toolbar icon is hidden by default (⋯ → Show Trash Icon, `tdg-show-trash-icon` in localStorage) as a safety measure against accidental permanent deletion.
+
 ---
 
 ## Key Workflows

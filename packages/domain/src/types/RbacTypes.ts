@@ -14,6 +14,7 @@ export const FEATURE_IDS = [
   'people-face-review',
   'print',
   'maintenance',
+  'trash-assets',
 ] as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[number];
@@ -30,6 +31,7 @@ export const FEATURE_LABELS: Record<FeatureId, string> = {
   'people-face-review':  'People face review',
   'print':               'Print',
   'maintenance':         'Maintenance tools',
+  'trash-assets':        'Trash photos (permanently delete)',
 };
 
 // ---------------------------------------------------------------------------

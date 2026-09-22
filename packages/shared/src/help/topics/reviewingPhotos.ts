@@ -5,7 +5,7 @@ export const reviewingPhotos: HelpTopic = {
   title: 'Reviewing Photos',
   category: 'Basics',
   order: 3,
-  keywords: ['review', 'state', 'keep', 'pending', 'discard', 'new', 'rating', 'stars', 'keyboard shortcuts'],
+  keywords: ['review', 'state', 'keep', 'pending', 'discard', 'new', 'rating', 'stars', 'keyboard shortcuts', 'trash', 'delete', 'permanently delete'],
   body: `**Photo States**
 
 Every photo has one of four states:
@@ -33,6 +33,12 @@ Photos start as New. Set state with the toolbar buttons (Keep, Pending, Discard,
 | Enter / Space | Open Immersive full-screen overlay |
 | Escape | Close Immersive / Survey / Slideshow, or clear selection |
 | Cmd+A / Ctrl+A | Select all visible photos (Grid) |
+
+**Trash**
+
+Trash is different from Discard: Discard just changes a photo's state (recoverable, file untouched); Trash permanently deletes the photo's Tedography record and moves its original file into a "Trash" subfolder inside its own storage root. There's no in-app undo — recovering a trashed photo means manually moving the file back and re-importing it.
+
+The Trash icon is hidden from the toolbar by default as a safety measure. Turn it on in ⋯ → Show Trash Icon; it appears to the right of the Keep/Discard/Pending/New buttons and applies to the current selection, same as the state buttons.
 
 **Ratings**
 

@@ -22,6 +22,14 @@ export async function syncFaceDetectionIndexes(): Promise<void> {
   log.info('Synchronized faceDetections indexes');
 }
 
+export async function deleteFaceDetectionsForAssetIds(mediaAssetIds: string[]): Promise<void> {
+  if (mediaAssetIds.length === 0) {
+    return;
+  }
+
+  await FaceDetectionModel.deleteMany({ mediaAssetId: { $in: mediaAssetIds } });
+}
+
 export async function replaceFaceDetectionsForAsset(input: {
   mediaAssetId: string;
   detections: Array<Omit<FaceDetection, 'id' | 'createdAt' | 'updatedAt'>>;

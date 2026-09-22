@@ -25,6 +25,7 @@ const admin: PermissionMap = {
   'people-face-review':   'allow',
   'print':                'allow',
   'maintenance':          'allow',
+  'trash-assets':         'allow',
 };
 
 const full: PermissionMap = {
@@ -38,6 +39,7 @@ const full: PermissionMap = {
   'people-face-review':   'allow',
   'print':                'allow',
   'maintenance':          'deny',
+  'trash-assets':         'deny',
 };
 
 const limited: PermissionMap = {
@@ -51,6 +53,7 @@ const limited: PermissionMap = {
   'people-face-review':   'per-album',
   'print':                'per-album',
   'maintenance':          'deny',
+  'trash-assets':         'deny',
 };
 
 const roles: TedographyRole[] = [

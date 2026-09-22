@@ -1,4 +1,4 @@
-import type { MediaAsset, RefreshOperationResponse } from '@tedography/domain';
+import type { MediaAsset, RefreshOperationResponse, TrashAssetsResponse } from '@tedography/domain';
 
 type ApiErrorPayload = {
   error?: string;
@@ -123,6 +123,14 @@ export async function clearAssetsLocation(assetIds: string[]): Promise<MediaAsse
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ assetIds, clear: true })
+  });
+}
+
+export async function trashAssets(assetIds: string[]): Promise<TrashAssetsResponse> {
+  return fetchJson<TrashAssetsResponse>('/api/assets/trash', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assetIds })
   });
 }
 

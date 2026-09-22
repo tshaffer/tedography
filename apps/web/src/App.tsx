@@ -57,6 +57,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BrushIcon from '@mui/icons-material/Brush';
 import StarIcon from '@mui/icons-material/Star';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -110,7 +111,8 @@ import {
   updateAssetsCaptureDateMarkedWrong,
   updateAssetRating,
   updateAssetsLocation,
-  clearAssetsLocation
+  clearAssetsLocation,
+  trashAssets
 } from './api/assetApi';
 import { getAssetLocationSuggestion, type LocationSuggestion } from './api/locationSuggestionApi';
 import {
@@ -5023,6 +5025,11 @@ export default function App() {
     // Default is true (icons only); labels must be explicitly opted into.
     return stored === null ? true : stored === 'true';
   });
+  const [showTrashIcon, setShowTrashIcon] = useState<boolean>(() => {
+    // Default is false — hidden unless explicitly opted into, since Trash
+    // permanently deletes the Tedography record (unlike Discard).
+    return localStorage.getItem('tdg-show-trash-icon') === 'true';
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -7923,6 +7930,66 @@ export default function App() {
       );
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to update selected assets');
+    } finally {
+      for (const assetId of assetIds) {
+        setAssetUpdating(assetId, false);
+      }
+    }
+  }
+
+  // Unlike handleApplyPhotoStateToSelectedAssets (Discard), Trash permanently
+  // deletes the Tedography record — the original file is moved to a Trash
+  // folder on disk, but the asset is gone from the app for good.
+  async function handleTrashAssets(assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    const navigationList = surveyOpen
+      ? compareAssets
+      : immersiveOpen
+        ? immersiveAssets
+        : isLoupeMode
+          ? loupeAssets
+          : visibleAssets;
+    const trashedIdSetForReplacement = new Set(assetIds);
+    const replacementAssetId =
+      selectedAssetId && trashedIdSetForReplacement.has(selectedAssetId)
+        ? getAdjacentReplacementAssetId(navigationList, selectedAssetId)
+        : null;
+
+    for (const assetId of assetIds) {
+      setAssetUpdating(assetId, true);
+    }
+    setUpdateError(null);
+
+    try {
+      const response = await trashAssets(assetIds);
+      const trashedIds = new Set(
+        response.results.filter((result) => result.status === 'Trashed').map((result) => result.assetId)
+      );
+      const failedResults = response.results.filter((result) => result.status !== 'Trashed');
+
+      if (trashedIds.size > 0) {
+        setAssets((previous) => previous.filter((asset) => !trashedIds.has(asset.id)));
+        setSelectedAssetIds((previous) => previous.filter((id) => !trashedIds.has(id)));
+        if (selectionAnchorAssetId && trashedIds.has(selectionAnchorAssetId)) {
+          setSelectionAnchorAssetId(replacementAssetId);
+        }
+        if (selectedAssetId && trashedIds.has(selectedAssetId)) {
+          setSelectedAssetId(replacementAssetId);
+        }
+        void loadAlbumAssetCounts();
+        void loadAlbumCaptureDateRanges();
+      }
+
+      if (failedResults.length > 0) {
+        setUpdateError(
+          `Failed to trash ${failedResults.length} of ${assetIds.length} photo${assetIds.length === 1 ? '' : 's'}: ${failedResults[0]?.message ?? 'Unknown error'}`
+        );
+      }
+    } catch (error: unknown) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to trash selected photos');
     } finally {
       for (const assetId of assetIds) {
         setAssetUpdating(assetId, false);
@@ -13299,6 +13366,43 @@ export default function App() {
             </div>
           ) : null}
 
+          {/* Trash: permanently deletes the record (opt-in via Display Options) */}
+          {showTrashIcon && (isLibraryArea || isSearchArea) ? (
+            <div style={toolbarGroupStyle}>
+              <Tooltip
+                title={
+                  !can('trash-assets')
+                    ? 'Your role cannot trash photos'
+                    : hasSelectedAssets
+                      ? 'Move the current selection to Trash and permanently delete their Tedography records'
+                      : 'Select one or more photos to trash'
+                }
+              >
+                <span>
+                  <button
+                    type="button"
+                    style={
+                      hasSelectedAssets && canInAlbum('trash-assets', focusedAlbumWriterIds)
+                        ? toolbarIconButtonStyle
+                        : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }
+                    }
+                    onClick={() => {
+                      if (isLoupeMode && selectedAsset) {
+                        void handleTrashAssets([selectedAsset.id]);
+                      } else {
+                        void handleTrashAssets(selectedAssetIds);
+                      }
+                    }}
+                    disabled={!hasSelectedAssets || !canInAlbum('trash-assets', focusedAlbumWriterIds)}
+                    aria-label="Trash"
+                  >
+                    <DeleteForeverIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#cf222e' }} />
+                  </button>
+                </span>
+              </Tooltip>
+            </div>
+          ) : null}
+
           {/* Actions: Move to Album */}
           {(isLibraryArea || isSearchArea) ? (
             <div style={toolbarGroupStyle}>
@@ -14083,6 +14187,21 @@ export default function App() {
                   }}
                 >
                   {stateButtonsCompact ? 'Show State Labels' : 'Show Icons Only'}
+                </button>
+                <button
+                  type="button"
+                  className="tdg-overflow-item"
+                  onClick={() => {
+                    setToolbarOverflowOpen(false);
+                    setShowTrashIcon((prev) => {
+                      const next = !prev;
+                      localStorage.setItem('tdg-show-trash-icon', String(next));
+                      return next;
+                    });
+                  }}
+                  title="The Trash icon permanently deletes a photo's Tedography record (the original file is moved to a Trash folder on disk, but not the DB record)."
+                >
+                  {showTrashIcon ? 'Hide Trash Icon' : 'Show Trash Icon'}
                 </button>
 
                 {showsThumbnailSizeControl ? (
