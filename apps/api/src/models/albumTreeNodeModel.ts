@@ -1,4 +1,4 @@
-import { type AlbumTreeNode } from '@tedography/domain';
+import { locationDisplayModes, type AlbumTreeNode } from '@tedography/domain';
 import mongoose, { type Model, Schema } from 'mongoose';
 
 const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
@@ -39,6 +39,13 @@ const albumTreeNodeSchema = new Schema<AlbumTreeNode>(
     defaultCountry: { type: String, required: false, trim: true, default: null },
     defaultLocationLatitude: { type: Number, required: false, default: null },
     defaultLocationLongitude: { type: Number, required: false, default: null },
+    defaultPlaceName: { type: String, required: false, trim: true, default: null },
+    locationDisplayMode: {
+      type: String,
+      required: false,
+      enum: [...locationDisplayModes, null],
+      default: null
+    },
     createdAt: { type: String, required: true, trim: true },
     updatedAt: { type: String, required: true, trim: true }
   },

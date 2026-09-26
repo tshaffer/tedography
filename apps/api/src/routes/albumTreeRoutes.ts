@@ -9,6 +9,7 @@ import type {
   AlbumTreeNode,
   AlbumTreeNodeType
 } from '@tedography/domain';
+import { locationDisplayModes } from '@tedography/domain';
 import {
   addAssetsToAlbum,
   applyAlbumPlacementUpdates,
@@ -37,6 +38,7 @@ import {
   setAlbumPeopleAssignmentStatus,
   setAlbumReviewAssignmentStatus,
   updateAlbumDefaultLocation,
+  updateAlbumLocationDisplayMode,
   updateAlbumTreeNodeChildOrderMode
 } from '../repositories/albumTreeRepository.js';
 import { findRoleById } from '../repositories/roleRepository.js';
@@ -502,6 +504,7 @@ albumTreeRoutes.patch('/:id/default-location', requireFeature('create-albums'), 
 
   const body = req.body as {
     clear?: unknown;
+    placeName?: unknown;
     locationLabel?: unknown;
     city?: unknown;
     state?: unknown;
@@ -520,6 +523,7 @@ albumTreeRoutes.patch('/:id/default-location', requireFeature('create-albums'), 
       body.clear === true
         ? await updateAlbumDefaultLocation(node.id, null)
         : await updateAlbumDefaultLocation(node.id, {
+            defaultPlaceName: asStringOrNull(body.placeName),
             defaultLocationLabel: asStringOrNull(body.locationLabel),
             defaultCity: asStringOrNull(body.city),
             defaultState: asStringOrNull(body.state),
@@ -537,6 +541,42 @@ albumTreeRoutes.patch('/:id/default-location', requireFeature('create-albums'), 
     res.json(updated);
   } catch {
     const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update album default location' };
+    res.status(500).json(errorResponse);
+  }
+});
+
+albumTreeRoutes.patch('/:id/location-display-mode', requireFeature('create-albums'), async (req, res) => {
+  const node = await findAlbumTreeNodeById(req.params.id as string);
+  if (!node || node.nodeType !== 'Album') {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const body = req.body as { locationDisplayMode?: unknown };
+  const locationDisplayMode =
+    body.locationDisplayMode === null
+      ? null
+      : locationDisplayModes.find((mode) => mode === body.locationDisplayMode);
+  if (locationDisplayMode === undefined) {
+    const errorResponse: AlbumTreeErrorResponse = {
+      error: `locationDisplayMode must be null or one of ${locationDisplayModes.join(', ')}`
+    };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  try {
+    const updated = await updateAlbumLocationDisplayMode(node.id, locationDisplayMode);
+    if (!updated) {
+      const errorResponse: AlbumTreeErrorResponse = { error: 'Album node not found' };
+      res.status(404).json(errorResponse);
+      return;
+    }
+
+    res.json(updated);
+  } catch {
+    const errorResponse: AlbumTreeErrorResponse = { error: 'Failed to update album location display' };
     res.status(500).json(errorResponse);
   }
 });

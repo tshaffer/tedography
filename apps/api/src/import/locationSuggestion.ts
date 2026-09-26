@@ -5,6 +5,7 @@ export interface LocationSuggestion {
   sourceFilename: string;
   /** Minutes between the target's and source's captureDateTime, when both are known. */
   minutesApart: number | null;
+  placeName: string | null;
   locationLabel: string | null;
   city: string | null;
   state: string | null;
@@ -25,6 +26,7 @@ function toSuggestion(source: MediaAsset, minutesApart: number | null): Location
     sourceAssetId: source.id,
     sourceFilename: source.filename,
     minutesApart,
+    placeName: source.placeName ?? null,
     locationLabel: source.locationLabel ?? null,
     city: source.city ?? null,
     state: source.state ?? null,

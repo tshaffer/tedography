@@ -1,4 +1,4 @@
-import type { MediaAsset, RefreshOperationResponse, TrashAssetsResponse } from '@tedography/domain';
+import type { AssetLocationDisplayMode, MediaAsset, RefreshOperationResponse, TrashAssetsResponse } from '@tedography/domain';
 
 type ApiErrorPayload = {
   error?: string;
@@ -96,6 +96,7 @@ export async function updateAssetsCaptureDateMarkedWrong(request: {
 
 export interface SetAssetsLocationRequest {
   assetIds: string[];
+  placeName?: string | null;
   locationLabel?: string | null;
   city?: string | null;
   state?: string | null;
@@ -123,6 +124,21 @@ export async function clearAssetsLocation(assetIds: string[]): Promise<MediaAsse
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ assetIds, clear: true })
+  });
+}
+
+/** What the Location field shows for these photos; null displayMode = follow the album / global default. */
+export async function updateAssetsLocationDisplay(request: {
+  assetIds: string[];
+  displayMode: AssetLocationDisplayMode | null;
+  customLocationLabel?: string | null;
+}): Promise<MediaAsset[]> {
+  return fetchJson<MediaAsset[]>('/api/assets/location-display', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
   });
 }
 

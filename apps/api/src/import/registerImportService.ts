@@ -322,6 +322,9 @@ export async function registerImportedFiles(input: {
         locationSource: sourceAsset?.locationLabel || sourceAsset?.locationLatitude != null
           ? (sourceAsset?.locationSource ?? null)
           : classifyExtractedLocation(metadata),
+        placeName: sourceAsset?.placeName ?? null,
+        locationDisplayMode: sourceAsset?.locationDisplayMode ?? null,
+        customLocationLabel: sourceAsset?.customLocationLabel ?? null,
         importedAt,
         sourceAssetId: sourceAsset?.id ?? null,
         keywordIds: sourceAsset?.keywordIds ?? [],

@@ -4,7 +4,7 @@ import cors from 'cors';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
 import express, { type Express } from 'express';
-import { PhotoState, normalizePhotoState } from '@tedography/domain';
+import { PhotoState, assetLocationDisplayModes, normalizePhotoState } from '@tedography/domain';
 import type { RefreshOperationResponse } from '@tedography/domain';
 import { config } from './config.js';
 import { log } from './logger.js';
@@ -27,6 +27,7 @@ import {
   updateCaptureDatesPreservingTimes,
   bulkUpdatePhotoState,
   updateAssetsLocation,
+  updateAssetsLocationDisplay,
   updateCaptureDateTimeMarkedWrong,
   updateCaptureDateTimes,
   updatePhotoState,
@@ -394,6 +395,7 @@ export function createServer(): Express {
     const payload = req.body as {
       assetIds?: unknown;
       clear?: unknown;
+      placeName?: unknown;
       locationLabel?: unknown;
       city?: unknown;
       state?: unknown;
@@ -427,6 +429,7 @@ export function createServer(): Express {
     const asNumberOrNull = (value: unknown): number | null =>
       typeof value === 'number' && Number.isFinite(value) ? value : null;
 
+    const placeName = asStringOrNull(payload.placeName);
     const locationLabel = asStringOrNull(payload.locationLabel);
     const city = asStringOrNull(payload.city);
     const state = asStringOrNull(payload.state);
@@ -446,13 +449,58 @@ export function createServer(): Express {
     try {
       const updatedAssets = await updateAssetsLocation(
         assetIds,
-        { locationLabel, city, state, country, locationLatitude, locationLongitude },
+        { placeName, locationLabel, city, state, country, locationLatitude, locationLongitude },
         source
       );
       res.json(updatedAssets);
     } catch (error) {
       log.error('Failed to update asset location', error);
       res.status(500).json({ error: 'Failed to update asset location' });
+    }
+  });
+
+  // What the Location field shows for these photos: one of the album-level
+  // modes, 'custom' (with customLocationLabel), or null to follow the album /
+  // global default. Independent of the stored place.
+  app.patch('/api/assets/location-display', requireFeature('set-photo-state', (req) => {
+    const body = req.body as { assetIds?: unknown };
+    return Array.isArray(body.assetIds)
+      ? body.assetIds.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      : [];
+  }), async (req, res) => {
+    const payload = req.body as { assetIds?: unknown; displayMode?: unknown; customLocationLabel?: unknown };
+    const assetIds = Array.isArray(payload.assetIds)
+      ? payload.assetIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [];
+
+    if (assetIds.length === 0) {
+      res.status(400).json({ error: 'assetIds must contain at least one asset id' });
+      return;
+    }
+
+    const displayMode = payload.displayMode === null
+      ? null
+      : assetLocationDisplayModes.find((mode) => mode === payload.displayMode);
+    if (displayMode === undefined) {
+      res.status(400).json({ error: `displayMode must be null or one of ${assetLocationDisplayModes.join(', ')}` });
+      return;
+    }
+
+    const customLocationLabel =
+      typeof payload.customLocationLabel === 'string' && payload.customLocationLabel.trim().length > 0
+        ? payload.customLocationLabel.trim()
+        : null;
+    if (displayMode === 'custom' && !customLocationLabel) {
+      res.status(400).json({ error: 'customLocationLabel is required when displayMode is custom' });
+      return;
+    }
+
+    try {
+      const updatedAssets = await updateAssetsLocationDisplay(assetIds, displayMode, customLocationLabel);
+      res.json(updatedAssets);
+    } catch (error) {
+      log.error('Failed to update asset location display', error);
+      res.status(500).json({ error: 'Failed to update asset location display' });
     }
   });
 

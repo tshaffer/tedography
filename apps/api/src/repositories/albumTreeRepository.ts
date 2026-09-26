@@ -4,7 +4,8 @@ import {
   type AlbumReviewAssignmentStatus,
   type AlbumTreeChildOrderMode,
   type AlbumTreeNode,
-  type AlbumTreeNodeType
+  type AlbumTreeNodeType,
+  type LocationDisplayMode
 } from '@tedography/domain';
 import { randomUUID } from 'node:crypto';
 import { AlbumTreeNodeModel } from '../models/albumTreeNodeModel.js';
@@ -250,6 +251,7 @@ export async function renameAlbumTreeNode(
 }
 
 export interface AlbumDefaultLocationFields {
+  defaultPlaceName: string | null;
   defaultLocationLabel: string | null;
   defaultCity: string | null;
   defaultState: string | null;
@@ -266,6 +268,7 @@ export async function updateAlbumDefaultLocation(
     { id: albumId, nodeType: 'Album' },
     {
       $set: {
+        defaultPlaceName: location?.defaultPlaceName ?? null,
         defaultLocationLabel: location?.defaultLocationLabel ?? null,
         defaultCity: location?.defaultCity ?? null,
         defaultState: location?.defaultState ?? null,
@@ -275,6 +278,17 @@ export async function updateAlbumDefaultLocation(
         updatedAt: new Date().toISOString()
       }
     },
+    { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
+  ).lean<AlbumTreeNode | null>();
+}
+
+export async function updateAlbumLocationDisplayMode(
+  albumId: string,
+  locationDisplayMode: LocationDisplayMode | null
+): Promise<AlbumTreeNode | null> {
+  return AlbumTreeNodeModel.findOneAndUpdate(
+    { id: albumId, nodeType: 'Album' },
+    { $set: { locationDisplayMode, updatedAt: new Date().toISOString() } },
     { returnDocument: 'after', projection: { _id: 0 }, runValidators: true }
   ).lean<AlbumTreeNode | null>();
 }

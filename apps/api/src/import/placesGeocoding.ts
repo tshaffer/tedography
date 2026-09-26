@@ -16,6 +16,8 @@ export interface PlacePrediction {
 }
 
 export interface ResolvedPlace {
+  /** The place's name, e.g. "Garrapata State Park" (for a street address, the street line). */
+  placeName: string | null;
   formattedAddress: string | null;
   city: string | null;
   state: string | null;
@@ -38,6 +40,7 @@ interface PlacesAutocompleteResponse {
 }
 
 interface PlaceDetailsResponse {
+  displayName?: { text?: string };
   formattedAddress?: string;
   location?: { latitude?: number; longitude?: number };
   addressComponents?: Array<{
@@ -108,7 +111,9 @@ function pickAddressComponent(
 
 export async function getPlaceDetails(placeId: string, sessionToken: string): Promise<ResolvedPlace> {
   const apiKey = requireApiKey();
-  const fieldMask = ['formattedAddress', 'location', 'addressComponents'].join(',');
+  // displayName is a Place Details Pro field — requesting it bills the whole
+  // lookup at the Pro SKU rather than Essentials.
+  const fieldMask = ['displayName', 'formattedAddress', 'location', 'addressComponents'].join(',');
 
   const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`);
   url.searchParams.set('sessionToken', sessionToken);
@@ -128,6 +133,7 @@ export async function getPlaceDetails(placeId: string, sessionToken: string): Pr
   const payload = (await response.json()) as PlaceDetailsResponse;
 
   return {
+    placeName: payload.displayName?.text?.trim() || null,
     formattedAddress: payload.formattedAddress ?? null,
     city:
       pickAddressComponent(payload.addressComponents, 'locality') ??

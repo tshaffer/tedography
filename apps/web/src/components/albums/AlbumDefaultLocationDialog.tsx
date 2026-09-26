@@ -76,7 +76,9 @@ const selectedPlaceBoxStyle: CSSProperties = {
   border: '1px solid #bfdbfe',
   backgroundColor: '#eff6ff',
   borderRadius: '8px',
-  padding: '10px 12px'
+  padding: '10px 12px',
+  display: 'grid',
+  gap: '4px'
 };
 
 export function AlbumDefaultLocationDialog({
@@ -128,6 +130,7 @@ export function AlbumDefaultLocationDialog({
     try {
       const details = await getPlaceDetails(prediction.placeId, sessionTokenRef.current);
       setSelectedPlace({
+        placeName: details.placeName,
         locationLabel: details.formattedAddress ?? prediction.description,
         city: details.city,
         state: details.state,
@@ -187,7 +190,12 @@ export function AlbumDefaultLocationDialog({
 
               {selectedPlace ? (
                 <div style={selectedPlaceBoxStyle}>
-                  <strong style={{ fontSize: '13px', color: '#1d4ed8' }}>{selectedPlace.locationLabel}</strong>
+                  <strong style={{ fontSize: '13px', color: '#1d4ed8' }}>
+                    {selectedPlace.placeName ?? selectedPlace.locationLabel}
+                  </strong>
+                  {selectedPlace.placeName && selectedPlace.placeName !== selectedPlace.locationLabel ? (
+                    <span style={{ fontSize: '12px', color: '#374151' }}>{selectedPlace.locationLabel}</span>
+                  ) : null}
                 </div>
               ) : predictions.length > 0 ? (
                 <div style={suggestionsBoxStyle}>

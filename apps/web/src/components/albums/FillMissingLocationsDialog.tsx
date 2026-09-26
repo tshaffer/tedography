@@ -1,11 +1,15 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { getAlbumLocationSuggestions, type AlbumLocationSuggestionResult } from '../../api/locationSuggestionApi';
 import { updateAssetsLocation, type SetAssetsLocationRequest } from '../../api/assetApi';
+import type { LocationDisplayMode } from '@tedography/domain';
+import { formatLocationForDisplay } from '../../utilities/locationDisplay';
 
 interface FillMissingLocationsDialogProps {
   open: boolean;
   albumId: string;
   albumLabel: string;
+  /** How this album's photos show their location, so suggestions read the same way. */
+  locationDisplayMode: LocationDisplayMode;
   onClose: () => void;
   onApplied: (assetIds: string[]) => void;
 }
@@ -69,18 +73,18 @@ const linkButtonStyle: CSSProperties = {
   padding: 0
 };
 
-function suggestionPlace(suggestion: AlbumLocationSuggestionResult['suggestion']): string {
-  if (!suggestion) return '';
-  const parts = [suggestion.city, suggestion.state, suggestion.country].filter(
-    (value): value is string => Boolean(value && value.trim())
-  );
-  return parts.length > 0 ? parts.join(', ') : (suggestion.locationLabel ?? '');
+function suggestionPlace(
+  suggestion: AlbumLocationSuggestionResult['suggestion'],
+  mode: LocationDisplayMode
+): string {
+  return suggestion ? (formatLocationForDisplay(suggestion, mode) ?? '') : '';
 }
 
 export function FillMissingLocationsDialog({
   open,
   albumId,
   albumLabel,
+  locationDisplayMode,
   onClose,
   onApplied
 }: FillMissingLocationsDialogProps): ReactElement | null {
@@ -115,6 +119,7 @@ export function FillMissingLocationsDialog({
     if (!result.suggestion) return null;
     return {
       assetIds: [result.assetId],
+      placeName: result.suggestion.placeName,
       locationLabel: result.suggestion.locationLabel,
       city: result.suggestion.city,
       state: result.suggestion.state,
@@ -202,7 +207,7 @@ export function FillMissingLocationsDialog({
                       {result.suggestion ? (
                         <>
                           <div style={{ fontSize: '12px', color: applied ? '#059669' : '#059669' }}>
-                            ● {suggestionPlace(result.suggestion)}
+                            ● {suggestionPlace(result.suggestion, locationDisplayMode)}
                           </div>
                           <div style={{ fontSize: '11px', color: '#9ca3af' }}>
                             from {result.suggestion.sourceFilename}

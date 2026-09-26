@@ -4,6 +4,7 @@ import {
   type AlbumReviewAssignmentStatus,
   type AlbumTreeChildOrderMode,
   type AlbumTreeNode,
+  type LocationDisplayMode,
   type MediaAsset
 } from '@tedography/domain';
 
@@ -193,6 +194,7 @@ export async function updateAlbumTreeChildOrderMode(
 
 export interface SetAlbumDefaultLocationRequest {
   clear?: true;
+  placeName?: string | null;
   locationLabel?: string | null;
   city?: string | null;
   state?: string | null;
@@ -209,6 +211,25 @@ export async function updateAlbumDefaultLocation(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as unknown;
+    throw new Error(buildErrorMessage(response.status, payload));
+  }
+
+  return (await response.json()) as AlbumTreeNode;
+}
+
+/** What the Location field shows for this album's photos; null = the global default. */
+export async function updateAlbumLocationDisplayMode(
+  nodeId: string,
+  locationDisplayMode: LocationDisplayMode | null
+): Promise<AlbumTreeNode> {
+  const response = await fetch(`/api/album-tree/${encodeURIComponent(nodeId)}/location-display-mode`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locationDisplayMode })
   });
 
   if (!response.ok) {

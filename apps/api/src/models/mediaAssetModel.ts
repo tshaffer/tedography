@@ -1,4 +1,4 @@
-import { MediaType, PhotoState, type MediaAsset } from '@tedography/domain';
+import { MediaType, PhotoState, assetLocationDisplayModes, type MediaAsset } from '@tedography/domain';
 import mongoose, { type Model, Schema } from 'mongoose';
 
 const displayStorageTypes = ['archive-root', 'derived-root'] as const;
@@ -35,6 +35,14 @@ const mediaAssetSchema = new Schema<MediaAsset>(
       enum: ['exif', 'manual', 'inherited', 'none'],
       default: null
     },
+    placeName: { type: String, required: false, trim: true, default: null },
+    locationDisplayMode: {
+      type: String,
+      required: false,
+      enum: [...assetLocationDisplayModes, null],
+      default: null
+    },
+    customLocationLabel: { type: String, required: false, trim: true, default: null },
     importedAt: { type: String, required: true, trim: true },
     originalStorageRootId: { type: String, required: true, trim: true },
     originalArchivePath: { type: String, required: true, trim: true },

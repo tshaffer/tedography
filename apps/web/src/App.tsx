@@ -63,6 +63,7 @@ import {
   MediaType,
   type Person,
   PhotoState,
+  locationDisplayModes,
   normalizePhotoState,
   type AlbumKeywordAssignmentStatus,
   type AlbumPeopleAssignmentStatus,
@@ -70,6 +71,7 @@ import {
   type AlbumTreeNode,
   type AssetKeywordAssignmentStatus,
   type Keyword,
+  type LocationDisplayMode,
   type MediaAsset,
   type SmartAlbum,
   type SmartAlbumFilterSpec,
@@ -94,6 +96,7 @@ import {
   placeAssetsInAlbum,
   updateAlbumOrderingMode,
   updateAlbumDefaultLocation as updateAlbumDefaultLocationRequest,
+  updateAlbumLocationDisplayMode as updateAlbumLocationDisplayModeRequest,
   getAlbumCaptureDateRanges as getAlbumCaptureDateRangesRequest,
   type AlbumCaptureDateRange,
   getAlbumAssetCounts as getAlbumAssetCountsRequest,
@@ -111,6 +114,7 @@ import {
   updateAssetsCaptureDateMarkedWrong,
   updateAssetRating,
   updateAssetsLocation,
+  updateAssetsLocationDisplay,
   clearAssetsLocation,
   trashAssets
 } from './api/assetApi';
@@ -184,19 +188,32 @@ import { EditType, EDIT_TYPE_LABELS } from '@tedography/domain';
 import { ManageAlbumWritersDialog } from './components/albums/ManageAlbumWritersDialog';
 import { AlbumDefaultLocationDialog } from './components/albums/AlbumDefaultLocationDialog';
 import { FillMissingLocationsDialog } from './components/albums/FillMissingLocationsDialog';
+import { AlbumLocationDisplayDialog } from './components/albums/AlbumLocationDisplayDialog';
 import { ChangePinDialog } from './components/auth/ChangePinDialog';
 import { UserMenu } from './components/auth/UserMenu';
 import { MoveAlbumTreeNodeDialog } from './components/albums/MoveAlbumTreeNodeDialog';
 import { MoveAssetsToAlbumDialog } from './components/albums/MoveAssetsToAlbumDialog';
 import { CreateTopLevelGroupDialog } from './components/albums/CreateTopLevelGroupDialog';
-import { AssetDetailsPanel, formatLocation } from './components/assets/AssetDetailsPanel';
+import { AssetDetailsPanel } from './components/assets/AssetDetailsPanel';
 import { StarRatingControl } from './components/assets/StarRatingControl';
 import { AssetFilmstrip } from './components/assets/AssetFilmstrip';
 import { AssetKeywordsPanel } from './components/assets/AssetKeywordsPanel';
 import { AssetQuickBar } from './components/assets/AssetQuickBar';
 import { CropWatcher } from './components/assets/CropWatcher';
 import { SetCaptureDateDialog } from './components/assets/SetCaptureDateDialog';
-import { SetLocationDialog, type ResolvedLocationSelection } from './components/assets/SetLocationDialog';
+import {
+  SetLocationDialog,
+  type ResolvedLocationSelection,
+  type SetLocationSaveInput
+} from './components/assets/SetLocationDialog';
+import {
+  defaultGlobalLocationDisplayMode,
+  formatAlbumDefaultLocation,
+  formatLocationForDisplay,
+  locationDisplayModeLabels,
+  resolveAssetLocation,
+  resolveInheritedLocationDisplayMode
+} from './utilities/locationDisplay';
 import {
   ImportAssetsDialog,
   type ImportAssetsDialogInitialAlbumDestination
@@ -403,6 +420,7 @@ const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
 const showAlbumPeopleStatusBadgeStorageKey = 'tedography.album.showPeopleBadge';
 const showAlbumDateRangeCaptionStorageKey = 'tedography.album.showDateRangeCaption';
+const globalLocationDisplayModeStorageKey = 'tedography.location.displayMode';
 const albumStatusBadgeModeStorageKey = 'tedography.albumStatusBadgeMode';
 const showVisibilityPanelStorageKey = 'tedography.showVisibilityPanel';
 const assetsBootstrapStorageKey = 'tedography.bootstrap.assets';
@@ -3620,6 +3638,8 @@ type SlideshowViewerProps = {
   isShuffled: boolean;
   intervalMs: number;
   keywordLabels: string[];
+  // Already resolved against the photo / album / global display choice; never coordinates.
+  locationText: string | null;
   onExit: () => void;
   onFirst: () => void;
   onPrevious: () => void;
@@ -3641,6 +3661,7 @@ function SlideshowViewer({
   isShuffled,
   intervalMs,
   keywordLabels,
+  locationText,
   onExit,
   onFirst,
   onPrevious,
@@ -3699,11 +3720,6 @@ function SlideshowViewer({
   const imageUrl = getAssetDisplayImageUrl(asset);
   const progressPercent = total > 1 ? (index / (total - 1)) * 100 : 100;
 
-  // Coordinates are never shown to the user — only a place name, or nothing.
-  const locationText =
-    typeof asset.locationLabel === 'string' && asset.locationLabel.trim().length > 0
-      ? asset.locationLabel
-      : null;
 
   const peopleNames = (asset.people ?? []).map((p) => p.displayName);
 
@@ -4368,6 +4384,7 @@ export default function App() {
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [manageWritersAlbum, setManageWritersAlbum] = useState<AlbumTreeNode | null>(null);
   const [defaultLocationAlbum, setDefaultLocationAlbum] = useState<AlbumTreeNode | null>(null);
+  const [locationDisplayAlbum, setLocationDisplayAlbum] = useState<AlbumTreeNode | null>(null);
   const [fillMissingLocationsAlbum, setFillMissingLocationsAlbum] = useState<AlbumTreeNode | null>(null);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [keywordManagementDialogOpen, setKeywordManagementDialogOpen] = useState(false);
@@ -4851,6 +4868,17 @@ export default function App() {
     if (typeof window === 'undefined') return true;
     const stored = window.localStorage.getItem(showAlbumPeopleStatusBadgeStorageKey);
     return stored === null ? true : stored === 'true';
+  });
+  // What the Location field shows when neither the photo nor its album has its own choice.
+  const [globalLocationDisplayMode, setGlobalLocationDisplayMode] = useState<LocationDisplayMode>(() => {
+    try {
+      const stored = window.localStorage.getItem(globalLocationDisplayModeStorageKey);
+      return stored && stored in locationDisplayModeLabels
+        ? (stored as LocationDisplayMode)
+        : defaultGlobalLocationDisplayMode;
+    } catch {
+      return defaultGlobalLocationDisplayMode;
+    }
   });
   const [showAlbumDateRangeCaption, setShowAlbumDateRangeCaption] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -5361,6 +5389,14 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(showAlbumDateRangeCaptionStorageKey, showAlbumDateRangeCaption ? 'true' : 'false');
   }, [showAlbumDateRangeCaption]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(globalLocationDisplayModeStorageKey, globalLocationDisplayMode);
+    } catch {
+      // Storage unavailable — the choice just won't persist.
+    }
+  }, [globalLocationDisplayMode]);
 
   useEffect(() => {
     window.localStorage.setItem(showVisibilityPanelStorageKey, showVisibilityPanel ? 'true' : 'false');
@@ -6372,7 +6408,7 @@ export default function App() {
       const locationQuery = appliedSearchFilters.locationQuery.trim().toLowerCase();
       const matchesLocation =
         locationQuery.length === 0 ||
-        [asset.city, asset.state, asset.country, asset.locationLabel].some(
+        [asset.city, asset.state, asset.country, asset.locationLabel, asset.placeName, asset.customLocationLabel].some(
           (value) => typeof value === 'string' && value.toLowerCase().includes(locationQuery)
         );
 
@@ -6655,40 +6691,36 @@ export default function App() {
       .filter((node): node is AlbumTreeNode => node?.nodeType === 'Album')
       .map((node) => node.label);
   }, [albumNodesById, selectedAsset]);
+  const selectedAssetResolvedLocation = useMemo(
+    () =>
+      selectedAssetForDetails
+        ? resolveAssetLocation(selectedAssetForDetails, albumNodesById, singleCheckedAlbumId, globalLocationDisplayMode)
+        : null,
+    [albumNodesById, globalLocationDisplayMode, selectedAssetForDetails, singleCheckedAlbumId]
+  );
+  const selectedAssetHasOwnLocation = selectedAssetResolvedLocation?.text != null;
   const selectedAssetInheritedAlbumLocation = useMemo(() => {
-    if (!selectedAssetForDetails) {
+    if (!selectedAssetForDetails || !selectedAssetResolvedLocation || selectedAssetResolvedLocation.text !== null) {
       return null;
     }
 
-    const ownLocation = formatLocation(
-      selectedAssetForDetails.city,
-      selectedAssetForDetails.state,
-      selectedAssetForDetails.country,
-      selectedAssetForDetails.locationLabel
-    );
-    if (ownLocation !== '—') {
-      return null;
-    }
-
+    // Custom text with nothing typed can't happen (the API rejects it), so a
+    // null mode here only means "no location" — fall back to the global mode.
+    const mode = selectedAssetResolvedLocation.mode ?? globalLocationDisplayMode;
     for (const albumId of selectedAssetForDetails.albumIds ?? []) {
       const album = albumNodesById.get(albumId);
       if (!album || album.nodeType !== 'Album') {
         continue;
       }
 
-      const albumDefaultLocation = formatLocation(
-        album.defaultCity,
-        album.defaultState,
-        album.defaultCountry,
-        album.defaultLocationLabel
-      );
-      if (albumDefaultLocation !== '—') {
+      const albumDefaultLocation = formatAlbumDefaultLocation(album, mode);
+      if (albumDefaultLocation) {
         return { label: albumDefaultLocation, albumLabel: album.label };
       }
     }
 
     return null;
-  }, [albumNodesById, selectedAssetForDetails]);
+  }, [albumNodesById, globalLocationDisplayMode, selectedAssetForDetails, selectedAssetResolvedLocation]);
   useEffect(() => {
     const asset = selectedAssetForDetails;
     if (!asset || selectedAssetIds.length !== 1) {
@@ -6696,8 +6728,7 @@ export default function App() {
       return;
     }
 
-    const hasOwnLocation =
-      formatLocation(asset.city, asset.state, asset.country, asset.locationLabel) !== '—';
+    const hasOwnLocation = selectedAssetHasOwnLocation;
 
     if (hasOwnLocation || selectedAssetInheritedAlbumLocation || dismissedLocationSuggestionAssetId === asset.id) {
       setSelectedAssetLocationSuggestion(null);
@@ -6720,7 +6751,13 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [dismissedLocationSuggestionAssetId, selectedAssetForDetails, selectedAssetIds.length, selectedAssetInheritedAlbumLocation]);
+  }, [
+    dismissedLocationSuggestionAssetId,
+    selectedAssetForDetails,
+    selectedAssetHasOwnLocation,
+    selectedAssetIds.length,
+    selectedAssetInheritedAlbumLocation
+  ]);
   const selectedAssetAlbumOrderingModeLabel = useMemo(() => {
     if (!singleCheckedAlbumId || selectedAssetIds.length !== 1 || !selectedAsset) {
       return null;
@@ -8271,6 +8308,7 @@ export default function App() {
     try {
       const updatedAssets = await updateAssetsLocation({
         assetIds: [assetId],
+        placeName: suggestion.placeName,
         locationLabel: suggestion.locationLabel,
         city: suggestion.city,
         state: suggestion.state,
@@ -8308,7 +8346,7 @@ export default function App() {
     setSetLocationDialogOpen(true);
   }
 
-  async function handleSaveLocation(input: { clear: true } | ResolvedLocationSelection): Promise<void> {
+  async function handleSaveLocation(input: { clear: true } | SetLocationSaveInput): Promise<void> {
     const assetIds = selectedAssetIds;
     if (assetIds.length === 0) {
       return;
@@ -8317,18 +8355,31 @@ export default function App() {
     setUpdateError(null);
 
     try {
-      const updatedAssets =
-        'clear' in input
-          ? await clearAssetsLocation(assetIds)
-          : await updateAssetsLocation({
-              assetIds,
-              locationLabel: input.locationLabel,
-              city: input.city,
-              state: input.state,
-              country: input.country,
-              locationLatitude: input.locationLatitude,
-              locationLongitude: input.locationLongitude
-            });
+      let updatedAssets: MediaAsset[] = [];
+      if ('clear' in input) {
+        updatedAssets = await clearAssetsLocation(assetIds);
+      } else {
+        if (input.place) {
+          updatedAssets = await updateAssetsLocation({
+            assetIds,
+            placeName: input.place.placeName,
+            locationLabel: input.place.locationLabel,
+            city: input.place.city,
+            state: input.place.state,
+            country: input.place.country,
+            locationLatitude: input.place.locationLatitude,
+            locationLongitude: input.place.locationLongitude
+          });
+        }
+        if (input.display) {
+          // Returns the photos with both updates applied.
+          updatedAssets = await updateAssetsLocationDisplay({
+            assetIds,
+            displayMode: input.display.mode,
+            customLocationLabel: input.display.customLocationLabel
+          });
+        }
+      }
 
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
       setAssets((previous) => previous.map((asset) => updatesById.get(asset.id) ?? asset));
@@ -8365,6 +8416,7 @@ export default function App() {
       'clear' in input
         ? { clear: true as const }
         : {
+            placeName: input.placeName,
             locationLabel: input.locationLabel,
             city: input.city,
             state: input.state,
@@ -8376,6 +8428,16 @@ export default function App() {
     const updated = await updateAlbumDefaultLocationRequest(defaultLocationAlbum.id, request);
     setAlbumTreeNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
     setDefaultLocationAlbum(null);
+  }
+
+  async function handleSaveAlbumLocationDisplay(mode: LocationDisplayMode | null): Promise<void> {
+    if (!locationDisplayAlbum) {
+      return;
+    }
+
+    const updated = await updateAlbumLocationDisplayModeRequest(locationDisplayAlbum.id, mode);
+    setAlbumTreeNodes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+    setLocationDisplayAlbum(null);
   }
 
   async function handleArrangeSelectionByFilename(): Promise<void> {
@@ -12057,6 +12119,21 @@ export default function App() {
                       title={hasAlbumAccess ? undefined : noAccessTitle}
                       onClick={
                         hasAlbumAccess
+                          ? () => { closeAlbumTreeContextMenu(); setLocationDisplayAlbum(selectedAlbumTreeAlbumNode); }
+                          : undefined
+                      }
+                    >
+                      Location Display…
+                    </button>
+                  ) : null}
+                  {selectedAlbumTreeAlbumNode ? (
+                    <button
+                      type="button"
+                      style={hasAlbumAccess ? contextMenuItemStyle : disabledContextMenuItemStyle}
+                      disabled={!hasAlbumAccess}
+                      title={hasAlbumAccess ? undefined : noAccessTitle}
+                      onClick={
+                        hasAlbumAccess
                           ? () => { closeAlbumTreeContextMenu(); setFillMissingLocationsAlbum(selectedAlbumTreeAlbumNode); }
                           : undefined
                       }
@@ -13143,16 +13220,16 @@ export default function App() {
             asset={selectedAssetForDetails}
             albumLabels={selectedAssetAlbumLabels}
             albumOrderingModeLabel={selectedAssetAlbumOrderingModeLabel}
+            resolvedLocation={selectedAssetResolvedLocation}
             inheritedAlbumLocation={selectedAssetInheritedAlbumLocation}
             locationSuggestion={
               selectedAssetLocationSuggestion
                 ? {
-                    label: formatLocation(
-                      selectedAssetLocationSuggestion.city,
-                      selectedAssetLocationSuggestion.state,
-                      selectedAssetLocationSuggestion.country,
-                      selectedAssetLocationSuggestion.locationLabel
-                    ),
+                    label:
+                      formatLocationForDisplay(
+                        selectedAssetLocationSuggestion,
+                        selectedAssetResolvedLocation?.mode ?? globalLocationDisplayMode
+                      ) ?? '—',
                     sourceFilename: selectedAssetLocationSuggestion.sourceFilename,
                     minutesApart: selectedAssetLocationSuggestion.minutesApart
                   }
@@ -13884,6 +13961,20 @@ export default function App() {
                   />
                   Date range
                 </label>
+                <span style={filterSubsectionTitleStyle} title="Albums and photos can override this">
+                  Location Field
+                </span>
+                {locationDisplayModes.map((mode) => (
+                  <label key={mode} style={toggleOptionLabelStyle}>
+                    <input
+                      type="radio"
+                      name="global-location-display-mode"
+                      checked={globalLocationDisplayMode === mode}
+                      onChange={() => setGlobalLocationDisplayMode(mode)}
+                    />
+                    {locationDisplayModeLabels[mode]}
+                  </label>
+                ))}
                 <span style={filterSubsectionTitleStyle}>Photo Badges</span>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -15043,6 +15134,9 @@ export default function App() {
           keywordLabels={(selectedAsset.keywordIds ?? [])
             .map((id) => keywordsById.get(id)?.label ?? null)
             .filter((label): label is string => label !== null)}
+          locationText={
+            resolveAssetLocation(selectedAsset, albumNodesById, singleCheckedAlbumId, globalLocationDisplayMode).text
+          }
           onExit={stopSlideshow}
           onFirst={handleSlideshowFirst}
           onPrevious={() => handleSlideshowRelative(-1)}
@@ -15133,18 +15227,43 @@ export default function App() {
         open={setLocationDialogOpen}
         selectedAssetCount={selectedAssetIds.length}
         existingLocationLabel={
-          selectedAssetIds.length === 1 && selectedAssetForDetails
-            ? (() => {
-                const label = formatLocation(
-                  selectedAssetForDetails.city,
-                  selectedAssetForDetails.state,
-                  selectedAssetForDetails.country,
-                  selectedAssetForDetails.locationLabel
-                );
-                return label === '—' ? null : label;
-              })()
-            : null
+          selectedAssetIds.length === 1 ? (selectedAssetResolvedLocation?.text ?? null) : null
         }
+        currentLocation={selectedAssetIds.length === 1 ? selectedAssetForDetails : null}
+        currentDisplayMode={
+          selectedAssetIds.length === 1 ? (selectedAssetForDetails?.locationDisplayMode ?? null) : null
+        }
+        currentCustomLabel={
+          selectedAssetIds.length === 1 ? (selectedAssetForDetails?.customLocationLabel ?? null) : null
+        }
+        {...(() => {
+          // What "Default" means here: the album choice for this photo (or, for a
+          // multi-selection, the album being viewed), else the global one.
+          const albumIds =
+            selectedAssetIds.length === 1
+              ? (selectedAssetForDetails?.albumIds ?? [])
+              : singleCheckedAlbumId
+                ? [singleCheckedAlbumId]
+                : [];
+          const mode = resolveInheritedLocationDisplayMode(
+            { albumIds },
+            albumNodesById,
+            singleCheckedAlbumId,
+            globalLocationDisplayMode
+          );
+          // Same precedence as the resolver: the album being viewed first.
+          const candidateAlbumIds =
+            singleCheckedAlbumId && albumIds.includes(singleCheckedAlbumId)
+              ? [singleCheckedAlbumId, ...albumIds]
+              : albumIds;
+          const sourceAlbum = candidateAlbumIds
+            .map((albumId) => albumNodesById.get(albumId))
+            .find((album) => album?.locationDisplayMode != null);
+          return {
+            inheritedDisplayMode: mode,
+            inheritedDisplaySource: sourceAlbum ? `album "${sourceAlbum.label}"` : 'global'
+          };
+        })()}
         onClose={() => setSetLocationDialogOpen(false)}
         onSave={handleSaveLocation}
       />
@@ -15300,25 +15419,29 @@ export default function App() {
         albumLabel={defaultLocationAlbum?.label ?? ''}
         existingLocationLabel={
           defaultLocationAlbum
-            ? (() => {
-                const label = formatLocation(
-                  defaultLocationAlbum.defaultCity,
-                  defaultLocationAlbum.defaultState,
-                  defaultLocationAlbum.defaultCountry,
-                  defaultLocationAlbum.defaultLocationLabel
-                );
-                return label === '—' ? null : label;
-              })()
+            ? formatAlbumDefaultLocation(
+                defaultLocationAlbum,
+                defaultLocationAlbum.locationDisplayMode ?? globalLocationDisplayMode
+              )
             : null
         }
         onClose={() => setDefaultLocationAlbum(null)}
         onSave={handleSaveAlbumDefaultLocation}
+      />
+      <AlbumLocationDisplayDialog
+        open={locationDisplayAlbum !== null}
+        albumLabel={locationDisplayAlbum?.label ?? ''}
+        currentMode={locationDisplayAlbum?.locationDisplayMode ?? null}
+        globalMode={globalLocationDisplayMode}
+        onClose={() => setLocationDisplayAlbum(null)}
+        onSave={handleSaveAlbumLocationDisplay}
       />
       {fillMissingLocationsAlbum ? (
         <FillMissingLocationsDialog
           open={fillMissingLocationsAlbum !== null}
           albumId={fillMissingLocationsAlbum.id}
           albumLabel={fillMissingLocationsAlbum.label}
+          locationDisplayMode={fillMissingLocationsAlbum.locationDisplayMode ?? globalLocationDisplayMode}
           onClose={() => setFillMissingLocationsAlbum(null)}
           onApplied={() => void loadAssets({ showLoading: false, preserveCachedFirstPage: false })}
         />

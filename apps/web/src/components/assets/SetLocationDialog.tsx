@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import { locationDisplayModes, type AssetLocationDisplayMode, type LocationDisplayMode } from '@tedography/domain';
 import { autocompletePlace, getPlaceDetails, type PlacePrediction } from '../../api/geocodeApi';
+import {
+  formatLocationForDisplay,
+  locationDisplayModeLabels,
+  type LocationDisplayFields
+} from '../../utilities/locationDisplay';
 
 type LocationMode = 'set' | 'clear';
 
+// 'unchanged' (multi-select only) leaves each photo's own choice alone;
+// 'default' follows the album / global choice.
+type DisplayChoice = 'unchanged' | 'default' | AssetLocationDisplayMode;
+
 export interface ResolvedLocationSelection {
+  placeName: string | null;
   locationLabel: string;
   city: string | null;
   state: string | null;
@@ -12,13 +23,28 @@ export interface ResolvedLocationSelection {
   locationLongitude: number | null;
 }
 
+export interface SetLocationSaveInput {
+  /** The place picked from search, or null to keep each photo's stored place. */
+  place: ResolvedLocationSelection | null;
+  /** Omitted to leave each photo's display choice as it is; mode null = follow the album / global default. */
+  display?: { mode: AssetLocationDisplayMode | null; customLocationLabel: string | null };
+}
+
 interface SetLocationDialogProps {
   open: boolean;
   selectedAssetCount: number;
   /** Formatted display string for the current location, when editing a single asset that already has one. */
   existingLocationLabel?: string | null;
+  /** Single photo only: its stored location, used to preview each display option. */
+  currentLocation?: LocationDisplayFields | null;
+  /** Single photo only: its own display choice (null = follows the default). */
+  currentDisplayMode?: AssetLocationDisplayMode | null;
+  currentCustomLabel?: string | null;
+  /** What "default" means for these photos, and where it comes from (e.g. 'album "Big Sur"'). */
+  inheritedDisplayMode: LocationDisplayMode;
+  inheritedDisplaySource: string;
   onClose: () => void;
-  onSave: (input: { clear: true } | ResolvedLocationSelection) => Promise<void>;
+  onSave: (input: { clear: true } | SetLocationSaveInput) => Promise<void>;
 }
 
 const overlayStyle: CSSProperties = {
@@ -33,8 +59,8 @@ const overlayStyle: CSSProperties = {
 };
 
 const dialogStyle: CSSProperties = {
-  width: 'min(480px, 92vw)',
-  maxHeight: 'min(640px, 90vh)',
+  width: 'min(520px, 92vw)',
+  maxHeight: 'min(760px, 92vh)',
   borderRadius: '12px',
   border: '1px solid #d8d8d8',
   backgroundColor: '#fff',
@@ -133,6 +159,27 @@ const suggestionRowStyle: CSSProperties = {
   borderBottom: '1px solid #f0f0f0'
 };
 
+const sectionTitleStyle: CSSProperties = {
+  margin: '6px 0 0 0',
+  fontSize: '13px',
+  fontWeight: 600,
+  color: '#333'
+};
+
+const displayOptionStyle: CSSProperties = {
+  ...radioOptionStyle,
+  alignItems: 'center'
+};
+
+const displayPreviewStyle: CSSProperties = {
+  fontSize: '12px',
+  color: '#6b7280',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  minWidth: 0
+};
+
 const selectedPlaceBoxStyle: CSSProperties = {
   border: '1px solid #bfdbfe',
   backgroundColor: '#eff6ff',
@@ -150,6 +197,11 @@ export function SetLocationDialog({
   open,
   selectedAssetCount,
   existingLocationLabel = null,
+  currentLocation = null,
+  currentDisplayMode = null,
+  currentCustomLabel = null,
+  inheritedDisplayMode,
+  inheritedDisplaySource,
   onClose,
   onSave
 }: SetLocationDialogProps): ReactElement | null {
@@ -161,9 +213,13 @@ export function SetLocationDialog({
   const [resolvingPlace, setResolvingPlace] = useState(false);
   const [savePending, setSavePending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [displayChoice, setDisplayChoice] = useState<DisplayChoice>('default');
+  const [customText, setCustomText] = useState('');
   const sessionTokenRef = useRef<string>('');
 
   const isMultiSelect = selectedAssetCount > 1;
+  const initialDisplayChoice: DisplayChoice = isMultiSelect ? 'unchanged' : (currentDisplayMode ?? 'default');
+  const initialCustomText = isMultiSelect ? '' : (currentCustomLabel ?? '');
 
   useEffect(() => {
     if (!open) {
@@ -177,6 +233,10 @@ export function SetLocationDialog({
     setSelectedPlace(null);
     setSavePending(false);
     setSaveError(null);
+    setDisplayChoice(initialDisplayChoice);
+    setCustomText(initialCustomText);
+    // Reset only when the dialog opens; the initial values are read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Debounced autocomplete search as the user types.
@@ -215,10 +275,10 @@ export function SetLocationDialog({
 
   const helperText = useMemo(() => {
     if (selectedAssetCount === 1) {
-      return 'Search for a place and select a match to update the location for this photo.';
+      return 'Search for a place, choose what the Location field shows, or both.';
     }
 
-    return `Search for a place and select a match to apply to all ${selectedAssetCount} selected photos.`;
+    return `Search for a place, choose what the Location field shows, or both — applies to all ${selectedAssetCount} selected photos.`;
   }, [selectedAssetCount]);
 
   if (!open) {
@@ -231,6 +291,7 @@ export function SetLocationDialog({
     try {
       const details = await getPlaceDetails(prediction.placeId, sessionTokenRef.current);
       setSelectedPlace({
+        placeName: details.placeName,
         locationLabel: details.formattedAddress ?? prediction.description,
         city: details.city,
         state: details.state,
@@ -255,7 +316,39 @@ export function SetLocationDialog({
     }
   }
 
-  const canSave = !savePending && (mode === 'clear' || selectedPlace !== null);
+  const previewFields: LocationDisplayFields | null = selectedPlace ?? currentLocation;
+  const previewFor = (displayMode: LocationDisplayMode): string | null =>
+    previewFields ? formatLocationForDisplay(previewFields, displayMode) : null;
+
+  function handleChooseCustom(): void {
+    setDisplayChoice('custom');
+    if (customText.trim().length === 0) {
+      // Start from the text picked in search (or what's shown now) so it can be edited.
+      setCustomText(selectedPlace ? query : (existingLocationLabel ?? ''));
+    }
+  }
+
+  const displayChanged =
+    displayChoice !== initialDisplayChoice ||
+    (displayChoice === 'custom' && customText.trim() !== initialCustomText.trim());
+  const customTextValid = displayChoice !== 'custom' || customText.trim().length > 0;
+  const canSave =
+    !savePending && (mode === 'clear' || ((selectedPlace !== null || displayChanged) && customTextValid));
+
+  function renderDisplayOption(choice: DisplayChoice, label: string, preview: string | null): ReactElement {
+    return (
+      <label key={choice} style={displayOptionStyle}>
+        <input
+          type="radio"
+          name="location-display"
+          checked={displayChoice === choice}
+          onChange={() => setDisplayChoice(choice)}
+        />
+        <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+        {preview ? <span style={displayPreviewStyle}>{preview}</span> : null}
+      </label>
+    );
+  }
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -309,7 +402,12 @@ export function SetLocationDialog({
 
               {selectedPlace ? (
                 <div style={selectedPlaceBoxStyle}>
-                  <strong style={{ fontSize: '13px', color: '#1d4ed8' }}>{selectedPlace.locationLabel}</strong>
+                  <strong style={{ fontSize: '13px', color: '#1d4ed8' }}>
+                    {selectedPlace.placeName ?? selectedPlace.locationLabel}
+                  </strong>
+                  {selectedPlace.placeName && selectedPlace.placeName !== selectedPlace.locationLabel ? (
+                    <span style={{ fontSize: '12px', color: '#374151' }}>{selectedPlace.locationLabel}</span>
+                  ) : null}
                   {joinPlace(selectedPlace.city, selectedPlace.state, selectedPlace.country) ? (
                     <span style={{ fontSize: '12px', color: '#374151' }}>
                       {joinPlace(selectedPlace.city, selectedPlace.state, selectedPlace.country)}
@@ -338,11 +436,43 @@ export function SetLocationDialog({
                 <p style={helperTextStyle}>{resolvingPlace ? 'Resolving place…' : 'Searching…'}</p>
               ) : null}
 
-              {isMultiSelect ? (
+              {isMultiSelect && selectedPlace ? (
                 <p style={helperTextStyle}>
                   Applies to all {selectedAssetCount} selected photos. Each photo gets the same place.
                 </p>
               ) : null}
+
+              <p style={sectionTitleStyle}>Show in Location field</p>
+              <div style={radioGroupStyle}>
+                {isMultiSelect ? renderDisplayOption('unchanged', 'Leave each photo as it is', null) : null}
+                {renderDisplayOption(
+                  'default',
+                  `Default (${inheritedDisplaySource}: ${locationDisplayModeLabels[inheritedDisplayMode]})`,
+                  null
+                )}
+                {locationDisplayModes.map((displayMode) =>
+                  renderDisplayOption(displayMode, locationDisplayModeLabels[displayMode], previewFor(displayMode))
+                )}
+                <label style={displayOptionStyle}>
+                  <input
+                    type="radio"
+                    name="location-display"
+                    checked={displayChoice === 'custom'}
+                    onChange={handleChooseCustom}
+                  />
+                  <span style={{ whiteSpace: 'nowrap' }}>Custom text</span>
+                </label>
+                {displayChoice === 'custom' ? (
+                  <input
+                    type="text"
+                    value={customText}
+                    onChange={(event) => setCustomText(event.target.value)}
+                    placeholder="e.g. Garrapata State Park, Carmel, CA"
+                    style={inputStyle}
+                    autoFocus
+                  />
+                ) : null}
+              </div>
             </>
           ) : (
             <div style={{ display: 'grid', gap: '6px' }}>
@@ -365,7 +495,20 @@ export function SetLocationDialog({
             onClick={() => {
               setSavePending(true);
               setSaveError(null);
-              const input = mode === 'clear' ? ({ clear: true } as const) : (selectedPlace as ResolvedLocationSelection);
+              const input: { clear: true } | SetLocationSaveInput =
+                mode === 'clear'
+                  ? { clear: true }
+                  : {
+                      place: selectedPlace,
+                      ...(displayChanged && displayChoice !== 'unchanged'
+                        ? {
+                            display: {
+                              mode: displayChoice === 'default' ? null : displayChoice,
+                              customLocationLabel: displayChoice === 'custom' ? customText.trim() : null
+                            }
+                          }
+                        : {})
+                    };
               void onSave(input)
                 .catch((error: unknown) => {
                   setSaveError(error instanceof Error ? error.message : 'Failed to update location.');

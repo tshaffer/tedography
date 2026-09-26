@@ -1,3 +1,4 @@
+import type { LocationDisplayMode } from './MediaAsset.js';
 import type { AlbumKeywordAssignmentStatus, AlbumPeopleAssignmentStatus, AlbumReviewAssignmentStatus } from '../enums/KeywordAssignmentStatus.js';
 
 export type AlbumTreeNodeType = 'Group' | 'Album';
@@ -24,6 +25,10 @@ export interface AlbumTreeNode {
   defaultCountry?: string | null;
   defaultLocationLatitude?: number | null;
   defaultLocationLongitude?: number | null;
+  defaultPlaceName?: string | null;
+  // What the Location field shows for this album's photos (and its default
+  // location); null = the global default. A photo's own choice overrides it.
+  locationDisplayMode?: LocationDisplayMode | null;
   createdAt: string;
   updatedAt: string;
 }

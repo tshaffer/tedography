@@ -6,6 +6,7 @@ export interface PlacePrediction {
 }
 
 export interface ResolvedPlace {
+  placeName: string | null;
   formattedAddress: string | null;
   city: string | null;
   state: string | null;

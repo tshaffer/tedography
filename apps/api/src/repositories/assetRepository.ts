@@ -4,6 +4,7 @@ import {
   normalizePhotoState,
   type AssetKeywordAssignmentStatus,
   type CaptureDateTimeSource,
+  type AssetLocationDisplayMode,
   type LocationSource,
   type MediaAssetAlbumMembership,
   type MediaAssetPerson,
@@ -88,6 +89,9 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           city: 1,
           state: 1,
           country: 1,
+          placeName: 1,
+          locationDisplayMode: 1,
+          customLocationLabel: 1,
           importedAt: 1,
           originalFileFormat: 1,
           displayFileFormat: 1,
@@ -147,6 +151,9 @@ export async function getAssetPageForLibrary(input?: {
           city: 1,
           state: 1,
           country: 1,
+          placeName: 1,
+          locationDisplayMode: 1,
+          customLocationLabel: 1,
           importedAt: 1,
           originalFileFormat: 1,
           displayFileFormat: 1,
@@ -335,6 +342,9 @@ export interface CreateMediaAssetInput {
   state: string | null;
   country: string | null;
   locationSource?: LocationSource | null;
+  placeName?: string | null;
+  locationDisplayMode?: AssetLocationDisplayMode | null;
+  customLocationLabel?: string | null;
   importedAt: Date;
   originalStorageRootId: string;
   originalArchivePath: string;
@@ -379,6 +389,9 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     state: input.state,
     country: input.country,
     locationSource: input.locationSource ?? null,
+    placeName: input.placeName ?? null,
+    locationDisplayMode: input.locationDisplayMode ?? null,
+    customLocationLabel: input.customLocationLabel ?? null,
     importedAt: input.importedAt.toISOString(),
     originalStorageRootId: input.originalStorageRootId,
     originalArchivePath: input.originalArchivePath,
@@ -491,6 +504,7 @@ export async function updateCaptureDateTimes(
 }
 
 export interface LocationUpdateFields {
+  placeName: string | null;
   locationLabel: string | null;
   city: string | null;
   state: string | null;
@@ -513,13 +527,40 @@ export async function updateAssetsLocation(
     { id: { $in: normalizedAssetIds } },
     {
       $set: {
+        placeName: location?.placeName ?? null,
         locationLabel: location?.locationLabel ?? null,
         city: location?.city ?? null,
         state: location?.state ?? null,
         country: location?.country ?? null,
         locationLatitude: location?.locationLatitude ?? null,
         locationLongitude: location?.locationLongitude ?? null,
-        locationSource: location ? source : null
+        locationSource: location ? source : null,
+        // Clearing a location clears what the Location field shows, too.
+        ...(location ? {} : { locationDisplayMode: null, customLocationLabel: null })
+      }
+    },
+    { runValidators: true }
+  );
+
+  return findByIds(normalizedAssetIds);
+}
+
+export async function updateAssetsLocationDisplay(
+  assetIds: string[],
+  displayMode: AssetLocationDisplayMode | null,
+  customLocationLabel: string | null
+): Promise<MediaAsset[]> {
+  const normalizedAssetIds = [...new Set(assetIds.map((assetId) => assetId.trim()).filter(Boolean))];
+  if (normalizedAssetIds.length === 0) {
+    return [];
+  }
+
+  await MediaAssetModel.updateMany(
+    { id: { $in: normalizedAssetIds } },
+    {
+      $set: {
+        locationDisplayMode: displayMode,
+        customLocationLabel: displayMode === 'custom' ? customLocationLabel : null
       }
     },
     { runValidators: true }

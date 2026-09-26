@@ -2,6 +2,7 @@ export interface LocationSuggestion {
   sourceAssetId: string;
   sourceFilename: string;
   minutesApart: number | null;
+  placeName: string | null;
   locationLabel: string | null;
   city: string | null;
   state: string | null;

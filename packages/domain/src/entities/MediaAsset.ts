@@ -33,6 +33,21 @@ export type CaptureDateTimeSource =
  */
 export type LocationSource = 'exif' | 'manual' | 'inherited' | 'none';
 
+/**
+ * Which piece of a location the Location field shows. Set per album (applies
+ * to its photos) or globally; a photo can override with its own choice.
+ * - 'placeName': the place's name, e.g. "Garrapata State Park"
+ * - 'placeNameAndCity': e.g. "Garrapata State Park, Carmel, California"
+ * - 'address': the full address/label, e.g. "34500 CA-1, Carmel, CA 93923, USA"
+ * - 'cityStateCountry': e.g. "Carmel, California, United States"
+ */
+export const locationDisplayModes = ['placeName', 'placeNameAndCity', 'address', 'cityStateCountry'] as const;
+export type LocationDisplayMode = (typeof locationDisplayModes)[number];
+
+/** A photo's own display choice: one of the album-level modes, or its own custom text. */
+export const assetLocationDisplayModes = [...locationDisplayModes, 'custom'] as const;
+export type AssetLocationDisplayMode = (typeof assetLocationDisplayModes)[number];
+
 export interface MediaAssetAlbumMembership {
   albumId: string;
   // Legacy two-bucket ordering (pre-interleaving); still used as a fallback
@@ -129,6 +144,15 @@ export interface MediaAsset {
   state?: string | null;
   country?: string | null;
   locationSource?: LocationSource | null;
+  // Name of the place (Google Places displayName), e.g. "Garrapata State Park".
+  // Set only by the Set Location dialog; null for EXIF/Nominatim locations.
+  placeName?: string | null;
+  // Per-photo override of what the Location field shows; null = use the
+  // album's (or the global) LocationDisplayMode.
+  locationDisplayMode?: AssetLocationDisplayMode | null;
+  // Free text shown when locationDisplayMode is 'custom'. Independent of the
+  // stored place, and may be set on a photo with no place at all.
+  customLocationLabel?: string | null;
 
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.

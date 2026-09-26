@@ -15,6 +15,12 @@ interface AssetDetailsPanelProps {
   asset: MediaAsset | null;
   albumLabels?: string[];
   albumOrderingModeLabel?: string | null;
+  /**
+   * What the Location field shows for this photo, already resolved against its
+   * own / album / global display choice. text is null when the photo has no
+   * location of its own. Falls back to formatLocation when omitted.
+   */
+  resolvedLocation?: { text: string | null; isCustom: boolean } | null;
   /** Set when the asset has no location of its own but a containing album does. */
   inheritedAlbumLocation?: { label: string; albumLabel: string } | null;
   /** Set when the asset has no location (own or inherited) and a nearby sibling suggests one. */
@@ -335,6 +341,7 @@ export function AssetDetailsPanel({
   asset,
   albumLabels = [],
   albumOrderingModeLabel = null,
+  resolvedLocation = null,
   inheritedAlbumLocation = null,
   locationSuggestion = null,
   onApplyLocationSuggestion,
@@ -710,7 +717,9 @@ export function AssetDetailsPanel({
       {/* Location */}
       <div style={subSectionStyle}>
         {(() => {
-          const ownLocation = formatLocation(asset.city, asset.state, asset.country, asset.locationLabel);
+          const ownLocation = resolvedLocation
+            ? (resolvedLocation.text ?? '—')
+            : formatLocation(asset.city, asset.state, asset.country, asset.locationLabel);
           const hasOwnLocation = ownLocation !== '—';
           const showSuggestion = !hasOwnLocation && !inheritedAlbumLocation && locationSuggestion;
 
@@ -722,7 +731,11 @@ export function AssetDetailsPanel({
                   {hasOwnLocation ? (
                     <>
                       {ownLocation}
-                      {asset.locationSource === 'manual' ? (
+                      {resolvedLocation?.isCustom ? (
+                        <span style={locationBadgeStyle} title="Custom text you entered — shown instead of the place's own name or address">
+                          ● Custom
+                        </span>
+                      ) : asset.locationSource === 'manual' ? (
                         <span style={locationBadgeStyle} title="Set manually — won't be overwritten by re-import or backfill">
                           ● Manual
                         </span>
