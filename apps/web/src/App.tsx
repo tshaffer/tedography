@@ -7839,11 +7839,18 @@ export default function App() {
       }
 
       const updatedAsset = (await response.json()) as MediaAsset;
+      const previousPhotoState = assets.find((asset) => asset.id === assetId)?.photoState;
       setAssets((previous) =>
         previous.map((asset) => (asset.id === updatedAsset.id ? updatedAsset : asset))
       );
       if (selectedAssetId === updatedAsset.id) {
         setSelectedAssetDetails(updatedAsset);
+      }
+      // Album count badges exclude Discard, so entering or leaving Discard
+      // changes them.
+      if (previousPhotoState !== updatedAsset.photoState &&
+        (previousPhotoState === PhotoState.Discard || updatedAsset.photoState === PhotoState.Discard)) {
+        void loadAlbumAssetCounts();
       }
 
       const remainsVisibleAfterUpdate = (() => {
@@ -7962,9 +7969,22 @@ export default function App() {
       const updatedAssets = (await response.json()) as MediaAsset[];
 
       const updatesById = new Map(updatedAssets.map((asset) => [asset.id, asset]));
+      const crossesDiscardBoundary = assets.some((asset) => {
+        const updated = updatesById.get(asset.id);
+        return (
+          updated !== undefined &&
+          updated.photoState !== asset.photoState &&
+          (asset.photoState === PhotoState.Discard || updated.photoState === PhotoState.Discard)
+        );
+      });
       setAssets((previous) =>
         previous.map((asset) => updatesById.get(asset.id) ?? asset)
       );
+      // Album count badges exclude Discard, so entering or leaving Discard
+      // changes them.
+      if (crossesDiscardBoundary) {
+        void loadAlbumAssetCounts();
+      }
     } catch (error: unknown) {
       setUpdateError(error instanceof Error ? error.message : 'Failed to update selected assets');
     } finally {
