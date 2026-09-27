@@ -66,6 +66,10 @@ const mediaAssetSchema = new Schema<MediaAsset>(
     thumbnailDerivedPath: { type: String, required: false, trim: true },
     thumbnailFileFormat: { type: String, required: false, trim: true },
     thumbnailUrl: { type: String, required: false, trim: true },
+    linkedAudioStorageRootId: { type: String, required: false, trim: true, default: null },
+    linkedAudioArchivePath: { type: String, required: false, trim: true, default: null },
+    linkedAudioFileFormat: { type: String, required: false, trim: true, default: null },
+    linkedAudioDurationSeconds: { type: Number, required: false, default: null },
     albumIds: {
       type: [String],
       required: true,

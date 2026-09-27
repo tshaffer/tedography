@@ -365,6 +365,10 @@ export interface CreateMediaAssetInput {
   albumMemberships?: MediaAssetAlbumMembership[];
   sourceAssetId?: string | null;
   editMethod?: 'ai' | 'manual';
+  linkedAudioStorageRootId?: string | null;
+  linkedAudioArchivePath?: string | null;
+  linkedAudioFileFormat?: string | null;
+  linkedAudioDurationSeconds?: number | null;
 }
 
 export async function createMediaAsset(input: CreateMediaAssetInput): Promise<MediaAsset> {
@@ -409,6 +413,10 @@ export async function createMediaAsset(input: CreateMediaAssetInput): Promise<Me
     people: [],
     ...(input.sourceAssetId != null && { sourceAssetId: input.sourceAssetId }),
     ...(input.editMethod != null && { editMethod: input.editMethod }),
+    ...(input.linkedAudioStorageRootId != null && { linkedAudioStorageRootId: input.linkedAudioStorageRootId }),
+    ...(input.linkedAudioArchivePath != null && { linkedAudioArchivePath: input.linkedAudioArchivePath }),
+    ...(input.linkedAudioFileFormat != null && { linkedAudioFileFormat: input.linkedAudioFileFormat }),
+    ...(input.linkedAudioDurationSeconds != null && { linkedAudioDurationSeconds: input.linkedAudioDurationSeconds }),
   };
 
   if (input.thumbnailStorageType) {

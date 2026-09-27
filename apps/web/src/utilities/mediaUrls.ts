@@ -18,6 +18,10 @@ export function getOriginalMediaUrl(assetId: string, version?: string | null): s
   return appendVersion(`/api/media/original/${encodeURIComponent(assetId)}`, version);
 }
 
+export function getLinkedAudioMediaUrl(assetId: string, version?: string | null): string {
+  return appendVersion(`/api/media/audio/${encodeURIComponent(assetId)}`, version);
+}
+
 export function getFaceDetectionPreviewUrl(detectionId: string): string {
   return `/api/people-pipeline/detections/${encodeURIComponent(detectionId)}/preview`;
 }

@@ -8,6 +8,10 @@ import { type DiscoveredFile, walkImportFiles } from './importFileWalker.js';
 import { getStorageRootById, getStorageRoots } from './storageRoots.js';
 import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
+import {
+  findLoudPhotoCaptureMatch,
+  getLoudPhotoCaptureConsumedRelativePaths
+} from './loudPhotoCapture.js';
 
 export type ScanErrorCode = 'INVALID_INPUT' | 'NOT_FOUND' | 'UNAVAILABLE';
 
@@ -30,6 +34,8 @@ type SupportedScannedFile = {
   locationLatitude: number | null;
   locationLongitude: number | null;
   requiresDerivedDisplayFile: boolean;
+  hasLinkedAudio: boolean;
+  linkedAudioDurationSeconds: number | null;
 };
 
 function resolveStatus(input: {
@@ -107,6 +113,7 @@ export async function scanImportTarget(input: {
   });
 
   const supportedFileMap = new Map<string, SupportedScannedFile>();
+  const consumedByLoudPhotoCapture = new Set<string>();
 
   for (const discoveredFile of walkResult.files) {
     const mediaSupport = getMediaSupport(discoveredFile.filename);
@@ -123,6 +130,20 @@ export async function scanImportTarget(input: {
       originalFileFormat: getOriginalFileFormat(mediaSupport.extension)
     });
 
+    const loudPhotoMatch = await findLoudPhotoCaptureMatch({
+      photoAbsolutePath: discoveredFile.absolutePath,
+      photoRelativePath: discoveredFile.relativePath
+    });
+
+    if (loudPhotoMatch) {
+      for (const consumedPath of getLoudPhotoCaptureConsumedRelativePaths({
+        photoRelativePath: discoveredFile.relativePath,
+        audioRelativePath: loudPhotoMatch.audioRelativePath
+      })) {
+        consumedByLoudPhotoCapture.add(consumedPath);
+      }
+    }
+
     supportedFileMap.set(discoveredFile.relativePath, {
       discovered: discoveredFile,
       contentHash,
@@ -132,11 +153,17 @@ export async function scanImportTarget(input: {
       locationLabel: metadata.locationLabel,
       locationLatitude: metadata.locationLatitude,
       locationLongitude: metadata.locationLongitude,
-      requiresDerivedDisplayFile: displayPlan.requiresDerivedDisplayFile
+      requiresDerivedDisplayFile: displayPlan.requiresDerivedDisplayFile,
+      hasLinkedAudio: loudPhotoMatch !== null,
+      linkedAudioDurationSeconds: loudPhotoMatch?.audioDurationSeconds ?? null
     });
   }
 
-  const archivePaths = walkResult.files.map((file) => file.relativePath);
+  const nonConsumedFiles = walkResult.files.filter(
+    (file) => !consumedByLoudPhotoCapture.has(file.relativePath)
+  );
+
+  const archivePaths = nonConsumedFiles.map((file) => file.relativePath);
   const existingByPath = await findByOriginalStorageRootAndArchivePaths(root.id, archivePaths);
 
   const existingByPathMap = new Map<string, string>();
@@ -144,7 +171,7 @@ export async function scanImportTarget(input: {
     existingByPathMap.set(existingAsset.originalArchivePath, existingAsset.id);
   }
 
-  const files: ScannedCandidateFileDto[] = walkResult.files.map((discoveredFile) => {
+  const files: ScannedCandidateFileDto[] = nonConsumedFiles.map((discoveredFile) => {
     const mediaSupport = getMediaSupport(discoveredFile.filename);
     const supported = supportedFileMap.get(discoveredFile.relativePath);
     const existingAssetIdByPath = existingByPathMap.get(discoveredFile.relativePath);
@@ -176,7 +203,9 @@ export async function scanImportTarget(input: {
             locationLatitude: supported?.locationLatitude ?? null,
             locationLongitude: supported?.locationLongitude ?? null,
             contentHash: supported?.contentHash ?? null,
-            requiresDerivedDisplayFile: supported?.requiresDerivedDisplayFile ?? false
+            requiresDerivedDisplayFile: supported?.requiresDerivedDisplayFile ?? false,
+            hasLinkedAudio: supported?.hasLinkedAudio ?? false,
+            linkedAudioDurationSeconds: supported?.linkedAudioDurationSeconds ?? null
           }
         : {
             captureDateTime: null,
@@ -186,7 +215,9 @@ export async function scanImportTarget(input: {
             locationLatitude: null,
             locationLongitude: null,
             contentHash: null,
-            requiresDerivedDisplayFile: false
+            requiresDerivedDisplayFile: false,
+            hasLinkedAudio: false,
+            linkedAudioDurationSeconds: null
           })
     };
   });

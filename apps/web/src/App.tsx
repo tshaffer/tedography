@@ -58,6 +58,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BrushIcon from '@mui/icons-material/Brush';
 import StarIcon from '@mui/icons-material/Star';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -3452,6 +3453,18 @@ function AssetCard({
               title={`Rating: ${asset.rating} star${asset.rating !== 1 ? 's' : ''}`}
             >
               <span style={{ ...cardBadgeIconStyle, fontWeight: 700 }}>{asset.rating}</span>
+            </span>
+          ) : null}
+          {typeof asset.linkedAudioArchivePath === 'string' && asset.linkedAudioArchivePath.length > 0 ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#ea580c' }}
+              title={
+                typeof asset.linkedAudioDurationSeconds === 'number'
+                  ? `Has linked audio (${Math.round(asset.linkedAudioDurationSeconds)}s)`
+                  : 'Has linked audio'
+              }
+            >
+              <VolumeUpIcon style={cardBadgeIconStyle} />
             </span>
           ) : null}
         </span>

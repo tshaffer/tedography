@@ -9,6 +9,7 @@ import TextField from '@mui/material/TextField';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import FaceIcon from '@mui/icons-material/Face';
 import { listPeople } from '../../api/peoplePipelineApi';
+import { getLinkedAudioMediaUrl } from '../../utilities/mediaUrls';
 import { StarRatingControl } from './StarRatingControl';
 
 interface AssetDetailsPanelProps {
@@ -648,6 +649,23 @@ export function AssetDetailsPanel({
           ) : (
             <p style={{ fontSize: '12px', margin: 0, whiteSpace: 'pre-wrap' }}>{editQueueEntry.note}</p>
           )}
+        </section>
+      ) : null}
+
+      {/* Linked Audio (LoudPhoto-style capture) */}
+      {typeof asset.linkedAudioArchivePath === 'string' && asset.linkedAudioArchivePath.length > 0 ? (
+        <section style={subSectionStyle}>
+          <h4 style={subSectionTitleStyle}>
+            Audio
+            {typeof asset.linkedAudioDurationSeconds === 'number'
+              ? ` (${Math.round(asset.linkedAudioDurationSeconds)}s)`
+              : ''}
+          </h4>
+          <audio
+            controls
+            style={{ width: '100%', height: '32px' }}
+            src={getLinkedAudioMediaUrl(asset.id, asset.originalContentHash)}
+          />
         </section>
       ) : null}
 

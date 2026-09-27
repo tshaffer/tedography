@@ -85,6 +85,12 @@ export interface ScannedCandidateFileDto {
   locationLongitude?: number | null;
   contentHash?: string | null;
   requiresDerivedDisplayFile?: boolean;
+  // Set when this photo has a matched LoudPhoto-style linked audio capture
+  // sitting alongside it (same basename, a companion .json + audio file).
+  // The audio/metadata files themselves are excluded from `files` — they
+  // aren't independently importable, they ride along with the photo.
+  hasLinkedAudio?: boolean;
+  linkedAudioDurationSeconds?: number | null;
 }
 
 export interface ScanImportResponse {

@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { MediaType, type ImportApiErrorResponse } from '@tedography/domain';
 import {
   resolveDisplayAbsolutePathForAsset,
+  resolveLinkedAudioAbsolutePathForAsset,
   resolveOriginalAbsolutePathForAsset,
   resolveThumbnailAbsolutePathForAsset
 } from '../media/resolveAssetMediaPath.js';
@@ -26,6 +27,10 @@ function getContentTypeForFile(absolutePath: string): string {
 
   if (extension === '.heic') {
     return 'image/heic';
+  }
+
+  if (extension === '.m4a') {
+    return 'audio/mp4';
   }
 
   return 'application/octet-stream';
@@ -133,6 +138,37 @@ mediaRoutes.get('/original/:assetId', async (req, res) => {
     await sendResolvedFile(res, absolutePath, 'public, max-age=86400');
   } catch (error) {
     log.error('Failed to resolve original media path', error);
+    const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
+    res.status(404).json(errorResponse);
+  }
+});
+
+mediaRoutes.get('/audio/:assetId', async (req, res) => {
+  const assetId = req.params.assetId?.trim();
+  if (!assetId) {
+    const errorResponse: ImportApiErrorResponse = { error: 'assetId is required' };
+    res.status(400).json(errorResponse);
+    return;
+  }
+
+  const asset = await findById(assetId);
+  if (!asset) {
+    const errorResponse: ImportApiErrorResponse = { error: 'Asset not found' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  const absolutePath = resolveLinkedAudioAbsolutePathForAsset(asset);
+  if (!absolutePath) {
+    const errorResponse: ImportApiErrorResponse = { error: 'Asset has no linked audio' };
+    res.status(404).json(errorResponse);
+    return;
+  }
+
+  try {
+    await sendResolvedFile(res, absolutePath, 'public, max-age=86400');
+  } catch (error) {
+    log.error('Failed to resolve linked audio media path', error);
     const errorResponse: ImportApiErrorResponse = { error: 'File not found' };
     res.status(404).json(errorResponse);
   }

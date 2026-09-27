@@ -74,6 +74,19 @@ export function resolveDisplayAbsolutePathForAsset(asset: MediaAsset): string {
   throw new AssetMediaPathResolutionError('Asset does not contain a resolvable display file reference');
 }
 
+export function resolveLinkedAudioAbsolutePathForAsset(asset: MediaAsset): string | null {
+  if (
+    typeof asset.linkedAudioStorageRootId !== 'string' ||
+    asset.linkedAudioStorageRootId.length === 0 ||
+    typeof asset.linkedAudioArchivePath !== 'string' ||
+    asset.linkedAudioArchivePath.length === 0
+  ) {
+    return null;
+  }
+
+  return resolveArchiveAbsolutePath(asset.linkedAudioStorageRootId, asset.linkedAudioArchivePath);
+}
+
 export function resolveThumbnailAbsolutePathForAsset(asset: MediaAsset): string | null {
   if (asset.thumbnailStorageType !== 'derived-root') {
     return null;

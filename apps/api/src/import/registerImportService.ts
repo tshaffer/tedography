@@ -26,6 +26,7 @@ import {
 import { getStorageRootById, getStorageRoots } from './storageRoots.js';
 import { normalizeRelativePath, resolveSafeAbsolutePath } from './storagePathUtils.js';
 import { getMediaSupport } from './supportedMedia.js';
+import { findLoudPhotoCaptureMatch } from './loudPhotoCapture.js';
 import { generateJpegThumbnail } from './thumbnailGeneration.js';
 import { schedulePeoplePipelineForAsset } from '../people/peoplePipelineService.js';
 
@@ -294,6 +295,14 @@ export async function registerImportedFiles(input: {
       const sidecar = await readAiSidecar(absolutePath);
       const sourceAsset = sidecar ? await findById(sidecar.sourceAssetId) : null;
 
+      const loudPhotoMatch =
+        mediaSupport.mediaType === MediaType.Photo
+          ? await findLoudPhotoCaptureMatch({
+              photoAbsolutePath: absolutePath,
+              photoRelativePath: normalizedRelativePath
+            })
+          : null;
+
       const createdAsset = await createMediaAsset({
         filename: normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
         mediaType: mediaSupport.mediaType === 'Unknown' ? MediaType.Photo : mediaSupport.mediaType,
@@ -348,7 +357,11 @@ export async function registerImportedFiles(input: {
         thumbnailStorageType,
         thumbnailDerivedPath,
         thumbnailFileFormat,
-        thumbnailUrl
+        thumbnailUrl,
+        linkedAudioStorageRootId: loudPhotoMatch ? root.id : null,
+        linkedAudioArchivePath: loudPhotoMatch?.audioRelativePath ?? null,
+        linkedAudioFileFormat: loudPhotoMatch?.audioFileFormat ?? null,
+        linkedAudioDurationSeconds: loudPhotoMatch?.audioDurationSeconds ?? null
       });
 
       existingByPathMap.set(normalizedRelativePath, createdAsset);

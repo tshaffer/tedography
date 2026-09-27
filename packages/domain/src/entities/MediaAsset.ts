@@ -154,6 +154,15 @@ export interface MediaAsset {
   // stored place, and may be set on a photo with no place at all.
   customLocationLabel?: string | null;
 
+  // Linked audio companion — a LoudPhoto-style capture where audio was
+  // recorded starting the instant the photo was taken. Stored archive-root
+  // like most originals; unlike HEIC/RAW, it needs no derived/converted
+  // form, just playback as-is. Absent on ordinary photos.
+  linkedAudioStorageRootId?: string | null;
+  linkedAudioArchivePath?: string | null;
+  linkedAudioFileFormat?: string | null;
+  linkedAudioDurationSeconds?: number | null;
+
   // Temporary compatibility fields while API/frontend finish migrating
   // away from the previous single-file reference naming.
   storageRootId?: string;
