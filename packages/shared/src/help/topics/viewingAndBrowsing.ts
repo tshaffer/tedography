@@ -5,7 +5,7 @@ export const viewingAndBrowsing: HelpTopic = {
   title: 'Viewing and Browsing',
   category: 'Basics',
   order: 4,
-  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges'],
+  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges', 'audio', 'loudphoto', 'linked audio'],
   body: `**Browse modes** (⋯ → Browse Mode):
 
 - **Timeline** (default) — photos grouped by capture month with sticky headers; best for a chronological view.
@@ -14,13 +14,13 @@ export const viewingAndBrowsing: HelpTopic = {
 
 **Viewing modes** (toolbar): **Grid** (thumbnail grid, default), **Loupe** (single photo, full size, arrow-key navigation), **Filmstrip** (Loupe plus a thumbnail strip), **Survey** (side-by-side comparison of selected photos), **Slideshow** (full-screen auto-advance).
 
-In Grid and Loupe, the **Inspector** panel (right side) shows metadata: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset actions. Double-click a photo, or press Enter/Space, to open the **Immersive** full-screen overlay; Escape closes it.
+In Grid and Loupe, the **Inspector** panel (right side) shows metadata: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset actions. Double-click a photo, or press Enter/Space, to open the **Immersive** full-screen overlay; Escape closes it. If the photo has a linked audio recording (a LoudPhoto capture), the Inspector also shows an **Audio** section with an inline player.
 
 **Selection:** single click selects; Cmd/Ctrl+click toggles; Shift+click range-selects; Cmd+A/Ctrl+A selects all visible; drag-select works across the grid; long-press enters touch multi-select on mobile.
 
 **Timeline navigation:** the left sidebar shows a year/month navigator — click a month to scroll to that section. **Thumbnail size** is adjustable in Timeline and Albums modes (⋯ → Thumbnail Size) and persists across sessions.
 
-**Thumbnail badges** (toggle individually under ⋯ → Badges): state color, keyword present, Edit Queue status, edited-import / has-edited-version with a method icon (sparkle = AI, brush = manual), rating stars, and confirmed people present.
+**Thumbnail badges** (toggle individually under ⋯ → Badges): state color, keyword present, Edit Queue status, edited-import / has-edited-version with a method icon (sparkle = AI, brush = manual), rating stars, and confirmed people present. A **linked audio badge** (orange speaker icon) also appears on any photo with a linked audio recording — always shown when applicable, not part of the toggle list.
 
 **Slideshow** (⋯ → Slideshow): play/pause, next/prev, skip to first/last, adjustable speed, loop, shuffle, an info overlay (title/date/location/people/keywords), and a progress bar. Shortcuts: Space (pause/resume), ←/→ (prev/next), Home/End, F (fullscreen), S (shuffle), Escape (exit). Originals are never modified.
 

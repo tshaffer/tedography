@@ -5,7 +5,7 @@ export const importingPhotos: HelpTopic = {
   title: 'Importing Photos',
   category: 'Basics',
   order: 2,
-  keywords: ['import', 'scan', 'storage root', 'heic', 'thumbnail', 'format', 'tiff', 'raw'],
+  keywords: ['import', 'scan', 'storage root', 'heic', 'thumbnail', 'format', 'tiff', 'raw', 'audio', 'loudphoto', 'linked audio'],
   body: `Photos enter Tedography through the Import dialog. Click the **Import** button (cloud-download icon) in the toolbar to open it.
 
 **Steps:**
@@ -23,5 +23,7 @@ export const importingPhotos: HelpTopic = {
 
 Imported photos appear in Library with state **New** — the start of the review workflow.
 
-**Note:** Import only picks up new files. If already-imported photos have changed on disk (e.g. moved), use **Maintenance → Reimport** instead of Import.`,
+**Note:** Import only picks up new files. If already-imported photos have changed on disk (e.g. moved), use **Maintenance → Reimport** instead of Import.
+
+**Linked audio (LoudPhoto captures):** a photo exported from the LoudPhoto companion app alongside a matching \`.m4a\` audio file and \`.json\` metadata sidecar (same base filename) is linked automatically during import. The audio and sidecar aren't imported as separate media items — they attach to the photo. See **Viewing and Browsing** for how a linked capture appears and plays back.`,
 };

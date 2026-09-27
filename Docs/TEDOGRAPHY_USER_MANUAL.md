@@ -111,6 +111,8 @@ Imported photos appear in Library with the state **New** — the starting point 
 
 **Note:** Import only picks up new files. If you have already-imported photos whose source files have changed (e.g. you moved them on disk), use **Maintenance → Reimport** rather than Import.
 
+**Linked audio (LoudPhoto captures):** if a photo sits alongside a matching audio recording and metadata sidecar exported from the LoudPhoto companion app (same base filename, `.m4a` + `.json`), Tedography detects and links them automatically during import — no separate step needed. The audio and sidecar files aren't imported as their own media items; they ride along with the photo. See [3.6 Thumbnail Badges](#36-thumbnail-badges) for how a linked capture is shown.
+
 ---
 
 ## 2. Reviewing Photos
@@ -204,7 +206,7 @@ Within whichever browse mode is active, the toolbar lets you switch how photos a
 | **Survey** | Side-by-side comparison of selected photos; each photo can be zoomed independently |
 | **Slideshow** | Full-screen auto-advancing playback (see [Section 3.7](#37-slideshow)) |
 
-In Grid and Loupe modes the **Inspector** panel on the right shows metadata for the selected photo: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset action buttons.
+In Grid and Loupe modes the **Inspector** panel on the right shows metadata for the selected photo: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset action buttons. If the photo has a linked audio recording (see [1. Importing Photos](#1-importing-photos)), the Inspector also shows an **Audio** section with an inline player.
 
 Double-clicking a photo in Grid mode, or pressing `Enter` / `Space`, opens the **Immersive overlay** — a full-screen view of that photo with arrow-key navigation. Press `Escape` to close it.
 
@@ -256,8 +258,9 @@ Photo thumbnails in the grid can show small status badges. The visible badges ar
 | Edit method badge | Shown alongside the Edited import / Has edited version badges — a sparkle icon for AI-edited, a brush icon for manually edited (Lightroom, Photoshop, etc.); see [11.1 Edit Queue](#111-edit-queue) |
 | Rating badge | Amber badge showing the star count (1-5) for any rated photo; see 2.4 Ratings |
 | People badge | Photo has confirmed people data |
+| Linked audio badge | Orange speaker icon — this photo has a linked audio recording (a LoudPhoto capture). Always shown when present; not one of the toggleable badges. |
 
-Badges can be toggled on or off individually from the toolbar overflow menu under **Badges**.
+Badges can be toggled on or off individually from the toolbar overflow menu under **Badges** (the linked audio badge is always on when applicable and isn't part of this toggle list).
 
 ### 3.7 Slideshow
 
@@ -586,6 +589,8 @@ Click the **Print** button in the toolbar (or **⋯ → Print**) with one or mor
 4. **Review and order** — click **Order** to export the photos to the print provider, or **Go to Crop** if you want to adjust crops before ordering.
 
 The Print feature is subject to role-based permissions. Limited users can print only in albums where they have been granted write access.
+
+**Note:** A photo's linked audio (see [1. Importing Photos](#1-importing-photos)) is not currently included in Google Photos publishing, prints, or Slideshow playback — it plays only from the Inspector's Audio section.
 
 ---
 
