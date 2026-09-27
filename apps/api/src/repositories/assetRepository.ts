@@ -104,6 +104,10 @@ export async function getAllAssetsForLibrary(): Promise<MediaAsset[]> {
           editMethod: 1,
           editedAssetIds: 1,
           rating: 1,
+          linkedAudioStorageRootId: 1,
+          linkedAudioArchivePath: 1,
+          linkedAudioFileFormat: 1,
+          linkedAudioDurationSeconds: 1,
         }
       }
     )
@@ -166,6 +170,10 @@ export async function getAssetPageForLibrary(input?: {
           editMethod: 1,
           editedAssetIds: 1,
           rating: 1,
+          linkedAudioStorageRootId: 1,
+          linkedAudioArchivePath: 1,
+          linkedAudioFileFormat: 1,
+          linkedAudioDurationSeconds: 1,
         }
       }
     )
