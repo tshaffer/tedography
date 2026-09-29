@@ -61,6 +61,8 @@ import BrushIcon from '@mui/icons-material/Brush';
 import StarIcon from '@mui/icons-material/Star';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import EventIcon from '@mui/icons-material/Event';
+import PlaceIcon from '@mui/icons-material/Place';
 import {
   type AlbumTreeChildOrderMode,
   MediaType,
@@ -846,6 +848,19 @@ const contextMenuSubmenuStyle: CSSProperties = {
   top: '0',
   minWidth: '200px',
   zIndex: 1401
+};
+
+const contextMenuIconItemLayoutStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '16px'
+};
+
+const contextMenuItemIconStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  lineHeight: 1
 };
 
 const contextMenuDividerStyle: CSSProperties = {
@@ -11850,17 +11865,24 @@ export default function App() {
     const renderItem = (
       label: string,
       enabled: boolean,
+      icon: ReactElement,
       onSelect: () => void,
       title?: string
     ): ReactElement => (
       <button
         type="button"
-        style={enabled ? contextMenuItemStyle : disabledContextMenuItemStyle}
+        style={{
+          ...(enabled ? contextMenuItemStyle : disabledContextMenuItemStyle),
+          ...contextMenuIconItemLayoutStyle
+        }}
         disabled={!enabled}
         title={title}
         onClick={() => runAssetContextMenuAction(onSelect)}
       >
-        {label}
+        <span>{label}</span>
+        <span style={{ ...contextMenuItemIconStyle, opacity: enabled ? 1 : 0.4 }} aria-hidden="true">
+          {icon}
+        </span>
       </button>
     );
 
@@ -11882,6 +11904,7 @@ export default function App() {
             {renderItem(
               state,
               canSetState,
+              getPhotoStateIcon(state),
               () => void handleApplyPhotoStateToSelectedAssets(state),
               canSetState ? undefined : 'Your role cannot change photo state'
             )}
@@ -11893,6 +11916,7 @@ export default function App() {
             {renderItem(
               'Move to Trash',
               canTrash,
+              <DeleteForeverIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#cf222e' }} />,
               () => void handleTrashAssets(selectedAssetIds),
               canTrash
                 ? 'Move to Trash and permanently delete their Tedography records'
@@ -11904,6 +11928,7 @@ export default function App() {
         {renderItem(
           'Move to Album…',
           canMove,
+          <ArrowForwardIcon fontSize="inherit" style={toolbarIconContentStyle} />,
           () => setMoveAssetsDialogOpen(true),
           canMove ? undefined : 'Your role cannot move photos to albums'
         )}
@@ -11911,6 +11936,10 @@ export default function App() {
           ? renderItem(
               'Add to Edit Queue…',
               editQueueAddableIds.length > 0,
+              <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
+                <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
+              </span>,
               () => {
                 setAddToEditQueueDialogMode('add');
                 setAddToEditQueueDialogOpen(true);
@@ -11921,8 +11950,18 @@ export default function App() {
             )
           : null}
         <div style={contextMenuDividerStyle} />
-        {renderItem('Set Capture Date…', true, handleOpenSetCaptureDateDialog)}
-        {renderItem('Set Location…', true, handleOpenSetLocationDialog)}
+        {renderItem(
+          'Set Capture Date…',
+          true,
+          <EventIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          handleOpenSetCaptureDateDialog
+        )}
+        {renderItem(
+          'Set Location…',
+          true,
+          <PlaceIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          handleOpenSetLocationDialog
+        )}
       </div>
     );
   }
