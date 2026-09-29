@@ -23,6 +23,7 @@ Tedography is a personal photo archive and curation system. The primary workflow
    - 3.6 [Thumbnail Badges](#36-thumbnail-badges)
    - 3.7 [Slideshow](#37-slideshow)
    - 3.8 [Presentation Mode](#38-presentation-mode)
+   - 3.9 [Photo Context Menu](#39-photo-context-menu)
 4. [Album Management](#4-album-management)
    - 4.1 [Album Tree Structure](#41-album-tree-structure)
    - 4.2 [Creating Groups and Albums](#42-creating-groups-and-albums)
@@ -132,7 +133,7 @@ Photos start as **New**. The review workflow moves them toward **Keep** or **Dis
 
 ### 2.2 Setting Photo State
 
-With one or more photos selected, use the state buttons in the toolbar (Keep, Pending, Discard, New) or the keyboard shortcuts below. The buttons can be shown as icon-only or with text labels — toggle between the two from **⋯ → Show State Labels / Show Icons Only**.
+With one or more photos selected, use the state buttons in the toolbar (Keep, Pending, Discard, New), the keyboard shortcuts below, or right-click a thumbnail (see [Photo Context Menu](#39-photo-context-menu)). The buttons can be shown as icon-only or with text labels — toggle between the two from **⋯ → Show State Labels / Show Icons Only**.
 
 In **Survey mode** (multi-photo side-by-side view), the state buttons apply to the currently focused photo in the survey, not to the whole selection.
 
@@ -222,6 +223,7 @@ Tedography maintains an ordered list of selected photos.
 | Cmd+A / Ctrl+A | Selects all currently visible photos |
 | Long-press (touch) | Enters touch multi-select mode; subsequent taps toggle without needing Cmd/Ctrl |
 | Drag across grid | Drag-selects all photos the drag rectangle passes over |
+| Right-click | Opens the [Photo Context Menu](#39-photo-context-menu); if the photo isn't already selected, selects it alone first |
 
 When you use Cmd/Ctrl to build a selection incrementally, photos are added in click order. When you use Shift or Cmd+A, the selection follows the current visible display order. Features that use the selection (e.g. the first photo in Loupe mode) use display order, not click order.
 
@@ -297,6 +299,27 @@ Originals are never modified. **Planned for a future release:** transitions (fad
 Drag the presentation window to your TV or external display, then make it fullscreen. As you navigate photos in the main Library window, the presentation window updates automatically to show the currently selected photo. This lets you control what's shown on the big screen from your laptop without the audience seeing your browser UI.
 
 The two windows stay connected via a browser BroadcastChannel — no server round-trips required. Closing the presentation window or the main window ends the connection.
+
+### 3.9 Photo Context Menu
+
+Right-click (or Ctrl+click on a Mac) any thumbnail in Grid mode to open a context menu of actions for the current selection. These are the same actions available from the toolbar and the **⋯** menu, gathered in one place.
+
+**What the menu applies to:**
+- Right-clicking a photo that's already part of the selection applies the menu to the **whole selection**.
+- Right-clicking a photo outside the selection selects **that photo alone** first, then opens the menu for it.
+
+| Item | Action |
+|---|---|
+| Keep / Discard / Pending / New | Sets the photo state of every selected photo |
+| Move to Trash | Moves the selection to Trash and permanently deletes their Tedography records. Only shown when **⋯ → Show Trash Icon** is on; there's no confirmation, same as the toolbar icon |
+| Move to Album… | Opens the Move to Album dialog |
+| Add to Edit Queue… | Opens the Add to Edit Queue dialog (maintenance roles only; disabled if every selected photo is already queued) |
+| Set Capture Date… | Opens the [Set Capture Date](#73-set-capture-date) dialog |
+| Set Location… | Opens the Set Location dialog |
+
+Items your role can't use (or that you don't have write access to in the current album) appear grayed out, with a tooltip explaining why.
+
+Close the menu without choosing anything by clicking elsewhere, pressing **Escape**, or scrolling. On touch devices the menu is not used — long-press still enters touch multi-select mode.
 
 ---
 

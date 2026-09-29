@@ -5,7 +5,7 @@ export const reviewingPhotos: HelpTopic = {
   title: 'Reviewing Photos',
   category: 'Basics',
   order: 3,
-  keywords: ['review', 'state', 'keep', 'pending', 'discard', 'new', 'rating', 'stars', 'keyboard shortcuts', 'trash', 'delete', 'permanently delete'],
+  keywords: ['review', 'state', 'keep', 'pending', 'discard', 'new', 'rating', 'stars', 'keyboard shortcuts', 'trash', 'delete', 'permanently delete', 'right-click', 'context menu'],
   body: `**Photo States**
 
 Every photo has one of four states:
@@ -17,7 +17,7 @@ Every photo has one of four states:
 | Keep | Confirmed keeper |
 | Discard | Rejected — hidden by default, but the file is never deleted |
 
-Photos start as New. Set state with the toolbar buttons (Keep, Pending, Discard, New) or keyboard shortcuts. In Survey mode, state buttons apply to the currently focused photo, not the whole selection.
+Photos start as New. Set state with the toolbar buttons (Keep, Pending, Discard, New), keyboard shortcuts, or by right-clicking a thumbnail. In Survey mode, state buttons apply to the currently focused photo, not the whole selection.
 
 **Keyboard shortcuts** (work in Library, Survey, and Loupe when focus isn't in a text field):
 
@@ -38,7 +38,7 @@ Photos start as New. Set state with the toolbar buttons (Keep, Pending, Discard,
 
 Trash is different from Discard: Discard just changes a photo's state (recoverable, file untouched); Trash permanently deletes the photo's Tedography record and moves its original file into a "Trash" subfolder inside its own storage root. There's no in-app undo — recovering a trashed photo means manually moving the file back and re-importing it.
 
-The Trash icon is hidden from the toolbar by default as a safety measure. Turn it on in ⋯ → Show Trash Icon; it appears to the right of the Keep/Discard/Pending/New buttons and applies to the current selection, same as the state buttons.
+The Trash icon is hidden from the toolbar by default as a safety measure. Turn it on in ⋯ → Show Trash Icon; it appears to the right of the Keep/Discard/Pending/New buttons and applies to the current selection, same as the state buttons. Turning it on also adds **Move to Trash** to the right-click menu on thumbnails.
 
 **Ratings**
 

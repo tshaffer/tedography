@@ -5,7 +5,7 @@ export const viewingAndBrowsing: HelpTopic = {
   title: 'Viewing and Browsing',
   category: 'Basics',
   order: 4,
-  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges', 'audio', 'loudphoto', 'linked audio'],
+  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges', 'audio', 'loudphoto', 'linked audio', 'right-click', 'right click', 'context menu'],
   body: `**Browse modes** (⋯ → Browse Mode):
 
 - **Timeline** (default) — photos grouped by capture month with sticky headers; best for a chronological view.
@@ -17,6 +17,8 @@ export const viewingAndBrowsing: HelpTopic = {
 In Grid and Loupe, the **Inspector** panel (right side) shows metadata: filename, capture date, location, album membership, ordering mode, keywords, people, and per-asset actions. Double-click a photo, or press Enter/Space, to open the **Immersive** full-screen overlay; Escape closes it. If the photo has a linked audio recording (a LoudPhoto capture), the Inspector also shows an **Audio** section with an inline player.
 
 **Selection:** single click selects; Cmd/Ctrl+click toggles; Shift+click range-selects; Cmd+A/Ctrl+A selects all visible; drag-select works across the grid; long-press enters touch multi-select on mobile.
+
+**Right-click menu:** right-click (or Ctrl+click on a Mac) a thumbnail in Grid mode for quick actions on the selection — Keep / Discard / Pending / New, Move to Trash (only when ⋯ → Show Trash Icon is on), Move to Album…, Add to Edit Queue… (maintenance roles), Set Capture Date…, and Set Location…. Right-clicking a photo that isn't selected selects it alone first; right-clicking inside the selection applies to the whole selection. Items your role can't use are grayed out. Escape, clicking elsewhere, or scrolling closes the menu.
 
 **Timeline navigation:** the left sidebar shows a year/month navigator — click a month to scroll to that section. **Thumbnail size** is adjustable in Timeline and Albums modes (⋯ → Thumbnail Size) and persists across sessions.
 

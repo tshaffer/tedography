@@ -1,6 +1,8 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -685,6 +687,11 @@ type AlbumTreeContextMenuState = {
 
 const albumTreeContextMenuViewportPaddingPx = 8;
 
+type AssetContextMenuState = {
+  x: number;
+  y: number;
+};
+
 const timelineStickyTopPx = 10;
 const timelineActiveMonthOffsetPx = timelineStickyTopPx + 16;
 const timelineZoomLevels = [
@@ -839,6 +846,12 @@ const contextMenuSubmenuStyle: CSSProperties = {
   top: '0',
   minWidth: '200px',
   zIndex: 1401
+};
+
+const contextMenuDividerStyle: CSSProperties = {
+  height: '1px',
+  margin: '2px 4px',
+  backgroundColor: '#e5e5e5'
 };
 
 const primaryAreaControlsStyle: CSSProperties = {
@@ -1719,6 +1732,10 @@ body {
   line-height: 1.3;
   text-decoration: none;
   transition: background-color 80ms ease !important;
+}
+
+.tdg-asset-context-menu button:hover:not(:disabled) {
+  background-color: #f0f4f8;
 }
 
 .tdg-overflow-item:hover:not(:disabled) {
@@ -3219,6 +3236,7 @@ type AssetCardProps = {
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   onCardDoubleClick: (assetId: string) => void;
   onLongPress: (assetId: string) => void;
+  onCardContextMenu?: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
   orderingBadge?: 'suspect' | 'pinned' | null;
   manualOrderDragEnabled?: boolean;
   isManualOrderDragSource?: boolean;
@@ -3247,6 +3265,7 @@ function AssetCard({
   onCardClick,
   onCardDoubleClick,
   onLongPress,
+  onCardContextMenu,
   orderingBadge = null,
   manualOrderDragEnabled = false,
   isManualOrderDragSource = false,
@@ -3388,7 +3407,10 @@ function AssetCard({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onCardContextMenu?.(e, asset.id);
+      }}
       title={asset.filename}
       draggable={manualOrderDragEnabled}
       onDragStart={
@@ -4408,6 +4430,8 @@ export default function App() {
   const [albumTreeReviewStatusSubmenuOpen, setAlbumTreeReviewStatusSubmenuOpen] = useState(false);
   const [albumTreePeopleStatusSubmenuOpen, setAlbumTreePeopleStatusSubmenuOpen] = useState(false);
   const albumTreeContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const [assetContextMenu, setAssetContextMenu] = useState<AssetContextMenuState | null>(null);
+  const assetContextMenuRef = useRef<HTMLDivElement | null>(null);
   const albumTreeListRef = useRef<HTMLDivElement | null>(null);
   const albumTreeNodeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const checkedAlbumRevealIndexRef = useRef(-1);
@@ -11042,6 +11066,27 @@ export default function App() {
     }
   }
 
+  function handleAssetCardContextMenu(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
+    // Touch long-press is reserved for multi-select mode.
+    if (touchSelectionMode || (event.nativeEvent as PointerEvent).pointerType === 'touch') {
+      return;
+    }
+
+    // Right-clicking outside the selection targets just that photo (Finder-style).
+    if (!selectedAssetIds.includes(assetId)) {
+      setSelectedAssetId(assetId);
+      setSelectedAssetIds([assetId]);
+      setSelectionAnchorAssetId(assetId);
+    }
+
+    setAssetContextMenu({ x: event.clientX, y: event.clientY });
+  }
+
+  function runAssetContextMenuAction(action: () => void): void {
+    setAssetContextMenu(null);
+    action();
+  }
+
   function handleLongPress(assetId: string): void {
     setTouchSelectionMode(true);
     // Select the long-pressed card if it isn't already selected.
@@ -11164,6 +11209,12 @@ export default function App() {
       if (event.key === 'Escape' && albumTreeContextMenu) {
         event.preventDefault();
         closeAlbumTreeContextMenu();
+        return;
+      }
+
+      if (event.key === 'Escape' && assetContextMenu) {
+        event.preventDefault();
+        setAssetContextMenu(null);
         return;
       }
 
@@ -11364,6 +11415,7 @@ export default function App() {
     };
   }, [
     albumTreeContextMenu,
+    assetContextMenu,
     canInAlbum,
     compareAssets,
     focusedAlbumWriterIds,
@@ -11405,6 +11457,53 @@ export default function App() {
       setAlbumTreeContextMenu(null);
     }
   }, [albumTreeContextMenu, selectedTreeNodeId]);
+
+  useEffect(() => {
+    if (!assetContextMenu) {
+      return;
+    }
+
+    const handleDismiss = (): void => {
+      setAssetContextMenu(null);
+    };
+
+    window.addEventListener('pointerdown', handleDismiss);
+    window.addEventListener('scroll', handleDismiss, true);
+    window.addEventListener('resize', handleDismiss);
+    return () => {
+      window.removeEventListener('pointerdown', handleDismiss);
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('resize', handleDismiss);
+    };
+  }, [assetContextMenu]);
+
+  useEffect(() => {
+    if (assetContextMenu && selectedAssetIds.length === 0) {
+      setAssetContextMenu(null);
+    }
+  }, [assetContextMenu, selectedAssetIds.length]);
+
+  useLayoutEffect(() => {
+    const menuBounds = assetContextMenu ? assetContextMenuRef.current?.getBoundingClientRect() : undefined;
+    if (!assetContextMenu || !menuBounds) {
+      return;
+    }
+
+    const maxX = Math.max(
+      albumTreeContextMenuViewportPaddingPx,
+      window.innerWidth - menuBounds.width - albumTreeContextMenuViewportPaddingPx
+    );
+    const maxY = Math.max(
+      albumTreeContextMenuViewportPaddingPx,
+      window.innerHeight - menuBounds.height - albumTreeContextMenuViewportPaddingPx
+    );
+    const nextX = Math.min(Math.max(assetContextMenu.x, albumTreeContextMenuViewportPaddingPx), maxX);
+    const nextY = Math.min(Math.max(assetContextMenu.y, albumTreeContextMenuViewportPaddingPx), maxY);
+
+    if (nextX !== assetContextMenu.x || nextY !== assetContextMenu.y) {
+      setAssetContextMenu({ x: nextX, y: nextY });
+    }
+  }, [assetContextMenu]);
 
   useEffect(() => {
     if (!albumTreeContextMenu || !albumTreeContextMenuRef.current) {
@@ -11734,6 +11833,96 @@ export default function App() {
               );
             })
         )}
+      </div>
+    );
+  }
+
+  function renderAssetContextMenu(): ReactElement | null {
+    if (!assetContextMenu || selectedAssetIds.length === 0) {
+      return null;
+    }
+
+    const canSetState = canInAlbum('set-photo-state', focusedAlbumWriterIds);
+    const canTrash = canInAlbum('trash-assets', focusedAlbumWriterIds);
+    const canMove = canInAlbum('move-photos-to-album', focusedAlbumWriterIds);
+    const editQueueAddableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+
+    const renderItem = (
+      label: string,
+      enabled: boolean,
+      onSelect: () => void,
+      title?: string
+    ): ReactElement => (
+      <button
+        type="button"
+        style={enabled ? contextMenuItemStyle : disabledContextMenuItemStyle}
+        disabled={!enabled}
+        title={title}
+        onClick={() => runAssetContextMenuAction(onSelect)}
+      >
+        {label}
+      </button>
+    );
+
+    return (
+      <div
+        ref={assetContextMenuRef}
+        role="menu"
+        className="tdg-asset-context-menu"
+        style={{
+          ...contextMenuStyle,
+          left: `${assetContextMenu.x}px`,
+          top: `${assetContextMenu.y}px`
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        {reviewActions.map((state) => (
+          <Fragment key={state}>
+            {renderItem(
+              state,
+              canSetState,
+              () => void handleApplyPhotoStateToSelectedAssets(state),
+              canSetState ? undefined : 'Your role cannot change photo state'
+            )}
+          </Fragment>
+        ))}
+        {showTrashIcon ? (
+          <>
+            <div style={contextMenuDividerStyle} />
+            {renderItem(
+              'Move to Trash',
+              canTrash,
+              () => void handleTrashAssets(selectedAssetIds),
+              canTrash
+                ? 'Move to Trash and permanently delete their Tedography records'
+                : 'Your role cannot trash photos'
+            )}
+          </>
+        ) : null}
+        <div style={contextMenuDividerStyle} />
+        {renderItem(
+          'Move to Album…',
+          canMove,
+          () => setMoveAssetsDialogOpen(true),
+          canMove ? undefined : 'Your role cannot move photos to albums'
+        )}
+        {can('maintenance')
+          ? renderItem(
+              'Add to Edit Queue…',
+              editQueueAddableIds.length > 0,
+              () => {
+                setAddToEditQueueDialogMode('add');
+                setAddToEditQueueDialogOpen(true);
+              },
+              editQueueAddableIds.length > 0
+                ? undefined
+                : 'All selected photos are already in the Edit Queue'
+            )
+          : null}
+        <div style={contextMenuDividerStyle} />
+        {renderItem('Set Capture Date…', true, handleOpenSetCaptureDateDialog)}
+        {renderItem('Set Location…', true, handleOpenSetLocationDialog)}
       </div>
     );
   }
@@ -14981,6 +15170,7 @@ export default function App() {
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                           onLongPress={handleLongPress}
+                          onCardContextMenu={handleAssetCardContextMenu}
                         />
                       ))}
                     </div>
@@ -15019,6 +15209,7 @@ export default function App() {
                           onCardClick={handleCardClick}
                           onCardDoubleClick={openImmersiveForAsset}
                           onLongPress={handleLongPress}
+                          onCardContextMenu={handleAssetCardContextMenu}
                           manualOrderDragEnabled={
                             canDragReorderInCurrentAlbum && currentAlbumAssetIdSet.has(asset.id)
                           }
@@ -15065,6 +15256,7 @@ export default function App() {
                     onCardClick={handleCardClick}
                     onCardDoubleClick={openImmersiveForAsset}
                     onLongPress={handleLongPress}
+                    onCardContextMenu={handleAssetCardContextMenu}
                     manualOrderDragEnabled={
                       canDragReorderInCurrentAlbum && currentAlbumAssetIdSet.has(asset.id)
                     }
@@ -15228,6 +15420,7 @@ export default function App() {
       ) : null}
 
       {renderAlbumTreeContextMenu()}
+      {renderAssetContextMenu()}
 
       <MoveAlbumTreeNodeDialog
         open={moveDialogNode !== null}
