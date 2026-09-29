@@ -10,6 +10,7 @@ import {
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
   type ReactElement,
   type WheelEvent as ReactWheelEvent
 } from 'react';
@@ -3609,23 +3610,94 @@ function AssetDetailPanel({ asset }: AssetDetailPanelProps) {
   );
 }
 
+// Right-click, plus long-press on touch, opens the photo context menu on a
+// single-photo view (no touch multi-select to conflict with there).
+function useImageContextMenuHandlers(onOpenContextMenu: (x: number, y: number) => void) {
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
+  function cancelLongPress(): void {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  return {
+    onContextMenu: (event: ReactMouseEvent<HTMLElement>): void => {
+      event.preventDefault();
+      // Touch long-press is handled by the timer below.
+      if ((event.nativeEvent as PointerEvent).pointerType !== 'touch') {
+        onOpenContextMenu(event.clientX, event.clientY);
+      }
+    },
+    onTouchStart: (event: ReactTouchEvent<HTMLElement>): void => {
+      cancelLongPress();
+      longPressFiredRef.current = false;
+      const touch = event.touches[0];
+      if (event.touches.length !== 1 || !touch) {
+        return;
+      }
+
+      const { clientX, clientY } = touch;
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        longPressFiredRef.current = true;
+        onOpenContextMenu(clientX, clientY);
+      }, 500);
+    },
+    onTouchMove: cancelLongPress,
+    onTouchEnd: (event: ReactTouchEvent<HTMLElement>): void => {
+      cancelLongPress();
+      // Swallow the synthetic click so lifting the finger can't hit a menu item.
+      if (longPressFiredRef.current) {
+        longPressFiredRef.current = false;
+        event.preventDefault();
+      }
+    },
+    onTouchCancel: cancelLongPress
+  };
+}
+
 type LoupeViewerProps = {
   asset: MediaAsset;
   onOpenImmersive: (assetId: string) => void;
+  onOpenContextMenu: (x: number, y: number) => void;
 };
 
 function LoupeViewer({
   asset,
-  onOpenImmersive
+  onOpenImmersive,
+  onOpenContextMenu
 }: LoupeViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
+  const contextMenuHandlers = useImageContextMenuHandlers(onOpenContextMenu);
 
   return (
     <section style={loupeViewerStyle}>
       <div style={loupeImageWrapStyle}>
         <div style={loupeImageScrollerStyle}>
-          <div style={loupeImageStageStyle} onDoubleClick={() => onOpenImmersive(asset.id)}>
-            {imageUrl ? <img src={imageUrl} alt={asset.filename} style={loupeImageStyle} /> : null}
+          <div
+            style={loupeImageStageStyle}
+            onDoubleClick={() => onOpenImmersive(asset.id)}
+            {...contextMenuHandlers}
+          >
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={asset.filename}
+                style={{ ...loupeImageStyle, WebkitTouchCallout: 'none' }}
+                draggable={false}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -3644,15 +3716,18 @@ type ImmersiveViewerProps = {
   onPrevious: () => void;
   onNext: () => void;
   onActiveImageLoad: (assetId: string) => void;
+  onOpenContextMenu: (x: number, y: number) => void;
 };
 
 function ImmersiveViewer({
   asset,
   showFilename,
   onClose,
-  onActiveImageLoad
+  onActiveImageLoad,
+  onOpenContextMenu
 }: ImmersiveViewerProps) {
   const imageUrl = getAssetDisplayImageUrl(asset);
+  const contextMenuHandlers = useImageContextMenuHandlers(onOpenContextMenu);
 
   return (
     <div style={immersiveOverlayStyle} onClick={onClose}>
@@ -3660,13 +3735,14 @@ function ImmersiveViewer({
         style={{ width: '100%', height: '100%', display: 'flex', minHeight: 0 }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div style={immersiveImageWrapStyle}>
+        <div style={immersiveImageWrapStyle} {...contextMenuHandlers}>
           {imageUrl ? (
             <img
               key={asset.id}
               src={imageUrl}
               alt={asset.filename}
-              style={immersiveImageStyle}
+              style={{ ...immersiveImageStyle, WebkitTouchCallout: 'none' }}
+              draggable={false}
               onLoad={() => onActiveImageLoad(asset.id)}
             />
           ) : (
@@ -11097,6 +11173,37 @@ export default function App() {
     setAssetContextMenu({ x: event.clientX, y: event.clientY });
   }
 
+  function handleFilmstripContextMenu(event: ReactMouseEvent<HTMLElement>, assetId: string): void {
+    if (!isLoupeMode) {
+      handleAssetCardContextMenu(event, assetId);
+      return;
+    }
+
+    if ((event.nativeEvent as PointerEvent).pointerType === 'touch') {
+      return;
+    }
+
+    // In Loupe the filmstrip navigates rather than selects, so right-click shows
+    // that photo first; the Loupe sync effect keeps it within the selection.
+    setSelectedAssetId(assetId);
+    setAssetContextMenu({ x: event.clientX, y: event.clientY });
+  }
+
+  function handleImmersiveContextMenu(x: number, y: number): void {
+    if (!selectedAssetId) {
+      return;
+    }
+
+    // Opening Immersive clears a single selection, so target the photo on screen;
+    // a multi-photo set being stepped through (which includes it) is kept.
+    if (!selectedAssetIds.includes(selectedAssetId)) {
+      setSelectedAssetIds([selectedAssetId]);
+      setSelectionAnchorAssetId(selectedAssetId);
+    }
+
+    setAssetContextMenu({ x, y });
+  }
+
   function runAssetContextMenuAction(action: () => void): void {
     setAssetContextMenu(null);
     action();
@@ -11227,7 +11334,8 @@ export default function App() {
         return;
       }
 
-      if (event.key === 'Escape' && assetContextMenu) {
+      // An open photo menu swallows keys so navigation can't change the photo behind it.
+      if (assetContextMenu) {
         event.preventDefault();
         setAssetContextMenu(null);
         return;
@@ -11497,6 +11605,10 @@ export default function App() {
       setAssetContextMenu(null);
     }
   }, [assetContextMenu, selectedAssetIds.length]);
+
+  useEffect(() => {
+    setAssetContextMenu(null);
+  }, [immersiveOpen, viewerMode]);
 
   useLayoutEffect(() => {
     const menuBounds = assetContextMenu ? assetContextMenuRef.current?.getBoundingClientRect() : undefined;
@@ -11860,6 +11972,12 @@ export default function App() {
     const canSetState = canInAlbum('set-photo-state', focusedAlbumWriterIds);
     const canTrash = canInAlbum('trash-assets', focusedAlbumWriterIds);
     const canMove = canInAlbum('move-photos-to-album', focusedAlbumWriterIds);
+    const canRotateCrop = canInAlbum('rotate-and-crop', focusedAlbumWriterIds);
+    const rotateCropDeniedReason = !can('rotate-and-crop')
+      ? 'Your role cannot rotate or crop photos'
+      : !canRotateCrop
+        ? 'No write access to this album'
+        : undefined;
     const editQueueAddableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
 
     const renderItem = (
@@ -11905,7 +12023,14 @@ export default function App() {
               state,
               canSetState,
               getPhotoStateIcon(state),
-              () => void handleApplyPhotoStateToSelectedAssets(state),
+              () => {
+                // Mirror the toolbar: in Loupe (and Immersive), state applies to the displayed photo.
+                if ((isLoupeMode || immersiveOpen) && selectedAsset) {
+                  void handleSetPhotoState(selectedAsset.id, state);
+                } else {
+                  void handleApplyPhotoStateToSelectedAssets(state);
+                }
+              },
               canSetState ? undefined : 'Your role cannot change photo state'
             )}
           </Fragment>
@@ -11917,7 +12042,7 @@ export default function App() {
               'Move to Trash',
               canTrash,
               <DeleteForeverIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: '#cf222e' }} />,
-              () => void handleTrashAssets(selectedAssetIds),
+              () => void handleTrashAssets((isLoupeMode || immersiveOpen) && selectedAsset ? [selectedAsset.id] : selectedAssetIds),
               canTrash
                 ? 'Move to Trash and permanently delete their Tedography records'
                 : 'Your role cannot trash photos'
@@ -11961,6 +12086,37 @@ export default function App() {
           true,
           <PlaceIcon fontSize="inherit" style={toolbarIconContentStyle} />,
           handleOpenSetLocationDialog
+        )}
+        <div style={contextMenuDividerStyle} />
+        {renderItem(
+          'Rotate Counterclockwise',
+          canRotateCrop,
+          <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          () => void handleRotateSelectedAssets('counterclockwise'),
+          rotateCropDeniedReason
+        )}
+        {renderItem(
+          'Rotate 180°',
+          canRotateCrop,
+          <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          () => void handleRotateSelectedAssets('180'),
+          rotateCropDeniedReason
+        )}
+        {renderItem(
+          'Rotate Clockwise',
+          canRotateCrop,
+          <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          () => void handleRotateSelectedAssets('clockwise'),
+          rotateCropDeniedReason
+        )}
+        {/* Hidden in Immersive: Preview would open outside the fullscreen space. */}
+        {immersiveOpen ? null : renderItem(
+          'Crop in Preview',
+          canRotateCrop && selectedAssetIds.length === 1,
+          <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />,
+          () => void handleStartCrop(),
+          rotateCropDeniedReason ??
+            (selectedAssetIds.length === 1 ? undefined : 'Select exactly one photo to crop')
         )}
       </div>
     );
@@ -13882,106 +14038,37 @@ export default function App() {
             </Tooltip>
           </div>
 
-          {/* Rotation + Crop */}
-          {(isLibraryArea || isSearchArea) ? (
+          {/* Add to Edit Queue — maintenance feature */}
+          {(isLibraryArea || isSearchArea) && can('maintenance') ? (
             <div style={toolbarGroupStyle}>
               {(() => {
-                const canRotateCrop = canInAlbum('rotate-and-crop', focusedAlbumWriterIds);
-                const rotateDeniedReason = !can('rotate-and-crop')
-                  ? 'Your role cannot rotate photos'
-                  : !canRotateCrop
-                  ? 'No write access to this album'
-                  : null;
-                const cropDeniedReason = !can('rotate-and-crop')
-                  ? 'Your role cannot crop photos'
-                  : !canRotateCrop
-                  ? 'No write access to this album'
-                  : null;
+                const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+                const canAddToQueue = addableIds.length > 0;
+                const tooltipTitle =
+                  selectedAssetIds.length === 0
+                    ? 'Add to Edit Queue'
+                    : addableIds.length === 0
+                      ? 'All selected photos are already in the Edit Queue'
+                      : addableIds.length === 1
+                        ? 'Add to Edit Queue'
+                        : `Add ${addableIds.length} photos to Edit Queue`;
                 return (
-                  <>
-                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos counterclockwise' : 'Select one or more photos to rotate')}>
-                      <span>
-                        <button
-                          type="button"
-                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => void handleRotateSelectedAssets('counterclockwise')}
-                          disabled={!canRotateCrop || !hasSelectedAssets}
-                          aria-label="Rotate selected photos counterclockwise"
-                        >
-                          <RotateLeftIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos 180°' : 'Select one or more photos to rotate')}>
-                      <span>
-                        <button
-                          type="button"
-                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => void handleRotateSelectedAssets('180')}
-                          disabled={!canRotateCrop || !hasSelectedAssets}
-                          aria-label="Rotate selected photos 180 degrees"
-                        >
-                          <SwapVertIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={rotateDeniedReason ?? (hasSelectedAssets ? 'Rotate selected photos clockwise' : 'Select one or more photos to rotate')}>
-                      <span>
-                        <button
-                          type="button"
-                          style={(canRotateCrop && hasSelectedAssets) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => void handleRotateSelectedAssets('clockwise')}
-                          disabled={!canRotateCrop || !hasSelectedAssets}
-                          aria-label="Rotate selected photos clockwise"
-                        >
-                          <RotateRightIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={cropDeniedReason ?? (selectedAssetIds.length === 1 ? 'Crop photo in Preview' : 'Select exactly one photo to crop')}>
-                      <span>
-                        <button
-                          type="button"
-                          style={(canRotateCrop && selectedAssetIds.length === 1) ? toolbarIconButtonStyle : { ...toolbarIconButtonStyle, ...disabledToolbarActionButtonStyle }}
-                          onClick={() => void handleStartCrop()}
-                          disabled={!canRotateCrop || selectedAssetIds.length !== 1}
-                          aria-label="Crop photo in Preview"
-                        >
-                          <CropIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                    {can('maintenance') ? (() => {
-                      const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
-                      const canAddToQueue = addableIds.length > 0;
-                      const tooltipTitle =
-                        selectedAssetIds.length === 0
-                          ? 'Add to Edit Queue'
-                          : addableIds.length === 0
-                            ? 'All selected photos are already in the Edit Queue'
-                            : addableIds.length === 1
-                              ? 'Add to Edit Queue'
-                              : `Add ${addableIds.length} photos to Edit Queue`;
-                      return (
-                        <Tooltip title={tooltipTitle}>
-                          <span>
-                            <button
-                              type="button"
-                              style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
-                              disabled={!canAddToQueue}
-                              onClick={() => { setAddToEditQueueDialogMode('add'); setAddToEditQueueDialogOpen(true); }}
-                              aria-label="Add to Edit Queue"
-                            >
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
-                                <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                              </span>
-                            </button>
-                          </span>
-                        </Tooltip>
-                      );
-                    })() : null}
-                  </>
+                  <Tooltip title={tooltipTitle}>
+                    <span>
+                      <button
+                        type="button"
+                        style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
+                        disabled={!canAddToQueue}
+                        onClick={() => { setAddToEditQueueDialogMode('add'); setAddToEditQueueDialogOpen(true); }}
+                        aria-label="Add to Edit Queue"
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
+                          <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                        </span>
+                      </button>
+                    </span>
+                  </Tooltip>
                 );
               })()}
             </div>
@@ -15162,6 +15249,7 @@ export default function App() {
                   assets={isLoupeMode ? loupeAssets : visibleAssets}
                   activeAssetId={selectedAssetId}
                   onSelectAsset={handleFilmstripSelectAsset}
+                  onAssetContextMenu={handleFilmstripContextMenu}
                 />
               ) : null}
             </div>
@@ -15169,6 +15257,7 @@ export default function App() {
               <LoupeViewer
                 asset={selectedAsset}
                 onOpenImmersive={openImmersiveForAsset}
+                onOpenContextMenu={(x, y) => setAssetContextMenu({ x, y })}
               />
             ) : null}
             {!isLoupeMode && isTimelineGridMode ? (
@@ -15429,6 +15518,7 @@ export default function App() {
           onPrevious={() => handleSelectRelativeInList(immersiveAssets, -1)}
           onNext={() => handleSelectRelativeInList(immersiveAssets, 1)}
           onActiveImageLoad={handleImmersiveActiveImageLoad}
+          onOpenContextMenu={handleImmersiveContextMenu}
         />
       ) : null}
 

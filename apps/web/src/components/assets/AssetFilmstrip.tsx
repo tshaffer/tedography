@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { type MediaAsset } from '@tedography/domain';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 
@@ -6,6 +6,7 @@ type AssetFilmstripProps = {
   assets: MediaAsset[];
   activeAssetId: string | null;
   onSelectAsset: (assetId: string) => void;
+  onAssetContextMenu?: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
 };
 
 const stripStyle: CSSProperties = {
@@ -44,7 +45,12 @@ const imageStyle: CSSProperties = {
   display: 'block'
 };
 
-export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFilmstripProps) {
+export function AssetFilmstrip({
+  assets,
+  activeAssetId,
+  onSelectAsset,
+  onAssetContextMenu
+}: AssetFilmstripProps) {
   const containerRef = useRef<HTMLElement | null>(null);
   const thumbnailRefs = useRef(new Map<string, HTMLButtonElement>());
 
@@ -106,6 +112,10 @@ export function AssetFilmstrip({ assets, activeAssetId, onSelectAsset }: AssetFi
           style={asset.id === activeAssetId ? { ...itemButtonStyle, ...activeItemButtonStyle } : itemButtonStyle}
           onClick={() => onSelectAsset(asset.id)}
           onMouseDown={(event) => event.preventDefault()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            onAssetContextMenu?.(event, asset.id);
+          }}
           ref={(node) => {
             if (node) {
               thumbnailRefs.current.set(asset.id, node);

@@ -302,9 +302,9 @@ The two windows stay connected via a browser BroadcastChannel — no server roun
 
 ### 3.9 Photo Context Menu
 
-Right-click (or Ctrl+click on a Mac) any thumbnail in Grid mode to open a context menu of actions for the current selection. These are the same actions available from the toolbar and the **⋯** menu, gathered in one place.
+Right-click (or Ctrl+click on a Mac) a thumbnail in Grid mode, the photo in Loupe mode, a thumbnail in the filmstrip, or the photo in the full-screen Immersive view to open a context menu of actions. Most of these are also available from the toolbar or the **⋯** menu; rotate and crop are available only here.
 
-**What the menu applies to:**
+**What the menu applies to (Grid mode):**
 - Right-clicking a photo that's already part of the selection applies the menu to the **whole selection**.
 - Right-clicking a photo outside the selection selects **that photo alone** first, then opens the menu for it.
 
@@ -316,10 +316,18 @@ Right-click (or Ctrl+click on a Mac) any thumbnail in Grid mode to open a contex
 | Add to Edit Queue… | Opens the Add to Edit Queue dialog (maintenance roles only; disabled if every selected photo is already queued) |
 | Set Capture Date… | Opens the [Set Capture Date](#73-set-capture-date) dialog |
 | Set Location… | Opens the Set Location dialog |
+| Rotate Counterclockwise / Rotate 180° / Rotate Clockwise | [Rotates](#71-rotate) every selected photo |
+| Crop in Preview | Opens the photo in macOS Preview to [crop](#72-crop) it (exactly one photo selected) |
 
 Items your role can't use (or that you don't have write access to in the current album) appear grayed out, with a tooltip explaining why.
 
-Close the menu without choosing anything by clicking elsewhere, pressing **Escape**, or scrolling. On touch devices the menu is not used — long-press still enters touch multi-select mode.
+**In Loupe mode**, the menu mirrors the toolbar's Loupe behavior: Keep / Discard / Pending / New and Move to Trash apply to the photo on screen, while the other items apply to the selection (which is just the photo on screen unless you entered Loupe with several photos selected). Right-clicking a filmstrip thumbnail in Loupe first shows that photo, then opens the menu for it.
+
+**In the full-screen Immersive view**, the menu works the same way as in Loupe: it acts on the photo on screen (or, for state and Trash, on that photo while the other items cover the whole set if you opened Immersive with several photos selected). **Crop in Preview** isn't offered here, because Preview would open outside the fullscreen space; exit Immersive to crop. Pressing Escape exits fullscreen and closes the menu along with it.
+
+Close the menu without choosing anything by clicking elsewhere, pressing **Escape** (or any other key), or scrolling.
+
+**On touch devices**, long-press the photo in Loupe mode or in the Immersive view to open the menu. In Grid mode long-press still enters touch multi-select mode instead, so the menu isn't available there.
 
 ---
 
@@ -555,7 +563,7 @@ This is useful for finding out where a search result lives in your album tree, o
 
 ### 7.1 Rotate
 
-Select one or more photos and use the **Rotate** controls in the toolbar (or the Inspector). Three options are available:
+Select one or more photos, right-click one of them (in Grid or Loupe mode, or in the filmstrip), and choose a rotation from the [Photo Context Menu](#39-photo-context-menu). Three options are available:
 
 - **Rotate Clockwise** — 90° clockwise
 - **Rotate Counterclockwise** — 90° counterclockwise
@@ -565,7 +573,7 @@ Rotation is a non-destructive metadata operation — the original file is update
 
 ### 7.2 Crop
 
-Crop is available from the toolbar when one photo is selected. Clicking **Crop** opens the photo's source file in **macOS Preview**.
+Crop is available when exactly one photo is selected: right-click it (in Grid or Loupe mode, or in the filmstrip) and choose **Crop in Preview** from the [Photo Context Menu](#39-photo-context-menu). This opens the photo's source file in **macOS Preview**.
 
 Make your crop in Preview and save the file (`Cmd+S`). Tedography watches the file for changes. When it detects the save, it updates the asset's stored file and regenerates the display JPEG and thumbnail automatically. Close Preview when you are done.
 
