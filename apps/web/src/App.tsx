@@ -5790,8 +5790,12 @@ export default function App() {
         return;
       }
 
+      // Keep showing a longer cached list (it survives reloads in this tab) while the
+      // rest loads, rather than shrinking to the first page. The cached items are
+      // never trusted as data: the full list is re-fetched and swapped in at the end.
       const shouldPreserveCachedAssets =
         options?.preserveCachedFirstPage !== false &&
+        data.hasMore &&
         Array.isArray(cachedAssetsForScope) &&
         cachedAssetsForScope.length > data.items.length;
       const initialAssets = shouldPreserveCachedAssets ? cachedAssetsForScope : data.items;
@@ -5809,10 +5813,8 @@ export default function App() {
 
       if (data.hasMore) {
         void (async () => {
-          let combined = initialAssets;
-          let nextOffset = shouldPreserveCachedAssets
-            ? initialAssets.length
-            : data.offset + data.items.length;
+          let combined = data.items;
+          let nextOffset = data.offset + data.items.length;
           let hasMore = data.hasMore;
 
           while (hasMore && generation === assetsLoadGenerationRef.current) {
@@ -5830,14 +5832,24 @@ export default function App() {
             nextOffset = page.offset + page.items.length;
             hasMore = page.hasMore;
 
-            setAssets(combined);
-            appBootstrapCache.assets = {
-              items: combined,
-              scope
-            };
+            // While the cached list is on screen, wait for the complete fresh list.
+            if (!shouldPreserveCachedAssets) {
+              setAssets(combined);
+              appBootstrapCache.assets = {
+                items: combined,
+                scope
+              };
+            }
           }
 
           if (generation === assetsLoadGenerationRef.current) {
+            if (shouldPreserveCachedAssets) {
+              setAssets(combined);
+              appBootstrapCache.assets = {
+                items: combined,
+                scope
+              };
+            }
             setAssetsScopeLoadStatus('complete');
           }
         })().catch((error: unknown) => {
