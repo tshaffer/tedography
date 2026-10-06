@@ -5,7 +5,7 @@ export const viewingAndBrowsing: HelpTopic = {
   title: 'Viewing and Browsing',
   category: 'Basics',
   order: 4,
-  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges', 'audio', 'loudphoto', 'linked audio', 'right-click', 'right click', 'context menu'],
+  keywords: ['browse', 'timeline', 'grid', 'loupe', 'filmstrip', 'survey', 'slideshow', 'presentation', 'selection', 'thumbnail size', 'badges', 'audio', 'loudphoto', 'linked audio', 'right-click', 'right click', 'context menu', 'has keywords', 'keyword status', 'keyword badge'],
   body: `**Browse modes** (⋯ → Browse Mode):
 
 - **Timeline** (default) — photos grouped by capture month with sticky headers; best for a chronological view.
@@ -22,7 +22,7 @@ In Grid and Loupe, the **Inspector** panel (right side) shows metadata: filename
 
 **Timeline navigation:** the left sidebar shows a year/month navigator — click a month to scroll to that section. **Thumbnail size** is adjustable in Timeline and Albums modes (⋯ → Thumbnail Size) and persists across sessions.
 
-**Thumbnail badges** (toggle individually under ⋯ → Badges): state color, keyword present, Edit Queue status, edited-import / has-edited-version with a method icon (sparkle = AI, brush = manual), rating stars, and confirmed people present. A **linked audio badge** (orange speaker icon) also appears on any photo with a linked audio recording — always shown when applicable, not part of the toggle list.
+**Thumbnail badges** (toggle individually under ⋯ → Badges): state color, has keywords (slate # icon, any keyword assigned), keyword status (the manually set Not started / In progress / Complete keywording marker — gray / amber / green; absent until set), Edit Queue status, edited-import / has-edited-version with a method icon (sparkle = AI, brush = manual), rating stars, and confirmed people present. A **linked audio badge** (orange speaker icon) also appears on any photo with a linked audio recording — always shown when applicable, not part of the toggle list.
 
 **Slideshow** (⋯ → Slideshow): play/pause, next/prev, skip to first/last, adjustable speed, loop, shuffle, an info overlay (title/date/location/people/keywords), and a progress bar. Shortcuts: Space (pause/resume), ←/→ (prev/next), Home/End, F (fullscreen), S (shuffle), Escape (exit). Originals are never modified.
 

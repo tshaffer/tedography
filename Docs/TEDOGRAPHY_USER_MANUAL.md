@@ -253,7 +253,8 @@ Photo thumbnails in the grid can show small status badges. The visible badges ar
 | Badge | Meaning |
 |---|---|
 | State badge | Small colored indicator showing Keep (green), Discard (red), or Pending (blue). New photos show no badge. |
-| Keyword badge | Indicates the photo has keywords assigned |
+| Has Keywords badge | Slate `#` icon — the photo has one or more keywords assigned (hover for the count). Off by default. |
+| Keyword Status badge | Tag icon showing the photo's keyword *review* status, set by hand from the Inspector's Keywords **⋯** button: gray = Not started, amber = In progress, green = Complete. Photos with no status show no badge, even if they have keywords — use the Has Keywords badge for that. |
 | Edit Queue badge | Photo is currently in the (human) Edit Queue — awaiting export/editing |
 | Edited import badge | This photo was imported via the Edit Queue as an `_edited` file |
 | Has edited version badge | Shown on an original that has one or more edited versions imported from the Edit Queue |

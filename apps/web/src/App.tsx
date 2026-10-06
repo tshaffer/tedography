@@ -413,6 +413,7 @@ const showFilmstripStorageKey = 'tedography.showFilmstrip';
 const peopleReviewSimplifiedViewStorageKey = 'tedography.peopleReview.simplifiedView';
 const showThumbnailPhotoStateBadgesStorageKey = 'tedography.showThumbnailPhotoStateBadges';
 const showThumbnailKeywordBadgesStorageKey = 'tedography.showThumbnailKeywordBadges';
+const showThumbnailHasKeywordsBadgesStorageKey = 'tedography.showThumbnailHasKeywordsBadges';
 const showThumbnailEditQueueBadgesStorageKey = 'tedography.showThumbnailEditQueueBadges';
 const showThumbnailEditedImportBadgesStorageKey = 'tedography.showThumbnailEditedImportBadges';
 const showThumbnailHasEditedVersionBadgesStorageKey = 'tedography.showThumbnailHasEditedVersionBadges';
@@ -3241,6 +3242,7 @@ type AssetCardProps = {
   isUpdating: boolean;
   showPhotoStateBadge: boolean;
   showKeywordAssignmentBadge: boolean;
+  showHasKeywordsBadge: boolean;
   showAiQueueBadge: boolean;
   showEditedImportBadge: boolean;
   showHasEditedVersionBadge: boolean;
@@ -3270,6 +3272,7 @@ function AssetCard({
   isUpdating,
   showPhotoStateBadge,
   showKeywordAssignmentBadge,
+  showHasKeywordsBadge,
   showAiQueueBadge,
   showEditedImportBadge,
   showHasEditedVersionBadge,
@@ -3507,6 +3510,14 @@ function AssetCard({
           ) : null}
         </span>
         <span style={cardBottomBadgeRowStyle}>
+          {showHasKeywordsBadge && (asset.keywordIds?.length ?? 0) > 0 ? (
+            <span
+              style={{ ...cardBadgeChipStyle, backgroundColor: '#475569' }}
+              title={`Has ${asset.keywordIds?.length ?? 0} keyword${asset.keywordIds?.length === 1 ? '' : 's'}`}
+            >
+              <TagIcon style={cardBadgeIconStyle} />
+            </span>
+          ) : null}
           {showKeywordAssignmentBadge && asset.keywordAssignmentStatus ? (
             <span
               style={{
@@ -4921,6 +4932,13 @@ export default function App() {
 
     return window.localStorage.getItem(showThumbnailKeywordBadgesStorageKey) === 'true';
   });
+  const [showThumbnailHasKeywordsBadges, setShowThumbnailHasKeywordsBadges] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showThumbnailHasKeywordsBadgesStorageKey) === 'true';
+  });
   const [showThumbnailEditQueueBadges, setShowThumbnailEditQueueBadges] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return true;
@@ -5447,6 +5465,13 @@ export default function App() {
       showThumbnailKeywordBadges ? 'true' : 'false'
     );
   }, [showThumbnailKeywordBadges]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      showThumbnailHasKeywordsBadgesStorageKey,
+      showThumbnailHasKeywordsBadges ? 'true' : 'false'
+    );
+  }, [showThumbnailHasKeywordsBadges]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -14418,6 +14443,17 @@ export default function App() {
                 <label style={toggleOptionLabelStyle}>
                   <input
                     type="checkbox"
+                    checked={showThumbnailHasKeywordsBadges}
+                    onChange={(event) => setShowThumbnailHasKeywordsBadges(event.target.checked)}
+                  />
+                  <span style={{ ...menuBadgeChipStyle, backgroundColor: '#475569' }}>
+                    <TagIcon style={menuBadgeChipIconStyle} />
+                  </span>
+                  Has Keywords
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
                     checked={showThumbnailEditQueueBadges}
                     onChange={(event) => setShowThumbnailEditQueueBadges(event.target.checked)}
                   />
@@ -15344,6 +15380,7 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                          showHasKeywordsBadge={showThumbnailHasKeywordsBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
@@ -15383,6 +15420,7 @@ export default function App() {
                           isUpdating={updatingAssetIds[asset.id] === true}
                           showPhotoStateBadge={showThumbnailPhotoStateBadges}
                           showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                          showHasKeywordsBadge={showThumbnailHasKeywordsBadges}
                           showAiQueueBadge={showThumbnailEditQueueBadges}
                           showEditedImportBadge={showThumbnailEditedImportBadges}
                           showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
@@ -15430,6 +15468,7 @@ export default function App() {
                     isUpdating={updatingAssetIds[asset.id] === true}
                     showPhotoStateBadge={showThumbnailPhotoStateBadges}
                     showKeywordAssignmentBadge={showThumbnailKeywordBadges}
+                    showHasKeywordsBadge={showThumbnailHasKeywordsBadges}
                     showAiQueueBadge={showThumbnailEditQueueBadges}
                     showEditedImportBadge={showThumbnailEditedImportBadges}
                     showHasEditedVersionBadge={showThumbnailHasEditedVersionBadges}
