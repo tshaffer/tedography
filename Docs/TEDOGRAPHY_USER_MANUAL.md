@@ -507,7 +507,7 @@ Open **Search** from the top navigation. Available filters:
 
   Set Match to **OR** to combine filters (e.g. "Is manually edited import" + "Is AI edited import" with OR finds any edited import regardless of method); leave it on **AND** (the default) to require all the filters you've set.
 - **Rating** — at least N stars (0 = off, no minimum)
-- **Filename pattern**
+- **Filename pattern** — a case-insensitive regular expression matched anywhere in the filename. Use `|` for OR: `429|182` finds filenames containing either number; `-(429|182)\.` matches only those exact numbers before the extension.
 - **Publication status**
 
 **Capture date availability** is especially useful for finding undated photos that may need their date set manually. The three options are:

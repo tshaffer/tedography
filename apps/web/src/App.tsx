@@ -13423,7 +13423,7 @@ export default function App() {
                 type="text"
                 value={searchFilenamePattern}
                 onChange={(event) => setSearchFilenamePattern(event.target.value)}
-                placeholder="Case-insensitive regular expression"
+                placeholder="Regex, e.g. 429|182 to match either"
                 style={{ minWidth: 0 }}
               />
             </label>

@@ -5,10 +5,12 @@ export const searching: HelpTopic = {
   title: 'Searching',
   category: 'Search',
   order: 1,
-  keywords: ['search', 'filter', 'natural language search', 'people search', 'date range', 'filename pattern'],
+  keywords: ['search', 'filter', 'natural language search', 'people search', 'date range', 'filename pattern', 'regex', 'regular expression'],
   body: `Open **Search** from the top navigation.
 
 **Filters:** photo state, album, keyword (hierarchy-aware), people (Any/All match), date range, capture date availability (**Dated only** / **Undated only** / **Dated or undated** — useful for finding photos that need a manual date), five Edit Queue filters (is manually/AI edited import, has manually/AI edited version, in edit queue — each Any/Yes/No, combined with a Match AND/OR toggle), rating (at least N stars), filename pattern, and publication status.
+
+**Filename pattern** is a case-insensitive regular expression matched anywhere in the filename. Use \`|\` for OR: \`429|182\` finds filenames containing either number; \`-(429|182)\\.\` matches only those exact numbers right before the extension.
 
 **People search:** Has person, Has any of these people (Match: Any), Has all of these people (Match: All), Has no confirmed people, Has reviewable faces (unresolved face detections still needing review).
 
