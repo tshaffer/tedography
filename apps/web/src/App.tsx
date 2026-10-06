@@ -5148,6 +5148,8 @@ export default function App() {
   const orderInAlbumRootRef = useRef<HTMLDivElement | null>(null);
   const toolbarOverflowRootRef = useRef<HTMLDivElement | null>(null);
   const pendingGridRevealAssetIdRef = useRef<string | null>(null);
+  // Where Immersive goes if a move takes the displayed photo out of view.
+  const immersiveMoveFallbackAssetIdRef = useRef<string | null>(null);
   const timelineSectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const previousIsTimelineModeRef = useRef(false);
   const pendingTimelineRestoreRef = useRef<{ scrollY: number; contentSignature: string } | null>(null);
@@ -10913,6 +10915,19 @@ export default function App() {
 
     const assetIds = selectedAssets.map((asset) => asset.id);
     const destinationAlbum = albumNodesById.get(input.destinationAlbumId);
+    const movedAssetIdSet = new Set(assetIds);
+    const displayedImmersiveAssetId = immersiveOpen ? selectedAssetId : null;
+    const immersiveFallbackAssetId = displayedImmersiveAssetId
+      ? (() => {
+          // Nearest neighbor that isn't itself part of the move.
+          const notMoved = (list: MediaAsset[]): MediaAsset[] =>
+            list.filter((asset) => asset.id === displayedImmersiveAssetId || !movedAssetIdSet.has(asset.id));
+          return (
+            getAdjacentReplacementAssetId(notMoved(immersiveAssets), displayedImmersiveAssetId) ??
+            getAdjacentReplacementAssetId(notMoved(visibleAssets), displayedImmersiveAssetId)
+          );
+        })()
+      : null;
 
     if (input.keepInSourceAlbum) {
       await addAssetsToAlbum(input.destinationAlbumId, { assetIds });
@@ -10935,10 +10950,41 @@ export default function App() {
     });
     void loadAlbumAssetCounts();
     void loadAlbumCaptureDateRanges();
+
+    // Stay in Immersive: keep the displayed photo, or advance if it left the view.
+    if (displayedImmersiveAssetId) {
+      // Adding (keep in source) never removes the photo from view.
+      if (!input.keepInSourceAlbum) {
+        immersiveMoveFallbackAssetIdRef.current = immersiveFallbackAssetId;
+      }
+      return;
+    }
+
     setSelectedAssetIds([]);
     setSelectedAssetId(null);
     setSelectionAnchorAssetId(null);
   }
+
+  useEffect(() => {
+    if (!immersiveOpen) {
+      immersiveMoveFallbackAssetIdRef.current = null;
+      return;
+    }
+
+    if (immersiveMoveFallbackAssetIdRef.current === null) {
+      return;
+    }
+
+    const fallbackAssetId = immersiveMoveFallbackAssetIdRef.current;
+    immersiveMoveFallbackAssetIdRef.current = null;
+    if (selectedAssetId && !immersiveAssets.some((asset) => asset.id === selectedAssetId)) {
+      if (immersiveAssets.some((asset) => asset.id === fallbackAssetId)) {
+        setSelectedAssetId(fallbackAssetId);
+      } else {
+        closeImmersive();
+      }
+    }
+  }, [immersiveOpen, immersiveAssets, selectedAssetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleFilmstripSelectAsset(assetId: string): void {
     setSelectedAssetId(assetId);
