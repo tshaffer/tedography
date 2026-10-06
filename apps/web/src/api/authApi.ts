@@ -13,11 +13,22 @@ import type {
 
 type ApiErrorPayload = { error?: string };
 
+/** An HTTP error response from the auth API, carrying its status code. */
+export class AuthApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = 'AuthApiError';
+  }
+}
+
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, { cache: 'no-store', credentials: 'include', ...init });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
-    throw new Error(payload.error ?? `Request failed with status ${response.status}`);
+    throw new AuthApiError(payload.error ?? `Request failed with status ${response.status}`, response.status);
   }
   return (await response.json()) as T;
 }

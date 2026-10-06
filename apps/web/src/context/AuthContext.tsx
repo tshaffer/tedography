@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import type { FeatureId, PermissionMap, TedographyUser, UserListResponse } from '@tedography/domain';
-import { getMe, getMyPermissions, getUsers, login as apiLogin, logout as apiLogout } from '../api/authApi';
+import {
+  AuthApiError,
+  getMe,
+  getMyPermissions,
+  getUsers,
+  login as apiLogin,
+  logout as apiLogout
+} from '../api/authApi';
 
 interface AuthContextValue {
   /** The currently logged-in user, or null if not authenticated */
@@ -39,6 +46,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// How long the startup session check keeps retrying while the API is unreachable
+// (e.g. restarting under `tsx watch`) before falling back to the login screen.
+const sessionCheckRetryWindowMs = 30_000;
+const sessionCheckRetryDelayMs = 1_000;
+
 export function AuthProvider({ children }: { children: ReactNode }): ReactElement {
   const [user, setUser] = useState<TedographyUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,21 +59,39 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
 
   // Check for an existing session on mount
   useEffect(() => {
-    getMe()
-      .then(({ user: u }) => {
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const startedAt = Date.now();
+
+    const checkSession = async (): Promise<void> => {
+      try {
+        const { user: u } = await getMe();
+        const [{ users: all }, { permissions: perms }] = await Promise.all([getUsers(), getMyPermissions()]);
+        if (cancelled) return;
         setUser(u);
-        return Promise.all([getUsers(), getMyPermissions()]);
-      })
-      .then(([{ users: all }, { permissions: perms }]) => {
         setUsers(all);
         setPermissions(perms);
-      })
-      .catch(() => {
-        // 401 = not authenticated; ignore
+        setLoading(false);
+      } catch (error) {
+        if (cancelled) return;
+        // Only an actual auth rejection means signed out. A network failure or 5xx
+        // (the dev proxy returns 502/504 while the API restarts) is retried instead.
+        const isServerUnavailable = !(error instanceof AuthApiError) || error.status >= 500;
+        if (isServerUnavailable && Date.now() - startedAt < sessionCheckRetryWindowMs) {
+          retryTimer = setTimeout(() => void checkSession(), sessionCheckRetryDelayMs);
+          return;
+        }
         setUser(null);
         setPermissions(null);
-      })
-      .finally(() => setLoading(false));
+        setLoading(false);
+      }
+    };
+
+    void checkSession();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+    };
   }, []);
 
   const refreshUsers = useCallback(async () => {
