@@ -12983,7 +12983,7 @@ export default function App() {
                     setSearchKeywordInclude((prev) =>
                       value.map((k) => {
                         const existing = prev.find((c) => c.keywordId === k.id);
-                        return existing ?? { keywordId: k.id, includeDescendants: false };
+                        return existing ?? { keywordId: k.id, includeDescendants: true };
                       })
                     );
                   }}
@@ -13061,7 +13061,7 @@ export default function App() {
                     setSearchKeywordExclude((prev) =>
                       value.map((k) => {
                         const existing = prev.find((c) => c.keywordId === k.id);
-                        return existing ?? { keywordId: k.id, includeDescendants: false };
+                        return existing ?? { keywordId: k.id, includeDescendants: true };
                       })
                     );
                   }}
