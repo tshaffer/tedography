@@ -252,6 +252,8 @@ function truncateMiddle(text: string, maxLength = 32): string {
 interface AssetCropEntry {
   assetId: string;
   crop: PrintCrop;
+  /** Print size the crop was made for; a crop is kept only while the size is unchanged. */
+  size: PrintSize;
 }
 
 function buildDefaultPerItemSettings(
@@ -291,6 +293,7 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
     if (!open) return;
     setStep('provider');
     setSelectedProviderId(null);
+    setCropEntries([]);
     setResult(null);
     setExportError(null);
     setProvidersError(null);
@@ -306,15 +309,22 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
       .finally(() => setProvidersLoading(false));
   }, [open]);
 
-  const rebuildCropEntries = useCallback((itemSettings: Map<string, PerItemSetting>) => {
-    setCropEntries(
+  // Keep each photo's crop while its print size is unchanged; reset to the default
+  // crop for the new aspect ratio when the size changes (or there's no crop yet).
+  const reconcileCropEntries = useCallback((itemSettings: Map<string, PerItemSetting>) => {
+    setCropEntries((prevCrops) =>
       assets.map((a) => {
         const itemSize = itemSettings.get(a.id)?.size ?? size;
-        const landscape = isLandscape(a);
-        const aspect = printSizeAspect(itemSize, landscape);
-        const w = a.width ?? 1;
-        const h = a.height ?? 1;
-        return { assetId: a.id, crop: computeDefaultCrop(w, h, aspect) };
+        const existing = prevCrops.find((e) => e.assetId === a.id);
+        if (existing && existing.size === itemSize) {
+          return existing;
+        }
+        const aspect = printSizeAspect(itemSize, isLandscape(a));
+        return {
+          assetId: a.id,
+          crop: computeDefaultCrop(a.width ?? 1, a.height ?? 1, aspect),
+          size: itemSize
+        };
       })
     );
   }, [assets, size]);
@@ -322,31 +332,19 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
   const handleGoToSettings = useCallback(() => {
     const settings = buildDefaultPerItemSettings(assets, size, finish, quantity, cropMode);
     setPerItemSettings(settings);
-    rebuildCropEntries(settings);
+    reconcileCropEntries(settings);
     setStep('settings');
-  }, [assets, size, finish, quantity, rebuildCropEntries]);
+  }, [assets, size, finish, quantity, reconcileCropEntries]);
 
   // Apply a global change to all per-item settings
   const applyGlobalSize = useCallback((newSize: PrintSize) => {
     setSize(newSize);
-    setPerItemSettings((prev) => {
-      const next = new Map(prev);
-      for (const [id, s] of next) next.set(id, { ...s, size: newSize });
-      return next;
-    });
-    // Rebuild crops with the updated map
-    setCropEntries((prevCrops) =>
-      assets.map((a) => {
-        const landscape = isLandscape(a);
-        const aspect = printSizeAspect(newSize, landscape);
-        const w = a.width ?? 1;
-        const h = a.height ?? 1;
-        const existing = prevCrops.find((e) => e.assetId === a.id);
-        // Reset crop when size changes since aspect ratio changes
-        return { assetId: a.id, crop: existing ? computeDefaultCrop(w, h, aspect) : computeDefaultCrop(w, h, aspect) };
-      })
-    );
-  }, [assets]);
+    const next = new Map(perItemSettings);
+    for (const [id, s] of next) next.set(id, { ...s, size: newSize });
+    setPerItemSettings(next);
+    // Resets only the crops whose size actually changed (aspect ratio changes)
+    reconcileCropEntries(next);
+  }, [perItemSettings, reconcileCropEntries]);
 
   const applyGlobalFinish = useCallback((newFinish: PrintFinish) => {
     setFinish(newFinish);
@@ -376,34 +374,22 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
   }, []);
 
   const updateItemSetting = useCallback((assetId: string, patch: Partial<PerItemSetting>) => {
-    setPerItemSettings((prev) => {
-      const existing = prev.get(assetId);
-      if (!existing) return prev;
-      const next = new Map(prev);
-      const updated = { ...existing, ...patch };
-      next.set(assetId, updated);
-      // Rebuild crop for this asset if size changed
-      if (patch.size !== undefined) {
-        const asset = assets.find((a) => a.id === assetId);
-        if (asset) {
-          const landscape = isLandscape(asset);
-          const aspect = printSizeAspect(updated.size, landscape);
-          const w = asset.width ?? 1;
-          const h = asset.height ?? 1;
-          setCropEntries((prev) =>
-            prev.map((e) => e.assetId === assetId ? { ...e, crop: computeDefaultCrop(w, h, aspect) } : e)
-          );
-        }
-      }
-      return next;
-    });
-  }, [assets]);
+    const existing = perItemSettings.get(assetId);
+    if (!existing) return;
+    const next = new Map(perItemSettings);
+    next.set(assetId, { ...existing, ...patch });
+    setPerItemSettings(next);
+    // Resets this photo's crop only if its size actually changed
+    if (patch.size !== undefined) {
+      reconcileCropEntries(next);
+    }
+  }, [perItemSettings, reconcileCropEntries]);
 
   const handleGoToCrop = useCallback(() => {
-    rebuildCropEntries(perItemSettings);
+    reconcileCropEntries(perItemSettings);
     setCropIndex(0);
     setStep('crop');
-  }, [perItemSettings, rebuildCropEntries]);
+  }, [perItemSettings, reconcileCropEntries]);
 
   const handleExport = useCallback(async () => {
     if (!selectedProviderId) return;
@@ -751,6 +737,7 @@ export function PrintDialog({ open, assets, onClose }: PrintDialogProps): ReactE
           </p>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <CropEditor
+              key={currentCropAsset.id}
               imageUrl={imageUrl}
               printAspect={aspect}
               sourceWidth={srcW}

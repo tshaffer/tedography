@@ -61,6 +61,16 @@ export function computeDefaultCrop(sourceWidth: number, sourceHeight: number, pr
   };
 }
 
+function areCropsEqual(a: PrintCrop, b: PrintCrop): boolean {
+  const epsilon = 1e-6;
+  return (
+    Math.abs(a.x - b.x) < epsilon &&
+    Math.abs(a.y - b.y) < epsilon &&
+    Math.abs(a.width - b.width) < epsilon &&
+    Math.abs(a.height - b.height) < epsilon
+  );
+}
+
 export function CropEditor({
   imageUrl,
   printAspect,
@@ -83,23 +93,27 @@ export function CropEditor({
   // computed for the wrong orientation. We detect the swap here and correct:
   //   • recompute the initial crop in display-normalized coordinates
   //   • invert printAspect so resize stays constrained to the right shape
-  const exifCorrectedAspect = useRef<number | null>(null);
+  // Only the untouched initial crop (computed for the wrong orientation) is
+  // replaced, so a crop the user adjusted — or one already corrected — survives
+  // navigating away and back. The parent keys this component per photo, so
+  // displaySize is never a previous photo's measurement.
   useEffect(() => {
     if (displaySize.w === 0 || displaySize.h === 0) return;
-    if (exifCorrectedAspect.current === printAspect) return; // already handled
     const displayIsLandscape = displaySize.w > displaySize.h;
     const storedIsLandscape  = sourceWidth  > sourceHeight;
-    if (displayIsLandscape === storedIsLandscape) {
-      exifCorrectedAspect.current = printAspect; // orientations match — nothing to fix
-      return;
-    }
+    if (displayIsLandscape === storedIsLandscape) return; // orientations match — nothing to fix
+    if (!areCropsEqual(crop, computeDefaultCrop(sourceWidth, sourceHeight, printAspect))) return;
     // Orientations differ: image has been EXIF-rotated by the browser.
     // Recompute the default crop in display-normalized space with the
     // corrected (inverted) print aspect so the box looks right on screen.
-    exifCorrectedAspect.current = printAspect;
-    onChange(computeDefaultCrop(displaySize.w, displaySize.h, 1 / printAspect));
+    const correctedCrop = computeDefaultCrop(displaySize.w, displaySize.h, 1 / printAspect);
+    // When photo and print shapes match, both defaults are the full frame.
+    if (areCropsEqual(correctedCrop, crop)) return;
+    onChange(correctedCrop);
+  // `crop` is a dependency so "Reset to center" is corrected too; the corrected
+  // crop no longer equals the uncorrected default, so this doesn't loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displaySize, printAspect]);
+  }, [displaySize, printAspect, crop]);
   // ──────────────────────────────────────────────────────────────────────────
 
   const handleImageLoad = useCallback(() => {
