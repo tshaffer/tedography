@@ -14121,46 +14121,143 @@ export default function App() {
             </Tooltip>
           </div>
 
-          {/* Add to Edit Queue — maintenance feature */}
-          {(isLibraryArea || isSearchArea) && can('maintenance') ? (
-            <div style={toolbarGroupStyle}>
-              {(() => {
-                const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
-                const canAddToQueue = addableIds.length > 0;
-                const tooltipTitle =
-                  selectedAssetIds.length === 0
-                    ? 'Add to Edit Queue'
-                    : addableIds.length === 0
-                      ? 'All selected photos are already in the Edit Queue'
-                      : addableIds.length === 1
-                        ? 'Add to Edit Queue'
-                        : `Add ${addableIds.length} photos to Edit Queue`;
-                return (
-                  <Tooltip title={tooltipTitle}>
-                    <span>
-                      <button
-                        type="button"
-                        style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
-                        disabled={!canAddToQueue}
-                        onClick={() => { setAddToEditQueueDialogMode('add'); setAddToEditQueueDialogOpen(true); }}
-                        aria-label="Add to Edit Queue"
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
-                          <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
-                        </span>
-                      </button>
-                    </span>
-                  </Tooltip>
-                );
-              })()}
-            </div>
-          ) : null}
 
           </div>{/* end toolbarScrollContainerStyle */}
 
           {/* ── Always-visible tool buttons ── */}
           <div style={toolbarFixedToolsStyle}>
+
+          {/* Add to Edit Queue + Edit Queue — maintenance feature, kept together with no divider between */}
+          {can('maintenance') ? (
+            <div style={(isLibraryArea || isSearchArea) ? toolbarGroupStyle : topBarSectionStyle}>
+              {(isLibraryArea || isSearchArea) ? (
+                <>
+                  {(() => {
+                    const addableIds = selectedAssetIds.filter((id) => !editQueueAssetIdSet.has(id));
+                    const canAddToQueue = addableIds.length > 0;
+                    const tooltipTitle =
+                      selectedAssetIds.length === 0
+                        ? 'Add to Edit Queue'
+                        : addableIds.length === 0
+                          ? 'All selected photos are already in the Edit Queue'
+                          : addableIds.length === 1
+                            ? 'Add to Edit Queue'
+                            : `Add ${addableIds.length} photos to Edit Queue`;
+                    return (
+                      <Tooltip title={tooltipTitle}>
+                        <span>
+                          <button
+                            type="button"
+                            style={{ ...toolbarIconButtonStyle, opacity: canAddToQueue ? 1 : 0.35 }}
+                            disabled={!canAddToQueue}
+                            onClick={() => { setAddToEditQueueDialogMode('add'); setAddToEditQueueDialogOpen(true); }}
+                            aria-label="Add to Edit Queue"
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '1px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, marginBottom: '1px' }}>+</span>
+                              <PsychologyIcon fontSize="inherit" style={toolbarIconContentStyle} />
+                            </span>
+                          </button>
+                        </span>
+                      </Tooltip>
+                    );
+                  })()}
+                </>
+              ) : null}
+              <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
+                <Tooltip title={editQueueEntries.length > 0 ? `Edit Queue (${editQueueEntries.length})` : 'Edit Queue'}>
+                  <span>
+                    <button
+                      type="button"
+                      style={toolbarIconButtonStyle}
+                      data-selected={aiMenuOpen ? 'true' : undefined}
+                      onClick={() => setAiMenuOpen((prev) => !prev)}
+                      aria-label="Edit Queue"
+                    >
+                      <PsychologyIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: editQueueEntries.length > 0 ? '#9333ea' : undefined }} />
+                      {editQueueEntries.length > 0 ? (
+                        <span style={{ fontSize: '10px', lineHeight: 1, marginLeft: '2px', color: '#9333ea', fontWeight: 600 }}>
+                          {editQueueEntries.length}
+                        </span>
+                      ) : null}
+                    </button>
+                  </span>
+                </Tooltip>
+                {aiMenuOpen ? (
+                  <div
+                    className="tdg-overflow-menu"
+                    style={{
+                      position: 'fixed',
+                      top: `${aiMenuPosition.top}px`,
+                      right: `${aiMenuPosition.right}px`,
+                      maxHeight: `${aiMenuPosition.maxHeight}px`,
+                      overflowY: 'auto'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); void loadEditFolderFiles(); void refreshImportCandidateCount(); void loadEditQueue(); }}
+                    >
+                      Open Queue
+                    </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { void handleOpenEditHistory(); setAiMenuOpen(false); }}
+                    >
+                      View Edit History
+                    </button>
+                    {selectedAssetIds.length === 1 && selectedAsset ? (() => {
+                      const queueEntry = editQueueEntries.find((e) => e.assetId === selectedAsset.id);
+                      return queueEntry ? (
+                        <>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => { setAddToEditQueueDialogMode('edit'); setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
+                          >
+                            Edit Note & Type
+                          </button>
+                          <button
+                            type="button"
+                            className="tdg-overflow-item"
+                            onClick={() => { void handleRemoveFromEditQueue(selectedAsset.id); setAiMenuOpen(false); }}
+                          >
+                            Remove from Queue
+                          </button>
+                        </>
+                      ) : null;
+                    })() : null}
+                    {editQueueEntries.length > 0 ? (
+                      <>
+                        <div className="tdg-overflow-divider" />
+                        <button
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => { void handleExportEditQueue(editQueueEntries.map((e) => e.assetId)); setAiMenuOpen(false); }}
+                        >
+                          Export Queue
+                        </button>
+                        <button
+                          type="button"
+                          className="tdg-overflow-item"
+                          onClick={() => {
+                            setAiMenuOpen(false);
+                            if (window.confirm(`Clear the entire edit queue (${editQueueEntries.length} item${editQueueEntries.length !== 1 ? 's' : ''})? This cannot be undone.`)) {
+                              void handleClearEditQueue();
+                            }
+                          }}
+                        >
+                          Clear Queue
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {/* View modes: Grid, Loupe, Survey, Fullscreen — always visible */}
           {(isLibraryArea || isSearchArea) ? (
@@ -14239,99 +14336,6 @@ export default function App() {
             </div>
           ) : null}
 
-          {/* Edit Queue toolbar button — maintenance feature, admin only */}
-          {can('maintenance') ? <div style={menuAnchorStyle} id="tdg-ai-menu-root" ref={aiMenuRootRef}>
-            <Tooltip title={editQueueEntries.length > 0 ? `Edit Queue (${editQueueEntries.length})` : 'Edit Queue'}>
-              <span>
-                <button
-                  type="button"
-                  style={toolbarIconButtonStyle}
-                  data-selected={aiMenuOpen ? 'true' : undefined}
-                  onClick={() => setAiMenuOpen((prev) => !prev)}
-                  aria-label="Edit Queue"
-                >
-                  <PsychologyIcon fontSize="inherit" style={{ ...toolbarIconContentStyle, color: editQueueEntries.length > 0 ? '#9333ea' : undefined }} />
-                  {editQueueEntries.length > 0 ? (
-                    <span style={{ fontSize: '10px', lineHeight: 1, marginLeft: '2px', color: '#9333ea', fontWeight: 600 }}>
-                      {editQueueEntries.length}
-                    </span>
-                  ) : null}
-                </button>
-              </span>
-            </Tooltip>
-            {aiMenuOpen ? (
-              <div
-                className="tdg-overflow-menu"
-                style={{
-                  position: 'fixed',
-                  top: `${aiMenuPosition.top}px`,
-                  right: `${aiMenuPosition.right}px`,
-                  maxHeight: `${aiMenuPosition.maxHeight}px`,
-                  overflowY: 'auto'
-                }}
-              >
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => { setEditQueueDialogOpen(true); setAiMenuOpen(false); void loadEditFolderFiles(); void refreshImportCandidateCount(); void loadEditQueue(); }}
-                >
-                  Open Queue
-                </button>
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => { void handleOpenEditHistory(); setAiMenuOpen(false); }}
-                >
-                  View Edit History
-                </button>
-                {selectedAssetIds.length === 1 && selectedAsset ? (() => {
-                  const queueEntry = editQueueEntries.find((e) => e.assetId === selectedAsset.id);
-                  return queueEntry ? (
-                    <>
-                      <button
-                        type="button"
-                        className="tdg-overflow-item"
-                        onClick={() => { setAddToEditQueueDialogMode('edit'); setAddToEditQueueDialogOpen(true); setAiMenuOpen(false); }}
-                      >
-                        Edit Note & Type
-                      </button>
-                      <button
-                        type="button"
-                        className="tdg-overflow-item"
-                        onClick={() => { void handleRemoveFromEditQueue(selectedAsset.id); setAiMenuOpen(false); }}
-                      >
-                        Remove from Queue
-                      </button>
-                    </>
-                  ) : null;
-                })() : null}
-                {editQueueEntries.length > 0 ? (
-                  <>
-                    <div className="tdg-overflow-divider" />
-                    <button
-                      type="button"
-                      className="tdg-overflow-item"
-                      onClick={() => { void handleExportEditQueue(editQueueEntries.map((e) => e.assetId)); setAiMenuOpen(false); }}
-                    >
-                      Export Queue
-                    </button>
-                    <button
-                      type="button"
-                      className="tdg-overflow-item"
-                      onClick={() => {
-                        setAiMenuOpen(false);
-                        if (window.confirm(`Clear the entire edit queue (${editQueueEntries.length} item${editQueueEntries.length !== 1 ? 's' : ''})? This cannot be undone.`)) {
-                          void handleClearEditQueue();
-                        }
-                      }}
-                    >
-                      Clear Queue
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div> : null}
 
           {/* View Options toolbar button */}
           <div style={menuAnchorStyle} id="tdg-layout-menu-root" ref={layoutMenuRootRef}>
