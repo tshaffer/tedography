@@ -18,7 +18,7 @@ function normalize(doc: EditQueueEntry): EditQueueEntry {
 }
 
 export async function getQueueEntries(): Promise<EditQueueEntry[]> {
-  const docs = await EditQueueEntryModel.find().sort({ createdAt: 1 }).lean<EditQueueEntry[]>();
+  const docs = await EditQueueEntryModel.find().sort({ createdAt: -1, _id: -1 }).lean<EditQueueEntry[]>();
   return docs.map(normalize);
 }
 
