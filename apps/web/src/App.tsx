@@ -22,6 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import TuneIcon from '@mui/icons-material/Tune';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ImageSearchIcon from '@mui/icons-material/ImageSearch';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
@@ -14645,6 +14646,21 @@ export default function App() {
             ) : null}
           </div>
 
+          {/* Help */}
+          <Tooltip title="Help">
+            <span>
+              <button
+                type="button"
+                style={toolbarIconButtonStyle}
+                data-selected={helpDialogOpen ? 'true' : undefined}
+                onClick={() => setHelpDialogOpen(true)}
+                aria-label="Help"
+              >
+                <HelpOutlineIcon fontSize="inherit" style={toolbarIconContentStyle} />
+              </button>
+            </span>
+          </Tooltip>
+
           {/* Overflow -- less-frequent actions */}
           <div style={menuAnchorStyle} id="tdg-toolbar-overflow-root" ref={toolbarOverflowRootRef}>
             <Tooltip title="More">
@@ -15080,17 +15096,6 @@ export default function App() {
                 {/* Tools */}
                 <div className="tdg-overflow-divider" />
                 <div className="tdg-overflow-section">Tools</div>
-                <button
-                  type="button"
-                  className="tdg-overflow-item"
-                  onClick={() => {
-                    setToolbarOverflowOpen(false);
-                    setHelpDialogOpen(true);
-                  }}
-                  title="Open help"
-                >
-                  Help
-                </button>
                 {user?.roleId === 'admin' ? (
                   <Link
                     to="/admin/users"
