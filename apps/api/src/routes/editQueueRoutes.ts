@@ -8,6 +8,7 @@ import { PhotoState, MediaType, EditType, EDIT_TYPE_VALUES, type MediaAssetAlbum
 import { resolveOriginalAbsolutePathForAsset } from '../media/resolveAssetMediaPath.js';
 import {
   findById,
+  findByIds,
   createMediaAsset,
   updateMediaAssetAlbumIds,
   updateMediaAssetPeople,
@@ -23,7 +24,8 @@ import {
   updateQueueEntryEditType,
   upsertQueueEntry,
 } from '../repositories/editQueueRepository.js';
-import { createEditHistoryEntry } from '../repositories/editHistoryRepository.js';
+import { createEditHistoryEntry, getAllHistoryEntries } from '../repositories/editHistoryRepository.js';
+import { buildEditLookupResponse, type EditLookupAssetInfo } from '../editLookup/editLookup.js';
 import { buildDisplayFilePlan } from '../import/displayFilePlanning.js';
 import { convertToDisplayJpeg } from '../import/displayJpegConversion.js';
 import { extractImportMetadata } from '../import/exifMetadata.js';
@@ -239,6 +241,45 @@ editQueueRoutes.get('/', async (_req, res) => {
   } catch (error) {
     log.error('Failed to get edit queue', error);
     res.status(500).json({ error: 'Failed to get edit queue' });
+  }
+});
+
+// ─── GET /lookup — search the queue and Edit History by filename / folder ─────
+//
+// `q` is plain text with `*` and `?` wildcards (see editLookup/patternMatch.ts).
+// Read-only, so — like GET / — it is not gated behind the maintenance feature.
+
+editQueueRoutes.get('/lookup', async (req, res) => {
+  const query = typeof req.query.q === 'string' ? req.query.q : '';
+  try {
+    const [queueEntries, historyEntries, allNodes] = await Promise.all([
+      getQueueEntries(),
+      getAllHistoryEntries(),
+      listAlbumTreeNodes()
+    ]);
+    const nodesById = new Map(allNodes.map((n) => [n.id, n]));
+
+    const assetIds = Array.from(
+      new Set([...queueEntries.map((e) => e.assetId), ...historyEntries.map((e) => e.sourceAssetId)])
+    );
+    const assets = await findByIds(assetIds);
+    const assetsById = new Map<string, EditLookupAssetInfo>();
+    for (const asset of assets) {
+      const archivePath = asset.originalArchivePath ?? asset.archivePath ?? '';
+      const folder = path.posix.dirname(archivePath.replace(/\\/g, '/'));
+      const albumId = asset.albumIds?.[0] ?? null;
+      assetsById.set(asset.id, {
+        filename: asset.filename,
+        folder: folder === '.' ? '' : folder,
+        albumId,
+        albumPath: albumId ? buildAlbumPath(albumId, nodesById) : null
+      });
+    }
+
+    res.json(buildEditLookupResponse({ query, queueEntries, historyEntries, assetsById }));
+  } catch (error) {
+    log.error('Failed to search edit queue and history', error);
+    res.status(500).json({ error: 'Failed to search edit queue and history' });
   }
 });
 

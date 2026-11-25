@@ -1,4 +1,4 @@
-import type { EditQueueEntry, EditType } from '@tedography/domain';
+import type { EditLookupResponse, EditQueueEntry, EditType } from '@tedography/domain';
 
 export interface EditQueueEntryWithFilename extends EditQueueEntry {
   filename: string;
@@ -135,4 +135,15 @@ export function deleteEditFolderFile(filename: string): Promise<{ ok: boolean }>
   return fetchJson<{ ok: boolean }>(`/api/edit-queue/edit-folder/${encodeURIComponent(filename)}`, {
     method: 'DELETE',
   });
+}
+
+export async function lookupEditQueueAndHistory(query: string, signal?: AbortSignal): Promise<EditLookupResponse> {
+  const response = await fetch(`/api/edit-queue/lookup?q=${encodeURIComponent(query)}`, {
+    cache: 'no-store',
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return response.json() as Promise<EditLookupResponse>;
 }

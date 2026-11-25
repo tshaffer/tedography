@@ -38,6 +38,11 @@ export async function getHistoryEntries(limit = 200): Promise<EditHistoryEntry[]
     .lean<EditHistoryEntry[]>();
 }
 
+// Every history entry, active and archived — used by the Edit Queue / History lookup.
+export async function getAllHistoryEntries(): Promise<EditHistoryEntry[]> {
+  return EditHistoryModel.find().sort({ processedAt: -1 }).lean<EditHistoryEntry[]>();
+}
+
 export async function getEntriesByArchiveId(archiveId: string): Promise<EditHistoryEntry[]> {
   return EditHistoryModel
     .find({ archiveId })

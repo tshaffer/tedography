@@ -171,6 +171,7 @@ import {
 } from './api/editQueueApi';
 import { AddToEditQueueDialog } from './components/editQueue/AddToEditQueueDialog';
 import { EditHistoryDialog } from './components/editQueue/EditHistoryDialog';
+import { EditLookupDialog } from './components/editQueue/EditLookupDialog';
 import { EditHistoryArchivesDialog } from './components/editQueue/EditHistoryArchivesDialog';
 import { EditHistoryArchiveViewDialog } from './components/editQueue/EditHistoryArchiveViewDialog';
 import { EditQueueDialog } from './components/editQueue/EditQueueDialog';
@@ -423,6 +424,7 @@ const showThumbnailPeopleBadgesStorageKey = 'tedography.showThumbnailPeopleBadge
 const showThumbnailOrderingBadgesStorageKey = 'tedography.showThumbnailOrderingBadges';
 const showThumbnailRatingBadgesStorageKey = 'tedography.showThumbnailRatingBadges';
 const showImmersiveFilenameStorageKey = 'tedography.showImmersiveFilename';
+const showGridFilenamesStorageKey = 'tedography.showGridFilenames';
 const showAlbumKeywordBadgesStorageKey = 'tedography.showAlbumKeywordBadges';
 const showAlbumKeywordStatusBadgeStorageKey = 'tedography.album.showKeywordBadge';
 const showAlbumReviewStatusBadgeStorageKey = 'tedography.album.showReviewBadge';
@@ -1519,6 +1521,17 @@ const touchSelectEmptyRingStyle: CSSProperties = {
   backgroundColor: 'rgba(0,0,0,0.25)',
   boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
   pointerEvents: 'none'
+};
+
+const cardFilenameCaptionStyle: CSSProperties = {
+  padding: '4px 6px',
+  fontSize: '12px',
+  lineHeight: 1.3,
+  color: '#444',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  textAlign: 'center'
 };
 
 const cardHoverLabelStyle: CSSProperties = {
@@ -3250,6 +3263,7 @@ type AssetCardProps = {
   editMethodBadges: EditMethod[];
   showRatingBadge: boolean;
   showPeopleBadge: boolean;
+  showFilename?: boolean;
   aiQueueEntry: EditQueueEntryWithFilename | null;
   touchSelectionMode: boolean;
   onCardClick: (event: ReactMouseEvent<HTMLElement>, assetId: string) => void;
@@ -3280,6 +3294,7 @@ function AssetCard({
   editMethodBadges,
   showRatingBadge,
   showPeopleBadge,
+  showFilename = false,
   aiQueueEntry,
   touchSelectionMode,
   onCardClick,
@@ -3582,13 +3597,14 @@ function AssetCard({
         <span
           style={{
             ...cardHoverLabelStyle,
-            opacity: isHovered ? 1 : 0,
+            opacity: isHovered && !showFilename ? 1 : 0,
             border: isUpdating ? '1px solid #d68e00' : undefined
           }}
         >
           {asset.filename}
         </span>
       </div>
+      {showFilename ? <div style={cardFilenameCaptionStyle}>{asset.filename}</div> : null}
     </article>
   );
 }
@@ -4506,6 +4522,7 @@ export default function App() {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [exportPhotosDialogOpen, setExportPhotosDialogOpen] = useState(false);
   const [editHistoryDialogOpen, setEditHistoryDialogOpen] = useState(false);
+  const [editLookupDialogOpen, setEditLookupDialogOpen] = useState(false);
   const [editHistoryEntries, setEditHistoryEntries] = useState<EditHistoryEntryWithNavigation[]>([]);
   const [editHistoryLoading, setEditHistoryLoading] = useState(false);
   const [editHistoryError, setEditHistoryError] = useState<string | null>(null);
@@ -4993,6 +5010,13 @@ export default function App() {
     }
 
     return window.localStorage.getItem(showImmersiveFilenameStorageKey) === 'true';
+  });
+  const [showGridFilenames, setShowGridFilenames] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(showGridFilenamesStorageKey) === 'true';
   });
   const [showAlbumKeywordStatusBadge, setShowAlbumKeywordStatusBadge] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -5529,6 +5553,10 @@ export default function App() {
       showImmersiveFilename ? 'true' : 'false'
     );
   }, [showImmersiveFilename]);
+
+  useEffect(() => {
+    window.localStorage.setItem(showGridFilenamesStorageKey, showGridFilenames ? 'true' : 'false');
+  }, [showGridFilenames]);
 
   useEffect(() => {
     window.localStorage.setItem(showAlbumKeywordStatusBadgeStorageKey, showAlbumKeywordStatusBadge ? 'true' : 'false');
@@ -8807,6 +8835,7 @@ export default function App() {
   function handleNavigateToEditQueueAsset(assetId: string, albumId: string | null): void {
     setEditQueueDialogOpen(false);
     setEditHistoryDialogOpen(false);
+    setEditLookupDialogOpen(false);
     if (albumId) {
       setCheckedAlbumIds([albumId]);
       setSelectedTreeNodeId(albumId);
@@ -14209,6 +14238,13 @@ export default function App() {
                     >
                       View Edit History
                     </button>
+                    <button
+                      type="button"
+                      className="tdg-overflow-item"
+                      onClick={() => { setEditLookupDialogOpen(true); setAiMenuOpen(false); }}
+                    >
+                      Find in Queue &amp; History…
+                    </button>
                     {selectedAssetIds.length === 1 && selectedAsset ? (() => {
                       const queueEntry = editQueueEntries.find((e) => e.assetId === selectedAsset.id);
                       return queueEntry ? (
@@ -14586,6 +14622,14 @@ export default function App() {
                     onChange={(event) => setShowFilmstrip(event.target.checked)}
                   />
                   Show filmstrip
+                </label>
+                <label style={toggleOptionLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showGridFilenames}
+                    onChange={(event) => setShowGridFilenames(event.target.checked)}
+                  />
+                  Show filenames under thumbnails
                 </label>
                 <label style={toggleOptionLabelStyle}>
                   <input
@@ -15396,6 +15440,7 @@ export default function App() {
                           editMethodBadges={getEditMethodBadgesForAsset(asset)}
                           showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
+                          showFilename={showGridFilenames}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                           touchSelectionMode={touchSelectionMode}
@@ -15436,6 +15481,7 @@ export default function App() {
                           editMethodBadges={getEditMethodBadgesForAsset(asset)}
                           showRatingBadge={showThumbnailRatingBadges}
                           showPeopleBadge={showThumbnailPeopleBadges}
+                          showFilename={showGridFilenames}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                           aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                           touchSelectionMode={touchSelectionMode}
@@ -15484,6 +15530,7 @@ export default function App() {
                     editMethodBadges={getEditMethodBadgesForAsset(asset)}
                     showRatingBadge={showThumbnailRatingBadges}
                     showPeopleBadge={showThumbnailPeopleBadges}
+                          showFilename={showGridFilenames}
                           orderingBadge={getOrderingBadgeForAsset(asset)}
                     aiQueueEntry={editQueueEntriesByAssetId.get(asset.id) ?? null}
                     touchSelectionMode={touchSelectionMode}
@@ -15801,6 +15848,11 @@ export default function App() {
           setEditQueueExportNotice(null);
           setEditQueueExportError(null);
         }}
+      />
+      <EditLookupDialog
+        open={editLookupDialogOpen}
+        onClose={() => setEditLookupDialogOpen(false)}
+        onNavigate={(assetId, albumId) => handleNavigateToEditQueueAsset(assetId, albumId)}
       />
       <EditHistoryDialog
         open={editHistoryDialogOpen}
