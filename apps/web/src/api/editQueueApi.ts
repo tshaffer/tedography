@@ -6,6 +6,8 @@ export interface EditQueueEntryWithFilename extends EditQueueEntry {
   albumPath: string | null;
   editedAssetId: string | null;
   orphanedEditFilenames: string[];
+  // Returned files that could belong to this photo but also to another one.
+  ambiguousEditFilenames: string[];
   isExported: boolean;
 }
 
@@ -73,11 +75,29 @@ export function clearEditQueue(): Promise<void> {
   return fetchJson<void>('/api/edit-queue', { method: 'DELETE' });
 }
 
-export function exportEditQueue(assetIds: string[]): Promise<{ editPath: string; count: number }> {
-  return fetchJson<{ editPath: string; count: number }>('/api/edit-queue/export', {
+export type ExportStatus = 'exported' | 'alreadyExported' | 'previouslyExported' | 'conflict' | 'failed';
+
+export interface ExportItemResult {
+  assetId: string;
+  filename: string;
+  status: ExportStatus;
+  message: string;
+}
+
+export interface ExportEditQueueResponse {
+  editPath: string;
+  exportPath: string;
+  returnPath: string;
+  count: number;
+  counts: Record<ExportStatus, number>;
+  results: ExportItemResult[];
+}
+
+export function exportEditQueue(assetIds: string[], forceAssetIds: string[] = []): Promise<ExportEditQueueResponse> {
+  return fetchJson<ExportEditQueueResponse>('/api/edit-queue/export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assetIds }),
+    body: JSON.stringify({ assetIds, forceAssetIds }),
   });
 }
 
@@ -115,20 +135,37 @@ export function updateEditQueueEntryEditType(assetId: string, editType: EditType
   });
 }
 
-export function clearEditFolder(): Promise<{ ok: boolean; deletedCount: number }> {
+export function clearEditFolder(filenames: string[]): Promise<{ ok: boolean; deletedCount: number }> {
   return fetchJson<{ ok: boolean; deletedCount: number }>('/api/edit-queue/edit-folder', {
     method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filenames }),
   });
 }
+
+export type ReturnFileImportStatus = 'ready' | 'ambiguous' | 'unmatched' | 'other';
 
 export interface EditFolderFile {
   filename: string;
   size: number;
   modifiedAt: string;
+  isEditOutput: boolean;
+  importStatus: ReturnFileImportStatus;
 }
 
-export function listEditFolderFiles(): Promise<{ files: EditFolderFile[] }> {
-  return fetchJson<{ files: EditFolderFile[] }>('/api/edit-queue/edit-folder');
+export interface EditFolderInfo {
+  folders: { editPath: string; exportPath: string; returnPath: string; legacy: boolean };
+  manifest: { exists: boolean; entryCount: number };
+  notesExists: boolean;
+  exportedEntryCount: number;
+  exportedPresentCount: number;
+  files: EditFolderFile[];
+  ambiguous: Array<{ filename: string; candidates: Array<{ sourceAssetId: string; sourceFilename: string }> }>;
+  clearableFilenames: string[];
+}
+
+export function listEditFolderFiles(): Promise<EditFolderInfo> {
+  return fetchJson<EditFolderInfo>('/api/edit-queue/edit-folder');
 }
 
 export function deleteEditFolderFile(filename: string): Promise<{ ok: boolean }> {

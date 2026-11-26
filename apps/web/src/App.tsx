@@ -155,6 +155,8 @@ import {
   type EditedFileCandidate,
   type EditMethod,
   type EditFolderFile,
+  type EditFolderInfo,
+  type ExportItemResult,
   addToEditQueue,
   bulkAddToEditQueue,
   clearEditQueue,
@@ -4515,6 +4517,8 @@ export default function App() {
   const [editQueueClearFolderNotice, setEditQueueClearFolderNotice] = useState<string | null>(null);
   const [editQueueClearFolderError, setEditQueueClearFolderError] = useState<string | null>(null);
   const [editFolderFiles, setEditFolderFiles] = useState<EditFolderFile[]>([]);
+  const [editFolderInfo, setEditFolderInfo] = useState<EditFolderInfo | null>(null);
+  const [editQueueExportResults, setEditQueueExportResults] = useState<ExportItemResult[] | null>(null);
   const [editFolderFilesLoading, setEditFolderFilesLoading] = useState(false);
   const [editFolderFilesError, setEditFolderFilesError] = useState<string | null>(null);
   const [editQueueImportCandidateCount, setEditQueueImportCandidateCount] = useState(0);
@@ -6092,8 +6096,9 @@ export default function App() {
     setEditFolderFilesLoading(true);
     setEditFolderFilesError(null);
     try {
-      const { files } = await listEditFolderFiles();
-      setEditFolderFiles(files);
+      const info = await listEditFolderFiles();
+      setEditFolderInfo(info);
+      setEditFolderFiles(info.files);
     } catch (err) {
       setEditFolderFilesError(err instanceof Error ? err.message : 'Failed to load edit folder files');
     } finally {
@@ -8724,14 +8729,33 @@ export default function App() {
     }
   }
 
-  async function handleExportEditQueue(assetIds: string[]): Promise<void> {
+  async function handleExportEditQueue(assetIds: string[], forceAssetIds: string[] = []): Promise<void> {
     setEditQueueExportNotice(null);
     setEditQueueExportError(null);
+    setEditQueueExportResults(null);
     setEditQueueExporting(true);
     setEditQueueExportDialogOpen(true);
     try {
-      const result = await exportEditQueue(assetIds);
-      setEditQueueExportNotice(`Exported ${result.count} file${result.count !== 1 ? 's' : ''} to ${result.editPath}`);
+      const result = await exportEditQueue(assetIds, forceAssetIds);
+      const { exported, alreadyExported, previouslyExported, conflict, failed } = result.counts;
+      const sentences: string[] = [];
+      if (exported > 0) {
+        sentences.push(`${exported} photo${exported !== 1 ? 's' : ''} copied to ${result.exportPath} and linked.`);
+      }
+      if (alreadyExported > 0) {
+        sentences.push(
+          alreadyExported === 1
+            ? '1 photo linked. Its existing working copy was left untouched.'
+            : `${alreadyExported} photos linked. Their existing working copies were left untouched.`
+        );
+      }
+      const problems: string[] = [];
+      if (previouslyExported > 0) problems.push(`${previouslyExported} exported before but not found`);
+      if (conflict > 0) problems.push(`${conflict} filename conflict${conflict !== 1 ? 's' : ''}`);
+      if (failed > 0) problems.push(`${failed} failed`);
+      if (problems.length > 0) sentences.push(`Needs attention: ${problems.join(', ')}.`);
+      setEditQueueExportNotice(sentences.join(' '));
+      setEditQueueExportResults(result.results);
       await loadEditFolderFiles();
       await refreshImportCandidateCount();
       await loadEditQueue();
@@ -8785,12 +8809,12 @@ export default function App() {
     }
   }
 
-  async function handleClearEditFolder(): Promise<void> {
+  async function handleClearEditFolder(filenames: string[]): Promise<void> {
     setEditQueueClearFolderNotice(null);
     setEditQueueClearFolderError(null);
     try {
-      const result = await clearEditFolder();
-      setEditQueueClearFolderNotice(`Deleted ${result.deletedCount} file${result.deletedCount !== 1 ? 's' : ''} from edit folder`);
+      const result = await clearEditFolder(filenames);
+      setEditQueueClearFolderNotice(`Deleted ${result.deletedCount} returned file${result.deletedCount !== 1 ? 's' : ''}`);
       await loadEditFolderFiles();
       await refreshImportCandidateCount();
       await loadEditQueue();
@@ -15817,9 +15841,11 @@ export default function App() {
         clearFolderNotice={editQueueClearFolderNotice}
         clearFolderError={editQueueClearFolderError}
         editFolderFiles={editFolderFiles}
+        editFolderInfo={editFolderInfo}
         editFolderFilesLoading={editFolderFilesLoading}
         editFolderFilesError={editFolderFilesError}
         importCandidateCount={editQueueImportCandidateCount}
+        exportResults={editQueueExportResults}
         classifyCandidates={editQueueClassifyCandidates}
         classifyCommitting={editQueueClassifyCommitting}
         onClose={() => {
@@ -15830,7 +15856,7 @@ export default function App() {
         onExport={(assetIds) => void handleExportEditQueue(assetIds)}
         onImport={() => void handleImportEditedFiles()}
         onClearQueue={() => void handleClearEditQueue()}
-        onClearFolder={() => void handleClearEditFolder()}
+        onClearFolder={(filenames) => void handleClearEditFolder(filenames)}
         onDeleteEditFolderFile={(filename) => void handleDeleteEditFolderFile(filename)}
         onSaveNote={(assetId, note) => handleSaveEditQueueNote(assetId, note)}
         onSaveEditType={(assetId, editType) => void handleSaveEditQueueEditType(assetId, editType)}
@@ -15843,10 +15869,13 @@ export default function App() {
         exporting={editQueueExporting}
         notice={editQueueExportNotice}
         error={editQueueExportError}
+        results={editQueueExportResults}
+        onExportAnyway={(assetIds) => void handleExportEditQueue(assetIds, assetIds)}
         onClose={() => {
           setEditQueueExportDialogOpen(false);
           setEditQueueExportNotice(null);
           setEditQueueExportError(null);
+          setEditQueueExportResults(null);
         }}
       />
       <EditLookupDialog

@@ -113,6 +113,8 @@ API calls and components are organized by the same domain areas (albums, assets,
 | `TEDOGRAPHY_STORAGE_ROOTS` | `id\|label\|/absolute/path` separated by `;` |
 | `TEDOGRAPHY_DERIVED_ROOT` | Absolute path for derived files (converted HEIC, thumbnails) |
 | `TEDOGRAPHY_UNROTATED_ROOT` | Optional path for pre-rotation originals |
+| `TEDOGRAPHY_EDIT_PATH` | Edit Queue bookkeeping folder (`manifest.json`, `notes.txt`) |
+| `TEDOGRAPHY_EDIT_EXPORT_PATH` / `TEDOGRAPHY_EDIT_RETURN_PATH` | Optional: where Export copies originals / where finished `_edited` files are imported from. Set both or neither (neither = legacy single folder). Only the return folder is ever cleaned up. |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENABLED` | `true` / `false` |
 | `TEDOGRAPHY_PEOPLE_PIPELINE_ENGINE` | `rekognition` / `mock` / `none` |
 | `GOOGLE_PLACES_API_KEY` | Places API (New) key, restricted to `places.googleapis.com` — forward geocoding for Set Location |

@@ -257,6 +257,10 @@ export const config = {
   // so existing .env files keep working without changes.
   editPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_EDIT_PATH') ??
     parseOptionalAbsolutePathEnv('TEDOGRAPHY_AI_QUEUE_EXPORT_PATH'),
+  // Optional split of the Edit folder (see editQueue/editFolders.ts). When unset,
+  // each falls back to editPath — the legacy single-folder layout.
+  editExportPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_EDIT_EXPORT_PATH'),
+  editReturnPath: parseOptionalAbsolutePathEnv('TEDOGRAPHY_EDIT_RETURN_PATH'),
   googleApiKey: process.env.GOOGLE_API_KEY?.trim() || null,
   googlePlaces: {
     apiKey: process.env.GOOGLE_PLACES_API_KEY?.trim() || null,

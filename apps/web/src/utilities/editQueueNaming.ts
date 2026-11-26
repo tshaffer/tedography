@@ -8,7 +8,7 @@ function basenameWithoutExt(filename: string): string {
  * filename contains "_edited"), Export writes its manifest entry keyed off
  * *that* filename — so the next external-tool export must start with
  * `<thisBasename>_edited` to be matched back to it on import (see
- * findManifestMatchForFilename in editQueueRoutes.ts). Returns null for a
+ * matchEditedFilename in apps/api/src/editQueue/editedFilenameMatch.ts). Returns null for a
  * plain original, where no such hint is needed.
  */
 export function nextEditExportHint(filename: string): string | null {

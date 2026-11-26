@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, type CSSProperties, type ReactElement } from 'react';
 import { EditType, EDIT_TYPE_LABELS, EDIT_TYPE_VALUES } from '@tedography/domain';
 import type {
+  ExportItemResult,
   EditQueueEntryWithFilename,
   ImportEditedResult,
   EditedFileCandidate,
   EditMethod,
   EditFolderFile,
+  EditFolderInfo,
 } from '../../api/editQueueApi.js';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
 import { nextEditExportHint } from '../../utilities/editQueueNaming';
@@ -22,9 +24,12 @@ interface EditQueueDialogProps {
   clearFolderNotice: string | null;
   clearFolderError: string | null;
   editFolderFiles: EditFolderFile[];
+  editFolderInfo: EditFolderInfo | null;
   editFolderFilesLoading: boolean;
   editFolderFilesError: string | null;
   importCandidateCount: number;
+  // Outcome of the latest export; photos that succeeded are unchecked.
+  exportResults: ExportItemResult[] | null;
   classifyCandidates: EditedFileCandidate[];
   classifyCommitting: boolean;
   onClose: () => void;
@@ -32,7 +37,7 @@ interface EditQueueDialogProps {
   onExport: (assetIds: string[]) => void;
   onImport: () => void;
   onClearQueue: () => void;
-  onClearFolder: () => void;
+  onClearFolder: (filenames: string[]) => void;
   onDeleteEditFolderFile: (filename: string) => void;
   onSaveNote: (assetId: string, note: string) => Promise<void>;
   onSaveEditType: (assetId: string, editType: EditType) => void;
@@ -322,6 +327,20 @@ function classifySegButtonStyle(active: boolean, isFirst: boolean): CSSPropertie
   };
 }
 
+const RETURN_STATUS_LABELS: Record<EditFolderFile['importStatus'], string> = {
+  ready: 'ready to import',
+  ambiguous: 'ambiguous',
+  unmatched: 'no matching export',
+  other: 'not an edit',
+};
+
+const RETURN_STATUS_TITLES: Record<EditFolderFile['importStatus'], string> = {
+  ready: 'Matches exactly one exported photo; Import Edited Files will import it.',
+  ambiguous: 'Could belong to more than one exported photo, so it will not be imported automatically.',
+  unmatched: 'Looks like a finished edit but matches no photo in manifest.json.',
+  other: 'Not named like a finished edit (no _edited); ignored by Import and Clear Returned Files.',
+};
+
 export function EditQueueDialog({
   open,
   entries,
@@ -334,9 +353,11 @@ export function EditQueueDialog({
   clearFolderNotice,
   clearFolderError,
   editFolderFiles,
+  editFolderInfo,
   editFolderFilesLoading,
   editFolderFilesError,
   importCandidateCount,
+  exportResults,
   classifyCandidates,
   classifyCommitting,
   onClose,
@@ -356,6 +377,7 @@ export function EditQueueDialog({
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [confirmClearFolder, setConfirmClearFolder] = useState(false);
+  const clearableFilenames = editFolderInfo?.clearableFilenames ?? [];
   const [confirmClearQueue, setConfirmClearQueue] = useState(false);
   const [classifyMethodByFilename, setClassifyMethodByFilename] = useState<Record<string, EditMethod>>({});
   const [classifySelected, setClassifySelected] = useState<Set<string>>(new Set());
@@ -383,6 +405,19 @@ export function EditQueueDialog({
       setEditingAssetId(null);
     }
   }, [entries, editingAssetId]);
+
+  // Uncheck what an export dealt with, so the selection doesn't look like pending
+  // work. Photos that need attention stay checked.
+  useEffect(() => {
+    if (!exportResults) return;
+    const done = new Set(
+      exportResults.filter((r) => r.status === 'exported' || r.status === 'alreadyExported').map((r) => r.assetId)
+    );
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => !done.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [exportResults]);
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -591,6 +626,7 @@ export function EditQueueDialog({
                 const isSelected = selectedIds.has(entry.assetId);
                 const isEditing = editingAssetId === entry.assetId;
                 const hasOrphanedEdit = entry.orphanedEditFilenames.length > 0;
+                const hasAmbiguousEdit = entry.ambiguousEditFilenames.length > 0;
                 return (
                   <div
                     key={entry.assetId}
@@ -662,6 +698,12 @@ export function EditQueueDialog({
                       <span style={{ color: '#6b7280', fontSize: '10px' }}>{entry.albumPath}</span>
                     ) : null}
 
+                    {hasAmbiguousEdit ? (
+                      <span style={{ color: '#b45309', fontSize: '10px' }}>
+                        Ambiguous returned file{entry.ambiguousEditFilenames.length !== 1 ? 's' : ''} (could belong to more than one photo; not imported): {entry.ambiguousEditFilenames.join(', ')}
+                      </span>
+                    ) : null}
+
                     {entry.isExported && nextEditExportHint(entry.filename) ? (
                       <span
                         style={{ color: '#9ca3af', fontSize: '10px' }}
@@ -722,7 +764,7 @@ export function EditQueueDialog({
               style={selectedCount === 0 || exporting ? disabledButtonStyle : primaryButtonStyle}
               onClick={() => onExport(selectedAssetIds)}
               disabled={selectedCount === 0 || exporting}
-              title="Copy selected files and write manifest.json to edit folder"
+              title="Copy the selected originals into the export folder (never overwriting) and update manifest.json"
             >
               {exporting ? 'Exporting…' : selectedCount > 0 ? `Export (${selectedCount})` : 'Export'}
             </button>
@@ -731,7 +773,7 @@ export function EditQueueDialog({
               style={importing || importCandidateCount === 0 ? disabledButtonStyle : actionButtonStyle}
               onClick={onImport}
               disabled={importing || importCandidateCount === 0}
-              title={importCandidateCount === 0 ? 'No _edited files found in edit folder' : 'Scan edit folder for _edited files and import them'}
+              title={importCandidateCount === 0 ? 'No matching _edited files found in the return folder' : 'Scan the return folder for _edited files and import them'}
             >
               {importing
                 ? 'Importing…'
@@ -765,17 +807,46 @@ export function EditQueueDialog({
             )}
           </div>
 
-          {/* Edit folder file list — per-file delete */}
+          {/* Folders in use */}
+          {editFolderInfo ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: '#6b7280' }}>
+              <span style={{ fontWeight: 600 }}>Folders</span>
+              {editFolderInfo.folders.legacy ? (
+                <span title={editFolderInfo.folders.editPath}>
+                  Single folder (legacy layout): <code>{editFolderInfo.folders.editPath}</code> — exports, returned edits and manifest all share it.
+                </span>
+              ) : (
+                <>
+                  <span title={editFolderInfo.folders.exportPath}>
+                    Exports go to: <code>{editFolderInfo.folders.exportPath}</code> — managed by you and Lightroom; Tedography only adds files here and never deletes or overwrites anything
+                    {editFolderInfo.exportedEntryCount > 0
+                      ? ` (${editFolderInfo.exportedPresentCount} of ${editFolderInfo.exportedEntryCount} exported photos are directly in this folder; others may be in project subfolders)`
+                      : ''}
+                    .
+                  </span>
+                  <span title={editFolderInfo.folders.returnPath}>
+                    Finished edits are imported from: <code>{editFolderInfo.folders.returnPath}</code>
+                  </span>
+                  <span title={editFolderInfo.folders.editPath}>
+                    manifest.json{editFolderInfo.manifest.exists ? ` (${editFolderInfo.manifest.entryCount} photos)` : ' (not created yet)'}
+                    {editFolderInfo.notesExists ? ' and notes.txt' : ''} are kept in: <code>{editFolderInfo.folders.editPath}</code>
+                  </span>
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {/* Returned files — the only files Tedography offers to delete */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280' }}>
-              Edit Folder Files{editFolderFilesLoading ? '' : ` (${editFolderFiles.length})`}
+              Returned Files{editFolderFilesLoading ? '' : ` (${editFolderFiles.length})`}
             </span>
             {editFolderFilesLoading ? (
               <span style={{ fontSize: '11px', color: '#9ca3af' }}>Loading…</span>
             ) : editFolderFilesError ? (
               <span style={{ fontSize: '11px', color: '#b00020' }}>{editFolderFilesError}</span>
             ) : editFolderFiles.length === 0 ? (
-              <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No files in edit folder.</span>
+              <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>No files waiting in the return folder.</span>
             ) : (
               <div style={editFolderFileListStyle}>
                 {editFolderFiles.map((file) => (
@@ -783,15 +854,25 @@ export function EditQueueDialog({
                     <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {file.filename}
                     </span>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: '10px',
+                        color: file.importStatus === 'ready' ? '#16a34a' : file.importStatus === 'other' ? '#9ca3af' : '#b45309',
+                      }}
+                      title={RETURN_STATUS_TITLES[file.importStatus]}
+                    >
+                      {RETURN_STATUS_LABELS[file.importStatus]}
+                    </span>
                     <button
                       type="button"
                       style={iconButtonStyle}
                       onClick={() => {
-                        if (window.confirm(`Delete "${file.filename}" from the edit folder? This cannot be undone.`)) {
+                        if (window.confirm(`Delete "${file.filename}" from the return folder? This cannot be undone.`)) {
                           onDeleteEditFolderFile(file.filename);
                         }
                       }}
-                      title="Delete this file from the edit folder"
+                      title="Delete this file from the return folder"
                     >
                       ×
                     </button>
@@ -799,17 +880,31 @@ export function EditQueueDialog({
                 ))}
               </div>
             )}
+            {editFolderInfo && editFolderInfo.ambiguous.length > 0 ? (
+              <div style={{ fontSize: '11px', color: '#b45309' }}>
+                {editFolderInfo.ambiguous.map((item) => (
+                  <div key={item.filename}>
+                    {item.filename} could belong to: {item.candidates.map((c) => c.sourceFilename).join(' or ')}. It was left untouched — rename it so it matches only one.
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          {/* Clear folder — two-step confirm */}
-          <div style={footerButtonRowStyle}>
+          {/* Clear returned files — lists exactly what will be deleted */}
+          <div style={{ ...footerButtonRowStyle, flexWrap: 'wrap' }}>
             {confirmClearFolder ? (
               <>
-                <span style={{ fontSize: '12px', color: '#374151' }}>Delete all files in edit folder?</span>
+                <span style={{ fontSize: '12px', color: '#374151', flexBasis: '100%' }}>
+                  Delete these {clearableFilenames.length} returned file{clearableFilenames.length !== 1 ? 's' : ''}? Nothing else is touched.
+                  <span style={{ display: 'block', fontFamily: 'monospace', fontSize: '11px', color: '#6b7280' }}>
+                    {clearableFilenames.join(', ')}
+                  </span>
+                </span>
                 <button
                   type="button"
                   style={{ ...dangerButtonStyle, backgroundColor: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
-                  onClick={() => { setConfirmClearFolder(false); onClearFolder(); }}
+                  onClick={() => { setConfirmClearFolder(false); onClearFolder(clearableFilenames); }}
                 >
                   Yes, delete
                 </button>
@@ -818,8 +913,14 @@ export function EditQueueDialog({
                 </button>
               </>
             ) : (
-              <button type="button" style={dangerButtonStyle} onClick={() => setConfirmClearFolder(true)}>
-                Clear Edit Folder
+              <button
+                type="button"
+                style={clearableFilenames.length === 0 ? disabledButtonStyle : dangerButtonStyle}
+                onClick={() => setConfirmClearFolder(true)}
+                disabled={clearableFilenames.length === 0}
+                title="Delete the finished-edit (_edited) files waiting in the return folder. Never touches the export folder, manifest.json or notes.txt."
+              >
+                Clear Returned Files{clearableFilenames.length > 0 ? ` (${clearableFilenames.length})` : ''}
               </button>
             )}
           </div>
@@ -828,7 +929,7 @@ export function EditQueueDialog({
           {importResults && !importError ? (
             <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {importedCount === 0 && importErrorCount === 0 ? (
-                <span style={{ color: '#6b7280' }}>No _edited files found in edit folder.</span>
+                <span style={{ color: '#6b7280' }}>No matching _edited files found in the return folder.</span>
               ) : null}
               {importedResults.length > 0 ? (
                 <div>

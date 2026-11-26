@@ -10,7 +10,7 @@ import {
   findById,
   findByIds,
   createMediaAsset,
-  updateMediaAssetAlbumIds,
+  deleteAssetsByIds,
   updateMediaAssetPeople,
   addEditedAssetId,
   setMediaAssetEditMethod,
@@ -35,70 +35,62 @@ import {
   buildThumbnailDerivedRelativePath,
   resolveDerivedAbsolutePath,
 } from '../import/derivedStorage.js';
-import { getStorageRoots, getStorageRootById } from '../import/storageRoots.js';
+import { getStorageRootById } from '../import/storageRoots.js';
 import { getMediaSupport } from '../import/supportedMedia.js';
 import { generateJpegThumbnail } from '../import/thumbnailGeneration.js';
+import { resolveEditFolders, type EditFolders } from '../editQueue/editFolders.js';
+import { MANIFEST_FILENAME, NOTES_FILENAME, mergeIntoManifest, readManifest, basenameWithoutExt, type ManifestEntry } from '../editQueue/manifest.js';
+import { exportOneAsset, type ExportItemResult } from '../editQueue/exportService.js';
+import {
+  UnsafeDeleteError,
+  clearReturnedFiles,
+  deleteReturnFile,
+  listClearableReturnFiles,
+  listReturnFiles,
+  scanReturnFolder,
+} from '../editQueue/returnFiles.js';
+import { placeEditedFile } from '../editQueue/importPlacement.js';
 
 export const editQueueRoutes: RouterType = Router();
 
-// ─── Manifest type ───────────────────────────────────────────────────────────
-
-interface ManifestEntry {
-  sourceAssetId: string;
-  originalFilename: string;
-  originalBasename: string;
-  note: string;
-}
-
-interface Manifest {
-  exportedAt: string;
-  entries: ManifestEntry[];
-}
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getEditPath(): string | null {
-  return config.editPath;
+/**
+ * Resolves and validates the Edit folders from config. Refuses (rather than
+ * guessing) when they overlap each other or the library's own storage, so a bad
+ * configuration can never lead to a destructive operation.
+ */
+async function loadEditFolders(): Promise<{ ok: true; folders: EditFolders } | { ok: false; status: number; error: string }> {
+  if (!config.editPath) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'TEDOGRAPHY_EDIT_PATH (or TEDOGRAPHY_AI_QUEUE_EXPORT_PATH) is not configured in .env',
+    };
+  }
+  const result = await resolveEditFolders({
+    editPath: config.editPath,
+    exportPath: config.editExportPath,
+    returnPath: config.editReturnPath,
+    protectedPaths: [
+      ...config.storageRoots.map((r) => r.absolutePath),
+      config.derivedRoot,
+      ...(config.unrotatedRoot ? [config.unrotatedRoot] : []),
+    ],
+  });
+  if (!result.ok) {
+    return { ok: false, status: 500, error: `Edit folder configuration error: ${result.error}` };
+  }
+  return { ok: true, folders: result.folders };
 }
 
-function requireEditPath(res: Response): string | null {
-  const editPath = getEditPath();
-  if (!editPath) {
-    res.status(400).json({
-      error: 'TEDOGRAPHY_EDIT_PATH (or TEDOGRAPHY_AI_QUEUE_EXPORT_PATH) is not configured in .env',
-    });
+async function requireEditFolders(res: Response): Promise<EditFolders | null> {
+  const result = await loadEditFolders();
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return null;
   }
-  return editPath;
-}
-
-/** Find the registered storage root whose absolutePath is a prefix of the edit path. */
-function findStorageRootForEditPath(editPath: string): { id: string; absolutePath: string } | null {
-  const roots = getStorageRoots();
-  // Prefer the longest matching prefix so nested roots win.
-  const match = roots
-    .filter((r) => editPath.startsWith(r.absolutePath))
-    .sort((a, b) => b.absolutePath.length - a.absolutePath.length)[0];
-  return match ?? null;
-}
-
-function basenameWithoutExt(filename: string): string {
-  const ext = path.extname(filename);
-  return ext ? filename.slice(0, -ext.length) : filename;
-}
-
-/** Move a file, falling back to copy+delete if src and dest are on different volumes. */
-async function moveFile(src: string, dest: string): Promise<void> {
-  try {
-    await fs.rename(src, dest);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
-      await fs.copyFile(src, dest);
-      await fs.unlink(src);
-    } else {
-      throw err;
-    }
-  }
+  return result.folders;
 }
 
 type AlbumNodeMap = Map<string, { label: string; parentId: string | null }>;
@@ -117,91 +109,6 @@ function buildAlbumPath(albumId: string, nodesById: AlbumNodeMap): string | null
   return parts.length > 0 ? parts.join(' → ') : null;
 }
 
-/**
- * Matches an edited filename's basename against manifest entries whose original
- * basename is followed immediately by "_edited" (optionally with more characters
- * after, e.g. "_edited_ai", "_edited-2") — this lets more than one edited output
- * exist for the same original, as long as each has a distinct filename. When more
- * than one entry's basename qualifies, the longest one wins to avoid ambiguity.
- */
-function findManifestMatchForFilename(filename: string, manifestEntries: ManifestEntry[]): ManifestEntry | null {
-  const base = basenameWithoutExt(filename).toLowerCase();
-  const matches = manifestEntries.filter((entry) =>
-    base.startsWith(`${entry.originalBasename.toLowerCase()}_edited`)
-  );
-  if (matches.length === 0) return null;
-  return matches.sort((a, b) => b.originalBasename.length - a.originalBasename.length)[0]!;
-}
-
-async function readManifest(editPath: string): Promise<Manifest | null> {
-  try {
-    const raw = await fs.readFile(path.join(editPath, 'manifest.json'), 'utf-8');
-    return JSON.parse(raw) as Manifest;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Finds "_edited" files in the folder that don't resolve to any current manifest
- * entry — i.e. real edit output that Import can't see because its source asset's
- * manifest link is missing or was overwritten by a later export. Returns each
- * orphan's filename plus its inferred original basename (everything before
- * "_edited"), so callers can match it back to a specific queue entry.
- */
-async function findOrphanedEditedFiles(
-  editPath: string,
-  manifestEntries: ManifestEntry[]
-): Promise<{ filename: string; inferredBasename: string }[]> {
-  let allFiles: string[];
-  try {
-    allFiles = await fs.readdir(editPath);
-  } catch {
-    return [];
-  }
-
-  const orphans: { filename: string; inferredBasename: string }[] = [];
-  for (const filename of allFiles) {
-    if (filename === 'manifest.json' || filename === 'notes.txt') continue;
-    const base = basenameWithoutExt(filename);
-    const editedIdx = base.toLowerCase().indexOf('_edited');
-    if (editedIdx <= 0) continue;
-    if (findManifestMatchForFilename(filename, manifestEntries)) continue;
-    orphans.push({ filename, inferredBasename: base.slice(0, editedIdx) });
-  }
-  return orphans;
-}
-
-type EditedFileCandidate = { filename: string; manifestEntry: ManifestEntry };
-
-async function findEditedFileCandidates(
-  editPath: string
-): Promise<{ ok: true; candidates: EditedFileCandidate[] } | { ok: false; error: string }> {
-  const manifest = await readManifest(editPath);
-  if (!manifest) {
-    return { ok: false, error: 'manifest.json not found in edit path. Run Export first.' };
-  }
-
-  let allFiles: string[];
-  try {
-    allFiles = await fs.readdir(editPath);
-  } catch {
-    return { ok: false, error: 'Failed to read edit path directory' };
-  }
-
-  const candidates: EditedFileCandidate[] = [];
-  for (const filename of allFiles) {
-    const base = basenameWithoutExt(filename).toLowerCase();
-    if (!base.includes('_edited')) continue;
-    const manifestEntry = findManifestMatchForFilename(filename, manifest.entries);
-    if (manifestEntry) {
-      candidates.push({ filename, manifestEntry });
-    }
-  }
-
-  return { ok: true, candidates };
-}
-
 // ─── GET / — list queue entries with filenames and album path ────────────────
 
 editQueueRoutes.get('/', async (_req, res) => {
@@ -209,19 +116,28 @@ editQueueRoutes.get('/', async (_req, res) => {
     const [entries, allNodes] = await Promise.all([getQueueEntries(), listAlbumTreeNodes()]);
     const nodesById = new Map(allNodes.map((n) => [n.id, n]));
 
-    const editPath = getEditPath();
+    const loaded = await loadEditFolders();
     const orphansByBasenameLower = new Map<string, string[]>();
+    const ambiguousByAssetId = new Map<string, string[]>();
     let manifestAssetIds = new Set<string>();
-    if (editPath) {
-      const manifest = await readManifest(editPath);
+    if (loaded.ok) {
+      const manifest = await readManifest(loaded.folders.editPath);
       const manifestEntries = manifest?.entries ?? [];
       manifestAssetIds = new Set(manifestEntries.map((e) => e.sourceAssetId));
-      const orphans = await findOrphanedEditedFiles(editPath, manifestEntries);
-      for (const orphan of orphans) {
+      const scan = await scanReturnFolder(loaded.folders.returnPath, manifestEntries);
+      for (const orphan of scan.unmatched) {
+        if (!orphan.inferredBasename) continue;
         const key = orphan.inferredBasename.toLowerCase();
         const list = orphansByBasenameLower.get(key) ?? [];
         list.push(orphan.filename);
         orphansByBasenameLower.set(key, list);
+      }
+      for (const item of scan.ambiguous) {
+        for (const candidate of item.candidates) {
+          const list = ambiguousByAssetId.get(candidate.sourceAssetId) ?? [];
+          list.push(item.filename);
+          ambiguousByAssetId.set(candidate.sourceAssetId, list);
+        }
       }
     }
 
@@ -234,7 +150,8 @@ editQueueRoutes.get('/', async (_req, res) => {
         const albumPath = albumId ? buildAlbumPath(albumId, nodesById) : null;
         const orphanedEditFilenames = orphansByBasenameLower.get(basenameWithoutExt(filename).toLowerCase()) ?? [];
         const isExported = manifestAssetIds.has(entry.assetId);
-        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames, isExported };
+        const ambiguousEditFilenames = ambiguousByAssetId.get(entry.assetId) ?? [];
+        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames, ambiguousEditFilenames, isExported };
       })
     );
     res.json(withDetails);
@@ -346,71 +263,123 @@ editQueueRoutes.delete('/', requireFeature('maintenance'), async (_req, res) => 
   }
 });
 
-// ─── DELETE /edit-folder — clear all files from edit path ────────────────────
-
-editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (_req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
-
-  try {
-    const entries = await fs.readdir(editPath, { withFileTypes: true });
-    const fileEntries = entries.filter((e) => e.isFile());
-    await Promise.all(fileEntries.map((e) => fs.unlink(path.join(editPath, e.name))));
-    res.json({ ok: true, deletedCount: fileEntries.length });
-  } catch (error) {
-    log.error('Failed to clear edit folder', error);
-    res.status(500).json({ error: 'Failed to clear edit folder' });
-  }
-});
-
-// ─── GET /edit-folder — list files currently sitting in the edit folder ──────
+// ─── GET /edit-folder — what the Edit Queue folders currently hold ───────────
+//
+// Only the return folder's contents are listed for action. The export folder
+// ("Active Edits") belongs to Lightroom and the user, so it is summarized
+// read-only from the manifest and nothing in it is ever offered for deletion.
 
 editQueueRoutes.get('/edit-folder', requireFeature('maintenance'), async (_req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
 
   try {
-    const entries = await fs.readdir(editPath, { withFileTypes: true });
-    const fileEntries = entries.filter((e) => e.isFile());
-    const files = await Promise.all(
-      fileEntries.map(async (e) => {
-        const stat = await fs.stat(path.join(editPath, e.name));
-        return { filename: e.name, size: stat.size, modifiedAt: stat.mtime.toISOString() };
-      })
-    );
-    files.sort((a, b) => a.filename.localeCompare(b.filename));
-    res.json({ files });
+    const manifest = await readManifest(folders.editPath);
+    const entries = manifest?.entries ?? [];
+    const scan = await scanReturnFolder(folders.returnPath, entries);
+    const returnFiles = await listReturnFiles(folders.returnPath);
+    const clearable = await listClearableReturnFiles(folders.returnPath);
+
+    let exportedPresentCount = 0;
+    for (const entry of entries) {
+      const name = entry.exportedFilename ?? entry.originalFilename;
+      const present = await fs.lstat(path.join(folders.exportPath, name)).then(() => true, () => false);
+      if (present) exportedPresentCount++;
+    }
+
+    const matchedNames = new Set(scan.matched.map((m) => m.filename));
+    const ambiguousNames = new Set(scan.ambiguous.map((m) => m.filename));
+    const unmatchedNames = new Set(scan.unmatched.map((m) => m.filename));
+    res.json({
+      folders,
+      manifest: { exists: manifest != null, entryCount: entries.length },
+      notesExists: await fs.lstat(path.join(folders.editPath, NOTES_FILENAME)).then(() => true, () => false),
+      exportedEntryCount: entries.length,
+      exportedPresentCount,
+      files: returnFiles.map((file) => ({
+        ...file,
+        importStatus: matchedNames.has(file.filename)
+          ? 'ready'
+          : ambiguousNames.has(file.filename)
+            ? 'ambiguous'
+            : unmatchedNames.has(file.filename)
+              ? 'unmatched'
+              : 'other',
+      })),
+      ambiguous: scan.ambiguous.map((item) => ({
+        filename: item.filename,
+        candidates: item.candidates.map((c) => ({ sourceAssetId: c.sourceAssetId, sourceFilename: c.originalFilename })),
+      })),
+      clearableFilenames: clearable.map((f) => f.filename),
+    });
   } catch (error) {
     log.error('Failed to list edit folder', error);
     res.status(500).json({ error: 'Failed to list edit folder' });
   }
 });
 
-// ─── DELETE /edit-folder/:filename — delete a single file from the edit folder ─
+// ─── DELETE /edit-folder — clear returned edit files (and only those) ─────────
+//
+// Deletes regular "_edited" files directly inside the return folder. Never
+// directories, manifest.json, notes.txt, or anything in the export folder.
+// `filenames` limits deletion to what the user confirmed.
 
-editQueueRoutes.delete('/edit-folder/:filename', requireFeature('maintenance'), async (req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
+editQueueRoutes.delete('/edit-folder', requireFeature('maintenance'), async (req, res) => {
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
 
-  const filename = req.params.filename as string;
-  const targetAbsolutePath = path.resolve(path.join(editPath, filename));
-  const editPathResolved = path.resolve(editPath);
-  const isDirectChild =
-    path.dirname(targetAbsolutePath) === editPathResolved && !filename.includes('/') && !filename.includes('\\');
-  if (!isDirectChild) {
-    res.status(400).json({ error: 'Invalid filename' });
+  const body = (req.body ?? {}) as { filenames?: unknown };
+  if (body.filenames != null && (!Array.isArray(body.filenames) || !body.filenames.every((f) => typeof f === 'string'))) {
+    res.status(400).json({ error: 'filenames must be an array of strings' });
     return;
   }
 
   try {
-    await fs.unlink(targetAbsolutePath);
+    const deleted = await clearReturnedFiles(folders.returnPath, body.filenames as string[] | undefined);
+    log.info(`Cleared ${deleted.length} returned edit file(s) from ${folders.returnPath}`);
+    res.json({ ok: true, deletedCount: deleted.length, deleted });
+  } catch (error) {
+    log.error('Failed to clear returned files', error);
+    res.status(500).json({ error: 'Failed to clear returned files' });
+  }
+});
+
+// ─── DELETE /edit-folder/notes — remove notes.txt (never read back) ──────────
+
+editQueueRoutes.delete('/edit-folder/notes', requireFeature('maintenance'), async (_req, res) => {
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
+  try {
+    await fs.unlink(path.join(folders.editPath, NOTES_FILENAME)).catch((err: NodeJS.ErrnoException) => {
+      if (err.code !== 'ENOENT') throw err;
+    });
     res.json({ ok: true });
   } catch (error) {
+    log.error('Failed to delete notes.txt', error);
+    res.status(500).json({ error: 'Failed to delete notes.txt' });
+  }
+});
+
+// ─── DELETE /edit-folder/:filename — delete one file from the return folder ──
+
+editQueueRoutes.delete('/edit-folder/:filename', requireFeature('maintenance'), async (req, res) => {
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
+
+  const filename = req.params.filename as string;
+  try {
+    await deleteReturnFile(folders.returnPath, filename);
+    res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof UnsafeDeleteError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       res.status(404).json({ error: 'File not found' });
       return;
     }
-    log.error(`Failed to delete edit folder file "${filename}"`, error);
+    log.error(`Failed to delete returned file "${filename}"`, error);
     res.status(500).json({ error: 'Failed to delete file' });
   }
 });
@@ -427,111 +396,154 @@ editQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, r
   }
 });
 
-// ─── POST /export — copy files + write manifest.json + notes.txt ────────────
+// ─── POST /export — copy originals to the export folder + manifest + notes ───
+//
+// Never overwrites. Each photo gets one of: exported / alreadyExported /
+// previouslyExported / conflict / failed (see editQueue/exportService.ts). Only
+// photos with a reliably established working copy are written to the manifest.
+// `forceAssetIds` lists previouslyExported photos the user chose to export anyway.
 
 editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
 
-  const { assetIds } = req.body as { assetIds?: string[] };
+  const { assetIds, forceAssetIds } = req.body as { assetIds?: string[]; forceAssetIds?: string[] };
   if (!Array.isArray(assetIds) || assetIds.length === 0) {
     res.status(400).json({ error: 'assetIds must be a non-empty array' });
     return;
   }
+  const forced = new Set(Array.isArray(forceAssetIds) ? forceAssetIds : []);
 
   try {
-    await fs.mkdir(editPath, { recursive: true });
+    await fs.mkdir(folders.editPath, { recursive: true });
     const entries = await getQueueEntries();
     const entryMap = new Map(entries.map((e) => [e.assetId, e]));
+    const manifestEntries = (await readManifest(folders.editPath))?.entries ?? [];
 
+    const results: ExportItemResult[] = [];
     const noteLines: string[] = [];
     const newManifestEntries: ManifestEntry[] = [];
 
     for (const assetId of assetIds) {
       const entry = entryMap.get(assetId);
-      if (!entry) continue;
+      if (!entry) {
+        results.push({ assetId, filename: assetId, status: 'failed', message: 'Not in the Edit Queue' });
+        continue;
+      }
       const asset = await findById(assetId);
-      if (!asset) continue;
+      if (!asset) {
+        results.push({ assetId, filename: assetId, status: 'failed', message: 'Photo not found in the library' });
+        continue;
+      }
 
+      let sourcePath: string;
       try {
-        const srcPath = resolveOriginalAbsolutePathForAsset(asset);
-        const destPath = path.join(editPath, asset.filename);
-        await fs.copyFile(srcPath, destPath);
-        noteLines.push(`${asset.filename}: ${entry.note || '(no note)'}`);
-        newManifestEntries.push({
-          sourceAssetId: asset.id,
-          originalFilename: asset.filename,
-          originalBasename: basenameWithoutExt(asset.filename),
-          note: entry.note,
-        });
+        sourcePath = resolveOriginalAbsolutePathForAsset(asset);
       } catch (err) {
-        log.error(`Failed to copy asset ${assetId}`, err);
-        noteLines.push(`${asset.filename}: ERROR - could not copy file`);
+        log.error(`Failed to resolve original for asset ${assetId}`, err);
+        results.push({ assetId, filename: asset.filename, status: 'failed', message: 'Could not locate the original file' });
+        noteLines.push(`${asset.filename}: ERROR - could not locate file`);
+        continue;
+      }
+
+      const outcome = await exportOneAsset(
+        {
+          assetId,
+          filename: asset.filename,
+          sourcePath,
+          contentHash: asset.originalContentHash ?? null,
+          note: entry.note,
+        },
+        {
+          exportPath: folders.exportPath,
+          // Includes this batch's claims, so two same-named photos exported
+          // together can't both be tied to one file.
+          manifestEntries: [...manifestEntries, ...newManifestEntries],
+          force: forced.has(assetId),
+          hashFile: computeSha256ForFile,
+        }
+      );
+      results.push(outcome.result);
+      if (outcome.manifestEntry) {
+        newManifestEntries.push(outcome.manifestEntry);
+      }
+      if (outcome.result.status === 'exported' || outcome.result.status === 'alreadyExported') {
+        noteLines.push(`${asset.filename}: ${entry.note || '(no note)'}`);
+      } else {
+        noteLines.push(`${asset.filename}: NOT EXPORTED (${outcome.result.status})`);
+      }
+      if (outcome.result.status === 'failed') {
+        log.error(`Failed to export asset ${assetId}: ${outcome.result.message}`);
       }
     }
 
-    await fs.writeFile(
-      path.join(editPath, 'notes.txt'),
-      noteLines.join('\n') + '\n',
-      'utf-8'
-    );
+    await fs.writeFile(path.join(folders.editPath, NOTES_FILENAME), noteLines.join('\n') + '\n', 'utf-8');
 
-    // Merge into any existing manifest instead of overwriting it — otherwise a
-    // later export of a different subset silently orphans _edited files already
-    // produced for assets left out of this call. Re-exporting an asset updates
-    // its entry in place; entries are never pruned here (only Clear Edit Folder,
-    // which deletes manifest.json itself, removes entries).
-    const existingManifest = await readManifest(editPath);
-    const mergedEntriesByAssetId = new Map(
-      (existingManifest?.entries ?? []).map((e) => [e.sourceAssetId, e])
-    );
-    for (const entry of newManifestEntries) {
-      mergedEntriesByAssetId.set(entry.sourceAssetId, entry);
+    // Merge into the existing manifest — never replace it — so edits already
+    // produced for photos left out of this batch stay linked to their sources.
+    if (newManifestEntries.length > 0) {
+      await mergeIntoManifest(folders.editPath, newManifestEntries);
     }
 
-    const manifest: Manifest = {
-      exportedAt: new Date().toISOString(),
-      entries: Array.from(mergedEntriesByAssetId.values()),
-    };
-    await fs.writeFile(
-      path.join(editPath, 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-      'utf-8'
-    );
-
-    res.json({ editPath, count: newManifestEntries.length });
+    const countOf = (status: ExportItemResult['status']): number => results.filter((r) => r.status === status).length;
+    res.json({
+      editPath: folders.editPath,
+      exportPath: folders.exportPath,
+      returnPath: folders.returnPath,
+      count: countOf('exported'),
+      counts: {
+        exported: countOf('exported'),
+        alreadyExported: countOf('alreadyExported'),
+        previouslyExported: countOf('previouslyExported'),
+        conflict: countOf('conflict'),
+        failed: countOf('failed'),
+      },
+      results,
+    });
   } catch (error) {
     log.error('Failed to export edit queue', error);
-    res.status(500).json({ error: 'Failed to export edit queue' });
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to export edit queue' });
   }
 });
 
-// ─── GET /import/scan — find candidate _edited files, no side effects ───────
+// ─── GET /import/scan — classify returned files, no side effects ────────────
 
 editQueueRoutes.get('/import/scan', requireFeature('maintenance'), async (_req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
 
-  const result = await findEditedFileCandidates(editPath);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
+  const manifest = await readManifest(folders.editPath);
+  if (!manifest) {
+    res.status(400).json({ error: `${MANIFEST_FILENAME} not found in the edit folder. Run Export first.` });
     return;
   }
 
-  res.json({
-    files: result.candidates.map((c) => ({
-      filename: c.filename,
-      sourceAssetId: c.manifestEntry.sourceAssetId,
-      sourceFilename: c.manifestEntry.originalFilename,
-    })),
-  });
+  try {
+    const scan = await scanReturnFolder(folders.returnPath, manifest.entries);
+    res.json({
+      returnPath: folders.returnPath,
+      files: scan.matched.map((m) => ({
+        filename: m.filename,
+        sourceAssetId: m.entry.sourceAssetId,
+        sourceFilename: m.entry.originalFilename,
+      })),
+      ambiguous: scan.ambiguous.map((a) => ({
+        filename: a.filename,
+        candidates: a.candidates.map((c) => ({ sourceAssetId: c.sourceAssetId, sourceFilename: c.originalFilename })),
+      })),
+      unmatched: scan.unmatched.map((u) => ({ filename: u.filename })),
+    });
+  } catch (error) {
+    log.error('Failed to scan return folder', error);
+    res.status(500).json({ error: 'Failed to scan the return folder' });
+  }
 });
 
-// ─── POST /import — import the given classified _edited files ───────────────
+// ─── POST /import — import the given classified edited files ────────────────
 
 editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) => {
-  const editPath = requireEditPath(res);
-  if (!editPath) return;
+  const folders = await requireEditFolders(res);
+  if (!folders) return;
 
   const { files } = req.body as { files?: { filename?: string; editMethod?: string }[] };
   if (!Array.isArray(files) || files.length === 0) {
@@ -546,12 +558,14 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
   }
   const requestedFiles = files as { filename: string; editMethod: 'ai' | 'manual' }[];
 
-  const scanResult = await findEditedFileCandidates(editPath);
-  if (!scanResult.ok) {
-    res.status(400).json({ error: scanResult.error });
+  const manifest = await readManifest(folders.editPath);
+  if (!manifest) {
+    res.status(400).json({ error: `${MANIFEST_FILENAME} not found in the edit folder. Run Export first.` });
     return;
   }
-  const candidateByFilename = new Map(scanResult.candidates.map((c) => [c.filename, c.manifestEntry]));
+  const scanResult = await scanReturnFolder(folders.returnPath, manifest.entries);
+  const candidateByFilename = new Map(scanResult.matched.map((c) => [c.filename, c.entry]));
+  const ambiguousFilenames = new Set(scanResult.ambiguous.map((a) => a.filename));
 
   const results: Array<{
     filename: string;
@@ -562,13 +576,20 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
   }> = [];
 
   for (const { filename: editedFilename, editMethod } of requestedFiles) {
-    const absolutePath = path.join(editPath, editedFilename);
-
+    // Only a filename the scan classified as unambiguously matched is ever turned
+    // into a path, so the request can't name an arbitrary file.
     const manifestEntry = candidateByFilename.get(editedFilename);
     if (!manifestEntry) {
-      results.push({ filename: editedFilename, status: 'skipped', message: 'No matching manifest entry for source basename' });
+      results.push({
+        filename: editedFilename,
+        status: 'skipped',
+        message: ambiguousFilenames.has(editedFilename)
+          ? 'Ambiguous: more than one exported photo could be the source. Left in the return folder untouched.'
+          : 'No matching manifest entry for source basename',
+      });
       continue;
     }
+    const absolutePath = path.join(folders.returnPath, editedFilename);
 
     const sourceAsset = await findById(manifestEntry.sourceAssetId);
     if (!sourceAsset) {
@@ -680,9 +701,12 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
       // Inherit keywords
       const keywordIds = Array.isArray(sourceAsset.keywordIds) ? [...sourceAsset.keywordIds] : [];
 
-      // Move the edited file from the edit folder to the source asset's folder
-      await moveFile(absolutePath, destAbsolutePath);
-
+      // Copy into the source asset's folder (never overwriting), create the records,
+      // and only then delete the file from the return folder. Any failure rolls the
+      // copy back and leaves the return file in place for a retry.
+      const placement = await placeEditedFile(absolutePath, destAbsolutePath, async () => {
+      let createdAssetId: string | null = null;
+      try {
       // Create asset — photoState starts as New
       const newAsset = await createMediaAsset({
         filename: editedFilename,
@@ -722,6 +746,7 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
         sourceAssetId: sourceAsset.id,
         editMethod,
       });
+      createdAssetId = newAsset.id;
 
       // Inherit people from source
       const sourcePeople: MediaAssetPerson[] = (sourceAsset.people ?? []).map((p) => ({
@@ -739,6 +764,17 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
         addEditedAssetId(sourceAsset.id, newAsset.id),
         removeQueueEntry(sourceAsset.id),
       ]);
+      return newAsset;
+      } catch (err) {
+        if (createdAssetId) {
+          await deleteAssetsByIds([createdAssetId]).catch((cleanupErr) =>
+            log.error(`Failed to roll back asset ${createdAssetId} after import error`, cleanupErr)
+          );
+        }
+        throw err;
+      }
+      });
+      const newAsset = placement.value;
 
       // Record in history
       await createEditHistoryEntry({
@@ -753,7 +789,15 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
       });
 
       log.info(`Imported edited file ${editedFilename} as asset ${newAsset.id}`);
-      results.push({ filename: editedFilename, status: 'imported', assetId: newAsset.id, destPath: sourceFileDir });
+      results.push({
+        filename: editedFilename,
+        status: 'imported',
+        assetId: newAsset.id,
+        destPath: sourceFileDir,
+        ...(placement.returnFileRemoved
+          ? {}
+          : { message: 'Imported, but the file could not be deleted from the return folder; remove it manually.' }),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.error(`Failed to import ${editedFilename}`, err);
