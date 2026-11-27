@@ -1,6 +1,8 @@
+import { TRAILING_ADOBE_TOKENS, codedPrefix, endsWithExportCode } from './exportNames.js';
 import { basenameWithoutExt, type ManifestEntry } from './manifest.js';
 
-// A finished edit is named  <original basename>[Adobe tokens]_edited[suffix].<ext>
+// A finished edit is named  <working basename>[Adobe tokens]_edited[suffix].<ext>
+// where the working basename is that of the copy Export created.
 //
 //   IMG_2579_edited.tif            Lightroom-only edit
 //   IMG_2579_edited_v2.tif         further version (any suffix without "_edited")
@@ -10,7 +12,11 @@ import { basenameWithoutExt, type ManifestEntry } from './manifest.js';
 // "Adobe tokens" are the derivative suffixes Lightroom Classic appends to the
 // working file it creates: -Edit, -Edit-N (Edit in Photoshop), -Enhanced,
 // -Enhanced-NR / -Enhanced-SR (Enhance), -HDR, -Pano. Matching is on this
-// explicit grammar, never on a bare prefix or substring.
+// explicit grammar, never on a bare prefix or substring. The one extension: after
+// a coded name (IMG_2579__tdg0f1023d0), which identifies its photo by itself, a
+// description starting with "-" may stand where the Adobe tokens would:
+//
+//   IMG_2579__tdg0f1023d0-restoration_edited.tif
 //
 // The `_edited` marker is the LAST one in the name: whatever follows it is a
 // version suffix and cannot itself contain `_edited`. That keeps chained edits
@@ -19,7 +25,6 @@ import { basenameWithoutExt, type ManifestEntry } from './manifest.js';
 
 const EDITED_MARKER = '_edited';
 const ADOBE_TOKENS = /^(?:-edit(?:-\d+)?|-enhanced(?:-nr|-sr)?|-hdr|-pano)+$/;
-const TRAILING_ADOBE_TOKENS = /(?:-edit(?:-\d+)?|-enhanced(?:-nr|-sr)?|-hdr|-pano)+$/i;
 
 /** Files that are never edit output: macOS metadata, hidden files, our own bookkeeping. */
 export function isIgnoredFolderFile(filename: string): boolean {
@@ -39,11 +44,18 @@ export function extractEditedStem(filename: string): string | null {
   return base.slice(0, index);
 }
 
-/** The stem with any trailing Adobe derivative tokens removed — the likely original basename. */
+/**
+ * The working basename a returned file was probably made from: its stem up to the
+ * export code, or else with any trailing Adobe derivative tokens removed.
+ */
 export function inferOriginalBasename(filename: string): string | null {
   const stem = extractEditedStem(filename);
   if (stem == null) {
     return null;
+  }
+  const coded = codedPrefix(stem);
+  if (coded) {
+    return coded;
   }
   const stripped = stem.replace(TRAILING_ADOBE_TOKENS, '');
   return stripped.length > 0 ? stripped : stem;
@@ -55,13 +67,26 @@ export type FilenameMatch =
   | { kind: 'matched'; entry: ManifestEntry }
   | { kind: 'ambiguous'; candidates: ManifestEntry[] };
 
+/** The name returned edits are matched against; older entries recorded only the original. */
+function workingBasename(entry: ManifestEntry): string {
+  return entry.exportedFilename ? basenameWithoutExt(entry.exportedFilename) : entry.originalBasename;
+}
+
 function entryMatchesStem(entry: ManifestEntry, stemLower: string): boolean {
-  const originalLower = entry.originalBasename.toLowerCase();
-  if (originalLower.length === 0 || !stemLower.startsWith(originalLower)) {
+  const nameLower = workingBasename(entry).toLowerCase();
+  if (nameLower.length === 0 || !stemLower.startsWith(nameLower)) {
     return false;
   }
-  const remainder = stemLower.slice(originalLower.length);
-  return remainder.length === 0 || ADOBE_TOKENS.test(remainder);
+  const remainder = stemLower.slice(nameLower.length);
+  if (remainder.length === 0 || ADOBE_TOKENS.test(remainder)) {
+    return true;
+  }
+  return (
+    endsWithExportCode(nameLower) &&
+    remainder.startsWith('-') &&
+    !remainder.includes(EDITED_MARKER) &&
+    !remainder.includes('__tdg')
+  );
 }
 
 export function matchEditedFilename(filename: string, entries: ManifestEntry[]): FilenameMatch {

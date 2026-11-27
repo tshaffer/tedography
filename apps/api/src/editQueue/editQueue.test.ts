@@ -6,9 +6,17 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { matchEditedFilename, inferOriginalBasename } from './editedFilenameMatch.js';
 import { resolveEditFolders } from './editFolders.js';
-import { exportOneAsset, type ExportContext } from './exportService.js';
+import {
+  entriesMissingFromManifest,
+  exportCodes,
+  exportRootName,
+  nameKeyOf,
+  type ExportNameRecord,
+  type ExportNameStore,
+} from './exportNames.js';
+import { exportOneAsset, type ExportContext, type ExportOutcome } from './exportService.js';
 import { DestinationExistsError, placeEditedFile } from './importPlacement.js';
-import { mergeIntoManifest, readManifest, type ManifestEntry } from './manifest.js';
+import { mergeIntoManifest, readManifest, readManifestState, type ManifestEntry } from './manifest.js';
 import { clearReturnedFiles, deleteReturnFile, listClearableReturnFiles, scanReturnFolder, UnsafeDeleteError } from './returnFiles.js';
 
 const sha = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -23,6 +31,33 @@ function entry(id: string, filename: string, extra: Partial<ManifestEntry> = {})
     ...extra,
   };
 }
+
+/** In-memory stand-in for the database records, with the same uniqueness rules. */
+function memoryNames(initial: ExportNameRecord[] = []): ExportNameStore & { records: Map<string, ExportNameRecord> } {
+  const records = new Map(initial.map((r) => [r.assetId, { ...r }]));
+  return {
+    records,
+    find: async (assetId) => records.get(assetId) ?? null,
+    claim: async (record) => {
+      const existing = records.get(record.assetId);
+      if (existing) return existing;
+      const coded = /__tdg[0-9a-f]{8,}$/i.test(nameKeyOf(record.exportedFilename));
+      const taken = [...records.values()].some((r) => nameKeyOf(r.exportedFilename) === nameKeyOf(record.exportedFilename));
+      if (coded && taken) return null;
+      records.set(record.assetId, { ...record });
+      return records.get(record.assetId)!;
+    },
+    markExported: async (assetId) => {
+      const record = records.get(assetId);
+      if (record) record.exported = true;
+    },
+  };
+}
+
+// Asset ids shaped like the library's (UUIDs), so their codes are predictable.
+const ID_A = 'aaaaaaaa-1111-4111-8111-111111111111';
+const ID_B = 'bbbbbbbb-2222-4222-8222-222222222222';
+const ID_C = 'cccccccc-3333-4333-8333-333333333333';
 
 let root: string;
 let editPath: string;
@@ -142,23 +177,28 @@ describe('folder configuration', () => {
 });
 
 describe('export (tests 1, 4, 5, 6)', () => {
-  async function ctx(entries: ManifestEntry[] = [], force = false): Promise<ExportContext> {
-    return { exportPath: activeEdits, manifestEntries: entries, force, hashFile };
+  async function ctx(entries: ManifestEntry[] = [], force = false, names = memoryNames()): Promise<ExportContext> {
+    return { exportPath: activeEdits, manifestEntries: entries, names, force, hashFile };
   }
-  async function makeOriginal(name: string, content: string): Promise<string> {
-    const dir = path.join(root, 'Media');
+  async function makeOriginal(name: string, content: string, folder = 'Media'): Promise<string> {
+    const dir = path.join(root, folder);
     await fs.mkdir(dir, { recursive: true });
     const p = path.join(dir, name);
     await fs.writeFile(p, content);
     return p;
   }
 
-  it('copies a new original only into the export folder and leaves the source unchanged', async () => {
+  it('copies a new original under a coded name, only into the export folder, leaving the source unchanged', async () => {
     const src = await makeOriginal('IMG_5345.HEIC', 'original');
-    const out = await exportOneAsset({ assetId: 'a', filename: 'IMG_5345.HEIC', sourcePath: src, contentHash: sha('original'), note: 'n' }, await ctx());
+    const names = memoryNames();
+    const out = await exportOneAsset({ assetId: ID_A, filename: 'IMG_5345.HEIC', sourcePath: src, contentHash: sha('original'), note: 'n' }, await ctx([], false, names));
     assert.equal(out.result.status, 'exported');
-    assert.equal(out.manifestEntry?.exportedFilename, 'IMG_5345.HEIC');
-    assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_5345.HEIC'), 'utf-8'), 'original');
+    assert.equal(out.result.exportedFilename, 'IMG_5345__tdgaaaaaaaa.HEIC');
+    assert.equal(out.manifestEntry?.exportedFilename, 'IMG_5345__tdgaaaaaaaa.HEIC');
+    assert.equal(out.manifestEntry?.originalFilename, 'IMG_5345.HEIC');
+    assert.equal(names.records.get(ID_A)?.exported, true);
+    assert.deepEqual(await fs.readdir(activeEdits), ['IMG_5345__tdgaaaaaaaa.HEIC']);
+    assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_5345__tdgaaaaaaaa.HEIC'), 'utf-8'), 'original');
     assert.equal(await fs.readFile(src, 'utf-8'), 'original');
     assert.deepEqual(await fs.readdir(editPath).then((n) => n.sort()), ['Active Edits', 'Completed Edits', 'Exported TIFFs']);
   });
@@ -174,37 +214,120 @@ describe('export (tests 1, 4, 5, 6)', () => {
     assert.equal(out.manifestEntry?.exportedAt, '2026-01-01T00:00:00.000Z');
     assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_5345.HEIC'), 'utf-8'), 'original+lightroom-metadata');
     assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_5345.acr'), 'utf-8'), 'sidecar');
+    assert.deepEqual((await fs.readdir(activeEdits)).sort(), ['IMG_5345.HEIC', 'IMG_5345.acr']);
   });
 
-  it('recognizes an untouched copy by content hash even with no manifest entry', async () => {
+  it('keeps the plain name of an untouched copy made before names were recorded', async () => {
     const src = await makeOriginal('IMG_1.JPG', 'bytes');
     await fs.writeFile(path.join(activeEdits, 'IMG_1.JPG'), 'bytes');
-    const out = await exportOneAsset({ assetId: 'a', filename: 'IMG_1.JPG', sourcePath: src, contentHash: sha('bytes'), note: '' }, await ctx());
+    const names = memoryNames();
+    const out = await exportOneAsset({ assetId: 'a', filename: 'IMG_1.JPG', sourcePath: src, contentHash: sha('bytes'), note: '' }, await ctx([], false, names));
     assert.equal(out.result.status, 'alreadyExported');
+    assert.equal(names.records.get('a')?.exportedFilename, 'IMG_1.JPG');
   });
 
-  it('reports a conflict for a different asset with the same filename (test 6)', async () => {
+  it('gives photos that share a filename distinct names, and tells their edits apart (test 6)', async () => {
     const first = await makeOriginal('IMG_0001.JPG', 'first');
-    const second = path.join(root, 'Other');
-    await fs.mkdir(second);
-    const secondPath = path.join(second, 'IMG_0001.JPG');
-    await fs.writeFile(secondPath, 'second');
-
-    const a = await exportOneAsset({ assetId: 'a', filename: 'IMG_0001.JPG', sourcePath: first, contentHash: sha('first'), note: '' }, await ctx());
-    assert.equal(a.result.status, 'exported');
+    const second = await makeOriginal('IMG_0001.JPG', 'second', 'Other');
+    const names = memoryNames();
+    const a = await exportOneAsset({ assetId: ID_A, filename: 'IMG_0001.JPG', sourcePath: first, contentHash: sha('first'), note: '' }, await ctx([], false, names));
     const b = await exportOneAsset(
-      { assetId: 'b', filename: 'IMG_0001.JPG', sourcePath: secondPath, contentHash: sha('second'), note: '' },
-      await ctx([a.manifestEntry!])
+      { assetId: ID_B, filename: 'IMG_0001.JPG', sourcePath: second, contentHash: sha('second'), note: '' },
+      await ctx([a.manifestEntry!], false, names)
     );
-    assert.equal(b.result.status, 'conflict');
-    assert.equal(b.manifestEntry, null);
+    assert.equal(a.result.status, 'exported');
+    assert.equal(b.result.status, 'exported');
+    assert.equal(await fs.readFile(path.join(activeEdits, b.result.exportedFilename!), 'utf-8'), 'second');
+    const entries = [a.manifestEntry!, b.manifestEntry!];
+    for (const [out, id] of [[a, ID_A], [b, ID_B]] as const) {
+      const returned = out.result.exportedFilename!.replace('.JPG', '_edited.tif');
+      const match = matchEditedFilename(returned, entries);
+      assert.equal(match.kind === 'matched' && match.entry.sourceAssetId, id, returned);
+    }
+    // The shared library name no longer identifies either of them.
+    assert.equal(matchEditedFilename('IMG_0001_edited.tif', entries).kind, 'unmatched');
+  });
+
+  it('gives a twin its own name when an earlier export holds the plain one', async () => {
+    const src = await makeOriginal('IMG_0001.JPG', 'second');
+    await fs.writeFile(path.join(activeEdits, 'IMG_0001.JPG'), 'first');
+    const known = [entry('a', 'IMG_0001.JPG', { exportedFilename: 'IMG_0001.JPG' })];
+    const out = await exportOneAsset({ assetId: ID_B, filename: 'IMG_0001.JPG', sourcePath: src, contentHash: sha('second'), note: '' }, await ctx(known));
+    assert.equal(out.result.status, 'exported');
+    assert.equal(out.result.exportedFilename, 'IMG_0001__tdgbbbbbbbb.JPG');
     assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_0001.JPG'), 'utf-8'), 'first');
   });
 
-  it('treats an unknown, different file as a conflict and case-variant names as the same file', async () => {
+  it('lengthens the code when another asset already holds the name', async () => {
+    const twinId = 'aaaaaaaa-9999-4999-8999-999999999999';
+    const src = await makeOriginal('IMG_7.JPG', 'one');
+    const other = await makeOriginal('IMG_7.JPG', 'two', 'Other');
+    const names = memoryNames();
+    const a = await exportOneAsset({ assetId: ID_A, filename: 'IMG_7.JPG', sourcePath: src, contentHash: sha('one'), note: '' }, await ctx([], false, names));
+    // Detected from the database records alone, with an empty manifest.
+    const b = await exportOneAsset({ assetId: twinId, filename: 'IMG_7.JPG', sourcePath: other, contentHash: sha('two'), note: '' }, await ctx([], false, names));
+    assert.equal(a.result.exportedFilename, 'IMG_7__tdgaaaaaaaa.JPG');
+    assert.equal(b.result.exportedFilename, 'IMG_7__tdgaaaaaaaa9999.JPG');
+  });
+
+  it('reuses the recorded name, and recreates it only after confirmation', async () => {
+    const src = await makeOriginal('IMG_8.HEIC', 'x');
+    const names = memoryNames();
+    const input = { assetId: ID_A, filename: 'IMG_8.HEIC', sourcePath: src, contentHash: sha('x'), note: '' };
+    const first = await exportOneAsset(input, await ctx([], false, names));
+    const name = first.result.exportedFilename!;
+    await fs.rename(path.join(activeEdits, name), path.join(completedEdits, name));
+
+    // Even with the manifest lost, the record remembers it.
+    const blocked = await exportOneAsset(input, await ctx([], false, names));
+    assert.equal(blocked.result.status, 'previouslyExported');
+    assert.equal(blocked.result.exportedFilename, name);
+    assert.deepEqual(await fs.readdir(activeEdits), []);
+
+    const forced = await exportOneAsset(input, await ctx([], true, names));
+    assert.equal(forced.result.status, 'exported');
+    assert.equal(forced.result.exportedFilename, name);
+  });
+
+  it('keeps a name the manifest recorded before codes existed', async () => {
+    const src = await makeOriginal('IMG_5237.HEIC', 'x');
+    const names = memoryNames();
+    const known = [entry('a', 'IMG_5237.HEIC', { exportedFilename: 'IMG_5237.heic' })];
+    const input = { assetId: 'a', filename: 'IMG_5237.HEIC', sourcePath: src, contentHash: sha('x'), note: '' };
+    const blocked = await exportOneAsset(input, await ctx(known, false, names));
+    assert.equal(blocked.result.status, 'previouslyExported');
+    const forced = await exportOneAsset(input, await ctx(known, true, names));
+    assert.equal(forced.result.exportedFilename, 'IMG_5237.heic');
+    assert.deepEqual(await fs.readdir(activeEdits), ['IMG_5237.heic']);
+  });
+
+  it('does not treat a reserved but never-created name as already exported', async () => {
+    const src = await makeOriginal('IMG_9.JPG', 'x');
+    const names = memoryNames();
+    const missing = await exportOneAsset(
+      { assetId: ID_A, filename: 'IMG_9.JPG', sourcePath: path.join(root, 'gone.jpg'), contentHash: null, note: '' },
+      await ctx([], false, names)
+    );
+    assert.equal(missing.result.status, 'failed');
+    assert.equal(names.records.get(ID_A)?.exported, false);
+    const retried = await exportOneAsset({ assetId: ID_A, filename: 'IMG_9.JPG', sourcePath: src, contentHash: sha('x'), note: '' }, await ctx([], false, names));
+    assert.equal(retried.result.status, 'exported');
+  });
+
+  it('reports a conflict for an unknown file under a coded name that was never created', async () => {
+    const src = await makeOriginal('IMG_9.JPG', 'mine');
+    await fs.writeFile(path.join(activeEdits, 'IMG_9__tdgaaaaaaaa.JPG'), 'something else');
+    const out = await exportOneAsset({ assetId: ID_A, filename: 'IMG_9.JPG', sourcePath: src, contentHash: sha('mine'), note: '' }, await ctx());
+    assert.equal(out.result.status, 'conflict');
+    assert.equal(out.manifestEntry, null);
+    assert.equal(await fs.readFile(path.join(activeEdits, 'IMG_9__tdgaaaaaaaa.JPG'), 'utf-8'), 'something else');
+  });
+
+  it('treats an unknown, different file under the plain name as a conflict, whatever its case', async () => {
     const src = await makeOriginal('IMG_2.JPG', 'mine');
     await fs.writeFile(path.join(activeEdits, 'img_2.jpg'), 'something else');
-    const out = await exportOneAsset({ assetId: 'a', filename: 'IMG_2.JPG', sourcePath: src, contentHash: sha('mine'), note: '' }, await ctx());
+    const out = await exportOneAsset({ assetId: ID_A, filename: 'IMG_2.JPG', sourcePath: src, contentHash: sha('mine'), note: '' }, await ctx());
+    // On a case-sensitive volume the two names are different files.
     assert.ok(['conflict', 'exported'].includes(out.result.status));
     assert.equal(await fs.readFile(path.join(activeEdits, 'img_2.jpg'), 'utf-8'), 'something else');
   });
@@ -268,9 +391,21 @@ describe('export (tests 1, 4, 5, 6)', () => {
     const other = [entry('b', 'IMG_2579.jpg', { exportedFilename: 'IMG_2579.jpg' })];
     for (const existing of [jpeg('pixels'), jpeg('pixels', lightroomMetadata)]) {
       const out = await exportJpegOverExisting(existing, other);
-      assert.equal(out.result.status, 'conflict');
-      assert.equal(out.manifestEntry, null);
+      // The other photo's file is left alone; this one gets a name of its own.
+      assert.equal(out.result.status, 'exported');
+      assert.match(out.result.exportedFilename!, /^IMG_2579__tdg[0-9a-f]{8}\.jpg$/);
+      await fs.rm(path.join(activeEdits, out.result.exportedFilename!));
     }
+  });
+
+  it('reports a conflict when its own recorded name is listed for another asset too', async () => {
+    const both = [
+      entry('a', 'IMG_2579.jpg', { exportedFilename: 'IMG_2579.jpg' }),
+      entry('b', 'IMG_2579.jpg', { exportedFilename: 'IMG_2579.jpg' }),
+    ];
+    const out = await exportJpegOverExisting(jpeg('pixels'), both);
+    assert.equal(out.result.status, 'conflict');
+    assert.equal(out.manifestEntry, null);
   });
 
   it('asks before re-exporting when the earlier working copy is gone (spec 7.3)', async () => {
@@ -290,6 +425,111 @@ describe('export (tests 1, 4, 5, 6)', () => {
   });
 });
 
+describe('export names', () => {
+  it('builds the readable part of a new name without stacking codes or _edited', () => {
+    for (const [filename, rootName] of [
+      ['IMG_3161.jpg', 'IMG_3161'],
+      ['IMG_3161__tdgaaaaaaaa_edited.tif', 'IMG_3161'],
+      ['IMG_3161__tdgaaaaaaaa-Edit-2_edited_v2.tif', 'IMG_3161'],
+      ['IMG_3161__tdgaaaaaaaa-restoration_edited.tif', 'IMG_3161'],
+      ['IMG_4516_edited_ai.png', 'IMG_4516'],
+      ['IMG_2579-Edit_edited.tif', 'IMG_2579'],
+      ['Sunset-HDR.jpg', 'Sunset-HDR'],
+      ['76697144598__30CC69A5-D9A9.heic', '76697144598__30CC69A5-D9A9'],
+      ['AGF00002-edited(1).jpg', 'AGF00002-edited(1)'],
+    ]) {
+      assert.equal(exportRootName(filename!), rootName, filename);
+    }
+    assert.equal(exportCodes(ID_A)[0], 'aaaaaaaa');
+    assert.match(exportCodes('not-a-uuid')[0]!, /^[0-9a-f]{8}$/);
+  });
+
+  const coded = entry(ID_A, 'IMG_3161.jpg', { exportedFilename: 'IMG_3161__tdgaaaaaaaa.jpg' });
+
+  it('accepts descriptions after a coded name only', () => {
+    const matched = (name: string, list: ManifestEntry[]): boolean => matchEditedFilename(name, list).kind === 'matched';
+    for (const name of [
+      'IMG_3161__tdgaaaaaaaa_edited.tif',
+      'IMG_3161__tdgaaaaaaaa-Edit_edited_v2.tif',
+      'IMG_3161__tdgaaaaaaaa-restoration_edited.tif',
+      'IMG_3161__tdgaaaaaaaa-Edit-color fix_edited.tif',
+      'img_3161__TDGAAAAAAAA-Restoration_edited.TIF',
+    ]) {
+      assert.ok(matched(name, [coded]), name);
+    }
+    for (const name of [
+      'IMG_3161_edited.tif',
+      'IMG_3161__tdgaaaaaaaarestoration_edited.tif',
+      'IMG_3161__tdgaaaaaaaa restoration_edited.tif',
+      'IMG_3161__tdgaaaaaaaa-x_edited_ai_edited.tif',
+      'IMG_3161__tdgaaaaaaaa-x__tdgbbbbbbbb_edited.tif',
+      'IMG_3161__tdgaaaaaaaabbbb_edited.tif',
+    ]) {
+      assert.ok(!matched(name, [coded]), name);
+    }
+    assert.ok(!matched('IMG_3161-restoration_edited.tif', [entry('a', 'IMG_3161.jpg')]));
+  });
+
+  it('infers the coded name for orphan warnings', () => {
+    assert.equal(inferOriginalBasename('IMG_3161__tdgaaaaaaaa-restoration_edited.tif'), 'IMG_3161__tdgaaaaaaaa');
+  });
+
+  async function exportAs(assetId: string, filename: string, names: ExportNameStore, entries: ManifestEntry[]): Promise<ExportOutcome> {
+    const src = path.join(root, `source-${assetId}`);
+    await fs.writeFile(src, assetId);
+    return exportOneAsset(
+      { assetId, filename, sourcePath: src, contentHash: sha(assetId), note: '' },
+      { exportPath: activeEdits, manifestEntries: entries, names, force: false, hashFile }
+    );
+  }
+  const sourceOf = (name: string, entries: ManifestEntry[]): string | null => {
+    const m = matchEditedFilename(name, entries);
+    return m.kind === 'matched' ? m.entry.sourceAssetId : null;
+  };
+
+  it('scenario A: further versions from one project belong to the original', async () => {
+    const names = memoryNames();
+    const a = await exportAs(ID_A, 'IMG_3161.jpg', names, []);
+    const entries = [a.manifestEntry!];
+    for (const name of ['IMG_3161__tdgaaaaaaaa_edited.tif', 'IMG_3161__tdgaaaaaaaa-Edit_edited_v2.tif']) {
+      assert.equal(sourceOf(name, entries), ID_A, name);
+    }
+  });
+
+  it('scenario B: an edit queued again belongs to itself, not to its ancestor', async () => {
+    const names = memoryNames();
+    const a = await exportAs(ID_A, 'IMG_3161.jpg', names, []);
+    // The imported TIFF becomes asset C, still carrying A's code in its filename.
+    const c = await exportAs(ID_C, 'IMG_3161__tdgaaaaaaaa_edited.tif', names, [a.manifestEntry!]);
+    assert.equal(c.result.exportedFilename, 'IMG_3161__tdgcccccccc.tif');
+    const entries = [a.manifestEntry!, c.manifestEntry!];
+    assert.equal(sourceOf('IMG_3161__tdgcccccccc_edited.tif', entries), ID_C);
+    assert.equal(sourceOf('IMG_3161__tdgcccccccc-Edit_edited.tif', entries), ID_C);
+    assert.equal(sourceOf('IMG_3161__tdgaaaaaaaa_edited.tif', entries), ID_A);
+  });
+
+  it('leaves ambiguous older names unmatched to either photo', () => {
+    const old = [entry('a', 'IMG_0001.JPG'), entry('b', 'IMG_0001.HEIC')];
+    assert.equal(matchEditedFilename('IMG_0001_edited.tif', old).kind, 'ambiguous');
+  });
+
+  it('rebuilds a lost manifest from the records, without replacing listed entries', async () => {
+    const names = memoryNames();
+    const a = await exportAs(ID_A, 'IMG_3161.jpg', names, []);
+    await names.claim({ assetId: ID_B, exportedFilename: 'IMG_2__tdgbbbbbbbb.jpg', originalFilename: 'IMG_2.jpg', exported: false, createdAt: '' });
+
+    assert.equal((await readManifestState(editPath)).status, 'missing');
+    const restored = entriesMissingFromManifest([...names.records.values()], [], () => 'queued note');
+    // The reserved name that never got a file is not restored.
+    assert.deepEqual(restored.map((e) => e.sourceAssetId), [ID_A]);
+    assert.equal(restored[0]?.note, 'queued note');
+    await mergeIntoManifest(editPath, restored);
+    const manifest = await readManifest(editPath);
+    assert.equal(sourceOf('IMG_3161__tdgaaaaaaaa_edited.tif', manifest!.entries), ID_A);
+    assert.deepEqual(entriesMissingFromManifest([...names.records.values()], [a.manifestEntry!]), []);
+  });
+});
+
 describe('manifest (test 4)', () => {
   it('merges batches and keeps earlier entries', async () => {
     await mergeIntoManifest(editPath, [entry('a', 'IMG_1.JPG')]);
@@ -303,6 +543,7 @@ describe('manifest (test 4)', () => {
 
   it('refuses to overwrite an unreadable manifest', async () => {
     await fs.writeFile(path.join(editPath, 'manifest.json'), '{ not json');
+    assert.equal((await readManifestState(editPath)).status, 'unreadable');
     await assert.rejects(mergeIntoManifest(editPath, [entry('a', 'IMG_1.JPG')]));
     assert.equal(await fs.readFile(path.join(editPath, 'manifest.json'), 'utf-8'), '{ not json');
   });

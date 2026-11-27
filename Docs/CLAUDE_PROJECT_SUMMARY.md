@@ -64,6 +64,7 @@ MongoDB via Mongoose. Key collections:
 - `faceDetections`
 - `faceMatchReviews`
 - `personFaceExamples`
+- `editExportNames` — one permanent record per photo exported through the Edit Queue, holding its working filename (`<root>__tdg<code>.<ext>` for new exports; see `apps/api/src/editQueue/exportNames.ts`). Never deleted; `manifest.json` is rebuilt from it if missing
 
 ### Media Storage
 

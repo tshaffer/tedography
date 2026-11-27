@@ -10,7 +10,7 @@ import type {
   EditFolderInfo,
 } from '../../api/editQueueApi.js';
 import { getThumbnailMediaUrl } from '../../utilities/mediaUrls';
-import { nextEditExportHint } from '../../utilities/editQueueNaming';
+import { shouldShowWorkingFilename } from '../../utilities/editQueueNaming';
 
 interface EditQueueDialogProps {
   open: boolean;
@@ -704,12 +704,12 @@ export function EditQueueDialog({
                       </span>
                     ) : null}
 
-                    {entry.isExported && nextEditExportHint(entry.filename) ? (
+                    {entry.workingFilename && shouldShowWorkingFilename(entry.filename, entry.workingFilename) ? (
                       <span
-                        style={{ color: '#9ca3af', fontSize: '10px' }}
-                        title="This photo is itself an edited copy. Your next external-tool export must start with this exact filename to be matched back to it on import."
+                        style={{ color: '#6b7280', fontSize: '10px', overflowWrap: 'anywhere', userSelect: 'text' }}
+                        title="The name of this photo's copy in the export folder. A finished edit must start with this name (without the extension), followed by _edited."
                       >
-                        Next export should start with: {nextEditExportHint(entry.filename)}
+                        Working file: {entry.workingFilename}
                       </span>
                     ) : null}
 

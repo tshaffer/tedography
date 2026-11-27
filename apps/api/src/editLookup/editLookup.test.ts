@@ -106,3 +106,27 @@ test('a history entry whose source photo is gone is still found by filename, wit
   assert.equal(r.results[0]!.assetExists, false);
   assert.equal(r.results[0]!.folder, null);
 });
+
+test('finds a photo by its working filename, including one only known from an export', () => {
+  const workingNamesByAssetId = new Map([['a1', 'IMG_5345__tdg0f1023d0.heic'], ['a2', 'IMG_0007__tdgabcdef12.jpg']]);
+  const byName = buildEditLookupResponse({
+    query: 'IMG_0007__tdgabcdef12.tif',
+    queueEntries: [queueEntry('a1')],
+    historyEntries: [],
+    assetsById: assets,
+    workingNamesByAssetId
+  });
+  assert.deepEqual(byName.results.map((r) => r.assetId), ['a2']);
+  assert.equal(byName.results[0]?.workingFilename, 'IMG_0007__tdgabcdef12.jpg');
+  assert.ok(byName.results[0]?.matchedOn.includes('workingFilename'));
+
+  // A folder match alone doesn't pull in a photo that is only known from an export.
+  const byFolder = buildEditLookupResponse({
+    query: 'Yosemite',
+    queueEntries: [],
+    historyEntries: [],
+    assetsById: assets,
+    workingNamesByAssetId
+  });
+  assert.equal(byFolder.results.length, 0);
+});

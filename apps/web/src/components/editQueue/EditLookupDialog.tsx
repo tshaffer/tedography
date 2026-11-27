@@ -86,6 +86,7 @@ const historyLineStyle: CSSProperties = { color: '#374151', overflowWrap: 'anywh
 
 const MATCH_FIELD_LABELS: Record<EditLookupMatchField, string> = {
   filename: 'filename',
+  workingFilename: 'working filename',
   editedFilename: 'edited filename',
   folder: 'folder',
   album: 'album',
@@ -199,20 +200,20 @@ export function EditLookupDialog({ open, onClose, onNavigate }: EditLookupDialog
           />
           <span style={hintStyle}>
             <strong>*</strong> matches any text, <strong>?</strong> matches one character; case doesn&rsquo;t matter and
-            text can match anywhere. Searches the source and edited filenames (a different extension is fine), the
-            photo&rsquo;s folder, its album, and notes.
+            text can match anywhere. Searches the source, working and edited filenames (a different extension is
+            fine), the photo&rsquo;s folder, its album, and notes.
           </span>
         </div>
         <div style={bodyStyle}>
           {error ? <span style={{ ...summaryStyle, color: '#b91c1c' }}>{error}</span> : null}
           {!error && response == null && !loading ? (
-            <span style={summaryStyle}>Type to search the current Edit Queue and the full Edit History.</span>
+            <span style={summaryStyle}>Type to search the current Edit Queue, working filenames and the full Edit History.</span>
           ) : null}
           {!error && response != null ? (
             <span style={summaryStyle}>
               {loading ? 'Searching… ' : ''}
               {response.totalMatches === 0
-                ? 'No photos in the Edit Queue or Edit History match.'
+                ? 'No photos in the Edit Queue, exports or Edit History match.'
                 : `${response.totalMatches} photo${response.totalMatches === 1 ? '' : 's'}${
                     response.truncated ? ` (showing the first ${results.length} — narrow the search)` : ''
                   }`}
@@ -235,6 +236,9 @@ export function EditLookupDialog({ open, onClose, onNavigate }: EditLookupDialog
                   <span style={{ fontSize: '11px', color: '#9ca3af' }}>photo no longer in library</span>
                 )}
               </div>
+              {result.workingFilename && result.workingFilename !== result.filename ? (
+                <div style={pathStyle}>Working file: {result.workingFilename}</div>
+              ) : null}
               {result.folder || result.albumPath ? (
                 <div style={pathStyle}>
                   {result.folder ? <span>Folder: {result.folder}</span> : null}

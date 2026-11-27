@@ -24,6 +24,8 @@ export interface EditLookupInput {
   historyEntries: EditHistoryEntry[];
   // Keyed by asset id; absent for photos that no longer exist.
   assetsById: Map<string, EditLookupAssetInfo>;
+  // Recorded Edit Queue working filenames, keyed by asset id.
+  workingNamesByAssetId?: Map<string, string>;
 }
 
 function compareNatural(a: string, b: string): number {
@@ -49,7 +51,8 @@ export function buildEditLookupResponse(input: EditLookupInput): EditLookupRespo
     historyByAssetId.set(entry.sourceAssetId, list);
   }
 
-  const assetIds = new Set<string>([...queueByAssetId.keys(), ...historyByAssetId.keys()]);
+  const workingNames = input.workingNamesByAssetId ?? new Map<string, string>();
+  const assetIds = new Set<string>([...queueByAssetId.keys(), ...historyByAssetId.keys(), ...workingNames.keys()]);
   const results: EditLookupResult[] = [];
 
   for (const assetId of assetIds) {
@@ -59,7 +62,8 @@ export function buildEditLookupResponse(input: EditLookupInput): EditLookupRespo
       .sort((a, b) => b.processedAt.localeCompare(a.processedAt));
     const asset = input.assetsById.get(assetId) ?? null;
 
-    const filename = asset?.filename ?? history[0]?.sourceFilename ?? assetId;
+    const workingFilename = workingNames.get(assetId) ?? null;
+    const filename = asset?.filename ?? history[0]?.sourceFilename ?? workingFilename ?? assetId;
     const folder = asset?.folder ?? null;
     const albumPath = asset?.albumPath ?? null;
 
@@ -69,6 +73,9 @@ export function buildEditLookupResponse(input: EditLookupInput): EditLookupRespo
     }
     if (history.some((h) => matchesFilename(matchers, h.editedFilename))) {
       matchedOn.add('editedFilename');
+    }
+    if (workingFilename && matchesFilename(matchers, workingFilename)) {
+      matchedOn.add('workingFilename');
     }
     if (folder && matchesText(matchers, folder)) {
       matchedOn.add('folder');
@@ -83,6 +90,11 @@ export function buildEditLookupResponse(input: EditLookupInput): EditLookupRespo
       matchedOn.add('note');
     }
     if (matchedOn.size === 0) {
+      continue;
+    }
+    // A photo known only from an earlier export is listed when a filename matched,
+    // not for sharing a folder or album with the search text.
+    if (!queueEntry && history.length === 0 && !matchedOn.has('filename') && !matchedOn.has('workingFilename')) {
       continue;
     }
 
@@ -101,6 +113,7 @@ export function buildEditLookupResponse(input: EditLookupInput): EditLookupRespo
     results.push({
       assetId,
       filename,
+      workingFilename,
       assetExists: asset != null,
       folder,
       albumId: asset?.albumId ?? null,

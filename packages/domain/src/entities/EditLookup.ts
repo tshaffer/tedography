@@ -1,7 +1,7 @@
 import type { EditType } from '../enums/EditType.js';
 
 // Which part of a photo's record the search text matched.
-export type EditLookupMatchField = 'filename' | 'editedFilename' | 'folder' | 'album' | 'note';
+export type EditLookupMatchField = 'filename' | 'workingFilename' | 'editedFilename' | 'folder' | 'album' | 'note';
 
 export interface EditLookupQueueInfo {
   editType: EditType;
@@ -22,10 +22,13 @@ export interface EditLookupHistoryItem {
   archived: boolean;
 }
 
-// One source photo, with its Edit Queue status and every Edit History entry for it.
+// One source photo, with its Edit Queue status, working filename and every Edit
+// History entry for it.
 export interface EditLookupResult {
   assetId: string;
   filename: string;
+  // Name of its copy in the Edit Queue's export folder; null if never exported.
+  workingFilename: string | null;
   // False when the source photo no longer exists (e.g. it was trashed) — only history remains.
   assetExists: boolean;
   // Folder of the original file inside its storage root (null when the photo is gone).

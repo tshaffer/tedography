@@ -104,6 +104,9 @@ export function ExportQueueResultDialog({
   const attention = (results ?? []).filter((r) => r.status !== 'exported' && r.status !== 'alreadyExported');
   const previously = attention.filter((r) => r.status === 'previouslyExported');
   const hasProblems = attention.length > 0;
+  const renamed = (results ?? []).filter(
+    (r) => (r.status === 'exported' || r.status === 'alreadyExported') && r.exportedFilename && r.exportedFilename !== r.filename
+  );
 
   function handleOverlayClick(): void {
     if (!exporting) onClose();
@@ -127,6 +130,16 @@ export function ExportQueueResultDialog({
             <p style={{ ...messageStyle, color: error ? '#b00020' : hasProblems ? '#92400e' : '#2f6f3e' }}>
               {error ?? notice}
             </p>
+            {renamed.length > 0 ? (
+              <div style={{ marginTop: '10px', overflowY: 'auto', maxHeight: '24vh' }}>
+                <p style={{ ...messageStyle, fontSize: '12px', color: '#374151' }}>Working filenames:</p>
+                {renamed.map((r) => (
+                  <div key={r.assetId} style={{ fontSize: '12px', lineHeight: 1.5, color: '#374151', overflowWrap: 'anywhere' }}>
+                    {r.filename} → <strong>{r.exportedFilename}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {hasProblems ? (
               <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', maxHeight: '40vh' }}>
                 {attention.map((r) => (

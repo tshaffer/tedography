@@ -39,7 +39,18 @@ import { getStorageRootById } from '../import/storageRoots.js';
 import { getMediaSupport } from '../import/supportedMedia.js';
 import { generateJpegThumbnail } from '../import/thumbnailGeneration.js';
 import { resolveEditFolders, type EditFolders } from '../editQueue/editFolders.js';
-import { MANIFEST_FILENAME, NOTES_FILENAME, mergeIntoManifest, readManifest, basenameWithoutExt, type ManifestEntry } from '../editQueue/manifest.js';
+import {
+  MANIFEST_FILENAME,
+  NOTES_FILENAME,
+  basenameWithoutExt,
+  exportedNameOf,
+  mergeIntoManifest,
+  readManifestState,
+  type ManifestEntry,
+  type ManifestState,
+} from '../editQueue/manifest.js';
+import { entriesMissingFromManifest } from '../editQueue/exportNames.js';
+import { exportNameStore, listExportNames, recordManifestNames } from '../repositories/editExportNameRepository.js';
 import { exportOneAsset, type ExportItemResult } from '../editQueue/exportService.js';
 import {
   UnsafeDeleteError,
@@ -48,6 +59,7 @@ import {
   listClearableReturnFiles,
   listReturnFiles,
   scanReturnFolder,
+  type ReturnScanResult,
 } from '../editQueue/returnFiles.js';
 import { placeEditedFile } from '../editQueue/importPlacement.js';
 
@@ -93,6 +105,40 @@ async function requireEditFolders(res: Response): Promise<EditFolders | null> {
   return result.folders;
 }
 
+interface SourceEntries {
+  manifestStatus: ManifestState['status'];
+  // Every known source-to-working-copy link: the manifest's, plus any recorded in
+  // the database that it lacks.
+  entries: ManifestEntry[];
+  // The latter alone, to be written back to the manifest when it is next saved.
+  restored: ManifestEntry[];
+}
+
+/**
+ * Reads the links between working filenames and their source photos. A damaged
+ * manifest yields nothing, so that it gets looked at rather than worked around.
+ */
+async function loadSourceEntries(editPath: string): Promise<SourceEntries> {
+  const manifest = await readManifestState(editPath);
+  if (manifest.status === 'unreadable') {
+    return { manifestStatus: manifest.status, entries: [], restored: [] };
+  }
+  const [records, queue] = await Promise.all([listExportNames(), getQueueEntries()]);
+  const notes = new Map(queue.map((e) => [e.assetId, e.note]));
+  const restored = entriesMissingFromManifest(records, manifest.entries, (assetId) => notes.get(assetId) ?? '');
+  return { manifestStatus: manifest.status, entries: [...manifest.entries, ...restored], restored };
+}
+
+function importBlocker(source: SourceEntries): string | null {
+  if (source.manifestStatus === 'unreadable') {
+    return `${MANIFEST_FILENAME} in the edit folder could not be read. It has been left as it is.`;
+  }
+  if (source.manifestStatus === 'missing' && source.entries.length === 0) {
+    return `${MANIFEST_FILENAME} not found in the edit folder. Run Export first.`;
+  }
+  return null;
+}
+
 type AlbumNodeMap = Map<string, { label: string; parentId: string | null }>;
 
 function buildAlbumPath(albumId: string, nodesById: AlbumNodeMap): string | null {
@@ -119,11 +165,10 @@ editQueueRoutes.get('/', async (_req, res) => {
     const loaded = await loadEditFolders();
     const orphansByBasenameLower = new Map<string, string[]>();
     const ambiguousByAssetId = new Map<string, string[]>();
-    let manifestAssetIds = new Set<string>();
+    let workingNames = new Map<string, string>();
     if (loaded.ok) {
-      const manifest = await readManifest(loaded.folders.editPath);
-      const manifestEntries = manifest?.entries ?? [];
-      manifestAssetIds = new Set(manifestEntries.map((e) => e.sourceAssetId));
+      const { entries: manifestEntries } = await loadSourceEntries(loaded.folders.editPath);
+      workingNames = new Map(manifestEntries.map((e) => [e.sourceAssetId, exportedNameOf(e)]));
       const scan = await scanReturnFolder(loaded.folders.returnPath, manifestEntries);
       for (const orphan of scan.unmatched) {
         if (!orphan.inferredBasename) continue;
@@ -148,10 +193,14 @@ editQueueRoutes.get('/', async (_req, res) => {
         const albumIds = asset?.albumIds ?? [];
         const albumId = albumIds[0] ?? null;
         const albumPath = albumId ? buildAlbumPath(albumId, nodesById) : null;
-        const orphanedEditFilenames = orphansByBasenameLower.get(basenameWithoutExt(filename).toLowerCase()) ?? [];
-        const isExported = manifestAssetIds.has(entry.assetId);
+        const workingFilename = workingNames.get(entry.assetId) ?? null;
+        const orphanKeys = new Set(
+          [filename, ...(workingFilename ? [workingFilename] : [])].map((n) => basenameWithoutExt(n).toLowerCase())
+        );
+        const orphanedEditFilenames = [...orphanKeys].flatMap((key) => orphansByBasenameLower.get(key) ?? []);
+        const isExported = workingFilename != null;
         const ambiguousEditFilenames = ambiguousByAssetId.get(entry.assetId) ?? [];
-        return { ...entry, filename, albumId, albumPath, orphanedEditFilenames, ambiguousEditFilenames, isExported };
+        return { ...entry, filename, workingFilename, albumId, albumPath, orphanedEditFilenames, ambiguousEditFilenames, isExported };
       })
     );
     res.json(withDetails);
@@ -169,15 +218,21 @@ editQueueRoutes.get('/', async (_req, res) => {
 editQueueRoutes.get('/lookup', async (req, res) => {
   const query = typeof req.query.q === 'string' ? req.query.q : '';
   try {
-    const [queueEntries, historyEntries, allNodes] = await Promise.all([
+    const [queueEntries, historyEntries, allNodes, exportNames] = await Promise.all([
       getQueueEntries(),
       getAllHistoryEntries(),
-      listAlbumTreeNodes()
+      listAlbumTreeNodes(),
+      listExportNames()
     ]);
+    const workingNamesByAssetId = new Map(exportNames.map((r) => [r.assetId, r.exportedFilename]));
     const nodesById = new Map(allNodes.map((n) => [n.id, n]));
 
     const assetIds = Array.from(
-      new Set([...queueEntries.map((e) => e.assetId), ...historyEntries.map((e) => e.sourceAssetId)])
+      new Set([
+        ...queueEntries.map((e) => e.assetId),
+        ...historyEntries.map((e) => e.sourceAssetId),
+        ...workingNamesByAssetId.keys()
+      ])
     );
     const assets = await findByIds(assetIds);
     const assetsById = new Map<string, EditLookupAssetInfo>();
@@ -193,7 +248,7 @@ editQueueRoutes.get('/lookup', async (req, res) => {
       });
     }
 
-    res.json(buildEditLookupResponse({ query, queueEntries, historyEntries, assetsById }));
+    res.json(buildEditLookupResponse({ query, queueEntries, historyEntries, assetsById, workingNamesByAssetId }));
   } catch (error) {
     log.error('Failed to search edit queue and history', error);
     res.status(500).json({ error: 'Failed to search edit queue and history' });
@@ -274,16 +329,14 @@ editQueueRoutes.get('/edit-folder', requireFeature('maintenance'), async (_req, 
   if (!folders) return;
 
   try {
-    const manifest = await readManifest(folders.editPath);
-    const entries = manifest?.entries ?? [];
+    const { entries, manifestStatus } = await loadSourceEntries(folders.editPath);
     const scan = await scanReturnFolder(folders.returnPath, entries);
     const returnFiles = await listReturnFiles(folders.returnPath);
     const clearable = await listClearableReturnFiles(folders.returnPath);
 
     let exportedPresentCount = 0;
     for (const entry of entries) {
-      const name = entry.exportedFilename ?? entry.originalFilename;
-      const present = await fs.lstat(path.join(folders.exportPath, name)).then(() => true, () => false);
+      const present = await fs.lstat(path.join(folders.exportPath, exportedNameOf(entry))).then(() => true, () => false);
       if (present) exportedPresentCount++;
     }
 
@@ -292,7 +345,7 @@ editQueueRoutes.get('/edit-folder', requireFeature('maintenance'), async (_req, 
     const unmatchedNames = new Set(scan.unmatched.map((m) => m.filename));
     res.json({
       folders,
-      manifest: { exists: manifest != null, entryCount: entries.length },
+      manifest: { exists: manifestStatus === 'ok', entryCount: entries.length },
       notesExists: await fs.lstat(path.join(folders.editPath, NOTES_FILENAME)).then(() => true, () => false),
       exportedEntryCount: entries.length,
       exportedPresentCount,
@@ -401,6 +454,7 @@ editQueueRoutes.delete('/:assetId', requireFeature('maintenance'), async (req, r
 // Never overwrites. Each photo gets one of: exported / alreadyExported /
 // previouslyExported / conflict / failed (see editQueue/exportService.ts). Only
 // photos with a reliably established working copy are written to the manifest.
+// Working filenames are recorded permanently in the database.
 // `forceAssetIds` lists previouslyExported photos the user chose to export anyway.
 
 editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) => {
@@ -418,7 +472,15 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
     await fs.mkdir(folders.editPath, { recursive: true });
     const entries = await getQueueEntries();
     const entryMap = new Map(entries.map((e) => [e.assetId, e]));
-    const manifestEntries = (await readManifest(folders.editPath))?.entries ?? [];
+    const source = await loadSourceEntries(folders.editPath);
+    if (source.manifestStatus === 'unreadable') {
+      res.status(500).json({
+        error: `${MANIFEST_FILENAME} in the edit folder could not be read. Nothing was exported, and the file has been left as it is.`,
+      });
+      return;
+    }
+    // Names listed only in the manifest are recorded too, so they survive its loss.
+    await recordManifestNames(source.entries);
 
     const results: ExportItemResult[] = [];
     const noteLines: string[] = [];
@@ -427,12 +489,12 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
     for (const assetId of assetIds) {
       const entry = entryMap.get(assetId);
       if (!entry) {
-        results.push({ assetId, filename: assetId, status: 'failed', message: 'Not in the Edit Queue' });
+        results.push({ assetId, filename: assetId, exportedFilename: null, status: 'failed', message: 'Not in the Edit Queue' });
         continue;
       }
       const asset = await findById(assetId);
       if (!asset) {
-        results.push({ assetId, filename: assetId, status: 'failed', message: 'Photo not found in the library' });
+        results.push({ assetId, filename: assetId, exportedFilename: null, status: 'failed', message: 'Photo not found in the library' });
         continue;
       }
 
@@ -441,7 +503,13 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
         sourcePath = resolveOriginalAbsolutePathForAsset(asset);
       } catch (err) {
         log.error(`Failed to resolve original for asset ${assetId}`, err);
-        results.push({ assetId, filename: asset.filename, status: 'failed', message: 'Could not locate the original file' });
+        results.push({
+          assetId,
+          filename: asset.filename,
+          exportedFilename: null,
+          status: 'failed',
+          message: 'Could not locate the original file',
+        });
         noteLines.push(`${asset.filename}: ERROR - could not locate file`);
         continue;
       }
@@ -458,7 +526,8 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
           exportPath: folders.exportPath,
           // Includes this batch's claims, so two same-named photos exported
           // together can't both be tied to one file.
-          manifestEntries: [...manifestEntries, ...newManifestEntries],
+          manifestEntries: [...source.entries, ...newManifestEntries],
+          names: exportNameStore,
           force: forced.has(assetId),
           hashFile: computeSha256ForFile,
         }
@@ -467,10 +536,13 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
       if (outcome.manifestEntry) {
         newManifestEntries.push(outcome.manifestEntry);
       }
+      // notes.txt is read alongside the working files, so it leads with their names.
+      const workingName = outcome.result.exportedFilename;
+      const label = workingName && workingName !== asset.filename ? `${workingName} (${asset.filename})` : asset.filename;
       if (outcome.result.status === 'exported' || outcome.result.status === 'alreadyExported') {
-        noteLines.push(`${asset.filename}: ${entry.note || '(no note)'}`);
+        noteLines.push(`${label}: ${entry.note || '(no note)'}`);
       } else {
-        noteLines.push(`${asset.filename}: NOT EXPORTED (${outcome.result.status})`);
+        noteLines.push(`${label}: NOT EXPORTED (${outcome.result.status})`);
       }
       if (outcome.result.status === 'failed') {
         log.error(`Failed to export asset ${assetId}: ${outcome.result.message}`);
@@ -481,8 +553,9 @@ editQueueRoutes.post('/export', requireFeature('maintenance'), async (req, res) 
 
     // Merge into the existing manifest — never replace it — so edits already
     // produced for photos left out of this batch stay linked to their sources.
-    if (newManifestEntries.length > 0) {
-      await mergeIntoManifest(folders.editPath, newManifestEntries);
+    const toSave = [...source.restored, ...newManifestEntries];
+    if (toSave.length > 0) {
+      await mergeIntoManifest(folders.editPath, toSave);
     }
 
     const countOf = (status: ExportItemResult['status']): number => results.filter((r) => r.status === status).length;
@@ -512,14 +585,14 @@ editQueueRoutes.get('/import/scan', requireFeature('maintenance'), async (_req, 
   const folders = await requireEditFolders(res);
   if (!folders) return;
 
-  const manifest = await readManifest(folders.editPath);
-  if (!manifest) {
-    res.status(400).json({ error: `${MANIFEST_FILENAME} not found in the edit folder. Run Export first.` });
-    return;
-  }
-
   try {
-    const scan = await scanReturnFolder(folders.returnPath, manifest.entries);
+    const source = await loadSourceEntries(folders.editPath);
+    const blocker = importBlocker(source);
+    if (blocker) {
+      res.status(400).json({ error: blocker });
+      return;
+    }
+    const scan = await scanReturnFolder(folders.returnPath, source.entries);
     res.json({
       returnPath: folders.returnPath,
       files: scan.matched.map((m) => ({
@@ -558,12 +631,23 @@ editQueueRoutes.post('/import', requireFeature('maintenance'), async (req, res) 
   }
   const requestedFiles = files as { filename: string; editMethod: 'ai' | 'manual' }[];
 
-  const manifest = await readManifest(folders.editPath);
-  if (!manifest) {
-    res.status(400).json({ error: `${MANIFEST_FILENAME} not found in the edit folder. Run Export first.` });
+  let scanResult: ReturnScanResult;
+  try {
+    const source = await loadSourceEntries(folders.editPath);
+    const blocker = importBlocker(source);
+    if (blocker) {
+      res.status(400).json({ error: blocker });
+      return;
+    }
+    if (source.restored.length > 0) {
+      await mergeIntoManifest(folders.editPath, source.restored);
+    }
+    scanResult = await scanReturnFolder(folders.returnPath, source.entries);
+  } catch (error) {
+    log.error('Failed to prepare import', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to prepare import' });
     return;
   }
-  const scanResult = await scanReturnFolder(folders.returnPath, manifest.entries);
   const candidateByFilename = new Map(scanResult.matched.map((c) => [c.filename, c.entry]));
   const ambiguousFilenames = new Set(scanResult.ambiguous.map((a) => a.filename));
 

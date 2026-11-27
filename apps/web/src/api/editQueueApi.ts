@@ -2,6 +2,8 @@ import type { EditLookupResponse, EditQueueEntry, EditType } from '@tedography/d
 
 export interface EditQueueEntryWithFilename extends EditQueueEntry {
   filename: string;
+  // Name of the working copy Export created; null if not exported.
+  workingFilename: string | null;
   albumId: string | null;
   albumPath: string | null;
   editedAssetId: string | null;
@@ -80,6 +82,7 @@ export type ExportStatus = 'exported' | 'alreadyExported' | 'previouslyExported'
 export interface ExportItemResult {
   assetId: string;
   filename: string;
+  exportedFilename: string | null;
   status: ExportStatus;
   message: string;
 }

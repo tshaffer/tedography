@@ -289,7 +289,7 @@ export function EditHistoryDialog({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        style={{ fontWeight: 500, color: '#1a56db', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit', maxWidth: '200px' }}
+                        style={{ fontWeight: 500, color: '#1a56db', minWidth: 0, overflowWrap: 'anywhere', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit' }}
                         title="Navigate to source photo"
                         onClick={() => { onNavigate(entry.sourceAssetId, entry.albumId); }}
                       >
@@ -299,14 +299,14 @@ export function EditHistoryDialog({
                       {entry.editedAssetId ? (
                         <button
                           type="button"
-                          style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit', maxWidth: '200px' }}
+                          style={{ color: '#374151', minWidth: 0, overflowWrap: 'anywhere', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', fontSize: 'inherit' }}
                           title="Navigate to edited photo"
                           onClick={() => { onNavigate(entry.editedAssetId!, entry.albumId); }}
                         >
                           {entry.editedFilename || '—'}
                         </button>
                       ) : (
-                        <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: '#374151', minWidth: 0, overflowWrap: 'anywhere' }}>
                           {entry.editedFilename || '—'}
                         </span>
                       )}
